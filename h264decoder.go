@@ -138,5 +138,3 @@ func (d *h264Decoder) decode(nalu []byte) (image.Image, error) {
 		},
 	}, nil
 }
-
-
