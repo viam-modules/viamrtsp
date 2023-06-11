@@ -190,6 +190,12 @@ func (rc *rtspCamera) reconnectClient() (err error) {
 		}
 
 		for _, nalu := range au {
+
+			if len(nalu) < 20 {
+				// TODO(ERH): this is probably wrong, but fixes a spam issue with "no frame!"
+				continue
+			}
+
 			// convert NALUs into RGBA frames
 			lastImage, err := rc.rawDecoder.decode(nalu)
 
