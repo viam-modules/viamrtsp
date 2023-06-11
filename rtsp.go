@@ -11,8 +11,11 @@ import (
 
 	"github.com/bluenviron/gortsplib/v3"
 	"github.com/bluenviron/gortsplib/v3/pkg/base"
+	"github.com/bluenviron/gortsplib/v3/pkg/formats"
+	"github.com/bluenviron/gortsplib/v3/pkg/formats/rtph264"
 	"github.com/bluenviron/gortsplib/v3/pkg/liberrors"
 	"github.com/bluenviron/gortsplib/v3/pkg/url"
+
 	"github.com/edaniels/golog"
 	"github.com/edaniels/gostream"
 	"github.com/pion/rtp"
@@ -25,10 +28,10 @@ import (
 	"go.viam.com/rdk/resource"
 )
 
-var ModelH265 = resource.DefaultModelFamily.WithModel("rtsp-h265")
+var ModelH264 = resource.DefaultModelFamily.WithModel("rtsp-h264")
 
 func init() {
-	resource.RegisterComponent(camera.API, ModelH265, resource.Registration[camera.Camera, *rtsp.Config]{
+	resource.RegisterComponent(camera.API, ModelH264, resource.Registration[camera.Camera, *rtsp.Config]{
 		Constructor: func(ctx context.Context, _ resource.Dependencies, conf resource.Config, logger golog.Logger) (camera.Camera, error) {
 			newConf, err := resource.NativeConfig[*rtsp.Config](conf)
 			if err != nil {
@@ -67,30 +70,27 @@ func (rc *rtspCamera) Close(ctx context.Context) error {
 func (rc *rtspCamera) clientReconnectBackgroundWorker() {
 	rc.activeBackgroundWorkers.Add(1)
 	goutils.ManagedGo(func() {
-		for {
-			if ok := goutils.SelectContextOrWait(rc.cancelCtx, 5*time.Second); ok {
-				// use an OPTIONS request to see if the server is still responding to requests
-				res, err := rc.client.Options(rc.u)
-				badState := false
-				if err != nil && (errors.Is(err, liberrors.ErrClientTerminated{}) ||
-					errors.Is(err, io.EOF) ||
-					errors.Is(err, syscall.EPIPE) ||
-					errors.Is(err, syscall.ECONNREFUSED)) {
-					rc.logger.Warnw("The rtsp client encountered an error, trying to reconnect", "url", rc.u, "error", err)
-					badState = true
-				} else if res != nil && res.StatusCode != base.StatusOK {
-					rc.logger.Warnw("The rtsp server responded with non-OK status", "url", rc.u, "status code", res.StatusCode)
-					badState = true
+		for goutils.SelectContextOrWait(rc.cancelCtx, 5*time.Second) {
+			// use an OPTIONS request to see if the server is still responding to requests
+			res, err := rc.client.Options(rc.u)
+			badState := false
+			if err != nil && (errors.Is(err, liberrors.ErrClientTerminated{}) ||
+				errors.Is(err, io.EOF) ||
+				errors.Is(err, syscall.EPIPE) ||
+				errors.Is(err, syscall.ECONNREFUSED)) {
+				rc.logger.Warnw("The rtsp client encountered an error, trying to reconnect", "url", rc.u, "error", err)
+				badState = true
+			} else if res != nil && res.StatusCode != base.StatusOK {
+				rc.logger.Warnw("The rtsp server responded with non-OK status", "url", rc.u, "status code", res.StatusCode)
+				badState = true
+			}
+			
+			if badState {
+				if err = rc.reconnectClient(); err != nil {
+					rc.logger.Warnw("cannot reconnect to rtsp server", "error", err)
+				} else {
+					rc.logger.Infow("reconnected to rtsp server", "url", rc.u)
 				}
-				if badState {
-					if err = rc.reconnectClient(); err != nil {
-						rc.logger.Warnw("cannot reconnect to rtsp server", "error", err)
-					} else {
-						rc.logger.Infow("reconnected to rtsp server", "url", rc.u)
-					}
-				}
-			} else {
-				return
 			}
 		}
 	}, rc.activeBackgroundWorkers.Done)
@@ -98,6 +98,8 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker() {
 
 // reconnectClient reconnects the RTSP client to the streaming server by closing the old one and starting a new one.
 func (rc *rtspCamera) reconnectClient() (err error) {
+	rc.logger.Warnf("reconnectClient called")
+	
 	if rc == nil {
 		return errors.New("rtspCamera is nil")
 	}
@@ -123,41 +125,78 @@ func (rc *rtspCamera) reconnectClient() (err error) {
 		return err
 	}
 
-	format, decoder, err := h265Decoding()
-	if err != nil {
-		return err
-	}
-	
 	tracks, baseURL, _, err := rc.client.Describe(rc.u)
 	if err != nil {
 		return err
 	}
 	
+	// find the H264 media and format
+	var format *formats.H264
 	track := tracks.FindFormat(&format)
 	if track == nil {
 		rc.logger.Warnf("tracks available")
 		for _, x := range(tracks) {
 			rc.logger.Warnf("\t %v", x)
 		}
-		return errors.New("MJPEG track not found")
+		return errors.New("h264 track not found")
 	}
+
 	_, err = rc.client.Setup(track, baseURL, 0, 0)
 	if err != nil {
 		return err
 	}
+	
+	// setup RTP/H264 -> H264 decoder
+	rtpDec, err := format.CreateDecoder2()
+	if err != nil {
+		return err
+	}
+
+	// setup H264 -> raw frames decoder
+	h264RawDec, err := newH264Decoder()
+	if err != nil {
+		return err
+	}
+	//defer h264RawDec.close()
+
+	// if SPS and PPS are present into the SDP, send them to the decoder
+	if format.SPS != nil {
+		h264RawDec.decode(format.SPS)
+	}
+	if format.PPS != nil {
+		h264RawDec.decode(format.PPS)
+	}
+	
+
 	// On packet retreival, turn it into an image, and store it in shared memory
 	rc.client.OnPacketRTP(track, format, func(pkt *rtp.Packet) {
-		img, err := decoder(pkt)
+		// extract access units from RTP packets
+		au, _, err := rtpDec.Decode(pkt)
 		if err != nil {
+			if err != rtph264.ErrNonStartingPacketAndNoPrevious && err != rtph264.ErrMorePacketsNeeded {
+				rc.logger.Warnf("ERR: %v", err)
+			}
 			return
 		}
-		if img == nil {
-			return
+		
+		var lastImage image.Image
+		for _, nalu := range au {
+			// convert NALUs into RGBA frames
+			lastImage, err = h264RawDec.decode(nalu)
+			
+			if err != nil {
+				rc.logger.Warnf("ERR: %v", err)
+				return
+			}
+
 		}
-		rc.latestFrame.Store(&img)
-		if !rc.gotFirstFrameOnce {
-			rc.gotFirstFrameOnce = true
-			close(rc.gotFirstFrame)
+
+		if lastImage != nil {
+			rc.latestFrame.Store(&lastImage)
+			if !rc.gotFirstFrameOnce {
+				rc.gotFirstFrameOnce = true
+				close(rc.gotFirstFrame)
+			}
 		}
 	})
 	_, err = rc.client.Play(nil)
@@ -168,8 +207,6 @@ func (rc *rtspCamera) reconnectClient() (err error) {
 	return nil
 }
 
-// NewRTSPCamera creates a camera client using RTSP given the server URL.
-// Right now, only supports servers that have MJPEG video tracks.
 func NewRTSPCamera(ctx context.Context, name resource.Name, conf *rtsp.Config, logger golog.Logger) (camera.Camera, error) {
 	u, err := url.Parse(conf.Address)
 	if err != nil {
@@ -187,6 +224,7 @@ func NewRTSPCamera(ctx context.Context, name resource.Name, conf *rtsp.Config, l
 	}
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	reader := gostream.VideoReaderFunc(func(ctx context.Context) (image.Image, func(), error) {
+		logger.Warnf("hi")
 		select { // First select block always ensures the cancellations are listened to.
 		case <-cancelCtx.Done():
 			return nil, nil, cancelCtx.Err()
