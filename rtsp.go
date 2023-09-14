@@ -71,22 +71,27 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker() {
 	rc.activeBackgroundWorkers.Add(1)
 	goutils.ManagedGo(func() {
 		for goutils.SelectContextOrWait(rc.cancelCtx, 5*time.Second) {
-			// use an OPTIONS request to see if the server is still responding to requests
-			res, err := rc.client.Options(rc.u)
 			badState := false
-			if err != nil && (errors.Is(err, liberrors.ErrClientTerminated{}) ||
-				errors.Is(err, io.EOF) ||
-				errors.Is(err, syscall.EPIPE) ||
-				errors.Is(err, syscall.ECONNREFUSED)) {
-				rc.logger.Warnw("The rtsp client encountered an error, trying to reconnect", "url", rc.u, "error", err)
+
+			// use an OPTIONS request to see if the server is still responding to requests
+			if rc.client == nil {
 				badState = true
-			} else if res != nil && res.StatusCode != base.StatusOK {
-				rc.logger.Warnw("The rtsp server responded with non-OK status", "url", rc.u, "status code", res.StatusCode)
-				badState = true
+			} else {
+				res, err := rc.client.Options(rc.u)
+				if err != nil && (errors.Is(err, liberrors.ErrClientTerminated{}) ||
+					errors.Is(err, io.EOF) ||
+					errors.Is(err, syscall.EPIPE) ||
+					errors.Is(err, syscall.ECONNREFUSED)) {
+					rc.logger.Warnw("The rtsp client encountered an error, trying to reconnect", "url", rc.u, "error", err)
+					badState = true
+				} else if res != nil && res.StatusCode != base.StatusOK {
+					rc.logger.Warnw("The rtsp server responded with non-OK status", "url", rc.u, "status code", res.StatusCode)
+					badState = true
+				}
 			}
 
 			if badState {
-				if err = rc.reconnectClient(); err != nil {
+				if err := rc.reconnectClient(); err != nil {
 					rc.logger.Warnw("cannot reconnect to rtsp server", "error", err)
 				} else {
 					rc.logger.Infow("reconnected to rtsp server", "url", rc.u)
