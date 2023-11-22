@@ -16,22 +16,23 @@ import (
 	"github.com/bluenviron/gortsplib/v3/pkg/liberrors"
 	"github.com/bluenviron/gortsplib/v3/pkg/url"
 
-	"github.com/edaniels/golog"
-	"github.com/edaniels/gostream"
 	"github.com/pion/rtp"
 	"github.com/pkg/errors"
 	goutils "go.viam.com/utils"
 
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/components/camera/rtsp"
+	"go.viam.com/rdk/gostream"
+	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 )
 
-var ModelH264 = resource.DefaultModelFamily.WithModel("rtsp-h264")
+var family = resource.ModelNamespace("erh").WithFamily("viamrtsp")
+var ModelH264 = family.WithModel("rtsp-h264")
 
 func init() {
 	resource.RegisterComponent(camera.API, ModelH264, resource.Registration[camera.Camera, *rtsp.Config]{
-		Constructor: func(ctx context.Context, _ resource.Dependencies, conf resource.Config, logger golog.Logger) (camera.Camera, error) {
+		Constructor: func(ctx context.Context, _ resource.Dependencies, conf resource.Config, logger logging.Logger) (camera.Camera, error) {
 			newConf, err := resource.NativeConfig[*rtsp.Config](conf)
 			if err != nil {
 				return nil, err
@@ -56,7 +57,7 @@ type rtspCamera struct {
 
 	latestFrame atomic.Pointer[image.Image]
 
-	logger golog.Logger
+	logger logging.Logger
 }
 
 // Close closes the camera. It always returns nil, but because of Close() interface, it needs to return an error.
@@ -222,7 +223,7 @@ func (rc *rtspCamera) reconnectClient() (err error) {
 	return nil
 }
 
-func NewRTSPCamera(ctx context.Context, name resource.Name, conf *rtsp.Config, logger golog.Logger) (camera.Camera, error) {
+func NewRTSPCamera(ctx context.Context, name resource.Name, conf *rtsp.Config, logger logging.Logger) (camera.Camera, error) {
 	u, err := url.Parse(conf.Address)
 	if err != nil {
 		return nil, err
@@ -252,5 +253,5 @@ func NewRTSPCamera(ctx context.Context, name resource.Name, conf *rtsp.Config, l
 	if err != nil {
 		return nil, err
 	}
-	return camera.FromVideoSource(name, src), nil
+	return camera.FromVideoSource(name, src, logger), nil
 }
