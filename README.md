@@ -2,8 +2,7 @@
 Prep linux
 ===
 
-* sudo apt install libswscale-dev
-* sudo apt install libavcodec-dev
+* sudo apt install libswscale-dev libavcodec-dev
 
 Notes
 ===
