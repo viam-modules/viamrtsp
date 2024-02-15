@@ -1,0 +1,7 @@
+rplidar:
+    image_amd64: ghcr.io/viamrobotics/antique2:amd64-cache
+    image_arm64: ghcr.io/viamrobotics/antique2:arm64-cache
+    update_interval: 24h0m0s
+    persistent: true
+    user: testbot
+    group: testbot
