@@ -207,8 +207,6 @@ github.com/edaniels/golinters v0.0.4/go.mod h1:KzjC7OrCrRlFxufhH+kQ1Sdyzuj2eanHH
 github.com/edaniels/golog v0.0.0-20220930140416-6e52e83a97fc/go.mod h1:Ms3gOPiAEPRrgN3kBOF8YIkT2JEXxPFk/HBx/FAkmgA=
 github.com/edaniels/golog v0.0.0-20230215213219-28954395e8d0 h1:nNKMo+7J87eEtmp/tdmaORLS+u6mmcmW/ZpxJCQ+Mu8=
 github.com/edaniels/golog v0.0.0-20230215213219-28954395e8d0/go.mod h1:+Fw6jgiaW75M1z173j7FFZB2Ug5SccFxroA/eM2YFaM=
-github.com/edaniels/gostream v0.0.0-20230509190834-366e3941adaa h1:c3Eyu0zmH+VlXYQbF1l9bTUDBQ4SymRF9pNtxF+Ktfs=
-github.com/edaniels/gostream v0.0.0-20230509190834-366e3941adaa/go.mod h1:A9aG7uudF8/uTgijyRg+jNpI5zxzirqDjOFknNSr4vA=
 github.com/edaniels/lidario v0.0.0-20220607182921-5879aa7b96dd h1:W6Zlh2ja8A5vljn17Ix/gZhaUbYMFKAuBjc4t9nma7U=
 github.com/edaniels/lidario v0.0.0-20220607182921-5879aa7b96dd/go.mod h1:CibiLtefSZOd0smxazen6pzvjNK3HrvgGojYOqC3/4Q=
 github.com/edaniels/zeroconf v1.0.10 h1:NDCpH/MLs6VHUeXFMEyl1uV2oImziAkV8UkEBXjoXcQ=

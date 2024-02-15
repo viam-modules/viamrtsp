@@ -5,7 +5,6 @@ go 1.19
 require (
 	github.com/bluenviron/gortsplib/v3 v3.7.0
 	github.com/edaniels/golog v0.0.0-20230215213219-28954395e8d0
-	github.com/edaniels/gostream v0.0.0-20230509190834-366e3941adaa
 	github.com/pion/rtp v1.8.2
 	github.com/pkg/errors v0.9.1
 	go.viam.com/rdk v0.13.0
