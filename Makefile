@@ -1,8 +1,14 @@
-GOOS=linux
-GOARCH=arm64
+GOOS ?= $(shell go env GOOS)
+GOARCH ?= $(shell go env GOARCH)
 TARGET_IP ?= 127.0.0.1
 
-.Phony : build
+ifeq ($(GOARCH),amd64)
+	ARCH=x86_64
+else
+	ARCH=$(GOARCH)
+endif
+
+.Phony : build package
 
 # Build go binary
 build:
@@ -10,11 +16,11 @@ build:
 	
 # Create AppImage bundle
 package:
-	cd etc && sudo appimage-builder --recipe viam-rtsp-arm64.yml
+	cd etc && GOARCH=$(GOARCH) ARCH=$(ARCH) appimage-builder --recipe viam-rtsp-appimage.yml
 
 # Push binary to target
-push-bin:
-	scp bin/viamrtsp-$(GOOS)-$(GOARCH) viam@$(TARGET_IP):~/viamrtsp-$(GOOS)-$(GOARCH)
+push-mod:
+	scp etc/rtsp-module-0.0.1-aarch64.AppImage viam@$(TARGET_IP):~/viamrtsp-$(GOOS)-$(GOARCH)
 
 # Fake cam for testing
 fake-cam:
