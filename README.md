@@ -7,7 +7,7 @@ Prep linux
 Build Mac
 ===
 
-* Start canon `canon -arch arm64`
+* Start canon `canon -arch arm64` or `canon -arch amd64`
 * Install deps `make linux-deps`
 * Create golang binary `make build`
 * Create appimage `make package`

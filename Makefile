@@ -1,6 +1,6 @@
 GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
-ARCH= $(shell uname -m)
+ARCH ?= $(shell uname -m)
 TARGET_IP ?= 127.0.0.1
 
 .Phony : build package
@@ -15,7 +15,7 @@ package:
 
 # Push binary to target
 push-mod:
-	scp etc/rtsp-module-0.0.1-aarch64.AppImage viam@$(TARGET_IP):~/viamrtsp-$(GOOS)-$(GOARCH)
+	scp etc/rtsp-module-0.0.1-$(ARCH).AppImage viam@$(TARGET_IP):~/viamrtsp-$(GOOS)-$(GOARCH)-rebase
 
 # Fake cam for testing
 fake-cam:
