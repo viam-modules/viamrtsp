@@ -1,12 +1,7 @@
 GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
+ARCH= $(shell uname -m)
 TARGET_IP ?= 127.0.0.1
-
-ifeq ($(GOARCH),amd64)
-	ARCH=x86_64
-else
-	ARCH=$(GOARCH)
-endif
 
 .Phony : build package
 
