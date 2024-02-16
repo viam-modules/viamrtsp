@@ -9,6 +9,9 @@ bin/viamrtsp: *.go cmd/module/*.go
 
 build:
 	go build -v -o bin/viamrtsp-$(GOOS)-$(GOARCH) cmd/module/cmd.go
+	
+package:
+	cd etc && sudo appimage-builder --recipe viam-rtsp-arm64.yml
 
 push-bin:
 	scp bin/viamrtsp-$(GOOS)-$(GOARCH) viam@$(TARGET_IP):~/viamrtsp-$(GOOS)-$(GOARCH)
@@ -20,7 +23,7 @@ rtsp-server:
 	cd etc && docker run --rm -it -v rtsp-simple-server.yml:/rtsp-simple-server.yml -p 8554:8554 aler9/rtsp-simple-server:v1.3.0
 
 linux-dep:
-	sudo apt install libswscale-dev libavcodec-dev
+	@sudo apt install libswscale-dev libavcodec-dev
 	
 test:
 	go test
