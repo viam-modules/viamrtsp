@@ -8,8 +8,8 @@ Build for Linux
 ===
 
 * Start canon `canon -arch arm64` or `canon -arch amd64`
-* Install deps `make linux-deps`
-* Create golang binary `make build`
+* Install deps `make linux-dep`
+* Create golang binary `make build-linux`
 * Create appimage `make package`
 
 Build for Android
