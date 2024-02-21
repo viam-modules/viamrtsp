@@ -19,6 +19,7 @@ Build for Android
 * Build Android specific golang binary `make build-android`
 * Move FFmpeg lib onto device `make push-ffmpeg-android`
 * Move golang binary onto device `make push-binary-android`
+* Include `"env": {"LD_LIBRARY_PATH": "/data/local/tmp/ffmpeg/lib"}` in module config
 
 Test RTSP Cam
 ===
