@@ -24,6 +24,7 @@ LD := $(CC)
 RANLIB := $(TOOLCHAIN)/bin/llvm-ranlib
 STRIP := $(TOOLCHAIN)/bin/llvm-strip
 NM := $(TOOLCHAIN)/bin/llvm-nm
+SYSROOT := $(TOOLCHAIN)/sysroot
 
 # CGO settings
 CGO_ENABLED := 1
@@ -87,7 +88,7 @@ ffmpeg-android:
 		--disable-symver \
 		--enable-small \
 		--enable-cross-compile \
-		--sysroot=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64/sysroot && \
+		--sysroot=$(SYSROOT) && \
 	make -j$(shell nproc) && make install
 
 # Push FFmpeg to android device
