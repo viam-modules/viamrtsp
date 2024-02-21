@@ -4,7 +4,7 @@ Prep linux
 
 * sudo apt install libswscale-dev libavcodec-dev
 
-Build for Linux on Mac
+Build for Linux
 ===
 
 * Start canon `canon -arch arm64` or `canon -arch amd64`
@@ -12,7 +12,15 @@ Build for Linux on Mac
 * Create golang binary `make build`
 * Create appimage `make package`
 
-Virtual RTSP Cam
+Build for Android
+===
+* Install android specific RDK branch `make rdk-droid`
+* Build Android specific FFmpeg `make android-ffmpeg`
+* Build Android specific golang binary `make build-android`
+* Move FFmpeg lib onto device `make push-ffmpeg-android`
+* Move golang binary onto device `make push-binary-android`
+
+Test RTSP Cam
 ===
 
 * Start rtsp server on same device as viam-server `make rtsp-server`

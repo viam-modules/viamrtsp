@@ -31,3 +31,6 @@ bin
 *AppImage
 *appimage*
 *.DS_Store
+rdk-droid
+FFmpeg
+ffmpeg-android

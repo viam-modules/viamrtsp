@@ -6,7 +6,7 @@ import (
 	"unsafe"
 )
 
-// #cgo pkg-config: libavcodec libavutil libswscale
+// #cgo LDFLAGS: -lavcodec -lavutil -lswscale
 // #include <libavcodec/avcodec.h>
 // #include <libavutil/imgutils.h>
 // #include <libswscale/swscale.h>

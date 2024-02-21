@@ -2,33 +2,117 @@ GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
 ARCH ?= $(shell uname -m)
 TARGET_IP ?= 127.0.0.1
+API_LEVEL ?= 29
 
-.Phony : build package
+UNAME=$(shell uname)
+ifeq ($(UNAME),Linux)
+	NDK_ROOT ?= $(HOME)/Android/Sdk/ndk/26.1.10909125
+	HOST_OS ?= linux
+	CC_ARCH ?= x86_64
+else
+	NDK_ROOT ?= $(HOME)/Library/Android/sdk/ndk/26.1.10909125
+	HOST_OS ?= darwin
+	CC_ARCH ?= aarch64
+endif
 
-# Build go binary
-build:
-	go build -v -o bin/viamrtsp-$(GOOS)-$(GOARCH) cmd/module/cmd.go
-	
-# Create AppImage bundle
+# FFmpeg build settings
+TOOLCHAIN := $(NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64
+CC := $(TOOLCHAIN)/bin/$(CC_ARCH)-linux-android$(API_LEVEL)-clang
+CXX := $(TOOLCHAIN)/bin/$(CC_ARCH)-linux-android$(API_LEVEL)-clang++
+AR := $(TOOLCHAIN)/bin/llvm-ar
+LD := $(CC)
+RANLIB := $(TOOLCHAIN)/bin/llvm-ranlib
+STRIP := $(TOOLCHAIN)/bin/llvm-strip
+NM := $(TOOLCHAIN)/bin/llvm-nm
+
+# CGO settings
+CGO_ENABLED := 1
+CGO_CFLAGS := -I$(HOME)/viamrtsp/ffmpeg-android/include
+CGO_LDFLAGS := -L$(HOME)/viamrtsp/ffmpeg-android/lib
+OUTPUT_DIR := bin
+OUTPUT := $(OUTPUT_DIR)/viamrtsp-$(GOOS)-$(GOARCH)
+
+# # Build go binary for linux
+.PHONY: build-linux
+build-linux:
+	go build -v -o ./bin/viamrtsp-$(GOOS)-$(GOARCH) cmd/module/cmd.go
+
+# Build go binary for android
+build-android:
+	GOOS=android GOARCH=arm64 CGO_ENABLED=$(CGO_ENABLED) \
+		CGO_CFLAGS="$(CGO_CFLAGS)" \
+		CGO_LDFLAGS="$(CGO_LDFLAGS)" \
+		CC=$(CC) \
+		go build -v -tags no_cgo \
+		-o $(OUTPUT_DIR)/viamrtsp-android-arm64 ./cmd/module/cmd.go
+
+# Create linux AppImage bundle
+.PHONY: package
 package:
 	cd etc && GOARCH=$(GOARCH) ARCH=$(ARCH) appimage-builder --recipe viam-rtsp-appimage.yml
 
-# Push binary to target
-push-mod:
-	scp etc/rtsp-module-0.0.1-$(ARCH).AppImage viam@$(TARGET_IP):~/viamrtsp-$(GOOS)-$(GOARCH)-rebase
-
-# Fake cam for testing
-fake-cam:
-	ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec libx264 -b:v 900k -f rtsp -rtsp_transport tcp rtsp://localhost:8554/live.stream
-
-# RTSP server for testing
-rtsp-server:
-	cd etc && docker run --rm -it -v rtsp-simple-server.yml:/rtsp-simple-server.yml -p 8554:8554 aler9/rtsp-simple-server:v1.3.0
+# Push AppImage to target device
+push-appimg:
+	scp etc/rtsp-module-0.0.1-$(ARCH).AppImage viam@$(TARGET_IP):~/viamrtsp-mod
 
 # Install dependencies
 linux-dep:
 	sudo apt install libswscale-dev libavcodec-dev
-	
+
+# Build FFmpeg for Android
+# Requires Android NDK to be installed
+.PHONY: ffmpeg-android
+ffmpeg-android:
+	cd FFmpeg && \
+	./configure \
+		--prefix=$(HOME)/viamrtsp/ffmpeg-android \
+		--target-os=android \
+		--arch=aarch64 \
+		--cpu=armv8-a \
+		--cc=$(CC) \
+		--cxx=$(realpath $(NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64/bin/$(CC_ARCH)-linux-android29-clang++) \
+		--ar=$AR \
+		--ld=$(CC) \
+		--ranlib=$(RANLIB) \
+		--strip=$(STRIP) \
+		--nm=$(realpath $(NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64/bin/llvm-nm) \
+		--disable-static \
+		--enable-shared \
+		--disable-doc \
+		--disable-ffmpeg \
+		--disable-ffplay \
+		--disable-ffprobe \
+		--disable-avdevice \
+		--disable-symver \
+		--enable-small \
+		--enable-cross-compile \
+		--sysroot=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64/sysroot && \
+	make -j$(shell nproc) && make install
+
+# Push FFmpeg to android device
+push-ffmpeg-android:
+	adb push $(HOME)/viamrtsp/ffmpeg-android /data/local/tmp/ffmpeg
+
+# Push binary to android device
+push-binary-android:
+	adb push $(OUTPUT_DIR)/viamrtsp-android-arm64 /data/local/tmp/viamrtsp-android-arm64
+
+# Get android compatible rdk
+# Need to add 'replace go.viam.com/rdk => ./rdk-droid` to go.mod
+rdk-droid:
+	git clone git@github.com:abe-winter/rdk.git rdk-droid && \
+		cd rdk-droid && \
+		git checkout droid-apk
+
+# Fake cam for testing (h264)
+fake-cam:
+	ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec libx264 -b:v 900k -f rtsp -rtsp_transport tcp rtsp://localhost:8554/live.stream
+
+# RTSP server for testing
+# need docker installed
+rtsp-server:
+	cd etc && docker run --rm -it -v rtsp-simple-server.yml:/rtsp-simple-server.yml -p 8554:8554 aler9/rtsp-simple-server:v1.3.0
+
 test:
 	go test
 
