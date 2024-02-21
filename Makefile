@@ -32,12 +32,13 @@ CGO_LDFLAGS := -L$(HOME)/viamrtsp/ffmpeg-android/lib
 OUTPUT_DIR := bin
 OUTPUT := $(OUTPUT_DIR)/viamrtsp-$(GOOS)-$(GOARCH)
 
-# # Build go binary for linux
+# Build go binary for linux
 .PHONY: build-linux
 build-linux:
 	go build -v -o ./bin/viamrtsp-$(GOOS)-$(GOARCH) cmd/module/cmd.go
 
 # Build go binary for android
+.PHONY: build-android
 build-android:
 	GOOS=android GOARCH=arm64 CGO_ENABLED=$(CGO_ENABLED) \
 		CGO_CFLAGS="$(CGO_CFLAGS)" \
