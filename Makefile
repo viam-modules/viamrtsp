@@ -71,12 +71,12 @@ ffmpeg-android:
 		--arch=aarch64 \
 		--cpu=armv8-a \
 		--cc=$(CC) \
-		--cxx=$(realpath $(NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64/bin/$(CC_ARCH)-linux-android29-clang++) \
+		--cxx=$(CXX) \
 		--ar=$AR \
 		--ld=$(CC) \
 		--ranlib=$(RANLIB) \
 		--strip=$(STRIP) \
-		--nm=$(realpath $(NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64/bin/llvm-nm) \
+		--nm=$(NM) \
 		--disable-static \
 		--enable-shared \
 		--disable-doc \
