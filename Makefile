@@ -8,7 +8,7 @@ UNAME=$(shell uname)
 ifeq ($(UNAME),Linux)
 	NDK_ROOT ?= $(HOME)/Android/Sdk/ndk/26.1.10909125
 	HOST_OS ?= linux
-	CC_ARCH ?= x86_64
+	CC_ARCH ?= aarch64
 else
 	NDK_ROOT ?= $(HOME)/Library/Android/sdk/ndk/26.1.10909125
 	HOST_OS ?= darwin
@@ -26,10 +26,13 @@ STRIP := $(TOOLCHAIN)/bin/llvm-strip
 NM := $(TOOLCHAIN)/bin/llvm-nm
 SYSROOT := $(TOOLCHAIN)/sysroot
 
+FFMPEG_SUBDIR=viamrtsp/ffmpeg-android
+FFMPEG_PREFIX=$(HOME)/$(FFMPEG_SUBDIR)
+
 # CGO settings
 CGO_ENABLED := 1
-CGO_CFLAGS := -I$(HOME)/viamrtsp/ffmpeg-android/include
-CGO_LDFLAGS := -L$(HOME)/viamrtsp/ffmpeg-android/lib
+CGO_CFLAGS := -I$(FFMPEG_PREFIX)/include
+CGO_LDFLAGS := -L$(FFMPEG_PREFIX)/lib
 OUTPUT_DIR := bin
 OUTPUT := $(OUTPUT_DIR)/viamrtsp-$(GOOS)-$(GOARCH)
 
@@ -38,15 +41,26 @@ OUTPUT := $(OUTPUT_DIR)/viamrtsp-$(GOOS)-$(GOARCH)
 build-linux:
 	go build -v -o ./bin/viamrtsp-$(GOOS)-$(GOARCH) cmd/module/cmd.go
 
+edit-android:
+	# temporary command to get an android-compatible rdk branch
+	# todo: dedup with rdk-droid command
+	go mod edit -replace=go.viam.com/rdk=github.com/abe-winter/rdk@droid-apk
+	go mod tidy
+
 # Build go binary for android
 .PHONY: build-android
 build-android:
+	# if this fails with Camera interfaces, run `make edit-android` first
 	GOOS=android GOARCH=arm64 CGO_ENABLED=$(CGO_ENABLED) \
 		CGO_CFLAGS="$(CGO_CFLAGS)" \
 		CGO_LDFLAGS="$(CGO_LDFLAGS)" \
 		CC=$(CC) \
 		go build -v -tags no_cgo \
-		-o $(OUTPUT_DIR)/viamrtsp-android-arm64 ./cmd/module/cmd.go
+		-o $(OUTPUT) ./cmd/module/cmd.go
+
+module.tar.gz: $(OUTPUT) run.sh
+	# todo: dedup with 'make module' command
+	tar czf $@ $^ -C $(FFMPEG_PREFIX) lib
 
 # Create linux AppImage bundle
 .PHONY: package
@@ -59,15 +73,20 @@ push-appimg:
 
 # Install dependencies
 linux-dep:
-	sudo apt install libswscale-dev libavcodec-dev
+	sudo apt-get install -qy libswscale-dev libavcodec-dev
+
+FFmpeg:
+	# clone ffmpeg in the spot we need
+	# todo: maybe make this a submodule
+	git clone https://github.com/FFmpeg/FFmpeg -b n6.1.1 --depth 1
 
 # Build FFmpeg for Android
 # Requires Android NDK to be installed
 .PHONY: ffmpeg-android
-ffmpeg-android:
+ffmpeg-android: FFmpeg
 	cd FFmpeg && \
 	./configure \
-		--prefix=$(HOME)/viamrtsp/ffmpeg-android \
+		--prefix=$(FFMPEG_PREFIX) \
 		--target-os=android \
 		--arch=aarch64 \
 		--cpu=armv8-a \
@@ -93,7 +112,7 @@ ffmpeg-android:
 
 # Push FFmpeg to android device
 push-ffmpeg-android:
-	adb push $(HOME)/viamrtsp/ffmpeg-android /data/local/tmp/ffmpeg
+	adb push $(FFMPEG_PREFIX) android /data/local/tmp/ffmpeg
 
 # Push binary to android device
 push-binary-android:
