@@ -6,7 +6,7 @@
   "models": [
     {
       "api": "rdk:component:camera",
-      "model": "viam-labs:viamrtsp:rtsp-h264"
+      "model": "viam-labs:viamrtsp:rtsp"
     }
   ],
   "entrypoint": "run.sh"
