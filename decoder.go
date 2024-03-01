@@ -60,14 +60,10 @@ func getStreamInfo(url string) string {
 		stream := *(**C.AVStream)(unsafe.Pointer(uintptr(unsafe.Pointer(avFormatCtx.streams)) + uintptr(i)*unsafe.Sizeof(*avFormatCtx.streams)))
 		codecParams := stream.codecpar
 
-		codecName := C.GoString(C.avcodec_get_name(codecParams.codec_id))
-
 		if codecParams.codec_id == C.AV_CODEC_ID_H264 {
 			return "h264"
 		} else if codecParams.codec_id == C.AV_CODEC_ID_HEVC {
 			return "h265"
-		} else {
-			return codecName
 		}
 	}
 
