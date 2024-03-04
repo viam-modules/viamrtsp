@@ -1,12 +1,12 @@
 {
-  "module_id": "viam-labs:viamrtsp",
-  "visibility": "private",
-  "url": "https://github.com/viam-labs/rtsp-camera",
-  "description": "module for rtsp, currently supports x264",
+  "module_id": "erh:viamrtsp",
+  "visibility": "public",
+  "url": "https://github.com/erh/viamrtsp",
+  "description": "module for rtsp, currently supports h264 and h265",
   "models": [
     {
       "api": "rdk:component:camera",
-      "model": "viam-labs:viamrtsp:rtsp"
+      "model": "erh:viamrtsp:rtsp-h264"
     }
   ],
   "entrypoint": "run.sh"
