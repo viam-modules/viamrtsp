@@ -5,4 +5,5 @@ if [ $(command -v getprop) ]; then
 	export LD_LIBRARY_PATH=$PWD/lib:$LD_LIBRARY_PATH
 fi
 
-exec ./bin/viamrtsp-android-arm64 $@
+echo running viamrtsp
+exec ./bin/viamrtsp $@

@@ -14,7 +14,7 @@ AppDir:
     id: com.viam.rtsp-${GOARCH}
     name: rtsp-module
     icon: viam-server
-    version: 0.0.1
+    version: ${MOD_VERSION}
     exec: usr/bin/viamrtsp-linux-${GOARCH}
     exec_args: $@
   files:
