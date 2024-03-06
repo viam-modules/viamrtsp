@@ -239,7 +239,6 @@ func (rc *rtspCamera) initH264(tracks media.Medias, baseURL *url.URL) (err error
 		for _, nalu := range au {
 			if len(nalu) < 20 {
 				// TODO: this is probably wrong, but fixes a spam issue with "no frame!"
-				rc.logger.Warnf("nalu too short", len(nalu))
 				continue
 			}
 			lastImage, err := rc.rawDecoder.decode(nalu)
