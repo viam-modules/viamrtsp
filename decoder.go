@@ -110,8 +110,8 @@ func convertCodec(cCodec C.int) videoCodec {
 
 // avError converts an AV error code to a AV error message string.
 func avError(avErr C.int) string {
-	var errbuf [1024]C.char
-	if C.av_strerror(avErr, &errbuf[0], 1024) < 0 {
+	var errbuf [C.AV_ERROR_MAX_STRING_SIZE]C.char
+	if C.av_strerror(avErr, &errbuf[0], C.AV_ERROR_MAX_STRING_SIZE) < 0 {
 		return fmt.Sprintf("Unknown error with code %d", avErr)
 	}
 	return C.GoString(&errbuf[0])
