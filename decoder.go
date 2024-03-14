@@ -14,6 +14,24 @@ import (
 #include <libavutil/imgutils.h>
 #include <libswscale/swscale.h>
 #include <libavformat/avformat.h>
+#include <libavutil/avutil.h>
+
+int get_video_codec(AVFormatContext *avFormatCtx) {
+    int found_hevc = 0;
+    for (int i = 0; i < avFormatCtx->nb_streams; i++) {
+        AVStream *stream = avFormatCtx->streams[i];
+        AVCodecParameters *codecParams = stream->codecpar;
+        if (codecParams->codec_id == AV_CODEC_ID_H264) {
+            return AV_CODEC_ID_H264;
+        } else if (codecParams->codec_id == AV_CODEC_ID_HEVC) {
+            found_hevc = 1;
+        }
+    }
+    if (found_hevc) {
+        return AV_CODEC_ID_HEVC;
+    }
+    return AV_CODEC_ID_NONE;
+}
 */
 import "C"
 
@@ -42,35 +60,51 @@ func frameLineSize(frame *C.AVFrame) *C.int {
 	return (*C.int)(unsafe.Pointer(&frame.linesize[0]))
 }
 
-// getStreamInfo opens a stream URL and retrieves its information
+// getStreamInfo opens a stream URL and retrieves the video codec.
 func getStreamInfo(url string) (videoCodec, error) {
-	// Register all formats and codecs
-	C.avformat_network_init()
-
 	cUrl := C.CString(url)
 	defer C.free(unsafe.Pointer(cUrl))
 
 	var avFormatCtx *C.AVFormatContext = nil
-	if C.avformat_open_input(&avFormatCtx, cUrl, nil, nil) != 0 {
-		return Unknown, errors.New("avformat_open_input() failed")
+	ret := C.avformat_open_input(&avFormatCtx, cUrl, nil, nil)
+	if ret < 0 {
+		return Unknown, fmt.Errorf("avformat_open_input() failed: %s", avError(ret))
 	}
 	defer C.avformat_close_input(&avFormatCtx)
 
-	if C.avformat_find_stream_info(avFormatCtx, nil) < 0 {
-		return Unknown, fmt.Errorf("avformat_find_stream_info() failed")
+	ret = C.avformat_find_stream_info(avFormatCtx, nil)
+	if ret < 0 {
+		return Unknown, fmt.Errorf("avformat_find_stream_info() failed: %s", avError(ret))
 	}
 
-	for i := 0; i < int(avFormatCtx.nb_streams); i++ {
-		stream := *(**C.AVStream)(unsafe.Pointer(uintptr(unsafe.Pointer(avFormatCtx.streams)) + uintptr(i)*unsafe.Sizeof(*avFormatCtx.streams)))
-		codecParams := stream.codecpar
-		if codecParams.codec_id == C.AV_CODEC_ID_H264 {
-			return H264, nil
-		} else if codecParams.codec_id == C.AV_CODEC_ID_HEVC {
-			return H265, nil
-		}
-	}
+	cCodec := C.get_video_codec(avFormatCtx)
+	codec := convertCodec(cCodec)
 
-	return Unknown, errors.New("no supported codec found")
+	if codec == Unknown {
+		return Unknown, errors.New("no supported codec found")
+	}
+	return codec, nil
+}
+
+// convertCodec converts a C int to a Go videoCodec.
+func convertCodec(cCodec C.int) videoCodec {
+	switch cCodec {
+	case C.AV_CODEC_ID_H264:
+		return H264
+	case C.AV_CODEC_ID_HEVC:
+		return H265
+	default:
+		return Unknown
+	}
+}
+
+// avError converts an AV error code to a AV error message string.
+func avError(avErr C.int) string {
+	var errbuf [1024]C.char
+	if C.av_strerror(avErr, &errbuf[0], 1024) < 0 {
+		return fmt.Sprintf("Unknown error with code %d", avErr)
+	}
+	return C.GoString(&errbuf[0])
 }
 
 // newDecoder creates a new decoder for the given codec.
