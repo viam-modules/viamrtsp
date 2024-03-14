@@ -15,6 +15,7 @@ import (
 #include <libswscale/swscale.h>
 #include <libavformat/avformat.h>
 #include <libavutil/avutil.h>
+#include <stdlib.h>
 
 int get_video_codec(AVFormatContext *avFormatCtx) {
     int found_h265 = 0;
