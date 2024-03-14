@@ -18,10 +18,19 @@ import (
 #include <stdlib.h>
 
 int get_video_codec(AVFormatContext *avFormatCtx) {
+    if (avFormatCtx == NULL) {
+        return AV_CODEC_ID_NONE;
+    }
     int found_h265 = 0;
     for (int i = 0; i < avFormatCtx->nb_streams; i++) {
         AVStream *stream = avFormatCtx->streams[i];
+        if (stream == NULL) {
+            continue;
+        }
         AVCodecParameters *codecParams = stream->codecpar;
+        if (codecParams == NULL) {
+            continue;
+        }
         if (codecParams->codec_id == AV_CODEC_ID_H264) {
             return AV_CODEC_ID_H264;
         } else if (codecParams->codec_id == AV_CODEC_ID_H265) {
