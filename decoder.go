@@ -17,18 +17,18 @@ import (
 #include <libavutil/avutil.h>
 
 int get_video_codec(AVFormatContext *avFormatCtx) {
-    int found_hevc = 0;
+    int found_h265 = 0;
     for (int i = 0; i < avFormatCtx->nb_streams; i++) {
         AVStream *stream = avFormatCtx->streams[i];
         AVCodecParameters *codecParams = stream->codecpar;
         if (codecParams->codec_id == AV_CODEC_ID_H264) {
             return AV_CODEC_ID_H264;
-        } else if (codecParams->codec_id == AV_CODEC_ID_HEVC) {
-            found_hevc = 1;
+        } else if (codecParams->codec_id == AV_CODEC_ID_H265) {
+            found_h265 = 1;
         }
     }
-    if (found_hevc) {
-        return AV_CODEC_ID_HEVC;
+    if (found_h265) {
+        return AV_CODEC_ID_H265;
     }
     return AV_CODEC_ID_NONE;
 }
@@ -91,7 +91,7 @@ func convertCodec(cCodec C.int) videoCodec {
 	switch cCodec {
 	case C.AV_CODEC_ID_H264:
 		return H264
-	case C.AV_CODEC_ID_HEVC:
+	case C.AV_CODEC_ID_H265:
 		return H265
 	default:
 		return Unknown
@@ -144,7 +144,7 @@ func newH264Decoder() (*decoder, error) {
 
 // newH265Decoder creates a new H265 decoder.
 func newH265Decoder() (*decoder, error) {
-	return newDecoder(C.AV_CODEC_ID_HEVC)
+	return newDecoder(C.AV_CODEC_ID_H265)
 }
 
 // close closes the decoder.
