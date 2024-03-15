@@ -7,7 +7,6 @@ import (
 	"github.com/edaniels/golog"
 
 	"go.viam.com/rdk/components/camera"
-	"go.viam.com/rdk/components/camera/rtsp"
 	"go.viam.com/rdk/config"
 	"go.viam.com/rdk/resource"
 	robotimpl "go.viam.com/rdk/robot/impl"
@@ -45,7 +44,7 @@ func realMain() error {
 				Attributes: utils.AttributeMap{
 					"rtsp_address": os.Args[2],
 				},
-				ConvertedAttributes: &rtsp.Config{
+				ConvertedAttributes: &viamrtsp.Config{
 					Address: os.Args[2],
 				},
 			},

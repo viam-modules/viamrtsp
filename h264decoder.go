@@ -6,11 +6,24 @@ import (
 	"unsafe"
 )
 
-// #cgo pkg-config: libavcodec libavutil libswscale
-// #include <libavcodec/avcodec.h>
-// #include <libavutil/imgutils.h>
-// #include <libswscale/swscale.h>
+/*
+#cgo LDFLAGS: -lavcodec -lavutil -lswscale -lavformat
+#include <libavcodec/avcodec.h>
+#include <libavutil/imgutils.h>
+#include <libavutil/log.h>
+#include <libswscale/swscale.h>
+#include <libavformat/avformat.h>
+*/
 import "C"
+
+// Decoder is a generic FFmpeg decoder.
+type decoder struct {
+	codecCtx    *C.AVCodecContext
+	srcFrame    *C.AVFrame
+	swsCtx      *C.struct_SwsContext
+	dstFrame    *C.AVFrame
+	dstFramePtr []uint8
+}
 
 func frameData(frame *C.AVFrame) **C.uint8_t {
 	return (**C.uint8_t)(unsafe.Pointer(&frame.data[0]))
@@ -20,17 +33,12 @@ func frameLineSize(frame *C.AVFrame) *C.int {
 	return (*C.int)(unsafe.Pointer(&frame.linesize[0]))
 }
 
-// h264Decoder is a wrapper around ffmpeg's H264 decoder.
-type h264Decoder struct {
-	codecCtx    *C.AVCodecContext
-	srcFrame    *C.AVFrame
-	swsCtx      *C.struct_SwsContext
-	dstFrame    *C.AVFrame
-	dstFramePtr []uint8
-}
-
-// newH264Decoder allocates a new h264Decoder.
-func newH264Decoder() (*h264Decoder, error) {
+func newH264Decoder() (*decoder, error) {
+	// https://ffmpeg.org/doxygen/2.3/group__lavu__log__constants.html
+	// https://ffmpeg.org/doxygen/2.3/group__lavu__log.html#ga1fd32c74db581e3e2e7f35d277bb1e24
+	// We do this to suppress some errors that say "no frame!" on startup which recover on their own
+	// TODO: Set this state once for the process
+	C.av_log_set_level(C.AV_LOG_FATAL)
 	codec := C.avcodec_find_decoder(C.AV_CODEC_ID_H264)
 	if codec == nil {
 		return nil, fmt.Errorf("avcodec_find_decoder() failed")
@@ -53,14 +61,14 @@ func newH264Decoder() (*h264Decoder, error) {
 		return nil, fmt.Errorf("av_frame_alloc() failed")
 	}
 
-	return &h264Decoder{
+	return &decoder{
 		codecCtx: codecCtx,
 		srcFrame: srcFrame,
 	}, nil
 }
 
 // close closes the decoder.
-func (d *h264Decoder) close() {
+func (d *decoder) close() {
 	if d.dstFrame != nil {
 		C.av_frame_free(&d.dstFrame)
 	}
@@ -73,7 +81,8 @@ func (d *h264Decoder) close() {
 	C.avcodec_close(d.codecCtx)
 }
 
-func (d *h264Decoder) decode(nalu []byte) (image.Image, error) {
+func (d *decoder) decode(nalu []byte) (image.Image, error) {
+	// 0x00000001
 	nalu = append([]uint8{0x00, 0x00, 0x00, 0x01}, []uint8(nalu)...)
 
 	// send frame to decoder
