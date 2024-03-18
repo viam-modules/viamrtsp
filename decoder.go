@@ -17,6 +17,9 @@ import (
 #include <libavutil/avutil.h>
 #include <stdlib.h>
 
+// get_video_codec checks the provided AVFormatContext to find a supported video codec.
+// It prioritizes H264 over H265 if both are found.
+// If no supported codec is identified, it returns AV_CODEC_ID_NONE.
 int get_video_codec(AVFormatContext *avFormatCtx) {
     if (avFormatCtx == NULL) {
         return AV_CODEC_ID_NONE;
