@@ -4,12 +4,10 @@ go 1.19
 
 require (
 	github.com/bluenviron/gortsplib/v3 v3.7.0
-	github.com/edaniels/golog v0.0.0-20230215213219-28954395e8d0
-	github.com/edaniels/gostream v0.0.0-20230509190834-366e3941adaa
 	github.com/pion/rtp v1.8.2
 	github.com/pkg/errors v0.9.1
-	go.viam.com/rdk v0.13.0
-	go.viam.com/utils v0.1.52
+	go.viam.com/rdk v0.23.2
+	go.viam.com/utils v0.1.60
 )
 
 require (
@@ -40,6 +38,7 @@ require (
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/disintegration/imaging v1.6.2 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
+	github.com/edaniels/golog v0.0.0-20230215213219-28954395e8d0 // indirect
 	github.com/edaniels/lidario v0.0.0-20220607182921-5879aa7b96dd // indirect
 	github.com/edaniels/zeroconf v1.0.10 // indirect
 	github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5 // indirect
@@ -55,6 +54,7 @@ require (
 	github.com/go-gl/mathgl v1.0.0 // indirect
 	github.com/go-latex/latex v0.0.0-20230307184459-12ec69307ad9 // indirect
 	github.com/go-pdf/fpdf v0.6.0 // indirect
+	github.com/goccy/go-graphviz v0.1.3-0.20240305010347-606fdf55b06d // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
@@ -135,18 +135,18 @@ require (
 	go.uber.org/goleak v1.2.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
-	go.viam.com/api v0.1.223 // indirect
+	go.viam.com/api v0.1.274 // indirect
 	go.viam.com/test v1.1.1-0.20220913152726-5da9916c08a2 // indirect
 	goji.io v2.0.2+incompatible // indirect
 	golang.org/x/crypto v0.14.0 // indirect
-	golang.org/x/exp v0.0.0-20230321023759-10a507213a29 // indirect
-	golang.org/x/image v0.12.0 // indirect
+	golang.org/x/exp v0.0.0-20230725012225-302865e7556b // indirect
+	golang.org/x/image v0.14.0 // indirect
 	golang.org/x/mod v0.11.0 // indirect
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/oauth2 v0.10.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
-	golang.org/x/text v0.13.0 // indirect
+	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/tools v0.10.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	gonum.org/v1/gonum v0.12.0 // indirect
