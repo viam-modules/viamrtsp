@@ -25,7 +25,7 @@ func main() {
 func realMain() error {
 
 	ctx := context.Background()
-	logger := logging.NewLogger("client")
+	logger := module.NewLoggerFromArgs("client")
 
 	netconfig := config.NetworkConfig{}
 	netconfig.BindAddress = "0.0.0.0:8083"
