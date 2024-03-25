@@ -23,10 +23,10 @@ import (
 	goutils "go.viam.com/utils"
 
 	"go.viam.com/rdk/components/camera"
-	"go.viam.com/rdk/components/camera/rtsp"
 	"go.viam.com/rdk/gostream"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
+	"go.viam.com/rdk/rimage/transform"
 )
 
 var family = resource.ModelNamespace("erh").WithFamily("viamrtsp")
@@ -36,6 +36,32 @@ func init() {
 	resource.RegisterComponent(camera.API, ModelH264, resource.Registration[camera.Camera, *rtsp.Config]{
 		Constructor: newRTSPCamera,
 	})
+}
+
+// Config are the config attributes for an RTSP camera model.
+type Config struct {
+	Address          string                             `json:"rtsp_address"`
+	IntrinsicParams  *transform.PinholeCameraIntrinsics `json:"intrinsic_parameters,omitempty"`
+	DistortionParams *transform.BrownConrady            `json:"distortion_parameters,omitempty"`
+}
+
+// Validate checks to see if the attributes of the model are valid.
+func (conf *Config) Validate(path string) ([]string, error) {
+	_, err := url.Parse(conf.Address)
+	if err != nil {
+		return nil, err
+	}
+	if conf.IntrinsicParams != nil {
+		if err := conf.IntrinsicParams.CheckValid(); err != nil {
+			return nil, err
+		}
+	}
+	if conf.DistortionParams != nil {
+		if err := conf.DistortionParams.CheckValid(); err != nil {
+			return nil, err
+		}
+	}
+	return nil, nil
 }
 
 // rtspCamera contains the rtsp client, and the reader function that fulfills the camera interface.

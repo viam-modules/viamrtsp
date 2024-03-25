@@ -4,11 +4,10 @@ import (
 	"context"
 	"os"
 
-	"github.com/edaniels/golog"
-
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/components/camera/rtsp"
 	"go.viam.com/rdk/config"
+	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	robotimpl "go.viam.com/rdk/robot/impl"
 	"go.viam.com/rdk/robot/web"
@@ -26,7 +25,7 @@ func main() {
 func realMain() error {
 
 	ctx := context.Background()
-	logger := golog.NewDevelopmentLogger("client")
+	logger := logging.NewLogger("client")
 
 	netconfig := config.NetworkConfig{}
 	netconfig.BindAddress = "0.0.0.0:8083"
