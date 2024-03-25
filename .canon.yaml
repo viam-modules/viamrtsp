@@ -6,4 +6,13 @@ rtsp:
     persistent: false
     user: testbot
     group: testbot
-    
+
+viam-rdk-antique:
+    image_amd64: ghcr.io/viamrobotics/antique2:amd64-cache
+    image_arm64: ghcr.io/viamrobotics/antique2:arm64-cache
+    image_arm: ghcr.io/viamrobotics/antique2:armhf-cache
+    minimum_date: 2023-10-26T20:00:00.0Z
+    update_interval: 168h0m0s
+    user: testbot
+    group: testbot
+    persistent: true
