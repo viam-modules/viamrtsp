@@ -33,7 +33,7 @@ var family = resource.ModelNamespace("erh").WithFamily("viamrtsp")
 var ModelH264 = family.WithModel("rtsp-h264")
 
 func init() {
-	resource.RegisterComponent(camera.API, ModelH264, resource.Registration[camera.Camera, *rtsp.Config]{
+	resource.RegisterComponent(camera.API, ModelH264, resource.Registration[camera.Camera, *Config]{
 		Constructor: newRTSPCamera,
 	})
 }
@@ -353,7 +353,7 @@ func (rc *rtspCamera) initH265(tracks media.Medias, baseURL *url.URL) (err error
 }
 
 func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.Config, logger logging.Logger) (camera.Camera, error) {
-	newConf, err := resource.NativeConfig[*rtsp.Config](conf)
+	newConf, err := resource.NativeConfig[*Config](conf)
 	if err != nil {
 		return nil, err
 	}
