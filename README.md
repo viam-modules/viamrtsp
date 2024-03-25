@@ -2,7 +2,7 @@
 Prep linux
 ===
 
-* sudo apt install libswscale-dev libavcodec-dev
+* sudo apt install libswscale-dev libavcodec-dev libavformat-dev libavutil-dev
 
 Notes
 ===
