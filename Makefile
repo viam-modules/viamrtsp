@@ -19,6 +19,7 @@ endif
 
 bin/viamrtsp: build-ffmpeg *.go cmd/module/*.go
 	PKG_CONFIG_PATH=$(FFMPEG_PREFIX)/lib/pkgconfig \
+		CGO_LDFLAGS=$(CGO_LDFLAGS) \
 		go build -o bin/viamrtsp cmd/module/cmd.go
 
 test:
