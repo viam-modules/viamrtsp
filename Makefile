@@ -33,7 +33,7 @@ updaterdk:
 	go mod tidy
 
 FFmpeg:
-	git clone https://github.com/FFmpeg/FFmpeg.git --depth 1 --branch release/6.1
+	git submodule init && git submodule update
 
 $(FFMPEG_PREFIX): FFmpeg
 	cd FFmpeg && ./configure $(FFMPEG_OPTS) && make -j$(shell nproc) && make install
