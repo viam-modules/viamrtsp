@@ -30,12 +30,16 @@ import (
 )
 
 var family = resource.ModelNamespace("erh").WithFamily("viamrtsp")
+var Model = family.WithModel("rtsp")
 var ModelH264 = family.WithModel("rtsp-h264")
+var Models = []resource.Model{Model, ModelH264}
 
 func init() {
-	resource.RegisterComponent(camera.API, ModelH264, resource.Registration[camera.Camera, *Config]{
-		Constructor: newRTSPCamera,
-	})
+	for _, model := range Models {
+		resource.RegisterComponent(camera.API, model, resource.Registration[camera.Camera, *Config]{
+			Constructor: newRTSPCamera,
+		})
+	}
 }
 
 // Config are the config attributes for an RTSP camera model.
@@ -78,6 +82,8 @@ type rtspCamera struct {
 	activeBackgroundWorkers sync.WaitGroup
 
 	latestFrame atomic.Pointer[image.Image]
+
+	mustUseH264 bool
 
 	logger logging.Logger
 }
@@ -173,6 +179,9 @@ func (rc *rtspCamera) reconnectClient() (err error) {
 	codecInfo, err := getStreamInfo(rc.u.String())
 	if err != nil {
 		return err
+	}
+	if rc.mustUseH264 && codecInfo != H264 {
+		return errors.New("h264 requested, but h264 codec not detected")
 	}
 
 	switch codecInfo {
@@ -362,8 +371,9 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		return nil, err
 	}
 	rtspCam := &rtspCamera{
-		u:      u,
-		logger: logger,
+		u:           u,
+		logger:      logger,
+		mustUseH264: conf.Model == ModelH264,
 	}
 	err = rtspCam.reconnectClient()
 	if err != nil {
