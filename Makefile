@@ -36,7 +36,7 @@ FFmpeg:
 	git submodule init && git submodule update
 
 $(FFMPEG_PREFIX): FFmpeg
-	cd FFmpeg && ./configure $(FFMPEG_OPTS) && make -j$(shell nproc) && make install
+	cd FFmpeg && ./configure $(FFMPEG_OPTS) && $(MAKE) -j$(shell nproc) && $(MAKE) install
 
 build-ffmpeg:
 ifeq ($(UNAME_S),Linux)
