@@ -55,3 +55,6 @@ module: bin/viamrtsp
 
 clean:
 	rm -rf FFmpeg bin/viamrtsp module.tar.gz
+
+clean-all:
+	git clean -fxd
