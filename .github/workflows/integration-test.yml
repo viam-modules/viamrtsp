@@ -40,23 +40,8 @@ jobs:
         chmod 755 viam-server
         sudo ./viam-server --aix-install
         
-    - name: Add viam-server config
-      run: |
-        cat << EOF > integration-test-config.json
-        {
-          "model": "erh:viamrtsp:rtsp",
-          "name": "ip-cam",
-          "namespace": "rdk",
-          "type": "camera",
-          "attributes": {
-            "rtsp_address": "rtsp://localhost:8554/live.stream"
-          },
-          "depends_on": []
-        }
-        EOF
-        
     - name: Run viam-server
-      run: viam-server -debug -config ./integration-test-config.json &
+      run: viam-server -debug -config ./test/integration-test-config.json &
 
     - name: Build and run test binary
       run: |
