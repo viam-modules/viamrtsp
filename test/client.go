@@ -36,4 +36,6 @@ func main() {
 	if err != nil {
 		logger.Fatal(err)
 	}
+
+	logger.Info("All tests passed! Success :)")
 }
