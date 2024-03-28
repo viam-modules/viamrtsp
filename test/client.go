@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"time"
 
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
@@ -9,9 +10,13 @@ import (
 )
 
 func main() {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	logger := logging.NewDebugLogger("client")
+
 	robot, err := client.New(
-		context.Background(),
+		ctx,
 		"localhost:8080",
 		logger,
 	)
@@ -19,7 +24,7 @@ func main() {
 		logger.Fatal(err)
 	}
 
-	defer robot.Close(context.Background())
+	defer robot.Close(ctx)
 
 	logger.Info("Resources:")
 	logger.Info(robot.ResourceNames())
@@ -28,11 +33,11 @@ func main() {
 	if err != nil {
 		logger.Fatal(err)
 	}
-	stream, err := ipCam.Stream(context.Background())
+	stream, err := ipCam.Stream(ctx)
 	if err != nil {
 		logger.Fatal(err)
 	}
-	_, _, err = stream.Next(context.Background())
+	_, _, err = stream.Next(ctx)
 	if err != nil {
 		logger.Fatal(err)
 	}
