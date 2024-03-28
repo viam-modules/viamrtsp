@@ -26,7 +26,7 @@ jobs:
     - name: Run fake RTSP camera
       run: ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec libx264 -pix_fmt yuv420p -f rtsp -rtsp_transport tcp rtsp://0.0.0.0:8554/live.stream &
       
-    - name: Build Go binary
+    - name: Build viamrtsp binary
       run: make bin/viamrtsp
       
     - name: Install viam-server
@@ -35,7 +35,7 @@ jobs:
         chmod 755 viam-server
         sudo ./viam-server --aix-install
         
-    - name: Configure viam-server
+    - name: Add viam-server config
       run: |
         cat << EOF > integration-test-config.json
         {
@@ -51,4 +51,9 @@ jobs:
         EOF
         
     - name: Run viam-server
-      run: viam-server -config ./integration-test-config.json
+      run: viam-server -debug -config ./integration-test-config.json &
+
+    - name: Build test client binary and run test client script
+      run: |
+        go build -o test ./testClient.go && chmod +x ./test
+        ./test
