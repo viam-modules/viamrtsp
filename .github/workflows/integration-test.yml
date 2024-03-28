@@ -1,10 +1,14 @@
 name: Integration test with mediamtx stream
 
-on: [push, pull_request]
+on: [push]
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        arch: [arm64]
     
     steps:
     - uses: actions/checkout@v3
