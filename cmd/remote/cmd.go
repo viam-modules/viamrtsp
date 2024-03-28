@@ -39,7 +39,7 @@ func realMain() error {
 			{
 				Name:  os.Args[1],
 				API:   camera.API,
-				Model: viamrtsp.Model,
+				Model: viamrtsp.ModelAgnostic,
 				Attributes: utils.AttributeMap{
 					"rtsp_address": os.Args[2],
 				},

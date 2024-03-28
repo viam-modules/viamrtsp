@@ -30,9 +30,15 @@ import (
 )
 
 var family = resource.ModelNamespace("erh").WithFamily("viamrtsp")
-var Model = family.WithModel("rtsp")
+var ModelAgnostic = family.WithModel("rtsp")
 var ModelH264 = family.WithModel("rtsp-h264")
-var Models = []resource.Model{Model, ModelH264}
+var ModelH265 = family.WithModel("rtsp-h265")
+var Models = []resource.Model{ModelAgnostic, ModelH264, ModelH265}
+var modelToCodecMap = map[resource.Model]videoCodec{
+	ModelAgnostic: Unknown,
+	ModelH264:     H264,
+	ModelH265:     H265,
+}
 
 func init() {
 	for _, model := range Models {
@@ -83,8 +89,6 @@ type rtspCamera struct {
 
 	latestFrame atomic.Pointer[image.Image]
 
-	mustUseH264 bool
-
 	logger logging.Logger
 }
 
@@ -96,7 +100,7 @@ func (rc *rtspCamera) Close(ctx context.Context) error {
 }
 
 // clientReconnectBackgroundWorker checks every 5 sec to see if the client is connected to the server, and reconnects if not.
-func (rc *rtspCamera) clientReconnectBackgroundWorker() {
+func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 	rc.activeBackgroundWorkers.Add(1)
 	goutils.ManagedGo(func() {
 		for goutils.SelectContextOrWait(rc.cancelCtx, 5*time.Second) {
@@ -120,7 +124,7 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker() {
 			}
 
 			if badState {
-				if err := rc.reconnectClient(); err != nil {
+				if err := rc.reconnectClient(codecInfo); err != nil {
 					rc.logger.Warnw("cannot reconnect to rtsp server", "error", err)
 				} else {
 					rc.logger.Infow("reconnected to rtsp server", "url", rc.u)
@@ -144,7 +148,7 @@ func (rc *rtspCamera) closeConnection() error {
 }
 
 // reconnectClient reconnects the RTSP client to the streaming server by closing the old one and starting a new one.
-func (rc *rtspCamera) reconnectClient() (err error) {
+func (rc *rtspCamera) reconnectClient(codecInfo videoCodec) (err error) {
 	rc.logger.Warnf("reconnectClient called")
 
 	if rc == nil {
@@ -176,12 +180,11 @@ func (rc *rtspCamera) reconnectClient() (err error) {
 		return err
 	}
 
-	codecInfo, err := getStreamInfo(rc.u.String())
-	if err != nil {
-		return err
-	}
-	if rc.mustUseH264 && codecInfo != H264 {
-		return errors.New("h264 requested, but h264 codec not detected")
+	if codecInfo == Unknown {
+		codecInfo, err = getStreamInfo(rc.u.String())
+		if err != nil {
+			return err
+		}
 	}
 
 	switch codecInfo {
@@ -371,11 +374,11 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		return nil, err
 	}
 	rtspCam := &rtspCamera{
-		u:           u,
-		logger:      logger,
-		mustUseH264: conf.Model == ModelH264,
+		u:      u,
+		logger: logger,
 	}
-	err = rtspCam.reconnectClient()
+	codecInfo := modelToCodecMap[conf.Model]
+	err = rtspCam.reconnectClient(codecInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -391,7 +394,7 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 	rtspCam.cancelCtx = cancelCtx
 	rtspCam.cancelFunc = cancel
 	cameraModel := camera.NewPinholeModelWithBrownConradyDistortion(newConf.IntrinsicParams, newConf.DistortionParams)
-	rtspCam.clientReconnectBackgroundWorker()
+	rtspCam.clientReconnectBackgroundWorker(codecInfo)
 	src, err := camera.NewVideoSourceFromReader(ctx, rtspCam, &cameraModel, camera.ColorStream)
 	if err != nil {
 		return nil, err
