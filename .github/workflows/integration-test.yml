@@ -8,6 +8,11 @@ jobs:
     
     steps:
     - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.19
     
     - name: Install dependencies
       run: |
@@ -53,8 +58,7 @@ jobs:
     - name: Run viam-server
       run: viam-server -debug -config ./integration-test-config.json &
 
-    - name: Build test client binary and run test client script
+    - name: Run test client binary
       run: |
-        go build -o testClient ./testClient.go
         chmod +x ./testClient
         ./testClient
