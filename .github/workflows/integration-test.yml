@@ -4,11 +4,7 @@ on: [push]
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-        arch: [arm64]
+    runs-on: [buildjet-16vcpu-ubuntu-2204-arm]
     
     steps:
     - uses: actions/checkout@v3
