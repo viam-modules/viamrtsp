@@ -1,3 +1,6 @@
+> [!NOTE]
+> This repository has been archived to avoid confusion with the official upstream ([erh/viamrtsp](https://github.com/erh/viamrtsp)).
+
 Prep Linux
 ===
 * sudo apt install libswscale-dev libavcodec-dev libavformat-dev
