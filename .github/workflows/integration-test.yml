@@ -55,5 +55,6 @@ jobs:
 
     - name: Build test client binary and run test client script
       run: |
-        go build -o test ./testClient.go && chmod +x ./test
-        ./test
+        go build -o testClient ./testClient.go
+        chmod +x ./testClient
+        ./testClient
