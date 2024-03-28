@@ -39,11 +39,37 @@ jobs:
         curl https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-x86_64.AppImage -o viam-server
         chmod 755 viam-server
         sudo ./viam-server --aix-install
+
+    # Generate config from within yml because relative paths don't reliably work for module exec paths
+    - name: Generate viam-server config
+      run: |
+        echo '{
+          "components": [
+            {
+              "name": "ip-cam",
+              "namespace": "rdk",
+              "type": "camera",
+              "model": "erh:viamrtsp:rtsp-h264",
+              "attributes": {
+                "rtsp_address": "rtsp://localhost:8554/live.stream"
+              },
+              "depends_on": []
+            }
+          ],
+          "modules": [
+            {
+              "type": "local",
+              "name": "viamrtsp",
+              "executable_path": "'$(realpath bin/viamrtsp)'"
+            }
+          ]
+        }' > integration-test-config.json
         
+    # Sleep to give time for server to start
     - name: Run viam-server
       run: |
-        viam-server -debug -config ./test/integration-test-config.json &
-        sleep 30
+        viam-server -debug -config ./integration-test-config.json &
+        sleep 10
 
     - name: Build and run test binary
       run: |
