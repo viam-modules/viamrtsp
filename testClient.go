@@ -2,7 +2,6 @@ package viamrtsp
 
 import (
 	"context"
-	"os"
 
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
@@ -19,7 +18,6 @@ func main() {
 	)
 	if err != nil {
 		logger.Fatal(err)
-		os.Exit(1)
 	}
 
 	defer robot.Close(context.Background())
@@ -27,16 +25,13 @@ func main() {
 	ipCam, err := camera.FromRobot(robot, "ip-cam")
 	if err != nil {
 		logger.Fatal(err)
-		os.Exit(1)
 	}
 	stream, err := ipCam.Stream(context.Background())
 	if err != nil {
 		logger.Fatal(err)
-		os.Exit(1)
 	}
 	_, _, err = stream.Next(context.Background())
 	if err != nil {
 		logger.Fatal(err)
-		os.Exit(1)
 	}
 }
