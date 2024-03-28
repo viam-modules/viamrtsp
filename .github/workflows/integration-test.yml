@@ -41,7 +41,9 @@ jobs:
         sudo ./viam-server --aix-install
         
     - name: Run viam-server
-      run: viam-server -debug -config ./test/integration-test-config.json &
+      run: |
+        viam-server -debug -config ./test/integration-test-config.json &
+        sleep 30
 
     - name: Build and run test binary
       run: |

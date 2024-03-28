@@ -21,6 +21,9 @@ func main() {
 
 	defer robot.Close(context.Background())
 
+	logger.Info("Resources:")
+	logger.Info(robot.ResourceNames())
+
 	ipCam, err := camera.FromRobot(robot, "ip-cam")
 	if err != nil {
 		logger.Fatal(err)
