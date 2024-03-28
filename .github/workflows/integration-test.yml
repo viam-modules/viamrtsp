@@ -58,7 +58,8 @@ jobs:
     - name: Run viam-server
       run: viam-server -debug -config ./integration-test-config.json &
 
-    - name: Run test client binary
+    - name: Build and run test binary
       run: |
-        chmod +x ./testClient
-        ./testClient
+        go build -o testBinary ./test/client.go
+        chmod +x ./testBinary
+        ./testBinary

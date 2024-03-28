@@ -1,4 +1,4 @@
-package viamrtsp
+package main
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"go.viam.com/rdk/robot/client"
 )
 
-//lint:ignore U1000 This is a script
 func main() {
 	logger := logging.NewDebugLogger("client")
 	robot, err := client.New(
