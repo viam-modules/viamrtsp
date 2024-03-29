@@ -1,6 +1,12 @@
-name: Integration test with mediamtx stream
+name: Integration test using mediamtx
 
-on: [push]
+on:
+  push:
+    branches:
+      - '*'
+  pull_request:
+    branches:
+      - '*'
 
 jobs:
   build-and-test:
@@ -65,16 +71,11 @@ jobs:
           ]
         }' > integration-test-config.json
         
+    # Sleep to give time for server to start
     - name: Run viam-server
       run: |
         viam-server -debug -config ./integration-test-config.json &
-    
-    # hardcoded RTSP port to open
-    - name: Wait for stream to start
-      run: |
-        while ! nc -z localhost 8554; do   
-          sleep 1
-        done
+        sleep 10
 
     - name: Build and run test binary
       run: |
