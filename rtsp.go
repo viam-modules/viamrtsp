@@ -34,10 +34,18 @@ var ModelAgnostic = family.WithModel("rtsp")
 var ModelH264 = family.WithModel("rtsp-h264")
 var ModelH265 = family.WithModel("rtsp-h265")
 var Models = []resource.Model{ModelAgnostic, ModelH264, ModelH265}
-var modelToCodecMap = map[resource.Model]videoCodec{
-	ModelAgnostic: Unknown,
-	ModelH264:     H264,
-	ModelH265:     H265,
+
+func modelToCodec(model resource.Model) videoCodec {
+	switch model {
+	case ModelAgnostic:
+		return Unknown
+	case ModelH264:
+		return H264
+	case ModelH265:
+		return H265
+	default:
+		return Unknown
+	}
 }
 
 func init() {
@@ -377,7 +385,7 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		u:      u,
 		logger: logger,
 	}
-	codecInfo := modelToCodecMap[conf.Model]
+	codecInfo := modelToCodec(conf.Model)
 	err = rtspCam.reconnectClient(codecInfo)
 	if err != nil {
 		return nil, err
