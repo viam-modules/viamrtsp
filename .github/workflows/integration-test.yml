@@ -5,6 +5,9 @@ on: [push]
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        architecture: [x86_64, arm64]
     
     steps:
     - uses: actions/checkout@v3
