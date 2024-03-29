@@ -68,6 +68,13 @@ jobs:
     - name: Run viam-server
       run: |
         viam-server -debug -config ./integration-test-config.json &
+    
+    # hardcoded RTSP port to open
+    - name: Wait for stream to start
+      run: |
+        while ! nc -z localhost 8554; do   
+          sleep 1
+        done
 
     - name: Build and run test binary
       run: |
