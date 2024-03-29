@@ -383,6 +383,9 @@ func (rc *rtspCamera) initMJPEG(tracks media.Medias, baseURL *url.URL) error {
 		if err != nil {
 			return
 		}
+		if frame == nil {
+			return
+		}
 
 		img, err := jpeg.Decode(bytes.NewReader(frame))
 		if err != nil {
