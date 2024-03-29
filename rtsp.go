@@ -1,8 +1,10 @@
 package viamrtsp
 
 import (
+	"bytes"
 	"context"
 	"image"
+	"image/jpeg"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -182,6 +184,9 @@ func (rc *rtspCamera) reconnectClient() (err error) {
 	case H265:
 		rc.logger.Infof("setting up H265 decoder")
 		err = rc.initH265(tracks, baseURL)
+	case MJPEG:
+		rc.logger.Infof("setting up MJPEG decoder")
+		err = rc.initMJPEG(tracks, baseURL)
 	default:
 		return errors.Errorf("codec not supported %v", codecInfo)
 	}
@@ -198,9 +203,48 @@ func (rc *rtspCamera) reconnectClient() (err error) {
 	return nil
 }
 
+// initMJPEG initializes the MJPEG decoder and sets up the client to receive JPEG frames.
+func (rc *rtspCamera) initMJPEG(tracks media.Medias, baseURL *url.URL) error {
+	var mjpegFormat *formats.MJPEG
+	track := tracks.FindFormat(&mjpegFormat)
+	if track == nil {
+		rc.logger.Warn("tracks available")
+		for _, x := range tracks {
+			rc.logger.Warnf("\t %v", x)
+		}
+		return errors.New("MJPEG track not found")
+	}
+
+	_, err := rc.client.Setup(track, baseURL, 0, 0)
+	if err != nil {
+		return err
+	}
+
+	mjpegDecoder, err := mjpegFormat.CreateDecoder2()
+	if err != nil {
+		return errors.Wrap(err, "error creating MJPEG decoder")
+	}
+
+	rc.client.OnPacketRTP(track, mjpegFormat, func(pkt *rtp.Packet) {
+		frame, _, err := mjpegDecoder.Decode(pkt)
+		if err != nil {
+			return
+		}
+
+		img, err := jpeg.Decode(bytes.NewReader(frame))
+		if err != nil {
+			rc.logger.Errorf("error converting MJPEG frame to image: %v", err)
+			return
+		}
+
+		rc.latestFrame.Store(&img)
+	})
+
+	return nil
+}
+
 // initH264 initializes the H264 decoder and sets up the client to receive H264 packets.
 func (rc *rtspCamera) initH264(tracks media.Medias, baseURL *url.URL) (err error) {
-	// setup RTP/H264 -> H264 decoder
 	var format *formats.H264
 
 	track := tracks.FindFormat(&format)
