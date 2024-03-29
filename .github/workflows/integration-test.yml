@@ -5,9 +5,6 @@ on: [push]
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        architecture: [x86_64, arm64]
     
     steps:
     - uses: actions/checkout@v3
@@ -68,11 +65,9 @@ jobs:
           ]
         }' > integration-test-config.json
         
-    # Sleep to give time for server to start
     - name: Run viam-server
       run: |
         viam-server -debug -config ./integration-test-config.json &
-        sleep 10
 
     - name: Build and run test binary
       run: |
