@@ -21,7 +21,7 @@ jobs:
           - name: "mjpeg"
             model: "erh:viamrtsp:rtsp-h264" # TODO(hexbabe): change model after models PR is merged
             codec: "mjpeg"
-            extra_ffmpeg_args: "-huffman 0"
+            extra_ffmpeg_args: ""
     
     steps:
     - uses: actions/checkout@v3
