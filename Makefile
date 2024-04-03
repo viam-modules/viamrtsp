@@ -1,6 +1,6 @@
 UNAME_S ?= $(shell uname -s)
 UNAME_M ?= $(shell uname -m)
-FFMPEG_PREFIX ?= $(shell pwd)/ffmpeg/$(UNAME_S)-$(UNAME_M)
+FFMPEG_PREFIX ?= $(shell pwd)/FFmpeg/$(UNAME_S)-$(UNAME_M)
 FFMPEG_OPTS ?= --prefix=$(FFMPEG_PREFIX) \
                --enable-static \
                --disable-shared \
@@ -33,7 +33,7 @@ updaterdk:
 	go mod tidy
 
 FFmpeg:
-	git submodule init && git submodule update
+	git clone https://github.com/FFmpeg/FFmpeg.git --depth 1 --branch n6.1
 
 $(FFMPEG_PREFIX): FFmpeg
 	cd FFmpeg && ./configure $(FFMPEG_OPTS) && $(MAKE) -j$(shell nproc) && $(MAKE) install
