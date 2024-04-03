@@ -2,6 +2,7 @@ package viamrtsp
 
 import (
 	"context"
+	"fmt"
 	"image"
 	"io"
 	"sync"
@@ -34,19 +35,6 @@ var ModelAgnostic = family.WithModel("rtsp")
 var ModelH264 = family.WithModel("rtsp-h264")
 var ModelH265 = family.WithModel("rtsp-h265")
 var Models = []resource.Model{ModelAgnostic, ModelH264, ModelH265}
-
-func modelToCodec(model resource.Model) videoCodec {
-	switch model {
-	case ModelAgnostic:
-		return Unknown
-	case ModelH264:
-		return H264
-	case ModelH265:
-		return H265
-	default:
-		return Unknown
-	}
-}
 
 func init() {
 	for _, model := range Models {
@@ -188,7 +176,7 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec) (err error) {
 		return err
 	}
 
-	if codecInfo == Unknown {
+	if codecInfo == Agnostic {
 		codecInfo, err = getStreamInfo(rc.u.String())
 		if err != nil {
 			return err
@@ -385,7 +373,10 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		u:      u,
 		logger: logger,
 	}
-	codecInfo := modelToCodec(conf.Model)
+	codecInfo, err := modelToCodec(conf.Model)
+	if err != nil {
+		return nil, err
+	}
 	err = rtspCam.reconnectClient(codecInfo)
 	if err != nil {
 		return nil, err
@@ -409,4 +400,17 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 	}
 
 	return camera.FromVideoSource(conf.ResourceName(), src, logger), nil
+}
+
+func modelToCodec(model resource.Model) (videoCodec, error) {
+	switch model {
+	case ModelAgnostic:
+		return Agnostic, nil
+	case ModelH264:
+		return H264, nil
+	case ModelH265:
+		return H265, nil
+	default:
+		return Unknown, fmt.Errorf("model '%s' has unspecified codec handling", model.Name)
+	}
 }
