@@ -10,7 +10,7 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_PREFIX) \
                --enable-decoder=h264 \
                --enable-decoder=hevc \
                --enable-network \
-               --enable-protocol=http \
+               --enable-demuxer=rtsp \
                --enable-swscale
 CGO_LDFLAGS := -L$(FFMPEG_PREFIX)/lib
 ifeq ($(UNAME_S),Linux)
