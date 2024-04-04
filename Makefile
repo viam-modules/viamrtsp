@@ -16,7 +16,7 @@ ifeq ($(UNAME_S),Linux)
 	CGO_LDFLAGS := "$(CGO_LDFLAGS) -l:libjpeg.a"
 endif
 
-.PHONY: build-ffmpeg test lint updaterdk module
+.PHONY: build-ffmpeg test lint updaterdk module clean
 
 bin/viamrtsp: build-ffmpeg *.go cmd/module/*.go
 	PKG_CONFIG_PATH=$(FFMPEG_PREFIX)/lib/pkgconfig \
