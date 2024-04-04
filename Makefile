@@ -49,3 +49,6 @@ endif
 
 module: bin/viamrtsp
 	tar czf module.tar.gz bin/viamrtsp
+
+clean:
+	rm -rf FFmpeg bin/viamrtsp module.tar.gz
