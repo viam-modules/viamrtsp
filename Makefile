@@ -10,7 +10,7 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_PREFIX) \
                --enable-decoder=h264 \
                --enable-decoder=hevc \
                --enable-network \
-			   --enable-demuxer=rtsp \
+               --enable-demuxer=rtsp \
                --enable-parser=h264 \
                --enable-parser=hevc
 
