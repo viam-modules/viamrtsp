@@ -11,8 +11,8 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_PREFIX) \
                --enable-decoder=hevc \
                --enable-network \
 			   --enable-demuxer=rtsp \
-			   --enable-parser=h264 \
-			   --enable-parser=hevc
+               ----enable-parser=h264 \
+               --enable-parser=hevc
 
 CGO_LDFLAGS := -L$(FFMPEG_PREFIX)/lib
 ifeq ($(UNAME_S),Linux)
