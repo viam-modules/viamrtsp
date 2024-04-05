@@ -15,6 +15,7 @@ import (
 #include <libswscale/swscale.h>
 #include <libavformat/avformat.h>
 #include <libavutil/avutil.h>
+#include <libavutil/log.h>
 #include <stdlib.h>
 
 // get_video_codec checks the provided AVFormatContext to find a supported video codec.
@@ -109,6 +110,11 @@ func convertCodec(cCodec C.int) videoCodec {
 	default:
 		return Unknown
 	}
+}
+
+// setLogLevel sets the FFmpeg log level.
+func setLogLevel(level int) {
+	C.av_log_set_level(C.int(level))
 }
 
 // avError converts an AV error code to a AV error message string.

@@ -32,6 +32,8 @@ import (
 var family = resource.ModelNamespace("erh").WithFamily("viamrtsp")
 var ModelH264 = family.WithModel("rtsp-h264")
 
+const ffmpegLogLevel = 8
+
 func init() {
 	resource.RegisterComponent(camera.API, ModelH264, resource.Registration[camera.Camera, *Config]{
 		Constructor: newRTSPCamera,
@@ -169,6 +171,8 @@ func (rc *rtspCamera) reconnectClient() (err error) {
 	if err != nil {
 		return err
 	}
+
+	setLogLevel(ffmpegLogLevel)
 
 	codecInfo, err := getStreamInfo(rc.u.String())
 	if err != nil {
