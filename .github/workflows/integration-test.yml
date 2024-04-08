@@ -15,11 +15,9 @@ jobs:
       matrix:
         config:
           - name: "h264"
-            model: "erh:viamrtsp:rtsp-h264"
             codec: "libx264"
             extra_ffmpeg_args: ""
           - name: "mjpeg"
-            model: "erh:viamrtsp:rtsp-h264" # TODO(hexbabe): change model after models PR is merged
             codec: "mjpeg"
             extra_ffmpeg_args: "-huffman 0"
     
@@ -66,7 +64,7 @@ jobs:
               "name": "ip-cam",
               "namespace": "rdk",
               "type": "camera",
-              "model": "${{ matrix.config.model }}",
+              "model": "erh:viamrtsp:rtsp",
               "attributes": {
                 "rtsp_address": "rtsp://localhost:8554/live.stream"
               },
