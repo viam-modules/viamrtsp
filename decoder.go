@@ -61,6 +61,7 @@ type videoCodec int
 
 const (
 	Unknown videoCodec = iota
+	Agnostic
 	H264
 	H265
 )
