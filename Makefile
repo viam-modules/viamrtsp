@@ -17,6 +17,17 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-network \
                --enable-parser=h264 \
                --enable-parser=hevc
+ifeq ($(TARGET),Android)
+	NDK_ROOT ?= $(HOME)/Library/Android/Sdk/ndk/26.1.10909125
+	API_LEVEL ?= 30
+	FFMPEG_OPTS += --target-os=android \
+	               --arch=aarch64 \
+				   --cpu=armv8-a \
+	               --enable-cross-compile \
+	               --sysroot=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(UNAME_S)-x86_64/sysroot \
+				   --cc=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(UNAME_S)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang \
+				   --cxx=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(UNAME_S)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang++
+endif
 
 CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib
 ifeq ($(UNAME_S),Linux)
