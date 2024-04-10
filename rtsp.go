@@ -411,3 +411,21 @@ func modelToCodec(model resource.Model) (videoCodec, error) {
 		return Unknown, fmt.Errorf("model '%s' has unspecified codec handling", model.Name)
 	}
 }
+
+// getAvailableCodec returns a supported codec in the given tracks.
+func getAvailableCodec(tracks media.Medias) videoCodec {
+	var h264 *formats.H264
+	var h265 *formats.H265
+
+	// List of formats/codecs in priority order
+	formatPointers := []interface{}{&h264, &h265}
+	codecs := []videoCodec{H264, H265}
+
+	for i, formatPtr := range formatPointers {
+		if tracks.FindFormat(formatPtr) != nil {
+			return codecs[i]
+		}
+	}
+
+	return Unknown
+}
