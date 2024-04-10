@@ -4,9 +4,6 @@ import (
 	"fmt"
 	"image"
 	"unsafe"
-
-	"github.com/bluenviron/gortsplib/v3/pkg/formats"
-	"github.com/bluenviron/gortsplib/v3/pkg/media"
 )
 
 /*
@@ -59,25 +56,6 @@ func frameData(frame *C.AVFrame) **C.uint8_t {
 
 func frameLineSize(frame *C.AVFrame) *C.int {
 	return (*C.int)(unsafe.Pointer(&frame.linesize[0]))
-}
-
-// getAvailableCodec returns a supported codec in the given tracks.
-func getAvailableCodec(tracks media.Medias) videoCodec {
-	var h264 *formats.H264
-	var h265 *formats.H265
-
-	// List of formats/codecs in priority order
-	formatPointers := []interface{}{&h264, &h265}
-	codecs := []videoCodec{H264, H265}
-
-	for i, formatPtr := range formatPointers {
-		if tracks.FindFormat(formatPtr) != nil {
-			return codecs[i]
-		}
-	}
-
-	// If no codec is found, return Unknown
-	return Unknown
 }
 
 // avError converts an AV error code to a AV error message string.
