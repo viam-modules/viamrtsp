@@ -5,46 +5,17 @@ import (
 	"image"
 	"unsafe"
 
-	"github.com/pkg/errors"
+	"github.com/bluenviron/gortsplib/v3/pkg/formats"
+	"github.com/bluenviron/gortsplib/v3/pkg/media"
 )
 
 /*
 #cgo pkg-config: libavcodec libavutil libswscale libavformat
 #include <libavcodec/avcodec.h>
 #include <libavutil/imgutils.h>
+#include <libavutil/error.h>
 #include <libswscale/swscale.h>
-#include <libavformat/avformat.h>
-#include <libavutil/avutil.h>
 #include <stdlib.h>
-
-// get_video_codec checks the provided AVFormatContext to find a supported video codec.
-// It prioritizes H264 over H265 if both are found.
-// If no supported codec is identified, it returns AV_CODEC_ID_NONE.
-int get_video_codec(AVFormatContext *avFormatCtx) {
-    if (avFormatCtx == NULL) {
-        return AV_CODEC_ID_NONE;
-    }
-    int found_h265 = 0;
-    for (int i = 0; i < avFormatCtx->nb_streams; i++) {
-        AVStream *stream = avFormatCtx->streams[i];
-        if (stream == NULL) {
-            continue;
-        }
-        AVCodecParameters *codecParams = stream->codecpar;
-        if (codecParams == NULL) {
-            continue;
-        }
-        if (codecParams->codec_id == AV_CODEC_ID_H264) {
-            return AV_CODEC_ID_H264;
-        } else if (codecParams->codec_id == AV_CODEC_ID_H265) {
-            found_h265 = 1;
-        }
-    }
-    if (found_h265) {
-        return AV_CODEC_ID_H265;
-    }
-    return AV_CODEC_ID_NONE;
-}
 */
 import "C"
 
@@ -74,30 +45,23 @@ func frameLineSize(frame *C.AVFrame) *C.int {
 	return (*C.int)(unsafe.Pointer(&frame.linesize[0]))
 }
 
-// getStreamInfo opens a stream URL and retrieves the video codec.
-func getStreamInfo(url string) (videoCodec, error) {
-	cUrl := C.CString(url)
-	defer C.free(unsafe.Pointer(cUrl))
+// getAvailableCodec returns a supported codec in the given tracks.
+func getAvailableCodec(tracks media.Medias) videoCodec {
+	var h264 *formats.H264
+	var h265 *formats.H265
 
-	var avFormatCtx *C.AVFormatContext = nil
-	ret := C.avformat_open_input(&avFormatCtx, cUrl, nil, nil)
-	if ret < 0 {
-		return Unknown, fmt.Errorf("avformat_open_input() failed: %s", avError(ret))
-	}
-	defer C.avformat_close_input(&avFormatCtx)
+	// List of formats/codecs in priority order
+	formatPointers := []interface{}{&h264, &h265}
+	codecs := []videoCodec{H264, H265}
 
-	ret = C.avformat_find_stream_info(avFormatCtx, nil)
-	if ret < 0 {
-		return Unknown, fmt.Errorf("avformat_find_stream_info() failed: %s", avError(ret))
+	for i, formatPtr := range formatPointers {
+		if tracks.FindFormat(formatPtr) != nil {
+			return codecs[i]
+		}
 	}
 
-	cCodec := C.get_video_codec(avFormatCtx)
-	codec := convertCodec(cCodec)
-
-	if codec == Unknown {
-		return Unknown, errors.New("no supported codec found")
-	}
-	return codec, nil
+	// If no codec is found, return Unknown
+	return Unknown
 }
 
 // convertCodec converts a C int to a Go videoCodec.

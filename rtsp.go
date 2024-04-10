@@ -177,10 +177,7 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec) (err error) {
 	}
 
 	if codecInfo == Agnostic {
-		codecInfo, err = getStreamInfo(rc.u.String())
-		if err != nil {
-			return err
-		}
+		codecInfo = getAvailableCodec(tracks)
 	}
 
 	switch codecInfo {
