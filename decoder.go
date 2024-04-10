@@ -4,6 +4,12 @@ import (
 	"fmt"
 	"image"
 	"unsafe"
+<<<<<<< HEAD
+=======
+
+	"github.com/bluenviron/gortsplib/v3/pkg/formats"
+	"github.com/bluenviron/gortsplib/v3/pkg/media"
+>>>>>>> b7c869e (Codec lookup without libav)
 )
 
 /*
@@ -56,6 +62,20 @@ func frameData(frame *C.AVFrame) **C.uint8_t {
 
 func frameLineSize(frame *C.AVFrame) *C.int {
 	return (*C.int)(unsafe.Pointer(&frame.linesize[0]))
+}
+
+// convertCodec converts a C int to a Go videoCodec.
+func convertCodec(cCodec C.int) videoCodec {
+	switch cCodec {
+	case C.AV_CODEC_ID_H264:
+		return H264
+	case C.AV_CODEC_ID_H265:
+		return H265
+	case C.AV_CODEC_ID_MJPEG:
+		return MJPEG
+	default:
+		return Unknown
+	}
 }
 
 // avError converts an AV error code to a AV error message string.
