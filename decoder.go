@@ -64,20 +64,6 @@ func frameLineSize(frame *C.AVFrame) *C.int {
 	return (*C.int)(unsafe.Pointer(&frame.linesize[0]))
 }
 
-// convertCodec converts a C int to a Go videoCodec.
-func convertCodec(cCodec C.int) videoCodec {
-	switch cCodec {
-	case C.AV_CODEC_ID_H264:
-		return H264
-	case C.AV_CODEC_ID_H265:
-		return H265
-	case C.AV_CODEC_ID_MJPEG:
-		return MJPEG
-	default:
-		return Unknown
-	}
-}
-
 // avError converts an AV error code to a AV error message string.
 func avError(avErr C.int) string {
 	var errbuf [C.AV_ERROR_MAX_STRING_SIZE]C.char
