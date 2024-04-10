@@ -36,7 +36,8 @@ var family = resource.ModelNamespace("erh").WithFamily("viamrtsp")
 var ModelAgnostic = family.WithModel("rtsp")
 var ModelH264 = family.WithModel("rtsp-h264")
 var ModelH265 = family.WithModel("rtsp-h265")
-var Models = []resource.Model{ModelAgnostic, ModelH264, ModelH265}
+var ModelMJPEG = family.WithModel("rtsp-mjpeg")
+var Models = []resource.Model{ModelAgnostic, ModelH264, ModelH265, ModelMJPEG}
 
 func init() {
 	for _, model := range Models {
@@ -457,6 +458,8 @@ func modelToCodec(model resource.Model) (videoCodec, error) {
 		return H264, nil
 	case ModelH265:
 		return H265, nil
+	case ModelMJPEG:
+		return MJPEG, nil
 	default:
 		return Unknown, fmt.Errorf("model '%s' has unspecified codec handling", model.Name)
 	}
