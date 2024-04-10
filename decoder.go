@@ -4,12 +4,6 @@ import (
 	"fmt"
 	"image"
 	"unsafe"
-<<<<<<< HEAD
-=======
-
-	"github.com/bluenviron/gortsplib/v3/pkg/formats"
-	"github.com/bluenviron/gortsplib/v3/pkg/media"
->>>>>>> b7c869e (Codec lookup without libav)
 )
 
 /*
