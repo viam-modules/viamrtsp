@@ -18,13 +18,13 @@ import (
 #include <stdlib.h>
 
 // get_video_codec checks the provided AVFormatContext to find a supported video codec.
-// It prioritizes H264 over H265 if both are found.
+// It prioritizes H264, H265, then MJPEG if multiple are available.
 // If no supported codec is identified, it returns AV_CODEC_ID_NONE.
 int get_video_codec(AVFormatContext *avFormatCtx) {
     if (avFormatCtx == NULL) {
         return AV_CODEC_ID_NONE;
     }
-    int found_h265 = 0;
+
     for (int i = 0; i < avFormatCtx->nb_streams; i++) {
         AVStream *stream = avFormatCtx->streams[i];
         if (stream == NULL) {
@@ -37,18 +37,17 @@ int get_video_codec(AVFormatContext *avFormatCtx) {
         if (codecParams->codec_id == AV_CODEC_ID_H264) {
             return AV_CODEC_ID_H264;
         } else if (codecParams->codec_id == AV_CODEC_ID_H265) {
-            found_h265 = 1;
+            return AV_CODEC_ID_H265;
+        } else if (codecParams->codec_id == AV_CODEC_ID_MJPEG) {
+            return AV_CODEC_ID_MJPEG;
         }
-    }
-    if (found_h265) {
-        return AV_CODEC_ID_H265;
     }
     return AV_CODEC_ID_NONE;
 }
 */
 import "C"
 
-// Decoder is a generic FFmpeg decoder.
+// decoder is a generic FFmpeg decoder.
 type decoder struct {
 	codecCtx    *C.AVCodecContext
 	srcFrame    *C.AVFrame
@@ -64,6 +63,7 @@ const (
 	Agnostic
 	H264
 	H265
+	MJPEG
 )
 
 func frameData(frame *C.AVFrame) **C.uint8_t {
@@ -107,6 +107,8 @@ func convertCodec(cCodec C.int) videoCodec {
 		return H264
 	case C.AV_CODEC_ID_H265:
 		return H265
+	case C.AV_CODEC_ID_MJPEG:
+		return MJPEG
 	default:
 		return Unknown
 	}

@@ -15,6 +15,10 @@
     {
       "api": "rdk:component:camera",
       "model": "erh:viamrtsp:rtsp-h265"
+    },
+    {
+      "api": "rdk:component:camera",
+      "model": "erh:viamrtsp:rtsp-mjpeg"
     }
   ],
   "entrypoint": "bin/viamrtsp"
