@@ -10,10 +10,8 @@ jobs:
         config:
           - name: "h264"
             codec: "libx264"
-            extra_ffmpeg_args: ""
           - name: "h265"
             codec: "libx265"
-            extra_ffmpeg_args: ""
           - name: "mjpeg"
             codec: "mjpeg"
             extra_ffmpeg_args: "-huffman 0"
