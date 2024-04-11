@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 
-	"go.uber.org/zap/zapcore"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/module"
@@ -20,10 +19,6 @@ func mainWithArgs(ctx context.Context, args []string, logger logging.Logger) err
 	myMod, err := module.NewModuleFromArgs(ctx, logger)
 	if err != nil {
 		return err
-	}
-
-	if logger.Level() != zapcore.DebugLevel {
-		viamrtsp.SetLibAVLogLevelFatal()
 	}
 
 	for _, model := range viamrtsp.Models {
