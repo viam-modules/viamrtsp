@@ -272,7 +272,6 @@ func newH264ServerHandler(
 			logger.Debug("OnSessionCloseFunc")
 			sh.mu.Lock()
 			defer sh.mu.Unlock()
-			// sh.stream.Close()
 		},
 		OnDescribeFunc: func(ctx *gortsplib.ServerHandlerOnDescribeCtx, sh *serverHandler) (*base.Response, *gortsplib.ServerStream, error) {
 			logger.Debug("OnDescribeFunc")
