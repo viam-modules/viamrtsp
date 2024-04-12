@@ -36,13 +36,15 @@ import (
 	"go.viam.com/rdk/rimage/transform"
 )
 
-var family = resource.ModelNamespace("erh").WithFamily("viamrtsp")
-var ModelAgnostic = family.WithModel("rtsp")
-var ModelH264 = family.WithModel("rtsp-h264")
-var ModelH265 = family.WithModel("rtsp-h265")
-var ModelMJPEG = family.WithModel("rtsp-mjpeg")
-var Models = []resource.Model{ModelAgnostic, ModelH264, ModelH265, ModelMJPEG}
-var ErrH264PassthroughNotEnabled = errors.New("H264 passthrough is not enabled")
+var (
+	family                       = resource.ModelNamespace("erh").WithFamily("viamrtsp")
+	ModelAgnostic                = family.WithModel("rtsp")
+	ModelH264                    = family.WithModel("rtsp-h264")
+	ModelH265                    = family.WithModel("rtsp-h265")
+	ModelMJPEG                   = family.WithModel("rtsp-mjpeg")
+	Models                       = []resource.Model{ModelAgnostic, ModelH264, ModelH265, ModelMJPEG}
+	ErrH264PassthroughNotEnabled = errors.New("H264 passthrough is not enabled")
+)
 
 func init() {
 	for _, model := range Models {
