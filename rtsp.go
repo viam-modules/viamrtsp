@@ -135,20 +135,19 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 					errors.Is(err, io.EOF) ||
 					errors.Is(err, syscall.EPIPE) ||
 					errors.Is(err, syscall.ECONNREFUSED)) {
-					rc.logger.Warnw("The rtsp client encountered an error, trying to reconnect", "url", rc.u, "error", err)
+					rc.logger.Warnf("The rtsp client encountered an error, trying to reconnect to %s, err: %s", rc.u, err)
 					badState = true
 				} else if res != nil && res.StatusCode != base.StatusOK {
-					rc.logger.Warnw("The rtsp server responded with non-OK status", "url", rc.u, "status code", res.StatusCode)
+					rc.logger.Warnf("The rtsp server responded with non-OK status url: %s, status_code: %s", rc.u, res.StatusCode)
 					badState = true
 				}
 			}
 
 			if badState {
 				if err := rc.reconnectClient(codecInfo); err != nil {
-					rc.logger.Warnw("cannot reconnect to rtsp server", "error", err)
-					rc.logger.Warnf("cannot reconnect to rtsp server %s", err.Error())
+					rc.logger.Warnf("cannot reconnect to rtsp server err: %s", err.Error())
 				} else {
-					rc.logger.Infow("reconnected to rtsp server", "url", rc.u)
+					rc.logger.Infof("reconnected to rtsp server url: %s", rc.u)
 				}
 			}
 		}
@@ -213,17 +212,17 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec) error {
 
 	switch codecInfo {
 	case H264:
-		rc.logger.Infof("setting up H264 decoder")
+		rc.logger.Info("setting up H264 decoder")
 		if err := rc.initH264(session); err != nil {
 			return err
 		}
 	case H265:
-		rc.logger.Infof("setting up H265 decoder")
+		rc.logger.Info("setting up H265 decoder")
 		if err := rc.initH265(session); err != nil {
 			return err
 		}
 	case MJPEG:
-		rc.logger.Infof("setting up MJPEG decoder")
+		rc.logger.Info("setting up MJPEG decoder")
 		if err := rc.initMJPEG(session); err != nil {
 			return err
 		}
@@ -281,7 +280,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		au, err := rtpDec.Decode(pkt)
 		if err != nil {
 			if err != rtph264.ErrNonStartingPacketAndNoPrevious && err != rtph264.ErrMorePacketsNeeded {
-				rc.logger.Errorf("error decoding(1) h264 rstp stream %v", err)
+				rc.logger.Errorf("error decoding(1) h264 rstp stream err: %s", err.Error())
 			}
 			return
 		}
@@ -290,7 +289,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 			// convert NALUs into RGBA frames
 			image, err := rc.rawDecoder.decode(nalu)
 			if err != nil {
-				rc.logger.Errorf("error decoding(2) h264 rtsp stream  %v", err)
+				rc.logger.Errorf("error decoding(2) h264 rtsp stream  %s", err.Error())
 				return
 			}
 			if image != nil {
@@ -406,7 +405,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		au, err := rtpDec.Decode(pkt)
 		if err != nil {
 			if err != rtph265.ErrNonStartingPacketAndNoPrevious && err != rtph265.ErrMorePacketsNeeded {
-				rc.logger.Errorf("error decoding(1) h265 rstp stream %v", err)
+				rc.logger.Errorf("error decoding(1) h265 rstp stream err: %s", err.Error())
 			}
 			return
 		}
@@ -414,7 +413,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		for _, nalu := range au {
 			lastImage, err := rc.rawDecoder.decode(nalu)
 			if err != nil {
-				rc.logger.Errorf("error decoding(2) h265 rtsp stream  %v", err)
+				rc.logger.Errorf("error decoding(2) h265 rtsp stream err: %s", err.Error())
 				return
 			}
 
@@ -464,7 +463,7 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 
 		img, err := jpeg.Decode(bytes.NewReader(frame))
 		if err != nil {
-			rc.logger.Debugw("error converting MJPEG frame to image", "error", err)
+			rc.logger.Debugf("error converting MJPEG frame to image err: %s", err.Error())
 			return
 		}
 
@@ -483,7 +482,9 @@ func (rc *rtspCamera) SubscribeRTP(ctx context.Context, bufferSize int, packetsC
 		return uuid.Nil, ErrH264PassthroughNotEnabled
 	}
 
-	sub, err := rtppassthrough.NewStreamSubscription(bufferSize, func(err error) { rc.logger.Errorw("stream subscription hit error", "err", err) })
+	sub, err := rtppassthrough.NewStreamSubscription(bufferSize, func(err error) {
+		rc.logger.Errorf("stream subscription hit err: %s", err.Error())
+	})
 	if err != nil {
 		return uuid.Nil, err
 	}
