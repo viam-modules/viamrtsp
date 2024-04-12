@@ -23,7 +23,7 @@ ifeq ($(UNAME_S),Linux)
 	CGO_LDFLAGS := "$(CGO_LDFLAGS) -l:libjpeg.a"
 endif
 
-.PHONY: build-ffmpeg test lint updaterdk module clean
+.PHONY: build-ffmpeg lint update-rdk module clean clean-all
 
 $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
 	PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig \
@@ -33,7 +33,7 @@ $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
 lint:
 	gofmt -w -s .
 
-updaterdk:
+update-rdk:
 	go get go.viam.com/rdk@latest
 	go mod tidy
 
@@ -54,11 +54,9 @@ endif
 module: $(BIN_OUTPUT_PATH)/viamrtsp
 	tar czf $(BIN_OUTPUT_PATH)/module.tar.gz $(BIN_OUTPUT_PATH)/viamrtsp
 
-clean-ffmpeg-all:
-	rm -rf FFmpeg
-
-clean-viamrtsp:
+clean:
 	rm -rf $(BIN_OUTPUT_PATH)/viamrtsp $(BIN_OUTPUT_PATH)/module.tar.gz
 
 clean-all:
+	rm -rf FFmpeg
 	git clean -fxd
