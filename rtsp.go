@@ -146,6 +146,7 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 			if badState {
 				if err := rc.reconnectClient(codecInfo); err != nil {
 					rc.logger.Warnw("cannot reconnect to rtsp server", "error", err)
+					rc.logger.Warnf("cannot reconnect to rtsp server %s", err.Error())
 				} else {
 					rc.logger.Infow("reconnected to rtsp server", "url", rc.u)
 				}
@@ -339,12 +340,12 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		}
 	}
 
-	rc.client.OnPacketRTP(media, f, onPacketRTP)
-
 	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
 	if err != nil {
 		return errors.Wrapf(err, "when calling RTSP Setup on %s for H264", session.BaseURL)
 	}
+
+	rc.client.OnPacketRTP(media, f, onPacketRTP)
 
 	return nil
 }
@@ -394,6 +395,11 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		rc.logger.Warnf("no PPS found in H265 format")
 	}
 
+	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
+	if err != nil {
+		return errors.Wrapf(err, "when calling RTSP Setup on %s for H265", session.BaseURL)
+	}
+
 	// On packet retreival, turn it into an image, and store it in shared memory
 	rc.client.OnPacketRTP(media, f, func(pkt *rtp.Packet) {
 		// Extract access units from RTP packets
@@ -417,11 +423,6 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 			}
 		}
 	})
-
-	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
-	if err != nil {
-		return errors.Wrapf(err, "when calling RTSP Setup on %s for H265", session.BaseURL)
-	}
 
 	return nil
 }
@@ -447,6 +448,11 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 		return errors.Wrap(err, "creating MJPEG RTP decoder")
 	}
 
+	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
+	if err != nil {
+		return errors.Wrapf(err, "when calling RTSP Setup on %s for MJPEG", session.BaseURL)
+	}
+
 	rc.client.OnPacketRTP(media, f, func(pkt *rtp.Packet) {
 		frame, err := mjpegDecoder.Decode(pkt)
 		if err != nil {
@@ -464,11 +470,6 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 
 		rc.latestFrame.Store(&img)
 	})
-
-	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
-	if err != nil {
-		return errors.Wrapf(err, "when calling RTSP Setup on %s for MJPEG", session.BaseURL)
-	}
 
 	return nil
 }
