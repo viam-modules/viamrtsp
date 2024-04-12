@@ -66,6 +66,21 @@ const (
 	MJPEG
 )
 
+func (vc videoCodec) String() string {
+	switch vc {
+	case Agnostic:
+		return "Agnostic"
+	case H264:
+		return "H264"
+	case H265:
+		return "H265"
+	case MJPEG:
+		return "MJPEG"
+	default:
+		return "Unknown"
+	}
+}
+
 func frameData(frame *C.AVFrame) **C.uint8_t {
 	return (**C.uint8_t)(unsafe.Pointer(&frame.data[0]))
 }

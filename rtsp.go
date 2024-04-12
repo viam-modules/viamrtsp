@@ -166,12 +166,12 @@ func (rc *rtspCamera) closeConnection() {
 }
 
 // reconnectClient reconnects the RTSP client to the streaming server by closing the old one and starting a new one.
-func (rc *rtspCamera) reconnectClient(codecInfo videoCodec) (err error) {
+func (rc *rtspCamera) reconnectClient(codecInfo videoCodec) error {
 	if rc == nil {
 		return errors.New("rtspCamera is nil")
 	}
 
-	rc.logger.Warnf("reconnectClient called")
+	rc.logger.Warnf("reconnectClient called with codec: %s", codecInfo)
 
 	rc.closeConnection()
 
@@ -186,9 +186,9 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec) (err error) {
 	rc.client.OnDecodeError = func(err error) {
 		rc.logger.Debugf("OnDecodeError: err: %s", err.Error())
 	}
-	err = rc.client.Start(rc.u.Scheme, rc.u.Host)
-	if err != nil {
-		return err
+
+	if err := rc.client.Start(rc.u.Scheme, rc.u.Host); err != nil {
+		return errors.Wrapf(err, "when calling RTSP START on Scheme: %s, Host: %s", rc.u.Scheme, rc.u.Host)
 	}
 
 	var clientSuccessful bool
@@ -200,35 +200,37 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec) (err error) {
 
 	session, _, err := rc.client.Describe(rc.u)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "when calling RTSP DESCRIBE on %s", rc.u)
 	}
 
 	if codecInfo == Agnostic {
 		codecInfo, err = getStreamInfo(rc.u.String())
 		if err != nil {
-			return err
+			return errors.Wrap(err, "when trying to detect codec with libav")
 		}
 	}
 
 	switch codecInfo {
 	case H264:
 		rc.logger.Infof("setting up H264 decoder")
-		err = rc.initH264(session)
+		if err := rc.initH264(session); err != nil {
+			return err
+		}
 	case H265:
 		rc.logger.Infof("setting up H265 decoder")
-		err = rc.initH265(session)
+		if err := rc.initH265(session); err != nil {
+			return err
+		}
 	case MJPEG:
 		rc.logger.Infof("setting up MJPEG decoder")
-		err = rc.initMJPEG(session)
+		if err := rc.initMJPEG(session); err != nil {
+			return err
+		}
 	default:
 		return errors.Errorf("codec not supported %v", codecInfo)
 	}
-	if err != nil {
-		return err
-	}
 
-	_, err = rc.client.Play(nil)
-	if err != nil {
+	if _, err := rc.client.Play(nil); err != nil {
 		return err
 	}
 	clientSuccessful = true
@@ -253,14 +255,13 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 	// setup RTP/H264 -> H264 decoder
 	rtpDec, err := f.CreateDecoder()
 	if err != nil {
-		rc.logger.Errorf("error creating H264 decoder %v", err)
-		return err
+		return errors.Wrap(err, "creating H264 RTP decoder")
 	}
 
 	// setup H264 -> raw frames decoder
 	rc.rawDecoder, err = newH264Decoder()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "creating H264 raw decoder")
 	}
 
 	// if SPS and PPS are present into the SDP, send them to the decoder
@@ -285,12 +286,10 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		}
 
 		for _, nalu := range au {
-
 			// convert NALUs into RGBA frames
 			image, err := rc.rawDecoder.decode(nalu)
-
 			if err != nil {
-				rc.logger.Error("error decoding(2) h264 rtsp stream  %v", err)
+				rc.logger.Errorf("error decoding(2) h264 rtsp stream  %v", err)
 				return
 			}
 			if image != nil {
@@ -306,7 +305,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 	if rc.rtpH264Passthrough {
 		fp, err := formatprocessor.New(1472, f, true)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "unable to create new h264 rtp formatprocessor")
 		}
 
 		publishToWebRTC := func(pkt *rtp.Packet) {
@@ -340,12 +339,12 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		}
 	}
 
+	rc.client.OnPacketRTP(media, f, onPacketRTP)
+
 	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "when calling RTSP Setup on %s for H264", session.BaseURL)
 	}
-
-	rc.client.OnPacketRTP(media, f, onPacketRTP)
 
 	return nil
 }
@@ -366,20 +365,14 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		return errors.New("h265 track not found")
 	}
 
-	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
-	if err != nil {
-		return err
-	}
-
 	rtpDec, err := f.CreateDecoder()
 	if err != nil {
-		rc.logger.Errorf("error creating H265 decoder %v", err)
-		return err
+		return errors.Wrap(err, "creating H265 RTP decoder")
 	}
 
 	rc.rawDecoder, err = newH265Decoder()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "creating H265 raw decoder")
 	}
 
 	// For H.265, handle VPS, SPS, and PPS
@@ -415,7 +408,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		for _, nalu := range au {
 			lastImage, err := rc.rawDecoder.decode(nalu)
 			if err != nil {
-				rc.logger.Error("error decoding(2) h265 rtsp stream  %v", err)
+				rc.logger.Errorf("error decoding(2) h265 rtsp stream  %v", err)
 				return
 			}
 
@@ -425,6 +418,11 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		}
 	})
 
+	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
+	if err != nil {
+		return errors.Wrapf(err, "when calling RTSP Setup on %s for H265", session.BaseURL)
+	}
+
 	return nil
 }
 
@@ -433,6 +431,7 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 	if rc.rtpH264Passthrough {
 		return errors.New("address reports to have only an MJPEG track but rtpH264Passthrough was enabled")
 	}
+
 	var f *format.MJPEG
 	media := session.FindFormat(&f)
 	if media == nil {
@@ -443,14 +442,9 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 		return errors.New("MJPEG track not found")
 	}
 
-	_, err := rc.client.Setup(session.BaseURL, media, 0, 0)
-	if err != nil {
-		return err
-	}
-
 	mjpegDecoder, err := f.CreateDecoder()
 	if err != nil {
-		return errors.Wrap(err, "error creating MJPEG decoder")
+		return errors.Wrap(err, "creating MJPEG RTP decoder")
 	}
 
 	rc.client.OnPacketRTP(media, f, func(pkt *rtp.Packet) {
@@ -464,12 +458,18 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 
 		img, err := jpeg.Decode(bytes.NewReader(frame))
 		if err != nil {
-			rc.logger.Errorf("error converting MJPEG frame to image: %v", err)
+			rc.logger.Debugw("error converting MJPEG frame to image", "error", err)
 			return
 		}
 
 		rc.latestFrame.Store(&img)
 	})
+
+	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
+	if err != nil {
+		return errors.Wrapf(err, "when calling RTSP Setup on %s for MJPEG", session.BaseURL)
+	}
+
 	return nil
 }
 
@@ -568,10 +568,12 @@ func (rc *rtspCamera) Unsubscribe(ctx context.Context, id rtppassthrough.Subscri
 func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.Config, logger logging.Logger) (camera.Camera, error) {
 	newConf, err := resource.NativeConfig[*Config](conf)
 	if err != nil {
+		logger.Error(err.Error())
 		return nil, err
 	}
 	u, err := base.ParseURL(newConf.Address)
 	if err != nil {
+		logger.Error(err.Error())
 		return nil, err
 	}
 	rtspCam := &rtspCamera{
@@ -582,10 +584,12 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 	}
 	codecInfo, err := modelToCodec(conf.Model)
 	if err != nil {
+		logger.Error(err.Error())
 		return nil, err
 	}
 	err = rtspCam.reconnectClient(codecInfo)
 	if err != nil {
+		logger.Error(err.Error())
 		return nil, err
 	}
 	cancelCtx, cancel := context.WithCancel(context.Background())
@@ -603,6 +607,7 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 	rtspCam.clientReconnectBackgroundWorker(codecInfo)
 	src, err := camera.NewVideoSourceFromReader(ctx, rtspCam, &cameraModel, camera.ColorStream)
 	if err != nil {
+		logger.Error(err.Error())
 		return nil, err
 	}
 
