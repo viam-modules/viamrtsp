@@ -240,7 +240,6 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec) (err error) {
 func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 	// setup RTP/H264 -> H264 decoder
 	var f *format.H264
-	var forma format.Format
 
 	media := session.FindFormat(&f)
 	if media == nil {
@@ -250,7 +249,6 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		}
 		return errors.New("h264 track not found")
 	}
-	forma = f
 
 	// setup RTP/H264 -> H264 decoder
 	rtpDec, err := f.CreateDecoder()
@@ -347,7 +345,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		return err
 	}
 
-	rc.client.OnPacketRTP(media, forma, onPacketRTP)
+	rc.client.OnPacketRTP(media, f, onPacketRTP)
 
 	return nil
 }
@@ -507,6 +505,7 @@ func (rc *rtspCamera) SubscribeRTP(ctx context.Context, bufferSize int, packetsC
 	// This is intended to free the SubscribeRTP caller from needing
 	// to care about how to transform RTSP compliant RTP packets into
 	// WebRTC compliant RTP packets.
+	// Inspired by https://github.com/bluenviron/mediamtx/blob/main/internal/servers/webrtc/session.go#L185
 	unitSubscriberFunc := func(u unit.Unit) error {
 		tunit, ok := u.(*unit.H264)
 		if !ok {
@@ -521,7 +520,9 @@ func (rc *rtspCamera) SubscribeRTP(ctx context.Context, bufferSize int, packetsC
 		if !firstReceived {
 			firstReceived = true
 		} else if tunit.PTS < lastPTS {
-			return errors.New("WebRTC doesn't support H264 streams with B-frames")
+			err := errors.New("WebRTC doesn't support H264 streams with B-frames")
+			rc.logger.Error(err.Error())
+			return err
 		}
 		lastPTS = tunit.PTS
 
