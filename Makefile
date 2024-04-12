@@ -1,7 +1,11 @@
+BIN_OUTPUT_PATH = bin/$(shell uname -s)-$(shell uname -m)
 UNAME_S ?= $(shell uname -s)
 UNAME_M ?= $(shell uname -m)
-FFMPEG_PREFIX ?= $(shell pwd)/FFmpeg/$(UNAME_S)-$(UNAME_M)
-FFMPEG_OPTS ?= --prefix=$(FFMPEG_PREFIX) \
+FFMPEG_TAG ?= n6.1
+FFMPEG_VERSION ?= $(shell pwd)/FFmpeg/$(FFMPEG_TAG)
+FFMPEG_VERSION_PLATFORM ?= $(FFMPEG_VERSION)/$(UNAME_S)-$(UNAME_M)
+FFMPEG_BUILD ?= $(FFMPEG_VERSION_PLATFORM)/build
+FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-static \
                --disable-shared \
                --disable-programs \
@@ -14,20 +18,17 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_PREFIX) \
                --enable-parser=h264 \
                --enable-parser=hevc
 
-CGO_LDFLAGS := -L$(FFMPEG_PREFIX)/lib
+CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib
 ifeq ($(UNAME_S),Linux)
 	CGO_LDFLAGS := "$(CGO_LDFLAGS) -l:libjpeg.a"
 endif
 
 .PHONY: build-ffmpeg test lint updaterdk module clean
 
-bin/viamrtsp: build-ffmpeg *.go cmd/module/*.go
-	PKG_CONFIG_PATH=$(FFMPEG_PREFIX)/lib/pkgconfig \
+$(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
+	PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig \
 		CGO_LDFLAGS=$(CGO_LDFLAGS) \
-		go build -o bin/viamrtsp cmd/module/cmd.go
-
-test:
-	go test
+		go build -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
 
 lint:
 	gofmt -w -s .
@@ -36,11 +37,11 @@ updaterdk:
 	go get go.viam.com/rdk@latest
 	go mod tidy
 
-FFmpeg:
-	git clone https://github.com/FFmpeg/FFmpeg.git --depth 1 --branch n6.1
+$(FFMPEG_VERSION_PLATFORM):
+	git clone https://github.com/FFmpeg/FFmpeg.git --depth 1 --branch $(FFMPEG_TAG) $(FFMPEG_VERSION_PLATFORM)
 
-$(FFMPEG_PREFIX): FFmpeg
-	cd FFmpeg && ./configure $(FFMPEG_OPTS) && $(MAKE) -j$(shell nproc) && $(MAKE) install
+$(FFMPEG_BUILD): $(FFMPEG_VERSION_PLATFORM)
+	cd $(FFMPEG_VERSION_PLATFORM) && ./configure $(FFMPEG_OPTS) && $(MAKE) -j$(shell nproc) && $(MAKE) install
 
 build-ffmpeg:
 ifeq ($(UNAME_S),Linux)
@@ -48,13 +49,16 @@ ifeq ($(UNAME_M),x86_64)
 	which nasm || (sudo apt update && sudo apt install -y nasm)
 endif
 endif
-	$(MAKE) $(FFMPEG_PREFIX)
+	$(MAKE) $(FFMPEG_BUILD)
 
-module: bin/viamrtsp
-	tar czf module.tar.gz bin/viamrtsp
+module: $(BIN_OUTPUT_PATH)/viamrtsp
+	tar czf $(BIN_OUTPUT_PATH)/module.tar.gz $(BIN_OUTPUT_PATH)/viamrtsp
 
-clean:
-	rm -rf FFmpeg bin/viamrtsp module.tar.gz
+clean-ffmpeg-all:
+	rm -rf FFmpeg
+
+clean-viamrtsp:
+	rm -rf $(BIN_OUTPUT_PATH)/viamrtsp $(BIN_OUTPUT_PATH)/module.tar.gz
 
 clean-all:
 	git clean -fxd
