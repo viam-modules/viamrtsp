@@ -204,10 +204,14 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec) error {
 	}
 
 	if codecInfo == Agnostic {
+		rc.logger.Debugf("calling getStreamInfo on %s", rc.u)
 		codecInfo, err = getStreamInfo(rc.u.String())
 		if err != nil {
-			return errors.Wrap(err, "when trying to detect codec with libav")
+			err := errors.Wrap(err, "when trying to detect codec with libav")
+			rc.logger.Debugf(err.Error())
+			return err
 		}
+		rc.logger.Debug("getStreamInfo success")
 	}
 
 	switch codecInfo {
