@@ -66,6 +66,21 @@ const (
 	MJPEG
 )
 
+func (vc videoCodec) String() string {
+	switch vc {
+	case Agnostic:
+		return "Agnostic"
+	case H264:
+		return "H264"
+	case H265:
+		return "H265"
+	case MJPEG:
+		return "MJPEG"
+	default:
+		return "Unknown"
+	}
+}
+
 func frameData(frame *C.AVFrame) **C.uint8_t {
 	return (**C.uint8_t)(unsafe.Pointer(&frame.data[0]))
 }
@@ -121,6 +136,12 @@ func avError(avErr C.int) string {
 		return fmt.Sprintf("Unknown error with code %d", avErr)
 	}
 	return C.GoString(&errbuf[0])
+}
+
+// SetLibAVLogLevelFatal sets libav errors to fatal log level
+// to cut down on log spam
+func SetLibAVLogLevelFatal() {
+	C.av_log_set_level(C.AV_LOG_FATAL)
 }
 
 // newDecoder creates a new decoder for the given codec.
