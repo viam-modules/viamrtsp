@@ -6,10 +6,8 @@ import (
 	"fmt"
 	"image"
 	"image/jpeg"
-	"io"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"github.com/bluenviron/gortsplib/v4"
