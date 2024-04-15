@@ -112,10 +112,12 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 				badState = true
 			} else {
 				res, err := rc.client.Options(rc.u)
-				if err != nil && (errors.Is(err, liberrors.ErrClientTerminated{}) ||
-					errors.Is(err, io.EOF) ||
-					errors.Is(err, syscall.EPIPE) ||
-					errors.Is(err, syscall.ECONNREFUSED)) {
+				rc.logger.Debugf("Options reponse: %s, err: %s", res, err)
+				// Nick S:
+				// This error happens all the time on hardware we need to support & does not affect
+				// the performance of camera streaming. As a result, we ignore this error specifically
+				_, isErrClientInvalidState := err.(liberrors.ErrClientInvalidState)
+				if err != nil && !isErrClientInvalidState {
 					rc.logger.Warnf("The rtsp client encountered an error, trying to reconnect to %s, err: %s", rc.u, err)
 					badState = true
 				} else if res != nil && res.StatusCode != base.StatusOK {
