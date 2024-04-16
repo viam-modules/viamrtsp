@@ -86,6 +86,7 @@ type subAndCB struct {
 
 // rtspCamera contains the rtsp client, and the reader function that fulfills the camera interface.
 type rtspCamera struct {
+	model resource.Model
 	gostream.VideoReader
 	u *base.URL
 
@@ -101,7 +102,8 @@ type rtspCamera struct {
 
 	logger logging.Logger
 
-	rtpH264Passthrough bool
+	rtpPassthrough bool
+	currentCodec   atomic.Int64
 
 	subsMu       sync.RWMutex
 	subAndCBByID map[rtppassthrough.SubscriptionID]subAndCB
@@ -158,6 +160,7 @@ func (rc *rtspCamera) closeConnection() {
 		rc.client.Close()
 		rc.client = nil
 	}
+	rc.currentCodec.Store(0)
 	if rc.rawDecoder != nil {
 		rc.rawDecoder.close()
 		rc.rawDecoder = nil
@@ -166,10 +169,6 @@ func (rc *rtspCamera) closeConnection() {
 
 // reconnectClient reconnects the RTSP client to the streaming server by closing the old one and starting a new one.
 func (rc *rtspCamera) reconnectClient(codecInfo videoCodec) error {
-	if rc == nil {
-		return errors.New("rtspCamera is nil")
-	}
-
 	rc.logger.Warnf("reconnectClient called with codec: %s", codecInfo)
 
 	rc.closeConnection()
@@ -237,7 +236,7 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec) error {
 		return err
 	}
 	clientSuccessful = true
-
+	rc.currentCodec.Store(int64(codecInfo))
 	return nil
 }
 
@@ -305,7 +304,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		storeImage(pkt)
 	}
 
-	if rc.rtpH264Passthrough {
+	if rc.rtpPassthrough {
 		fp, err := formatprocessor.New(1472, f, true)
 		if err != nil {
 			return errors.Wrap(err, "unable to create new h264 rtp formatprocessor")
@@ -354,7 +353,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 
 // initH265 initializes the H265 decoder and sets up the client to receive H265 packets.
 func (rc *rtspCamera) initH265(session *description.Session) (err error) {
-	if rc.rtpH264Passthrough {
+	if rc.rtpPassthrough && rc.model != ModelAgnostic {
 		return errors.New("address reports to have only an h265 track but rtpH264Passthrough was enabled")
 	}
 	var f *format.H265
@@ -431,7 +430,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 
 // initMJPEG initializes the MJPEG decoder and sets up the client to receive JPEG frames.
 func (rc *rtspCamera) initMJPEG(session *description.Session) error {
-	if rc.rtpH264Passthrough {
+	if rc.rtpPassthrough && rc.model != ModelAgnostic {
 		return errors.New("address reports to have only an MJPEG track but rtpH264Passthrough was enabled")
 	}
 
@@ -479,14 +478,14 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 // SubscribeRTP registers the PacketCallback which will be called when there are new packets.
 // NOTE: Packets may be dropped before calling packetsCB if the rate new packets are received by
 // the rtppassthrough.Source is greater than the rate the subscriber consumes them.
-
 func (rc *rtspCamera) SubscribeRTP(ctx context.Context, bufferSize int, packetsCB rtppassthrough.PacketCallback) (rtppassthrough.SubscriptionID, error) {
-	if !rc.rtpH264Passthrough {
+	if err := rc.validateSupportsPassthrough(); err != nil {
+		rc.logger.Debug(err.Error())
 		return uuid.Nil, ErrH264PassthroughNotEnabled
 	}
 
 	sub, err := rtppassthrough.NewStreamSubscription(bufferSize, func(err error) {
-		rc.logger.Errorf("stream subscription hit err: %s", err.Error())
+		rc.logger.Errorf("stream subscription hit err: %s", err)
 	})
 	if err != nil {
 		return uuid.Nil, err
@@ -582,10 +581,11 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		return nil, err
 	}
 	rtspCam := &rtspCamera{
-		u:                  u,
-		rtpH264Passthrough: newConf.RTPPassthrough,
-		subAndCBByID:       make(map[rtppassthrough.SubscriptionID]subAndCB),
-		logger:             logger,
+		model:          conf.Model,
+		u:              u,
+		rtpPassthrough: newConf.RTPPassthrough,
+		subAndCBByID:   make(map[rtppassthrough.SubscriptionID]subAndCB),
+		logger:         logger,
 	}
 	codecInfo, err := modelToCodec(conf.Model)
 	if err != nil {
@@ -626,6 +626,23 @@ func (rc *rtspCamera) unsubscribeAll() {
 		subAndCB.sub.Close()
 		delete(rc.subAndCBByID, id)
 	}
+}
+
+func (rc *rtspCamera) validateSupportsPassthrough() error {
+	if !rc.rtpPassthrough {
+		return errors.New("rtp_passthrough not enabled in config")
+	}
+
+	if rc.model != ModelAgnostic && rc.model != ModelH264 {
+		return fmt.Errorf("model %s does not support rtp_passthrough", rc.model)
+	}
+
+	currentCodec := videoCodec(rc.currentCodec.Load())
+	if currentCodec != H264 {
+		return fmt.Errorf("rtp_passthrough only supported on H264 codec, current codec is: %s", currentCodec)
+	}
+
+	return nil
 }
 
 func modelToCodec(model resource.Model) (videoCodec, error) {
