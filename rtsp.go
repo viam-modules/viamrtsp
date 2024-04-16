@@ -53,8 +53,7 @@ type Config struct {
 	DistortionParams *transform.BrownConrady            `json:"distortion_parameters,omitempty"`
 }
 
-// CodecFormat is a struct that contains a pointer to a codec format and
-// the FFmpeg codec that it corresponds to.
+// CodecFormat contains a pointer to a format and the corresponding FFmpeg codec.
 type CodecFormat struct {
 	FormatPointer interface{}
 	Codec         videoCodec
