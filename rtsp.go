@@ -119,7 +119,7 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 					rc.logger.Warnf("The rtsp client encountered an error, trying to reconnect to %s, err: %s", rc.u, err)
 					badState = true
 				} else if res != nil && res.StatusCode != base.StatusOK {
-					rc.logger.Warnf("The rtsp server responded with non-OK status url: %s, status_code: %s", rc.u, res.StatusCode)
+					rc.logger.Warnf("The rtsp server responded with non-OK status url: %s, status_code: %d", rc.u, res.StatusCode)
 					badState = true
 				}
 			}
@@ -159,13 +159,13 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec) error {
 	// replace the client with a new one, but close it if setup is not successful
 	rc.client = &gortsplib.Client{}
 	rc.client.OnPacketLost = func(err error) {
-		rc.logger.Debugf("OnPacketLost: err: %s", err.Error())
+		rc.logger.Debugf("OnPacketLost: err: %s", err)
 	}
 	rc.client.OnTransportSwitch = func(err error) {
-		rc.logger.Debugf("OnTransportSwitch: err: %s", err.Error())
+		rc.logger.Debugf("OnTransportSwitch: err: %s", err)
 	}
 	rc.client.OnDecodeError = func(err error) {
-		rc.logger.Debugf("OnDecodeError: err: %s", err.Error())
+		rc.logger.Debugf("OnDecodeError: err: %s", err)
 	}
 
 	if err := rc.client.Start(rc.u.Scheme, rc.u.Host); err != nil {
