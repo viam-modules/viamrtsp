@@ -1,5 +1,6 @@
 // Package formatprocessor processes RTP packets into Units when can then be re-encoded
-// heavily copied from https://github.com/bluenviron/mediamtx/blob/main/internal/formatprocessor/h264.go & the rest of that package
+// heavily copied from https://github.com/bluenviron/mediamtx/blob/main/internal/formatprocessor/h264.go
+// https://github.com/bluenviron/mediamtx/blob/main/internal/unit/h264.go & related package & the rest of that package
 package formatprocessor
 
 import (
@@ -11,14 +12,52 @@ import (
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtph264"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
 	"github.com/pion/rtp"
-
-	"github.com/erh/viamrtsp/unit"
 )
+
+// Unit is the elementary data unit routed across the server.
+type Unit interface {
+	// returns RTP packets contained into the unit.
+	GetRTPPackets() []*rtp.Packet
+
+	// returns the NTP timestamp of the unit.
+	GetNTP() time.Time
+
+	// returns the PTS of the unit.
+	GetPTS() time.Duration
+}
+
+// H264 is a H264 data unit.
+type H264 struct {
+	Base
+	AU [][]byte
+}
+
+// Base contains fields shared across all units.
+type Base struct {
+	RTPPackets []*rtp.Packet
+	NTP        time.Time
+	PTS        time.Duration
+}
+
+// GetRTPPackets implements Unit.
+func (u *Base) GetRTPPackets() []*rtp.Packet {
+	return u.RTPPackets
+}
+
+// GetNTP implements Unit.
+func (u *Base) GetNTP() time.Time {
+	return u.NTP
+}
+
+// GetPTS implements Unit.
+func (u *Base) GetPTS() time.Duration {
+	return u.PTS
+}
 
 // Processor processes RTP packets & turns them into Units.
 type Processor interface {
 	// process a Unit.
-	ProcessUnit(unit.Unit) error
+	ProcessUnit(Unit) error
 
 	// process a RTP packet and convert it into a unit.
 	ProcessRTPPacket(
@@ -26,7 +65,7 @@ type Processor interface {
 		ntp time.Time,
 		pts time.Duration,
 		hasNonRTSPReaders bool,
-	) (unit.Unit, error)
+	) (Unit, error)
 }
 
 // New returns a new Processor.
@@ -381,8 +420,8 @@ func (t *formatProcessorH264) remuxAccessUnit(au [][]byte) [][]byte {
 	return filteredNALUs
 }
 
-func (t *formatProcessorH264) ProcessUnit(uu unit.Unit) error {
-	u := uu.(*unit.H264)
+func (t *formatProcessorH264) ProcessUnit(uu Unit) error {
+	u := uu.(*H264)
 
 	t.updateTrackParametersFromAU(u.AU)
 	u.AU = t.remuxAccessUnit(u.AU)
@@ -408,9 +447,9 @@ func (t *formatProcessorH264) ProcessRTPPacket(
 	ntp time.Time,
 	pts time.Duration,
 	hasNonRTSPReaders bool,
-) (unit.Unit, error) {
-	u := &unit.H264{
-		Base: unit.Base{
+) (Unit, error) {
+	u := &H264{
+		Base: Base{
 			RTPPackets: []*rtp.Packet{pkt},
 			NTP:        ntp,
 			PTS:        pts,

@@ -20,7 +20,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/erh/viamrtsp/formatprocessor"
-	"github.com/erh/viamrtsp/unit"
 
 	"github.com/pion/rtp"
 	"github.com/pkg/errors"
@@ -79,7 +78,7 @@ func (conf *Config) Validate(path string) ([]string, error) {
 	return nil, nil
 }
 
-type unitSubscriberFunc func(unit.Unit) error
+type unitSubscriberFunc func(formatprocessor.Unit) error
 type subAndCB struct {
 	cb  unitSubscriberFunc
 	sub *rtppassthrough.StreamSubscription
@@ -512,8 +511,8 @@ func (rc *rtspCamera) SubscribeRTP(ctx context.Context, bufferSize int, packetsC
 	// to care about how to transform RTSP compliant RTP packets into
 	// WebRTC compliant RTP packets.
 	// Inspired by https://github.com/bluenviron/mediamtx/blob/main/internal/servers/webrtc/session.go#L185
-	unitSubscriberFunc := func(u unit.Unit) error {
-		tunit, ok := u.(*unit.H264)
+	unitSubscriberFunc := func(u formatprocessor.Unit) error {
+		tunit, ok := u.(*formatprocessor.H264)
 		if !ok {
 			return errors.New("(*unit.H264) type conversion error")
 		}
