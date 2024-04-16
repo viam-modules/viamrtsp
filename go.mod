@@ -2,6 +2,8 @@ module github.com/erh/viamrtsp
 
 go 1.21
 
+toolchain go1.21.8
+
 require (
 	github.com/bluenviron/gortsplib/v4 v4.8.0
 	github.com/bluenviron/mediacommon v1.9.2
@@ -14,8 +16,6 @@ require (
 	go.viam.com/test v1.1.1-0.20220913152726-5da9916c08a2
 	go.viam.com/utils v0.1.71
 )
-
-toolchain go1.21.8
 
 require (
 	4d63.com/gocheckcompilerdirectives v1.2.1 // indirect
