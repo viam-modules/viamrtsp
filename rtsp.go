@@ -17,12 +17,17 @@ import (
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtph264"
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtph265"
 	"github.com/bluenviron/gortsplib/v4/pkg/liberrors"
+	"github.com/google/uuid"
+
+	"github.com/erh/viamrtsp/formatprocessor"
+	"github.com/erh/viamrtsp/unit"
 
 	"github.com/pion/rtp"
 	"github.com/pkg/errors"
 	goutils "go.viam.com/utils"
 
 	"go.viam.com/rdk/components/camera"
+	"go.viam.com/rdk/components/camera/rtppassthrough"
 	"go.viam.com/rdk/gostream"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
@@ -30,12 +35,13 @@ import (
 )
 
 var (
-	family        = resource.ModelNamespace("erh").WithFamily("viamrtsp")
-	ModelAgnostic = family.WithModel("rtsp")
-	ModelH264     = family.WithModel("rtsp-h264")
-	ModelH265     = family.WithModel("rtsp-h265")
-	ModelMJPEG    = family.WithModel("rtsp-mjpeg")
-	Models        = []resource.Model{ModelAgnostic, ModelH264, ModelH265, ModelMJPEG}
+	family                       = resource.ModelNamespace("erh").WithFamily("viamrtsp")
+	ModelAgnostic                = family.WithModel("rtsp")
+	ModelH264                    = family.WithModel("rtsp-h264")
+	ModelH265                    = family.WithModel("rtsp-h265")
+	ModelMJPEG                   = family.WithModel("rtsp-mjpeg")
+	Models                       = []resource.Model{ModelAgnostic, ModelH264, ModelH265, ModelMJPEG}
+	ErrH264PassthroughNotEnabled = errors.New("H264 passthrough is not enabled")
 )
 
 func init() {
@@ -49,6 +55,7 @@ func init() {
 // Config are the config attributes for an RTSP camera model.
 type Config struct {
 	Address          string                             `json:"rtsp_address"`
+	RTPPassthrough   bool                               `json:"rtp_passthrough"`
 	IntrinsicParams  *transform.PinholeCameraIntrinsics `json:"intrinsic_parameters,omitempty"`
 	DistortionParams *transform.BrownConrady            `json:"distortion_parameters,omitempty"`
 }
@@ -72,6 +79,12 @@ func (conf *Config) Validate(path string) ([]string, error) {
 	return nil, nil
 }
 
+type unitSubscriberFunc func(unit.Unit) error
+type subAndCB struct {
+	cb  unitSubscriberFunc
+	sub *rtppassthrough.StreamSubscription
+}
+
 // rtspCamera contains the rtsp client, and the reader function that fulfills the camera interface.
 type rtspCamera struct {
 	gostream.VideoReader
@@ -88,11 +101,17 @@ type rtspCamera struct {
 	latestFrame atomic.Pointer[image.Image]
 
 	logger logging.Logger
+
+	rtpH264Passthrough bool
+
+	subsMu       sync.RWMutex
+	subAndCBByID map[rtppassthrough.SubscriptionID]subAndCB
 }
 
 // Close closes the camera. It always returns nil, but because of Close() interface, it needs to return an error.
 func (rc *rtspCamera) Close(ctx context.Context) error {
 	rc.cancelFunc()
+	rc.unsubscribeAll()
 	rc.activeBackgroundWorkers.Wait()
 	rc.closeConnection()
 	return nil
@@ -287,6 +306,43 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		storeImage(pkt)
 	}
 
+	if rc.rtpH264Passthrough {
+		fp, err := formatprocessor.New(1472, f, true)
+		if err != nil {
+			return errors.Wrap(err, "unable to create new h264 rtp formatprocessor")
+		}
+
+		publishToWebRTC := func(pkt *rtp.Packet) {
+			pts, ok := rc.client.PacketPTS(media, pkt)
+			if !ok {
+				return
+			}
+			ntp := time.Now()
+			u, err := fp.ProcessRTPPacket(pkt, ntp, pts, true)
+			if err != nil {
+				rc.logger.Debug(err.Error())
+				return
+			}
+			rc.subsMu.RLock()
+			defer rc.subsMu.RUnlock()
+			if len(rc.subAndCBByID) == 0 {
+				return
+			}
+
+			// Publish the newly received packet Unit to all subscribers
+			for _, subAndCB := range rc.subAndCBByID {
+				if err := subAndCB.sub.Publish(func() error { return subAndCB.cb(u) }); err != nil {
+					rc.logger.Debug("RTP packet dropped due to %s", err.Error())
+				}
+			}
+		}
+
+		onPacketRTP = func(pkt *rtp.Packet) {
+			publishToWebRTC(pkt)
+			storeImage(pkt)
+		}
+	}
+
 	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
 	if err != nil {
 		return errors.Wrapf(err, "when calling RTSP Setup on %s for H264", session.BaseURL)
@@ -299,6 +355,9 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 
 // initH265 initializes the H265 decoder and sets up the client to receive H265 packets.
 func (rc *rtspCamera) initH265(session *description.Session) (err error) {
+	if rc.rtpH264Passthrough {
+		return errors.New("address reports to have only an h265 track but rtpH264Passthrough was enabled")
+	}
 	var f *format.H265
 
 	media := session.FindFormat(&f)
@@ -373,6 +432,10 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 
 // initMJPEG initializes the MJPEG decoder and sets up the client to receive JPEG frames.
 func (rc *rtspCamera) initMJPEG(session *description.Session) error {
+	if rc.rtpH264Passthrough {
+		return errors.New("address reports to have only an MJPEG track but rtpH264Passthrough was enabled")
+	}
+
 	var f *format.MJPEG
 	media := session.FindFormat(&f)
 	if media == nil {
@@ -414,6 +477,100 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 	return nil
 }
 
+// SubscribeRTP registers the PacketCallback which will be called when there are new packets.
+// NOTE: Packets may be dropped before calling packetsCB if the rate new packets are received by
+// the rtppassthrough.Source is greater than the rate the subscriber consumes them.
+
+func (rc *rtspCamera) SubscribeRTP(ctx context.Context, bufferSize int, packetsCB rtppassthrough.PacketCallback) (rtppassthrough.SubscriptionID, error) {
+	if !rc.rtpH264Passthrough {
+		return uuid.Nil, ErrH264PassthroughNotEnabled
+	}
+
+	sub, err := rtppassthrough.NewStreamSubscription(bufferSize, func(err error) {
+		rc.logger.Errorf("stream subscription hit err: %s", err.Error())
+	})
+	if err != nil {
+		return uuid.Nil, err
+	}
+	webrtcPayloadMaxSize := 1188 // 1200 - 12 (RTP header)
+	encoder := &rtph264.Encoder{
+		PayloadType:    96,
+		PayloadMaxSize: webrtcPayloadMaxSize,
+	}
+
+	if err := encoder.Init(); err != nil {
+		return uuid.Nil, err
+	}
+
+	var firstReceived bool
+	var lastPTS time.Duration
+	// OnPacketRTP will call this unitSubscriberFunc for all subscribers.
+	// unitSubscriberFunc will then convert the Unit into a slice of
+	// WebRTC compliant RTP packets & call packetsCB, which will
+	// allow the caller of SubscribeRTP to handle the packets.
+	// This is intended to free the SubscribeRTP caller from needing
+	// to care about how to transform RTSP compliant RTP packets into
+	// WebRTC compliant RTP packets.
+	// Inspired by https://github.com/bluenviron/mediamtx/blob/main/internal/servers/webrtc/session.go#L185
+	unitSubscriberFunc := func(u unit.Unit) error {
+		tunit, ok := u.(*unit.H264)
+		if !ok {
+			return errors.New("(*unit.H264) type conversion error")
+		}
+
+		// If we have no AUs we can't encode packets.
+		if tunit.AU == nil {
+			return nil
+		}
+
+		if !firstReceived {
+			firstReceived = true
+		} else if tunit.PTS < lastPTS {
+			err := errors.New("WebRTC doesn't support H264 streams with B-frames")
+			rc.logger.Error(err.Error())
+			return err
+		}
+		lastPTS = tunit.PTS
+
+		pkts, err := encoder.Encode(tunit.AU)
+		if err != nil {
+			// If there is an Encode error we just drop the packets.
+			return nil //nolint:nilerr
+		}
+
+		if len(pkts) == 0 {
+			// If no packets can be encoded from the AU, there is no need to call the subscriber's callback.
+			return nil
+		}
+
+		for _, pkt := range pkts {
+			pkt.Timestamp += tunit.RTPPackets[0].Timestamp
+		}
+
+		return packetsCB(pkts)
+	}
+
+	rc.subsMu.Lock()
+	defer rc.subsMu.Unlock()
+
+	rc.subAndCBByID[sub.ID()] = subAndCB{cb: unitSubscriberFunc, sub: sub}
+	sub.Start()
+	return sub.ID(), nil
+}
+
+// Unsubscribe deregisters the StreamSubscription's callback.
+func (rc *rtspCamera) Unsubscribe(ctx context.Context, id rtppassthrough.SubscriptionID) error {
+	rc.subsMu.Lock()
+	defer rc.subsMu.Unlock()
+	subAndCB, ok := rc.subAndCBByID[id]
+	if !ok {
+		return errors.New("id not found")
+	}
+	subAndCB.sub.Close()
+	delete(rc.subAndCBByID, id)
+	return nil
+}
+
 func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.Config, logger logging.Logger) (camera.Camera, error) {
 	newConf, err := resource.NativeConfig[*Config](conf)
 	if err != nil {
@@ -426,8 +583,10 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		return nil, err
 	}
 	rtspCam := &rtspCamera{
-		u:      u,
-		logger: logger,
+		u:                  u,
+		rtpH264Passthrough: newConf.RTPPassthrough,
+		subAndCBByID:       make(map[rtppassthrough.SubscriptionID]subAndCB),
+		logger:             logger,
 	}
 	codecInfo, err := modelToCodec(conf.Model)
 	if err != nil {
@@ -459,6 +618,15 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 	}
 
 	return camera.FromVideoSource(conf.ResourceName(), src, logger), nil
+}
+
+func (rc *rtspCamera) unsubscribeAll() {
+	rc.subsMu.Lock()
+	defer rc.subsMu.Unlock()
+	for id, subAndCB := range rc.subAndCBByID {
+		subAndCB.sub.Close()
+		delete(rc.subAndCBByID, id)
+	}
 }
 
 func modelToCodec(model resource.Model) (videoCodec, error) {

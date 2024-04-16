@@ -15,10 +15,12 @@ import (
 	"github.com/bluenviron/gortsplib/v4/pkg/format"
 	"github.com/bluenviron/gortsplib/v4/pkg/rtptime"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
+	"github.com/pion/rtp"
 	"go.viam.com/test"
 	"go.viam.com/utils"
 
 	"go.viam.com/rdk/components/camera"
+	"go.viam.com/rdk/components/camera/rtppassthrough"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/rimage/transform"
@@ -78,6 +80,65 @@ func TestRTSPCamera(t *testing.T) {
 			}
 			test.That(t, imageTimeoutCtx.Err(), test.ShouldBeNil)
 			test.That(t, im.Bounds(), test.ShouldResemble, image.Rect(0, 0, 480, 270))
+		})
+
+		t.Run("SubscribeRTP", func(t *testing.T) {
+			t.Run("when RTPPassthrough = true", func(t *testing.T) {
+				h, closeFunc := newH264ServerHandler(t, forma, bURL, logger)
+				defer closeFunc()
+				test.That(t, h.s.Start(), test.ShouldBeNil)
+				timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
+				defer timeoutCancel()
+				config := resource.NewEmptyConfig(camera.Named("foo"), ModelAgnostic)
+				config.ConvertedAttributes = &Config{Address: "rtsp://" + h.s.RTSPAddress, RTPPassthrough: true}
+				rtspCam, err := newRTSPCamera(timeoutCtx, nil, config, logger)
+				test.That(t, err, test.ShouldBeNil)
+				defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
+				vcs, ok := rtspCam.(rtppassthrough.Source)
+				test.That(t, ok, test.ShouldBeTrue)
+				cancelCtx, cancel := context.WithCancel(context.Background())
+				id, err := vcs.SubscribeRTP(timeoutCtx, 512, func(pkts []*rtp.Packet) error {
+					if len(pkts) > 0 {
+						logger.Info("got packets")
+						cancel()
+					}
+					return nil
+				})
+				test.That(t, err, test.ShouldBeNil)
+				defer func() {
+					err := vcs.Unsubscribe(context.Background(), id)
+					test.That(t, err, test.ShouldBeNil)
+				}()
+
+				select {
+				case <-timeoutCtx.Done():
+					t.Log("timed out waiting for packets")
+					t.FailNow()
+				case <-cancelCtx.Done():
+					// We got packets and are happy
+				}
+			})
+
+			t.Run("otherwise", func(t *testing.T) {
+				h, closeFunc := newH264ServerHandler(t, forma, bURL, logger)
+				defer closeFunc()
+				test.That(t, h.s.Start(), test.ShouldBeNil)
+				timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
+				defer timeoutCancel()
+				config := resource.NewEmptyConfig(camera.Named("foo"), ModelAgnostic)
+				config.ConvertedAttributes = &Config{Address: "rtsp://" + h.s.RTSPAddress}
+				rtspCam, err := newRTSPCamera(timeoutCtx, nil, config, logger)
+				test.That(t, err, test.ShouldBeNil)
+				defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
+				vcs, ok := rtspCam.(rtppassthrough.Source)
+				test.That(t, ok, test.ShouldBeTrue)
+				_, err = vcs.SubscribeRTP(timeoutCtx, 512, func(pkts []*rtp.Packet) error {
+					t.Log("should not happen")
+					t.FailNow()
+					return nil
+				})
+				test.That(t, err, test.ShouldBeError, ErrH264PassthroughNotEnabled)
+			})
 		})
 	})
 }
