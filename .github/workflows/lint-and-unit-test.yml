@@ -5,42 +5,38 @@ on:
     branches:
       - main
     paths:
-      - '**/*.go'
+      - '**/**.go'
   pull_request:
     paths:
-      - '**/*.go'
+      - '**/**.go'
 
 jobs:
   lint-and-unit-test:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.21
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo add-apt-repository universe && sudo apt-get install -y libswscale-dev libavcodec-dev libavformat-dev libavutil-dev ffmpeg
 
-      - name: Set up Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: 1.21
-
-      - name: Check gofmt results
-        run: |
-          UNFORMATTED=$(gofmt -l .)
-          if [ -n "$UNFORMATTED" ]; then
-            echo "Some files are not gofmt'd:"
-            echo $UNFORMATTED
-            exit 1
-          else
-            echo "All files are properly formatted."
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo add-apt-repository universe &&
-          sudo apt-get install -y libswscale-dev libavcodec-dev libavformat-dev libavutil-dev ffmpeg libfuse2
-
-      - name: Run linter and static checks
-        run: make lint
-
-      - name: Run unit tests
-        run: make unit-test
+    - name: Check gofmt
+      run: |
+        gofmt -d -s .
+        if [ -n "$(gofmt -d -s .)" ]; then
+          echo "gofmt is unhappy with your code quality!! Please run 'make lint' and commit the changes."
+          exit 1
+        fi
+    
+    - name: Run linter and static checks
+      run: make lint
+    
+    - name: Run unit tests
+      run: make unit-test
