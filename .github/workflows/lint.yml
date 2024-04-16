@@ -1,4 +1,4 @@
-name: Lint go
+name: Format and lint
 
 on:
     push:
@@ -23,5 +23,16 @@ jobs:
       with:
         go-version: 1.21
 
-    - name: Run linter
+    - name: Check gofmt
+      run: |
+        UNFORMATTED=$(gofmt -l .)
+        if [ -n "$UNFORMATTED" ]; then
+          echo "Some files are not gofmt'd:"
+          echo $UNFORMATTED
+          exit 1  # Exit with a status of 1 to indicate error
+        else
+          echo "All files are properly formatted."
+        fi
+    
+    - name: Run linter and static checks
       run: make lint

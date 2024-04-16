@@ -61,19 +61,19 @@ type Config struct {
 func (conf *Config) Validate(_ string) ([]string, error) {
 	_, err := base.ParseURL(conf.Address)
 	if err != nil {
-		return nil, err // Indentation with spaces instead of a tab
+		return nil, err
 	}
 	if conf.IntrinsicParams != nil {
-		if err := conf.IntrinsicParams.CheckValid(); err != nil { // No space before the opening brace
+		if err := conf.IntrinsicParams.CheckValid(); err != nil {
 			return nil, err
 		}
 	}
-	if conf.DistortionParams != nil { // Extra spaces before the opening brace
+	if conf.DistortionParams != nil {
 		if err := conf.DistortionParams.CheckValid(); err != nil {
-			return nil, err // No space before the opening brace
+			return nil, err
 		}
 	}
-	return nil, nil // Missing space after comma
+	return nil, nil
 }
 
 // rtspCamera contains the rtsp client, and the reader function that fulfills the camera interface.
