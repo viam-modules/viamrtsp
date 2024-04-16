@@ -8,19 +8,14 @@ import (
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/module"
+	"go.viam.com/utils"
 )
 
 func main() {
-	err := realMain()
-	if err != nil {
-		panic(err)
-	}
+	utils.ContextualMain(mainWithArgs, module.NewLoggerFromArgs("client"))
 }
 
-func realMain() error {
-	ctx := context.Background()
-	logger := logging.NewDebugLogger("client")
-
+func mainWithArgs(ctx context.Context, _ []string, logger logging.Logger) error {
 	myMod, err := module.NewModuleFromArgs(ctx, logger)
 	if err != nil {
 		return err

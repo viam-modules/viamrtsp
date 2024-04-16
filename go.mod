@@ -3,15 +3,19 @@ module github.com/erh/viamrtsp
 go 1.21
 
 require (
-	github.com/bluenviron/gortsplib/v3 v3.7.0
+	github.com/bluenviron/gortsplib/v4 v4.8.0
+	github.com/bluenviron/mediacommon v1.9.2
 	github.com/edaniels/golinters v0.0.5-0.20220906153528-641155550742
 	github.com/golangci/golangci-lint v1.57.2
-	github.com/pion/rtp v1.8.2
+	github.com/pion/rtp v1.8.5
 	github.com/pkg/errors v0.9.1
 	github.com/rhysd/actionlint v1.6.27
-	go.viam.com/rdk v0.23.2
-	go.viam.com/utils v0.1.60
+	go.viam.com/rdk v0.25.0-rc2
+	go.viam.com/test v1.1.1-0.20220913152726-5da9916c08a2
+	go.viam.com/utils v0.1.71
 )
+
+toolchain go1.21.8
 
 require (
 	4d63.com/gocheckcompilerdirectives v1.2.1 // indirect
@@ -48,9 +52,8 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/bkielbasa/cyclop v1.2.1 // indirect
-	github.com/blackjack/webcam v0.0.0-20230509180125-87693b3f29dc // indirect
+	github.com/blackjack/webcam v0.5.0 // indirect
 	github.com/blizzy78/varnamelen v0.8.0 // indirect
-	github.com/bluenviron/mediacommon v0.5.1 // indirect
 	github.com/bombsimon/wsl/v4 v4.2.1 // indirect
 	github.com/breml/bidichk v0.2.7 // indirect
 	github.com/breml/errchkjson v0.3.6 // indirect
@@ -87,7 +90,7 @@ require (
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/fullstorydev/grpcurl v1.8.6 // indirect
 	github.com/fzipp/gocyclo v0.6.0 // indirect
-	github.com/gen2brain/malgo v0.11.10 // indirect
+	github.com/gen2brain/malgo v0.11.21 // indirect
 	github.com/ghostiam/protogetter v0.3.5 // indirect
 	github.com/go-audio/audio v1.0.0 // indirect
 	github.com/go-audio/riff v1.0.0 // indirect
@@ -201,20 +204,20 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.0 // indirect
 	github.com/pion/datachannel v1.5.5 // indirect
 	github.com/pion/dtls/v2 v2.2.7 // indirect
-	github.com/pion/ice/v2 v2.3.11 // indirect
-	github.com/pion/interceptor v0.1.22 // indirect
+	github.com/pion/ice/v2 v2.3.13 // indirect
+	github.com/pion/interceptor v0.1.25 // indirect
 	github.com/pion/logging v0.2.2 // indirect
-	github.com/pion/mdns v0.0.8 // indirect
-	github.com/pion/mediadevices v0.5.1-0.20231017204133-3c9fee958efe // indirect
+	github.com/pion/mdns v0.0.12 // indirect
+	github.com/pion/mediadevices v0.6.2 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
-	github.com/pion/rtcp v1.2.10 // indirect
-	github.com/pion/sctp v1.8.8 // indirect
-	github.com/pion/sdp/v3 v3.0.6 // indirect
-	github.com/pion/srtp/v2 v2.0.17 // indirect
+	github.com/pion/rtcp v1.2.14 // indirect
+	github.com/pion/sctp v1.8.14 // indirect
+	github.com/pion/sdp/v3 v3.0.9 // indirect
+	github.com/pion/srtp/v2 v2.0.18 // indirect
 	github.com/pion/stun v0.6.1 // indirect
-	github.com/pion/transport/v2 v2.2.3 // indirect
+	github.com/pion/transport/v2 v2.2.4 // indirect
 	github.com/pion/turn/v2 v2.1.3 // indirect
-	github.com/pion/webrtc/v3 v3.2.21 // indirect
+	github.com/pion/webrtc/v3 v3.2.36 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/polyfloyd/go-errorlint v1.4.8 // indirect
 	github.com/prometheus/client_golang v1.12.2 // indirect
@@ -288,13 +291,12 @@ require (
 	go.uber.org/goleak v1.2.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
-	go.viam.com/api v0.1.274 // indirect
-	go.viam.com/test v1.1.1-0.20220913152726-5da9916c08a2 // indirect
+	go.viam.com/api v0.1.281 // indirect
 	goji.io v2.0.2+incompatible // indirect
 	golang.org/x/crypto v0.21.0 // indirect
 	golang.org/x/exp v0.0.0-20240103183307-be819d1f06fc // indirect
 	golang.org/x/exp/typeparams v0.0.0-20240314144324-c7f7c6466f7f // indirect
-	golang.org/x/image v0.14.0 // indirect
+	golang.org/x/image v0.15.0 // indirect
 	golang.org/x/mod v0.16.0 // indirect
 	golang.org/x/net v0.22.0 // indirect
 	golang.org/x/oauth2 v0.15.0 // indirect

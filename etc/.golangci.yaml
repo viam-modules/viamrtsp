@@ -52,9 +52,8 @@ linters:
     - wsl
     - depguard # allow importing of package viamrtsp
     - gocritic # false positives in cgo calls
+    - errcheck # gosec checks unhandled errors already
 linters-settings:
-  errcheck:
-    check-blank: true
   gci:
     sections:
       - standard
@@ -75,7 +74,6 @@ issues:
     - path: _test\.go$
       linters:
         - dupword
-        - errcheck
         - exhaustive
         - goconst
         - gosec
