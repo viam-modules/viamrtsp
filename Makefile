@@ -45,6 +45,9 @@ lint: gofmt tool-install
 	export pkgs="`go list -f '{{.Dir}}' ./...`" && echo "$$pkgs" | xargs go vet -vettool=$(TOOL_BIN)/combined
 	GOGC=50 $(TOOL_BIN)/golangci-lint run -v --fix --config=./etc/.golangci.yaml
 
+unit-test:
+	go test .
+
 update-rdk:
 	go get go.viam.com/rdk@latest
 	go mod tidy
