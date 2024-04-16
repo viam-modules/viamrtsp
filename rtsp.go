@@ -663,7 +663,8 @@ func modelToCodec(model resource.Model) (videoCodec, error) {
 	}
 }
 
-// getAvailableCodec returns a supported codec in the given tracks.
+// getAvailableCodec determines the first supported codec from a session's SDP data
+// returning Unknown if none are found.
 func getAvailableCodec(tracks *description.Session) videoCodec {
 	var h264 *format.H264
 	var h265 *format.H265
