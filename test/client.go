@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"go.viam.com/rdk/components/camera"
@@ -31,6 +33,9 @@ func main() {
 
 	ipCam, err := camera.FromRobot(robot, "ip-cam")
 	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			err = fmt.Errorf("%v: this likely means viam-server could not register/start the resource properly; check logs to verify", err)
+		}
 		logger.Fatal(err)
 	}
 	stream, err := ipCam.Stream(ctx)

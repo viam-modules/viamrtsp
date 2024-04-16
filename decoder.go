@@ -16,7 +16,7 @@ import (
 */
 import "C"
 
-// Decoder is a generic FFmpeg decoder.
+// decoder is a generic FFmpeg decoder.
 type decoder struct {
 	codecCtx    *C.AVCodecContext
 	srcFrame    *C.AVFrame
@@ -32,7 +32,23 @@ const (
 	Agnostic
 	H264
 	H265
+	MJPEG
 )
+
+func (vc videoCodec) String() string {
+	switch vc {
+	case Agnostic:
+		return "Agnostic"
+	case H264:
+		return "H264"
+	case H265:
+		return "H265"
+	case MJPEG:
+		return "MJPEG"
+	default:
+		return "Unknown"
+	}
+}
 
 func frameData(frame *C.AVFrame) **C.uint8_t {
 	return (**C.uint8_t)(unsafe.Pointer(&frame.data[0]))
@@ -51,6 +67,12 @@ func avError(avErr C.int) string {
 	return C.GoString(&errbuf[0])
 }
 
+// SetLibAVLogLevelFatal sets libav errors to fatal log level
+// to cut down on log spam
+func SetLibAVLogLevelFatal() {
+	C.av_log_set_level(C.AV_LOG_FATAL)
+}
+
 // newDecoder creates a new decoder for the given codec.
 func newDecoder(codecID C.enum_AVCodecID) (*decoder, error) {
 	codec := C.avcodec_find_decoder(codecID)
@@ -62,6 +84,9 @@ func newDecoder(codecID C.enum_AVCodecID) (*decoder, error) {
 	if codecCtx == nil {
 		return nil, fmt.Errorf("avcodec_alloc_context3() failed")
 	}
+
+	// Set the decoder to handle partial frames
+	codecCtx.flags2 |= C.AV_CODEC_FLAG2_CHUNKS
 
 	res := C.avcodec_open2(codecCtx, codec, nil)
 	if res < 0 {
