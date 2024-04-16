@@ -53,6 +53,13 @@ type Config struct {
 	DistortionParams *transform.BrownConrady            `json:"distortion_parameters,omitempty"`
 }
 
+// CodecFormat is a struct that contains a pointer to a codec format and
+// the FFmpeg codec that it corresponds to.
+type CodecFormat struct {
+	FormatPointer interface{}
+	Codec         videoCodec
+}
+
 // Validate checks to see if the attributes of the model are valid.
 func (conf *Config) Validate(path string) ([]string, error) {
 	_, err := base.ParseURL(conf.Address)
@@ -185,7 +192,7 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec) error {
 	}
 
 	if codecInfo == Agnostic {
-		codecInfo = getAvailableCodec(tracks)
+		codecInfo = getAvailableCodec(session)
 	}
 
 	switch codecInfo {
@@ -470,17 +477,21 @@ func modelToCodec(model resource.Model) (videoCodec, error) {
 }
 
 // getAvailableCodec returns a supported codec in the given tracks.
-func getAvailableCodec(tracks media.Medias) videoCodec {
-	var h264 *formats.H264
-	var h265 *formats.H265
+func getAvailableCodec(tracks *description.Session) videoCodec {
+	var h264 *format.H264
+	var h265 *format.H265
+	var mjpeg *format.MJPEG
 
 	// List of formats/codecs in priority order
-	formatPointers := []interface{}{&h264, &h265}
-	codecs := []videoCodec{H264, H265}
+	codecFormats := []CodecFormat{
+		{&h264, H264},
+		{&h265, H265},
+		{&mjpeg, MJPEG},
+	}
 
-	for i, formatPtr := range formatPointers {
-		if tracks.FindFormat(formatPtr) != nil {
-			return codecs[i]
+	for _, codecFormat := range codecFormats {
+		if tracks.FindFormat(codecFormat.FormatPointer) != nil {
+			return codecFormat.Codec
 		}
 	}
 
