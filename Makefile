@@ -1,4 +1,5 @@
 BIN_OUTPUT_PATH = bin/$(shell uname -s)-$(shell uname -m)
+TOOL_BIN = bin/gotools/$(shell uname -s)-$(shell uname -m)
 UNAME_S ?= $(shell uname -s)
 UNAME_M ?= $(shell uname -m)
 FFMPEG_TAG ?= n6.1
@@ -30,8 +31,16 @@ $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
 		CGO_LDFLAGS=$(CGO_LDFLAGS) \
 		go build -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
 
-lint:
-	gofmt -w -s .
+tool-install:
+	GOBIN=`pwd`/$(TOOL_BIN) go install \
+		github.com/edaniels/golinters/cmd/combined \
+		github.com/golangci/golangci-lint/cmd/golangci-lint \
+		github.com/rhysd/actionlint/cmd/actionlint
+
+lint: tool-install
+	go mod tidy
+	export pkgs="`go list -f '{{.Dir}}' ./...`" && echo "$$pkgs" | xargs go vet -vettool=$(TOOL_BIN)/combined
+	GOGC=50 $(TOOL_BIN)/golangci-lint run -v --fix --config=./etc/.golangci.yaml
 
 update-rdk:
 	go get go.viam.com/rdk@latest

@@ -1,9 +1,11 @@
+// This package provides the entrypoint for the remote
 package main
 
 import (
 	"context"
 	"os"
 
+	"github.com/erh/viamrtsp"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/config"
 	"go.viam.com/rdk/module"
@@ -11,8 +13,6 @@ import (
 	robotimpl "go.viam.com/rdk/robot/impl"
 	"go.viam.com/rdk/robot/web"
 	"go.viam.com/rdk/utils"
-
-	"github.com/erh/viamrtsp"
 )
 
 func main() {
@@ -21,8 +21,8 @@ func main() {
 		panic(err)
 	}
 }
-func realMain() error {
 
+func realMain() error {
 	ctx := context.Background()
 	logger := module.NewLoggerFromArgs("client")
 

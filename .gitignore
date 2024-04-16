@@ -27,3 +27,6 @@ go.work
 viamrtsp
 module.tar.gz
 FFmpeg
+
+# gotools
+bin/gotools

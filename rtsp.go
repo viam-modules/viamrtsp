@@ -1,3 +1,4 @@
+// Package viamrtsp implements RTSP camera support in a Viam module
 package viamrtsp
 
 import (
@@ -20,24 +21,29 @@ import (
 	"github.com/bluenviron/gortsplib/v3/pkg/liberrors"
 	"github.com/bluenviron/gortsplib/v3/pkg/media"
 	"github.com/bluenviron/gortsplib/v3/pkg/url"
-
 	"github.com/pion/rtp"
 	"github.com/pkg/errors"
-	goutils "go.viam.com/utils"
-
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/gostream"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/rimage/transform"
+	goutils "go.viam.com/utils"
 )
 
-var family = resource.ModelNamespace("erh").WithFamily("viamrtsp")
-var ModelAgnostic = family.WithModel("rtsp")
-var ModelH264 = family.WithModel("rtsp-h264")
-var ModelH265 = family.WithModel("rtsp-h265")
-var ModelMJPEG = family.WithModel("rtsp-mjpeg")
-var Models = []resource.Model{ModelAgnostic, ModelH264, ModelH265, ModelMJPEG}
+var (
+	family = resource.ModelNamespace("erh").WithFamily("viamrtsp")
+	// ModelAgnostic selects the best available codec.
+	ModelAgnostic = family.WithModel("rtsp")
+	// ModelH264 uses the h264 codec.
+	ModelH264 = family.WithModel("rtsp-h264")
+	// ModelH265 uses the h265 codec.
+	ModelH265 = family.WithModel("rtsp-h265")
+	// ModelMJPEG uses the mjpeg codec.
+	ModelMJPEG = family.WithModel("rtsp-mjpeg")
+	// Models is a slice containing the above available models.
+	Models = []resource.Model{ModelAgnostic, ModelH264, ModelH265, ModelMJPEG}
+)
 
 func init() {
 	for _, model := range Models {
@@ -54,24 +60,24 @@ type Config struct {
 	DistortionParams *transform.BrownConrady            `json:"distortion_parameters,omitempty"`
 }
 
-func (conf *Config) Validate(path string) ([]string, error) {
-    _, err := url.Parse(conf.Address)
-    if err != nil {
-      return nil, err // Indentation with spaces instead of a tab
-    }
-    if conf.IntrinsicParams != nil{
-        if err := conf.IntrinsicParams.CheckValid(); err != nil{ // No space before the opening brace
-            return nil, err
-        }
-    }
-    if conf.DistortionParams != nil   { // Extra spaces before the opening brace
-        if err := conf.DistortionParams.CheckValid(); err != nil{
-            return nil, err // No space before the opening brace
-        }
-    }
-    return nil,nil // Missing space after comma
+// Validate validates the module config.
+func (conf *Config) Validate(_ string) ([]string, error) {
+	_, err := url.Parse(conf.Address)
+	if err != nil {
+		return nil, err // Indentation with spaces instead of a tab
+	}
+	if conf.IntrinsicParams != nil {
+		if err := conf.IntrinsicParams.CheckValid(); err != nil { // No space before the opening brace
+			return nil, err
+		}
+	}
+	if conf.DistortionParams != nil { // Extra spaces before the opening brace
+		if err := conf.DistortionParams.CheckValid(); err != nil {
+			return nil, err // No space before the opening brace
+		}
+	}
+	return nil, nil // Missing space after comma
 }
-
 
 // rtspCamera contains the rtsp client, and the reader function that fulfills the camera interface.
 type rtspCamera struct {
@@ -92,7 +98,7 @@ type rtspCamera struct {
 }
 
 // Close closes the camera. It always returns nil, but because of Close() interface, it needs to return an error.
-func (rc *rtspCamera) Close(ctx context.Context) error {
+func (rc *rtspCamera) Close(_ context.Context) error {
 	rc.cancelFunc()
 	rc.activeBackgroundWorkers.Wait()
 	return rc.closeConnection()
@@ -148,11 +154,12 @@ func (rc *rtspCamera) closeConnection() error {
 
 // reconnectClient reconnects the RTSP client to the streaming server by closing the old one and starting a new one.
 func (rc *rtspCamera) reconnectClient(codecInfo videoCodec) (err error) {
-	rc.logger.Warnf("reconnectClient called")
+	// keep due to edge case
 
 	if rc == nil {
 		return errors.New("rtspCamera is nil")
 	}
+	rc.logger.Warn("reconnectClient called")
 
 	err = rc.closeConnection()
 	if err != nil {
@@ -165,7 +172,10 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec) (err error) {
 	var clientSuccessful bool
 	defer func() {
 		if !clientSuccessful {
-			rc.closeConnection()
+			err = rc.closeConnection()
+			if err != nil {
+				rc.logger.Debugw("error while closing rtsp client:", "error", err)
+			}
 		}
 	}()
 
@@ -188,14 +198,18 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec) (err error) {
 
 	switch codecInfo {
 	case H264:
-		rc.logger.Infof("setting up H264 decoder")
+		rc.logger.Info("setting up H264 decoder")
 		err = rc.initH264(tracks, baseURL)
 	case H265:
-		rc.logger.Infof("setting up H265 decoder")
+		rc.logger.Info("setting up H265 decoder")
 		err = rc.initH265(tracks, baseURL)
 	case MJPEG:
-		rc.logger.Infof("setting up MJPEG decoder")
+		rc.logger.Info("setting up MJPEG decoder")
 		err = rc.initMJPEG(tracks, baseURL)
+	case Unknown:
+		return errors.New("codecInfo should not be Unknown after getting stream info")
+	case Agnostic:
+		return errors.New("codecInfo should not be Agnostic after getting stream info")
 	default:
 		return errors.Errorf("codec not supported %v", codecInfo)
 	}
@@ -245,12 +259,18 @@ func (rc *rtspCamera) initH264(tracks media.Medias, baseURL *url.URL) (err error
 
 	// if SPS and PPS are present into the SDP, send them to the decoder
 	if format.SPS != nil {
-		rc.rawDecoder.decode(format.SPS)
+		_, err = rc.rawDecoder.decode(format.SPS)
+		if err != nil {
+			rc.logger.Warn("error decoding SPS")
+		}
 	} else {
 		rc.logger.Warn("no SPS found in H264 format")
 	}
 	if format.PPS != nil {
-		rc.rawDecoder.decode(format.PPS)
+		_, err = rc.rawDecoder.decode(format.PPS)
+		if err != nil {
+			rc.logger.Warn("error decoding PPS")
+		}
 	} else {
 		rc.logger.Warn("no PPS found in H264 format")
 	}
@@ -260,17 +280,15 @@ func (rc *rtspCamera) initH264(tracks media.Medias, baseURL *url.URL) (err error
 		// extract access units from RTP packets
 		au, _, err := rtpDec.Decode(pkt)
 		if err != nil {
-			if err != rtph264.ErrNonStartingPacketAndNoPrevious && err != rtph264.ErrMorePacketsNeeded {
+			if !errors.Is(err, rtph264.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph264.ErrMorePacketsNeeded) {
 				rc.logger.Errorf("error decoding(1) h264 rstp stream %v", err)
 			}
 			return
 		}
 
 		for _, nalu := range au {
-
 			// convert NALUs into RGBA frames
 			lastImage, err := rc.rawDecoder.decode(nalu)
-
 			if err != nil {
 				rc.logger.Error("error decoding(2) h264 rtsp stream  %v", err)
 				return
@@ -316,21 +334,30 @@ func (rc *rtspCamera) initH265(tracks media.Medias, baseURL *url.URL) (err error
 
 	// For H.265, handle VPS, SPS, and PPS
 	if format.VPS != nil {
-		rc.rawDecoder.decode(format.VPS)
+		_, err = rc.rawDecoder.decode(format.VPS)
+		if err != nil {
+			rc.logger.Warn("error decoding VPS")
+		}
 	} else {
 		rc.logger.Warn("no VPS found in H265 format")
 	}
 
 	if format.SPS != nil {
-		rc.rawDecoder.decode(format.SPS)
+		_, err = rc.rawDecoder.decode(format.SPS)
+		if err != nil {
+			rc.logger.Warn("error decoding SPS")
+		}
 	} else {
 		rc.logger.Warn("no SPS found in H265 format")
 	}
 
 	if format.PPS != nil {
-		rc.rawDecoder.decode(format.PPS)
+		_, err = rc.rawDecoder.decode(format.PPS)
+		if err != nil {
+			rc.logger.Warn("error decoding PPS")
+		}
 	} else {
-		rc.logger.Warnf("no PPS found in H265 format")
+		rc.logger.Warn("no PPS found in H265 format")
 	}
 
 	// On packet retreival, turn it into an image, and store it in shared memory
@@ -338,7 +365,7 @@ func (rc *rtspCamera) initH265(tracks media.Medias, baseURL *url.URL) (err error
 		// Extract access units from RTP packets
 		au, _, err := rtpDec.Decode(pkt)
 		if err != nil {
-			if err != rtph265.ErrNonStartingPacketAndNoPrevious && err != rtph265.ErrMorePacketsNeeded {
+			if !errors.Is(err, rtph265.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph265.ErrMorePacketsNeeded) {
 				rc.logger.Errorf("error decoding(1) h265 rstp stream %v", err)
 			}
 			return
@@ -425,7 +452,7 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		return nil, err
 	}
 	cancelCtx, cancel := context.WithCancel(context.Background())
-	reader := gostream.VideoReaderFunc(func(ctx context.Context) (image.Image, func(), error) {
+	reader := gostream.VideoReaderFunc(func(_ context.Context) (image.Image, func(), error) {
 		latest := rtspCam.latestFrame.Load()
 		if latest == nil {
 			return nil, func() {}, errors.New("no frame yet")

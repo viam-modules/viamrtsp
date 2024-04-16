@@ -1,8 +1,10 @@
+// This package is a test client for RTSP cam integration tests
 package main
 
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -12,6 +14,13 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Fatalf("Fatal error: %v", err)
+	}
+	log.Println("All tests passed! Success :)")
+}
+
+func run() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -23,10 +32,13 @@ func main() {
 		logger,
 	)
 	if err != nil {
-		logger.Fatal(err)
+		return err
 	}
-
-	defer robot.Close(ctx)
+	defer func() {
+		if err := robot.Close(ctx); err != nil {
+			logger.Errorf("failed to close robot client: %v", err)
+		}
+	}()
 
 	logger.Info("Resources:")
 	logger.Info(robot.ResourceNames())
@@ -34,18 +46,18 @@ func main() {
 	ipCam, err := camera.FromRobot(robot, "ip-cam")
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			err = fmt.Errorf("%v: this likely means viam-server could not register/start the resource properly; check logs to verify", err)
+			return fmt.Errorf("%w: this likely means viam-server could not register/start the resource properly; check logs to verify", err)
 		}
-		logger.Fatal(err)
+		return err
 	}
 	stream, err := ipCam.Stream(ctx)
 	if err != nil {
-		logger.Fatal(err)
+		return err
 	}
 	_, _, err = stream.Next(ctx)
 	if err != nil {
-		logger.Fatal(err)
+		return err
 	}
 
-	logger.Info("All tests passed! Success :)")
+	return nil
 }
