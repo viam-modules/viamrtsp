@@ -635,7 +635,7 @@ func (rc *rtspCamera) validateSupportsPassthrough() error {
 	}
 	modelSupportsPassthrough := rc.model == ModelAgnostic || rc.model == ModelH264
 	if !modelSupportsPassthrough {
-		return fmt.Errorf("model %s does not support rtp_passthrough", rc.model)
+		return fmt.Errorf("model %s does not support rtp_passthrough", rc.model.Name)
 	}
 
 	currentCodec := videoCodec(rc.currentCodec.Load())
