@@ -355,7 +355,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 // initH265 initializes the H265 decoder and sets up the client to receive H265 packets.
 func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 	if rc.rtpPassthrough {
-		rc.logger.Warn("rtp_passthrough is only supported for H264 codec. rtp_assthrough features disabled due to H265 RTSP track")
+		rc.logger.Warn("rtp_passthrough is only supported for H264 codec. rtp_passthrough features disabled due to H265 RTSP track")
 	}
 	var f *format.H265
 
@@ -432,7 +432,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 // initMJPEG initializes the MJPEG decoder and sets up the client to receive JPEG frames.
 func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 	if rc.rtpPassthrough {
-		rc.logger.Warn("rtp_passthrough is only supported for H264 codec. rtp_assthrough features disabled due to MJPEG RTSP track")
+		rc.logger.Warn("rtp_passthrough is only supported for H264 codec. rtp_passthrough features disabled due to MJPEG RTSP track")
 	}
 	var f *format.MJPEG
 	media := session.FindFormat(&f)
