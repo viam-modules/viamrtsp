@@ -75,6 +75,7 @@ func (conf *Config) Validate(path string) ([]string, error) {
 			return nil, err
 		}
 	}
+
 	return nil, nil
 }
 
@@ -353,8 +354,8 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 
 // initH265 initializes the H265 decoder and sets up the client to receive H265 packets.
 func (rc *rtspCamera) initH265(session *description.Session) (err error) {
-	if rc.rtpPassthrough && rc.model != ModelAgnostic {
-		return errors.New("address reports to have only an h265 track but rtpH264Passthrough was enabled")
+	if rc.rtpPassthrough {
+		rc.logger.Warn("rtp_passthrough is only supported for H264 codec. rtp_assthrough features disabled due to H265 RTSP track")
 	}
 	var f *format.H265
 
@@ -430,10 +431,9 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 
 // initMJPEG initializes the MJPEG decoder and sets up the client to receive JPEG frames.
 func (rc *rtspCamera) initMJPEG(session *description.Session) error {
-	if rc.rtpPassthrough && rc.model != ModelAgnostic {
-		return errors.New("address reports to have only an MJPEG track but rtpH264Passthrough was enabled")
+	if rc.rtpPassthrough {
+		rc.logger.Warn("rtp_passthrough is only supported for H264 codec. rtp_assthrough features disabled due to MJPEG RTSP track")
 	}
-
 	var f *format.MJPEG
 	media := session.FindFormat(&f)
 	if media == nil {
@@ -580,7 +580,7 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		logger.Error(err.Error())
 		return nil, err
 	}
-	rtspCam := &rtspCamera{
+	rc := &rtspCamera{
 		model:          conf.Model,
 		u:              u,
 		rtpPassthrough: newConf.RTPPassthrough,
@@ -592,25 +592,26 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		logger.Error(err.Error())
 		return nil, err
 	}
-	err = rtspCam.reconnectClient(codecInfo)
+
+	err = rc.reconnectClient(codecInfo)
 	if err != nil {
 		logger.Error(err.Error())
 		return nil, err
 	}
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	reader := gostream.VideoReaderFunc(func(ctx context.Context) (image.Image, func(), error) {
-		latest := rtspCam.latestFrame.Load()
+		latest := rc.latestFrame.Load()
 		if latest == nil {
 			return nil, func() {}, errors.New("no frame yet")
 		}
 		return *latest, func() {}, nil
 	})
-	rtspCam.VideoReader = reader
-	rtspCam.cancelCtx = cancelCtx
-	rtspCam.cancelFunc = cancel
+	rc.VideoReader = reader
+	rc.cancelCtx = cancelCtx
+	rc.cancelFunc = cancel
 	cameraModel := camera.NewPinholeModelWithBrownConradyDistortion(newConf.IntrinsicParams, newConf.DistortionParams)
-	rtspCam.clientReconnectBackgroundWorker(codecInfo)
-	src, err := camera.NewVideoSourceFromReader(ctx, rtspCam, &cameraModel, camera.ColorStream)
+	rc.clientReconnectBackgroundWorker(codecInfo)
+	src, err := camera.NewVideoSourceFromReader(ctx, rc, &cameraModel, camera.ColorStream)
 	if err != nil {
 		logger.Error(err.Error())
 		return nil, err
@@ -632,14 +633,14 @@ func (rc *rtspCamera) validateSupportsPassthrough() error {
 	if !rc.rtpPassthrough {
 		return errors.New("rtp_passthrough not enabled in config")
 	}
-
-	if rc.model != ModelAgnostic && rc.model != ModelH264 {
+	modelSupportsPassthrough := rc.model == ModelAgnostic || rc.model == ModelH264
+	if !modelSupportsPassthrough {
 		return fmt.Errorf("model %s does not support rtp_passthrough", rc.model)
 	}
 
 	currentCodec := videoCodec(rc.currentCodec.Load())
 	if currentCodec != H264 {
-		return fmt.Errorf("rtp_passthrough only supported on H264 codec, current codec is: %s", currentCodec)
+		return fmt.Errorf("rtp_passthrough only supported for H264 codec, current codec is: %s", currentCodec)
 	}
 
 	return nil
