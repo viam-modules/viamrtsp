@@ -28,7 +28,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo add-apt-repository universe &&
-        sudo apt-get install -y libswscale-dev libavcodec-dev libavformat-dev libavutil-dev ffmpeg libfuse2
+        sudo apt-get install -y libswscale-dev ffmpeg libfuse2
         
     - name: Download and extract mediamtx
       run: |

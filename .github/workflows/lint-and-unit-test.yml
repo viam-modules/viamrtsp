@@ -25,7 +25,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo add-apt-repository universe && sudo apt-get install -y libswscale-dev libavcodec-dev libavformat-dev libavutil-dev ffmpeg
+        sudo add-apt-repository universe && sudo apt-get install -y libswscale-dev ffmpeg
 
     - name: Check gofmt
       run: |
