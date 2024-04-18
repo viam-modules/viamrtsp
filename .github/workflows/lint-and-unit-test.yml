@@ -25,7 +25,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo add-apt-repository universe && sudo apt-get install -y libswscale-dev libavcodec-dev libavformat-dev libavutil-dev libfuse2
+        sudo add-apt-repository universe && sudo apt-get install -y libfuse2
 
     - name: Check gofmt
       run: |
@@ -34,8 +34,11 @@ jobs:
           exit 1
         fi
     
+    - name: Build ffmpeg and deps
+      run: make build-ffmpeg
+
     - name: Run linter and static checks
       run: make lint
     
     - name: Run unit tests
-      run: make unit-test
+      run: make test

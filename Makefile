@@ -23,13 +23,16 @@ CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib
 ifeq ($(UNAME_S),Linux)
 	CGO_LDFLAGS := "$(CGO_LDFLAGS) -l:libjpeg.a"
 endif
+PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
-.PHONY: build-ffmpeg tool-install gofmt lint update-rdk module clean clean-all
+.PHONY: build-ffmpeg tool-install gofmt lint test update-rdk module clean clean-all
 
 $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
-	PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig \
 		CGO_LDFLAGS=$(CGO_LDFLAGS) \
 		go build -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
+
+$(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
+	go build -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
 
 tool-install:
 	GOBIN=`pwd`/$(TOOL_BIN) go install \
@@ -45,7 +48,7 @@ lint: gofmt tool-install
 	export pkgs="`go list -f '{{.Dir}}' ./...`" && echo "$$pkgs" | xargs go vet -vettool=$(TOOL_BIN)/combined
 	GOGC=50 $(TOOL_BIN)/golangci-lint run -v --fix --config=./etc/.golangci.yaml
 
-unit-test:
+test:
 	go test ./...
 
 update-rdk:
