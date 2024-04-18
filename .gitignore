@@ -28,5 +28,5 @@ viamrtsp
 module.tar.gz
 FFmpeg
 
-# `make tool-install` for lint deps
-bin/gotools
+# Build artifacts
+bin

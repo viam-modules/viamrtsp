@@ -24,7 +24,7 @@ ifeq ($(UNAME_S),Linux)
 	CGO_LDFLAGS := "$(CGO_LDFLAGS) -l:libjpeg.a"
 endif
 
-.PHONY: build-ffmpeg lint update-rdk module clean clean-all
+.PHONY: build-ffmpeg tool-install gofmt lint update-rdk module clean clean-all
 
 $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
 	PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig \
@@ -46,7 +46,7 @@ lint: gofmt tool-install
 	GOGC=50 $(TOOL_BIN)/golangci-lint run -v --fix --config=./etc/.golangci.yaml
 
 unit-test:
-	go test .
+	go test ./...
 
 update-rdk:
 	go get go.viam.com/rdk@latest

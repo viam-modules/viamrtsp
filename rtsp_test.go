@@ -16,7 +16,6 @@ import (
 	"github.com/bluenviron/gortsplib/v4/pkg/rtptime"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
 	"github.com/pion/rtp"
-
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/components/camera/rtppassthrough"
 	"go.viam.com/rdk/logging"
@@ -137,7 +136,7 @@ func TestRTSPCamera(t *testing.T) {
 				defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
 				vcs, ok := rtspCam.(rtppassthrough.Source)
 				test.That(t, ok, test.ShouldBeTrue)
-				_, err = vcs.SubscribeRTP(timeoutCtx, 512, func(pkts []*rtp.Packet) error {
+				_, err = vcs.SubscribeRTP(timeoutCtx, 512, func(_ []*rtp.Packet) error {
 					t.Log("should not happen")
 					t.FailNow()
 					return nil

@@ -57,7 +57,7 @@ func (u *Base) GetPTS() time.Duration {
 // Processor processes RTP packets & turns them into Units.
 type Processor interface {
 	// process a Unit.
-	ProcessUnit(Unit) error
+	ProcessUnit(u Unit) error
 
 	// process a RTP packet and convert it into a unit.
 	ProcessRTPPacket(

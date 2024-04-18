@@ -18,10 +18,8 @@ import (
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtph264"
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtph265"
 	"github.com/bluenviron/gortsplib/v4/pkg/liberrors"
-	"github.com/google/uuid"
-
 	"github.com/erh/viamrtsp/formatprocessor"
-
+	"github.com/google/uuid"
 	"github.com/pion/rtp"
 	"github.com/pkg/errors"
 	"go.viam.com/rdk/components/camera"
@@ -45,6 +43,7 @@ var (
 	ModelMJPEG = family.WithModel("rtsp-mjpeg")
 	// Models is a slice containing the above available models.
 	Models = []resource.Model{ModelAgnostic, ModelH264, ModelH265, ModelMJPEG}
+	// ErrH264PassthroughNotEnabled is an error indicating H264 passthrough is not enabled.
 	ErrH264PassthroughNotEnabled = errors.New("H264 passthrough is not enabled")
 )
 
@@ -84,11 +83,13 @@ func (conf *Config) Validate(_ string) ([]string, error) {
 	return nil, nil
 }
 
-type unitSubscriberFunc func(formatprocessor.Unit) error
-type subAndCB struct {
-	cb  unitSubscriberFunc
-	sub *rtppassthrough.StreamSubscription
-}
+type (
+	unitSubscriberFunc func(formatprocessor.Unit) error
+	subAndCB           struct {
+		cb  unitSubscriberFunc
+		sub *rtppassthrough.StreamSubscription
+	}
+)
 
 // rtspCamera contains the rtsp client, and the reader function that fulfills the camera interface.
 type rtspCamera struct {
@@ -492,7 +493,11 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 // SubscribeRTP registers the PacketCallback which will be called when there are new packets.
 // NOTE: Packets may be dropped before calling packetsCB if the rate new packets are received by
 // the rtppassthrough.Source is greater than the rate the subscriber consumes them.
-func (rc *rtspCamera) SubscribeRTP(ctx context.Context, bufferSize int, packetsCB rtppassthrough.PacketCallback) (rtppassthrough.SubscriptionID, error) {
+func (rc *rtspCamera) SubscribeRTP(
+	_ context.Context,
+	bufferSize int,
+	packetsCB rtppassthrough.PacketCallback,
+) (rtppassthrough.SubscriptionID, error) {
 	if err := rc.validateSupportsPassthrough(); err != nil {
 		rc.logger.Debug(err.Error())
 		return uuid.Nil, ErrH264PassthroughNotEnabled
@@ -571,7 +576,7 @@ func (rc *rtspCamera) SubscribeRTP(ctx context.Context, bufferSize int, packetsC
 }
 
 // Unsubscribe deregisters the StreamSubscription's callback.
-func (rc *rtspCamera) Unsubscribe(ctx context.Context, id rtppassthrough.SubscriptionID) error {
+func (rc *rtspCamera) Unsubscribe(_ context.Context, id rtppassthrough.SubscriptionID) error {
 	rc.subsMu.Lock()
 	defer rc.subsMu.Unlock()
 	subAndCB, ok := rc.subAndCBByID[id]
@@ -613,7 +618,7 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		return nil, err
 	}
 	cancelCtx, cancel := context.WithCancel(context.Background())
-	reader := gostream.VideoReaderFunc(func(ctx context.Context) (image.Image, func(), error) {
+	reader := gostream.VideoReaderFunc(func(_ context.Context) (image.Image, func(), error) {
 		latest := rc.latestFrame.Load()
 		if latest == nil {
 			return nil, func() {}, errors.New("no frame yet")
