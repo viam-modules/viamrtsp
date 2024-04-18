@@ -283,7 +283,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		au, err := rtpDec.Decode(pkt)
 		if err != nil {
 			if err != rtph264.ErrNonStartingPacketAndNoPrevious && err != rtph264.ErrMorePacketsNeeded {
-				rc.logger.Errorf("error decoding(1) h264 rstp stream err: %s", err.Error())
+				rc.logger.Debugf("error decoding(1) h264 rstp stream err: %s", err.Error())
 			}
 			return
 		}
@@ -292,7 +292,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 			// convert NALUs into RGBA frames
 			image, err := rc.rawDecoder.decode(nalu)
 			if err != nil {
-				rc.logger.Errorf("error decoding(2) h264 rtsp stream  %s", err.Error())
+				rc.logger.Debugf("error decoding(2) h264 rtsp stream  %s", err.Error())
 				return
 			}
 			if image != nil {
@@ -408,7 +408,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		au, err := rtpDec.Decode(pkt)
 		if err != nil {
 			if err != rtph265.ErrNonStartingPacketAndNoPrevious && err != rtph265.ErrMorePacketsNeeded {
-				rc.logger.Errorf("error decoding(1) h265 rstp stream err: %s", err.Error())
+				rc.logger.Debugf("error decoding(1) h265 rstp stream err: %s", err.Error())
 			}
 			return
 		}
@@ -416,7 +416,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		for _, nalu := range au {
 			lastImage, err := rc.rawDecoder.decode(nalu)
 			if err != nil {
-				rc.logger.Errorf("error decoding(2) h265 rtsp stream err: %s", err.Error())
+				rc.logger.Debugf("error decoding(2) h265 rtsp stream err: %s", err.Error())
 				return
 			}
 
@@ -592,7 +592,7 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		logger.Error(err.Error())
 		return nil, err
 	}
-
+	SetLibAVLogLevelFatal()
 	err = rc.reconnectClient(codecInfo)
 	if err != nil {
 		logger.Error(err.Error())
