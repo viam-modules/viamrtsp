@@ -62,9 +62,9 @@ type Config struct {
 }
 
 // CodecFormat contains a pointer to a format and the corresponding FFmpeg codec.
-type CodecFormat struct {
-	FormatPointer interface{}
-	Codec         videoCodec
+type codecFormat struct {
+	formatPointer interface{}
+	codec         videoCodec
 }
 
 // Validate checks to see if the attributes of the model are valid.
@@ -664,21 +664,21 @@ func modelToCodec(model resource.Model) (videoCodec, error) {
 
 // getAvailableCodec determines the first supported codec from a session's SDP data
 // returning Unknown if none are found.
-func getAvailableCodec(tracks *description.Session) videoCodec {
+func getAvailableCodec(session *description.Session) videoCodec {
 	var h264 *format.H264
 	var h265 *format.H265
 	var mjpeg *format.MJPEG
 
 	// List of formats/codecs in priority order
-	codecFormats := []CodecFormat{
+	codecFormats := []codecFormat{
 		{&h264, H264},
 		{&h265, H265},
 		{&mjpeg, MJPEG},
 	}
 
 	for _, codecFormat := range codecFormats {
-		if tracks.FindFormat(codecFormat.FormatPointer) != nil {
-			return codecFormat.Codec
+		if session.FindFormat(codecFormat.formatPointer) != nil {
+			return codecFormat.codec
 		}
 	}
 
