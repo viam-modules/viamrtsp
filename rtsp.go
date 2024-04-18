@@ -64,19 +64,19 @@ type Config struct {
 }
 
 // Validate checks to see if the attributes of the model are valid.
-func (conf *Config) Validate(_ string) ([]string, error) {
+func (conf *Config) Validate(path string) ([]string, error) {
 	_, err := base.ParseURL(conf.Address)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid address '%s' for component at path '%s': %w", conf.Address, path, err)
 	}
 	if conf.IntrinsicParams != nil {
 		if err := conf.IntrinsicParams.CheckValid(); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("invalid intrinsic parameters for component at path '%s': %w", path, err)
 		}
 	}
 	if conf.DistortionParams != nil {
 		if err := conf.DistortionParams.CheckValid(); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("invalid distortion parameters for component at path '%s': %w", path, err)
 		}
 	}
 
