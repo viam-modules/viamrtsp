@@ -156,9 +156,6 @@ func newDecoder(codecID C.enum_AVCodecID) (*decoder, error) {
 		return nil, fmt.Errorf("avcodec_alloc_context3() failed")
 	}
 
-	// Set the decoder to handle partial frames
-	codecCtx.flags2 |= C.AV_CODEC_FLAG2_CHUNKS
-
 	res := C.avcodec_open2(codecCtx, codec, nil)
 	if res < 0 {
 		C.avcodec_close(codecCtx)
