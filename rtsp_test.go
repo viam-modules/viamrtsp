@@ -101,16 +101,15 @@ func TestRTSPCamera(t *testing.T) {
 				vcs, ok := rtspCam.(rtppassthrough.Source)
 				test.That(t, ok, test.ShouldBeTrue)
 				cancelCtx, cancel := context.WithCancel(context.Background())
-				id, err := vcs.SubscribeRTP(timeoutCtx, 512, func(pkts []*rtp.Packet) error {
+				sub, err := vcs.SubscribeRTP(timeoutCtx, 512, func(pkts []*rtp.Packet) {
 					if len(pkts) > 0 {
 						logger.Info("got packets")
 						cancel()
 					}
-					return nil
 				})
 				test.That(t, err, test.ShouldBeNil)
 				defer func() {
-					err := vcs.Unsubscribe(context.Background(), id)
+					err := vcs.Unsubscribe(context.Background(), sub.ID)
 					test.That(t, err, test.ShouldBeNil)
 				}()
 
@@ -136,10 +135,9 @@ func TestRTSPCamera(t *testing.T) {
 				defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
 				vcs, ok := rtspCam.(rtppassthrough.Source)
 				test.That(t, ok, test.ShouldBeTrue)
-				_, err = vcs.SubscribeRTP(timeoutCtx, 512, func(_ []*rtp.Packet) error {
+				_, err = vcs.SubscribeRTP(timeoutCtx, 512, func(pkts []*rtp.Packet) {
 					t.Log("should not happen")
 					t.FailNow()
-					return nil
 				})
 				test.That(t, err, test.ShouldBeError, ErrH264PassthroughNotEnabled)
 			})
