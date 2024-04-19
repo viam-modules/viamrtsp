@@ -17,6 +17,7 @@ import (
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtph264"
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtph265"
 	"github.com/bluenviron/gortsplib/v4/pkg/liberrors"
+	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
 	"github.com/google/uuid"
 
 	"github.com/erh/viamrtsp/formatprocessor"
@@ -289,6 +290,10 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		}
 
 		for _, nalu := range au {
+			typ := h264.NALUType(nalu[0] & 0x1F)
+			if typ == h264.NALUTypeSPS || typ == h264.NALUTypePPS {
+				continue
+			}
 			// convert NALUs into RGBA frames
 			image, err := rc.rawDecoder.decode(nalu)
 			if err != nil {
@@ -570,7 +575,6 @@ func (rc *rtspCamera) Unsubscribe(ctx context.Context, id rtppassthrough.Subscri
 }
 
 func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.Config, logger logging.Logger) (camera.Camera, error) {
-	SetLibAVLogLevelFatal()
 	newConf, err := resource.NativeConfig[*Config](conf)
 	if err != nil {
 		logger.Error(err.Error())
