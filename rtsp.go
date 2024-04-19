@@ -570,6 +570,7 @@ func (rc *rtspCamera) Unsubscribe(ctx context.Context, id rtppassthrough.Subscri
 }
 
 func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.Config, logger logging.Logger) (camera.Camera, error) {
+	SetLibAVLogLevelFatal()
 	newConf, err := resource.NativeConfig[*Config](conf)
 	if err != nil {
 		logger.Error(err.Error())
@@ -592,7 +593,6 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		logger.Error(err.Error())
 		return nil, err
 	}
-	SetLibAVLogLevelFatal()
 	err = rc.reconnectClient(codecInfo)
 	if err != nil {
 		logger.Error(err.Error())
