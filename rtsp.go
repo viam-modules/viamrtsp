@@ -63,6 +63,12 @@ type Config struct {
 	DistortionParams *transform.BrownConrady            `json:"distortion_parameters,omitempty"`
 }
 
+// CodecFormat contains a pointer to a format and the corresponding FFmpeg codec.
+type codecFormat struct {
+	formatPointer interface{}
+	codec         videoCodec
+}
+
 // Validate checks to see if the attributes of the model are valid.
 func (conf *Config) Validate(path string) ([]string, error) {
 	_, err := base.ParseURL(conf.Address)
@@ -141,8 +147,9 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 				// Nick S:
 				// This error happens all the time on hardware we need to support & does not affect
 				// the performance of camera streaming. As a result, we ignore this error specifically
-				var errClientInvalidState *liberrors.ErrClientInvalidState
-				if err != nil && !errors.As(err, &errClientInvalidState) {
+				//nolint:errorlint
+				_, isErrClientInvalidState := err.(liberrors.ErrClientInvalidState)
+				if err != nil && !isErrClientInvalidState {
 					rc.logger.Warnf("The rtsp client encountered an error, trying to reconnect to %s, err: %s", rc.u, err)
 					badState = true
 				} else if res != nil && res.StatusCode != base.StatusOK {
@@ -209,14 +216,7 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec) error {
 	}
 
 	if codecInfo == Agnostic {
-		rc.logger.Debugf("calling getStreamInfo on %s", rc.u)
-		codecInfo, err = getStreamInfo(rc.u.String())
-		if err != nil {
-			err := errors.Wrap(err, "when trying to detect codec with libav")
-			rc.logger.Debug(err.Error())
-			return err
-		}
-		rc.logger.Debug("getStreamInfo success")
+		codecInfo = getAvailableCodec(session)
 	}
 
 	switch codecInfo {
@@ -678,4 +678,27 @@ func modelToCodec(model resource.Model) (videoCodec, error) {
 	default:
 		return Unknown, fmt.Errorf("model '%s' has unspecified codec handling", model.Name)
 	}
+}
+
+// getAvailableCodec determines the first supported codec from a session's SDP data
+// returning Unknown if none are found.
+func getAvailableCodec(session *description.Session) videoCodec {
+	var h264 *format.H264
+	var h265 *format.H265
+	var mjpeg *format.MJPEG
+
+	// List of formats/codecs in priority order
+	codecFormats := []codecFormat{
+		{&h264, H264},
+		{&h265, H265},
+		{&mjpeg, MJPEG},
+	}
+
+	for _, codecFormat := range codecFormats {
+		if session.FindFormat(codecFormat.formatPointer) != nil {
+			return codecFormat.codec
+		}
+	}
+
+	return Unknown
 }

@@ -15,20 +15,18 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-decoder=h264 \
                --enable-decoder=hevc \
                --enable-network \
-               --enable-demuxer=rtsp \
                --enable-parser=h264 \
                --enable-parser=hevc
 
-CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib
+export CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib
 ifeq ($(UNAME_S),Linux)
-	CGO_LDFLAGS := "$(CGO_LDFLAGS) -l:libjpeg.a"
+	export CGO_LDFLAGS := "$(CGO_LDFLAGS) -l:libjpeg.a"
 endif
-PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
+export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
 .PHONY: build-ffmpeg tool-install gofmt lint test update-rdk module clean clean-all
 
 $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
-		CGO_LDFLAGS=$(CGO_LDFLAGS) \
 		go build -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
 
 $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go

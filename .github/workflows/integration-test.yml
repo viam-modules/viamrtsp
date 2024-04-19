@@ -10,17 +10,17 @@ jobs:
         config:
           - name: "h264"
             codec: "libx264"
-            should-passthrough: false
+            should_passthrough: "false"
           - name: "h265"
             codec: "libx265"
-            should-passthrough: false
+            should_passthrough: "false"
           - name: "mjpeg"
             codec: "mjpeg"
             extra_ffmpeg_args: "-huffman 0"
-            should-passthrough: false
+            should_passthrough: "false"
           - name: "h264 with passthrough"
             codec: "libx264"
-            should-passthrough: true
+            should_passthrough: "true"
     
     steps:
     - uses: actions/checkout@v3
@@ -34,7 +34,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo add-apt-repository universe &&
-        sudo apt-get install -y libswscale-dev libavcodec-dev libavformat-dev libavutil-dev libfuse2
+        sudo apt-get install -y libfuse2 ffmpeg
         
     - name: Download and extract mediamtx
       run: |
@@ -59,7 +59,7 @@ jobs:
     # Generate config from within yml because relative paths don't reliably work for module exec paths
     - name: Generate viam-server config
       run: |
-        should_passthrough=${{ matrix.config.should_passthrough }}
+        passthrough=${{ matrix.config.should_passthrough }}
         cat << EOF > "integration-test-config-${{ matrix.config.name }}.json"
         {
           "components": [
@@ -70,7 +70,7 @@ jobs:
               "model": "erh:viamrtsp:rtsp",
               "attributes": {
                 "rtsp_address": "rtsp://localhost:8554/live.stream",
-                "rtp_passthrough": "${should_passthrough}"
+                "rtp_passthrough": $passthrough
               },
               "depends_on": []
             }
@@ -84,7 +84,7 @@ jobs:
           ]
         }
         EOF
-        
+
     # Sleep to give time for server to start
     - name: Run viam-server
       run: |
