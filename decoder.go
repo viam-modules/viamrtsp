@@ -4,46 +4,15 @@ import (
 	"fmt"
 	"image"
 	"unsafe"
-
-	"github.com/pkg/errors"
 )
 
 /*
-#cgo pkg-config: libavcodec libavutil libswscale libavformat
+#cgo pkg-config: libavcodec libavutil libswscale
 #include <libavcodec/avcodec.h>
 #include <libavutil/imgutils.h>
+#include <libavutil/error.h>
 #include <libswscale/swscale.h>
-#include <libavformat/avformat.h>
-#include <libavutil/avutil.h>
 #include <stdlib.h>
-
-// get_video_codec checks the provided AVFormatContext to find a supported video codec.
-// It prioritizes H264, H265, then MJPEG if multiple are available.
-// If no supported codec is identified, it returns AV_CODEC_ID_NONE.
-int get_video_codec(AVFormatContext *avFormatCtx) {
-    if (avFormatCtx == NULL) {
-        return AV_CODEC_ID_NONE;
-    }
-
-    for (int i = 0; i < avFormatCtx->nb_streams; i++) {
-        AVStream *stream = avFormatCtx->streams[i];
-        if (stream == NULL) {
-            continue;
-        }
-        AVCodecParameters *codecParams = stream->codecpar;
-        if (codecParams == NULL) {
-            continue;
-        }
-        if (codecParams->codec_id == AV_CODEC_ID_H264) {
-            return AV_CODEC_ID_H264;
-        } else if (codecParams->codec_id == AV_CODEC_ID_H265) {
-            return AV_CODEC_ID_H265;
-        } else if (codecParams->codec_id == AV_CODEC_ID_MJPEG) {
-            return AV_CODEC_ID_MJPEG;
-        }
-    }
-    return AV_CODEC_ID_NONE;
-}
 */
 import "C"
 
@@ -87,46 +56,6 @@ func frameData(frame *C.AVFrame) **C.uint8_t {
 
 func frameLineSize(frame *C.AVFrame) *C.int {
 	return (*C.int)(unsafe.Pointer(&frame.linesize[0]))
-}
-
-// getStreamInfo opens a stream URL and retrieves the video codec.
-func getStreamInfo(url string) (videoCodec, error) {
-	cUrl := C.CString(url)
-	defer C.free(unsafe.Pointer(cUrl))
-
-	var avFormatCtx *C.AVFormatContext = nil
-	ret := C.avformat_open_input(&avFormatCtx, cUrl, nil, nil)
-	if ret < 0 {
-		return Unknown, fmt.Errorf("avformat_open_input() failed: %s", avError(ret))
-	}
-	defer C.avformat_close_input(&avFormatCtx)
-
-	ret = C.avformat_find_stream_info(avFormatCtx, nil)
-	if ret < 0 {
-		return Unknown, fmt.Errorf("avformat_find_stream_info() failed: %s", avError(ret))
-	}
-
-	cCodec := C.get_video_codec(avFormatCtx)
-	codec := convertCodec(cCodec)
-
-	if codec == Unknown {
-		return Unknown, errors.New("no supported codec found")
-	}
-	return codec, nil
-}
-
-// convertCodec converts a C int to a Go videoCodec.
-func convertCodec(cCodec C.int) videoCodec {
-	switch cCodec {
-	case C.AV_CODEC_ID_H264:
-		return H264
-	case C.AV_CODEC_ID_H265:
-		return H265
-	case C.AV_CODEC_ID_MJPEG:
-		return MJPEG
-	default:
-		return Unknown
-	}
 }
 
 // avError converts an AV error code to a AV error message string.
