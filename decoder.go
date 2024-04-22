@@ -47,6 +47,11 @@ int get_video_codec(AVFormatContext *avFormatCtx) {
 */
 import "C"
 
+var (
+	// H264StartCode is start code byte sequence for H264/H265 NALs.
+	H2645StartCode = []uint8{0x00, 0x00, 0x00, 0x01}
+)
+
 // decoder is a generic FFmpeg decoder.
 type decoder struct {
 	codecCtx    *C.AVCodecContext
