@@ -42,7 +42,6 @@ var (
 	ModelMJPEG                   = family.WithModel("rtsp-mjpeg")
 	Models                       = []resource.Model{ModelAgnostic, ModelH264, ModelH265, ModelMJPEG}
 	ErrH264PassthroughNotEnabled = errors.New("H264 passthrough is not enabled")
-	iFrameReceived               bool
 )
 
 func init() {
@@ -269,7 +268,18 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		return errors.Wrap(err, "creating H264 raw decoder")
 	}
 
-	iFrameReceived = false
+	// if SPS and PPS are present into the SDP, send them to the decoder
+	if f.SPS != nil {
+		rc.rawDecoder.decode(f.SPS) // nolint:errcheck
+	} else {
+		rc.logger.Warn("no SPS found in H264 format")
+	}
+	if f.PPS != nil {
+		rc.rawDecoder.decode(f.PPS) // nolint:errcheck
+	} else {
+		rc.logger.Warn("no PPS found in H264 format")
+	}
+
 	storeImage := func(pkt *rtp.Packet) {
 		au, err := rtpDec.Decode(pkt)
 		if err != nil {
@@ -280,7 +290,6 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		}
 
 		if h264.IDRPresent(au) && len(au) == 3 {
-			// create a new slice with the SPS, PPS, and IDR NALUs packed together
 			nalu := append(au[0], H2645StartCode...)
 			nalu = append(nalu, au[1]...)
 			nalu = append(nalu, H2645StartCode...)
@@ -293,14 +302,6 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 			if image != nil {
 				rc.latestFrame.Store(&image)
 			}
-			if !iFrameReceived {
-				iFrameReceived = true
-			}
-			return
-		}
-
-		if !iFrameReceived {
-			rc.logger.Debug("waiting for I frame")
 			return
 		}
 
