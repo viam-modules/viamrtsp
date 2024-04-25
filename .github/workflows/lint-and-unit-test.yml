@@ -1,10 +1,6 @@
 name: Unit test
 
-on:
-  push:
-    branches:
-      - main
-      - sean-viamrtsp/ignorethis
+on: [push, pull_request]
 
 jobs:
   unit-test:
@@ -22,6 +18,9 @@ jobs:
       run: |
         sudo apt-get update
         sudo add-apt-repository universe && sudo apt-get install -y libfuse2
-    
+
+    - name: Build ffmpeg and deps
+      run: make build-ffmpeg
+
     - name: Run unit tests
       run: make test
