@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - ignorethis
+      - sean-viamrtsp/ignorethis
 
 jobs:
   unit-test:
