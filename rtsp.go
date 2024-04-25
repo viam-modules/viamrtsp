@@ -503,6 +503,7 @@ func (rc *rtspCamera) SubscribeRTP(ctx context.Context, bufferSize int, packetsC
 		return uuid.Nil, err
 	}
 
+	// silly
 	var firstReceived bool
 	var lastPTS time.Duration
 	// OnPacketRTP will call this unitSubscriberFunc for all subscribers.
