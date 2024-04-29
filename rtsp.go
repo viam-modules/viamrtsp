@@ -147,9 +147,8 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 				// Nick S:
 				// This error happens all the time on hardware we need to support & does not affect
 				// the performance of camera streaming. As a result, we ignore this error specifically
-				//nolint:errorlint
-				_, isErrClientInvalidState := err.(liberrors.ErrClientInvalidState)
-				if err != nil && !isErrClientInvalidState {
+				var errClientInvalidState liberrors.ErrClientInvalidState
+				if err != nil && !errors.As(err, errClientInvalidState) {
 					rc.logger.Warnf("The rtsp client encountered an error, trying to reconnect to %s, err: %s", rc.u, err)
 					badState = true
 				} else if res != nil && res.StatusCode != base.StatusOK {
