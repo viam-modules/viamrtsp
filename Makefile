@@ -24,7 +24,7 @@ ifeq ($(UNAME_S),Linux)
 endif
 export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
-.PHONY: build-ffmpeg tool-install gofmt lint test update-rdk module clean clean-all
+.PHONY: build-ffmpeg tool-install gofmt lint update-rdk module clean clean-all
 
 $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
 		go build -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
@@ -46,8 +46,6 @@ lint: gofmt tool-install
 	export pkgs="`go list -f '{{.Dir}}' ./...`" && echo "$$pkgs" | xargs go vet -vettool=$(TOOL_BIN)/combined
 	GOGC=50 $(TOOL_BIN)/golangci-lint run -v --fix --config=./etc/.golangci.yaml
 
-test:
-	go test ./...
 
 update-rdk:
 	go get go.viam.com/rdk@latest
