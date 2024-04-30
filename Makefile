@@ -18,9 +18,9 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-parser=h264 \
                --enable-parser=hevc
 
-export CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib
+CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib
 ifeq ($(UNAME_S),Linux)
-	export CGO_LDFLAGS := "$(CGO_LDFLAGS) -l:libjpeg.a"
+	CGO_LDFLAGS := "$(CGO_LDFLAGS) -l:libjpeg.a"
 endif
 export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
@@ -28,9 +28,6 @@ export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
 $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
 		go build -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
-
-$(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
-	go build -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
 
 tool-install:
 	GOBIN=`pwd`/$(TOOL_BIN) go install \

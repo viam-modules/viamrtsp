@@ -3,7 +3,7 @@ name: Integration test using mediamtx
 on: [push, pull_request]
 
 jobs:
-  build-and-integration-test:
+  build-and-test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
