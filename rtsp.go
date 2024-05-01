@@ -18,6 +18,8 @@ import (
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtph264"
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtph265"
 	"github.com/bluenviron/gortsplib/v4/pkg/liberrors"
+	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
+
 	"github.com/erh/viamrtsp/formatprocessor"
 	"github.com/google/uuid"
 	"github.com/pion/rtp"
@@ -271,25 +273,25 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 	}
 
 	// setup H264 -> raw frames decoder
-	rc.rawDecoder, err = newH264Decoder()
+	rc.rawDecoder, err = newH264Decoder(rc.logger)
 	if err != nil {
 		return errors.Wrap(err, "creating H264 raw decoder")
 	}
 
 	// if SPS and PPS are present into the SDP, send them to the decoder
+	initialSPSAndPPS := [][]byte{}
 	if f.SPS != nil {
-		//nolint:gosec
-		rc.rawDecoder.decode(f.SPS)
+		initialSPSAndPPS = append(initialSPSAndPPS, f.SPS)
 	} else {
-		rc.logger.Warn("no SPS found in H264 format")
+		rc.logger.Warn("no initial SPS found in H264 format")
 	}
 	if f.PPS != nil {
-		//nolint:gosec
-		rc.rawDecoder.decode(f.PPS)
+		initialSPSAndPPS = append(initialSPSAndPPS, f.PPS)
 	} else {
-		rc.logger.Warn("no PPS found in H264 format")
+		rc.logger.Warn("no initial PPS found in H264 format")
 	}
 
+	var receivedFirstIDR bool
 	storeImage := func(pkt *rtp.Packet) {
 		au, err := rtpDec.Decode(pkt)
 		if err != nil {
@@ -299,21 +301,13 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 			return
 		}
 
-		for _, nalu := range au {
-			if len(nalu) < 20 {
-				// TODO(ERH): this is probably wrong, but fixes a spam issue with "no frame!"
-				continue
-			}
-			// convert NALUs into RGBA frames
-			image, err := rc.rawDecoder.decode(nalu)
-			if err != nil {
-				rc.logger.Errorf("error decoding(2) h264 rtsp stream  %s", err.Error())
-				return
-			}
-			if image != nil {
-				rc.latestFrame.Store(&image)
-			}
+		if !receivedFirstIDR && h264.IDRPresent(au) {
+			rc.logger.Debug("adding inital SPS & PPS")
+			receivedFirstIDR = true
+			au = append(initialSPSAndPPS, au...)
 		}
+
+		rc.storeH264Frame(au)
 	}
 
 	onPacketRTP := func(pkt *rtp.Packet) {
@@ -388,7 +382,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		return errors.Wrap(err, "creating H265 RTP decoder")
 	}
 
-	rc.rawDecoder, err = newH265Decoder()
+	rc.rawDecoder, err = newH265Decoder(rc.logger)
 	if err != nil {
 		return errors.Wrap(err, "creating H265 raw decoder")
 	}
@@ -704,4 +698,82 @@ func getAvailableCodec(session *description.Session) videoCodec {
 	}
 
 	return Unknown
+}
+
+func (rc *rtspCamera) storeH264Frame(au [][]byte) {
+	rc.logger.Debug("storeFrame START")
+	defer rc.logger.Debug("storeFrame END")
+	naluIndex := 0
+	for naluIndex < len(au) {
+		nalu := au[naluIndex]
+		if isCompactableH264(nalu) {
+			// if the NALU is a compactable type, compact it, feed it into the decoder & skip
+			// the NALUs that were compacted.
+			// We do this so that the libav functions the decoder uses under the hood don't log
+			// spam error messages (which happens when it is fed SPS or PPS without an IDR
+			nalu, nalusCompacted := rc.compactH264SPSAndPPSAndIDR(au[naluIndex:])
+			if err := rc.decodeAndStore(nalu); err != nil {
+				rc.logger.Errorf("error decoding(2) h264 rtsp stream  %s", err.Error())
+				return
+			}
+			naluIndex += nalusCompacted
+			continue
+		}
+
+		// otherwise feed in each non compactable NALU into the decoder
+		rc.logger.Debugf("received non compactable NALU: %s", naluType(nalu))
+		if err := rc.decodeAndStore(nalu); err != nil {
+			rc.logger.Errorf("error decoding(2) h264 rtsp stream  %s", err.Error())
+			return
+		}
+		naluIndex++
+	}
+}
+
+func (rc *rtspCamera) compactH264SPSAndPPSAndIDR(au [][]byte) ([]byte, int) {
+	rc.logger.Debugf("compactSPSAndPPSAndIDR START")
+	defer rc.logger.Debugf("compactSPSAndPPSAndIDR END")
+	compactedNALU, numCompacted := []byte{}, 0
+	for _, nalu := range au {
+		if !isCompactableH264(nalu) {
+			// return once we hit a non SPS, PPS or IDR message
+			return compactedNALU, numCompacted
+		}
+		rc.logger.Debugf("compacting NALU: %s", naluType(nalu))
+		// If this is the first iteration, don't add the start code
+		// as the first nalu has not been written yet
+		if len(compactedNALU) > 0 {
+			startCode := H2645StartCode()
+			compactedNALU = append(compactedNALU, startCode...)
+		}
+		compactedNALU = append(compactedNALU, nalu...)
+		numCompacted++
+	}
+	return compactedNALU, numCompacted
+}
+
+// H2645StartCode is start code byte sequence for H264/H265 NALs.
+func H2645StartCode() []byte {
+	return []uint8{0x00, 0x00, 0x00, 0x01}
+}
+
+func (rc *rtspCamera) decodeAndStore(nalu []byte) error {
+	image, err := rc.rawDecoder.decode(nalu)
+	if err != nil {
+		return err
+	}
+	if image != nil {
+		rc.logger.Debugf("got image")
+		rc.latestFrame.Store(&image)
+	}
+	return nil
+}
+
+func naluType(nalu []byte) h264.NALUType {
+	return h264.NALUType(nalu[0] & 0x1F)
+}
+
+func isCompactableH264(nalu []byte) bool {
+	typ := naluType(nalu)
+	return typ == h264.NALUTypeSPS || typ == h264.NALUTypePPS || typ == h264.NALUTypeIDR
 }
