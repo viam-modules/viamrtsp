@@ -27,7 +27,8 @@ export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 .PHONY: build-ffmpeg tool-install gofmt lint update-rdk module clean clean-all
 
 $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
-		go build -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
+	CGO_LDFLAGS=$(CGO_LDFLAGS) \
+	go build -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
 
 tool-install:
 	GOBIN=`pwd`/$(TOOL_BIN) go install \
