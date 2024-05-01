@@ -10,17 +10,11 @@ jobs:
         config:
           - name: "h264"
             codec: "libx264"
-            should_passthrough: "false"
           - name: "h265"
             codec: "libx265"
-            should_passthrough: "false"
           - name: "mjpeg"
             codec: "mjpeg"
             extra_ffmpeg_args: "-huffman 0"
-            should_passthrough: "false"
-          - name: "h264 with passthrough"
-            codec: "libx264"
-            should_passthrough: "true"
     
     steps:
     - uses: actions/checkout@v3
@@ -59,9 +53,7 @@ jobs:
     # Generate config from within yml because relative paths don't reliably work for module exec paths
     - name: Generate viam-server config
       run: |
-        passthrough=${{ matrix.config.should_passthrough }}
-        cat << EOF > "integration-test-config-${{ matrix.config.name }}.json"
-        {
+        echo '{
           "components": [
             {
               "name": "ip-cam",
@@ -69,8 +61,7 @@ jobs:
               "type": "camera",
               "model": "erh:viamrtsp:rtsp",
               "attributes": {
-                "rtsp_address": "rtsp://localhost:8554/live.stream",
-                "rtp_passthrough": $passthrough
+                "rtsp_address": "rtsp://localhost:8554/live.stream"
               },
               "depends_on": []
             }
@@ -79,11 +70,10 @@ jobs:
             {
               "type": "local",
               "name": "viamrtsp",
-              "executable_path": "$(realpath bin/Linux-x86_64/viamrtsp)"
+              "executable_path": "'$(realpath bin/Linux-x86_64/viamrtsp)'"
             }
           ]
-        }
-        EOF
+        }' > "integration-test-config-${{ matrix.config.name }}.json"
 
     # Sleep to give time for server to start
     - name: Run viam-server

@@ -27,7 +27,8 @@ export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 .PHONY: build-ffmpeg tool-install gofmt lint update-rdk module clean clean-all
 
 $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
-		go build -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
+	CGO_LDFLAGS=$(CGO_LDFLAGS) \
+	go build -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
 
 tool-install:
 	GOBIN=`pwd`/$(TOOL_BIN) go install \
@@ -42,7 +43,6 @@ lint: gofmt tool-install
 	go mod tidy
 	export pkgs="`go list -f '{{.Dir}}' ./...`" && echo "$$pkgs" | xargs go vet -vettool=$(TOOL_BIN)/combined
 	GOGC=50 $(TOOL_BIN)/golangci-lint run -v --fix --config=./etc/.golangci.yaml
-
 
 update-rdk:
 	go get go.viam.com/rdk@latest
