@@ -53,8 +53,7 @@ jobs:
     # Generate config from within yml because relative paths don't reliably work for module exec paths
     - name: Generate viam-server config
       run: |
-        cat << EOF > "integration-test-config-${{ matrix.config.name }}.json"
-        {
+        echo '{
           "components": [
             {
               "name": "ip-cam",
@@ -71,11 +70,10 @@ jobs:
             {
               "type": "local",
               "name": "viamrtsp",
-              "executable_path": "$(realpath bin/Linux-x86_64/viamrtsp)"
+              "executable_path": "'$(realpath bin/Linux-x86_64/viamrtsp)'"
             }
           ]
-        }
-        EOF
+        }' > "integration-test-config-${{ matrix.config.name }}.json"
 
     # Sleep to give time for server to start
     - name: Run viam-server
