@@ -28,6 +28,7 @@ import (
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/rimage/transform"
+	rutils "go.viam.com/rdk/utils"
 	"go.viam.com/utils"
 )
 
@@ -92,9 +93,8 @@ func (conf *Config) Validate(path string) ([]string, error) {
 type (
 	unitSubscriberFunc func(formatprocessor.Unit)
 	subAndCB           struct {
-		cb          unitSubscriberFunc
-		sub         *rtppassthrough.StreamSubscription
-		subCancelFn context.CancelFunc
+		cb  unitSubscriberFunc
+		buf *rtppassthrough.Buffer
 	}
 )
 
@@ -349,7 +349,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 
 			// Publish the newly received packet Unit to all subscribers
 			for _, subAndCB := range rc.subAndCBByID {
-				if err := subAndCB.sub.Publish(func() { subAndCB.cb(u) }); err != nil {
+				if err := subAndCB.buf.Publish(func() { subAndCB.cb(u) }); err != nil {
 					rc.logger.Debug("RTP packet dropped due to %s", err.Error())
 				}
 			}
@@ -507,18 +507,20 @@ func (rc *rtspCamera) SubscribeRTP(
 ) (rtppassthrough.Subscription, error) {
 	rc.logger.Info("SubscribeRTP START")
 	defer rc.logger.Info("SubscribeRTP END")
-	subCtx, subCancelFn := context.WithCancel(context.Background())
 	if err := rc.validateSupportsPassthrough(); err != nil {
 		rc.logger.Debug(err.Error())
-		subCancelFn()
 		return rtppassthrough.NilSubscription, ErrH264PassthroughNotEnabled
 	}
 
-	sub, err := rtppassthrough.NewStreamSubscription(bufferSize)
+	sub, buf, err := rtppassthrough.NewSubscription(bufferSize)
 	if err != nil {
-		subCancelFn()
 		return rtppassthrough.NilSubscription, err
 	}
+	g := rutils.NewGuard(func() {
+		buf.Close()
+	})
+	defer g.OnFail()
+
 	webrtcPayloadMaxSize := 1188 // 1200 - 12 (RTP header)
 	encoder := &rtph264.Encoder{
 		PayloadType:    96,
@@ -526,7 +528,6 @@ func (rc *rtspCamera) SubscribeRTP(
 	}
 
 	if err := encoder.Init(); err != nil {
-		subCancelFn()
 		return rtppassthrough.NilSubscription, err
 	}
 
@@ -599,13 +600,13 @@ func (rc *rtspCamera) SubscribeRTP(
 	rc.subsMu.Lock()
 	defer rc.subsMu.Unlock()
 
-	rc.subAndCBByID[sub.ID()] = subAndCB{
-		cb:          unitSubscriberFunc,
-		sub:         sub,
-		subCancelFn: subCancelFn,
+	rc.subAndCBByID[sub.ID] = subAndCB{
+		cb:  unitSubscriberFunc,
+		buf: buf,
 	}
-	sub.Start()
-	return rtppassthrough.Subscription{ID: sub.ID(), Context: subCtx}, nil
+	buf.Start()
+	g.Success()
+	return sub, nil
 }
 
 // Unsubscribe deregisters the StreamSubscription's callback.
@@ -618,9 +619,8 @@ func (rc *rtspCamera) Unsubscribe(_ context.Context, id rtppassthrough.Subscript
 	if !ok {
 		return errors.New("id not found")
 	}
-	subAndCB.sub.Close()
 	delete(rc.subAndCBByID, id)
-	subAndCB.subCancelFn()
+	subAndCB.buf.Close()
 	return nil
 }
 
@@ -682,9 +682,8 @@ func (rc *rtspCamera) unsubscribeAll() {
 	rc.subsMu.Lock()
 	defer rc.subsMu.Unlock()
 	for id, subAndCB := range rc.subAndCBByID {
-		subAndCB.sub.Close()
 		delete(rc.subAndCBByID, id)
-		subAndCB.subCancelFn()
+		subAndCB.buf.Close()
 	}
 }
 
