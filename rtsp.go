@@ -92,7 +92,7 @@ func (conf *Config) Validate(path string) ([]string, error) {
 
 type (
 	unitSubscriberFunc func(formatprocessor.Unit)
-	subAndCB           struct {
+	bufAndCB           struct {
 		cb  unitSubscriberFunc
 		buf *rtppassthrough.Buffer
 	}
@@ -122,7 +122,7 @@ type rtspCamera struct {
 	rtpPassthroughCancelCauseFn context.CancelCauseFunc
 
 	subsMu       sync.RWMutex
-	subAndCBByID map[rtppassthrough.SubscriptionID]subAndCB
+	bufAndCBByID map[rtppassthrough.SubscriptionID]bufAndCB
 }
 
 // Close closes the camera. It always returns nil, but because of Close() interface, it needs to return an error.
@@ -343,13 +343,13 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 			}
 			rc.subsMu.RLock()
 			defer rc.subsMu.RUnlock()
-			if len(rc.subAndCBByID) == 0 {
+			if len(rc.bufAndCBByID) == 0 {
 				return
 			}
 
 			// Publish the newly received packet Unit to all subscribers
-			for _, subAndCB := range rc.subAndCBByID {
-				if err := subAndCB.buf.Publish(func() { subAndCB.cb(u) }); err != nil {
+			for _, bufAndCB := range rc.bufAndCBByID {
+				if err := bufAndCB.buf.Publish(func() { bufAndCB.cb(u) }); err != nil {
 					rc.logger.Debug("RTP packet dropped due to %s", err.Error())
 				}
 			}
@@ -600,7 +600,7 @@ func (rc *rtspCamera) SubscribeRTP(
 	rc.subsMu.Lock()
 	defer rc.subsMu.Unlock()
 
-	rc.subAndCBByID[sub.ID] = subAndCB{
+	rc.bufAndCBByID[sub.ID] = bufAndCB{
 		cb:  unitSubscriberFunc,
 		buf: buf,
 	}
@@ -615,12 +615,12 @@ func (rc *rtspCamera) Unsubscribe(_ context.Context, id rtppassthrough.Subscript
 	defer rc.logger.Info("Unsubscribe END")
 	rc.subsMu.Lock()
 	defer rc.subsMu.Unlock()
-	subAndCB, ok := rc.subAndCBByID[id]
+	bufAndCB, ok := rc.bufAndCBByID[id]
 	if !ok {
 		return errors.New("id not found")
 	}
-	delete(rc.subAndCBByID, id)
-	subAndCB.buf.Close()
+	delete(rc.bufAndCBByID, id)
+	bufAndCB.buf.Close()
 	return nil
 }
 
@@ -640,7 +640,7 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		model:                       conf.Model,
 		u:                           u,
 		rtpPassthrough:              newConf.RTPPassthrough,
-		subAndCBByID:                make(map[rtppassthrough.SubscriptionID]subAndCB),
+		bufAndCBByID:                make(map[rtppassthrough.SubscriptionID]bufAndCB),
 		rtpPassthroughCtx:           rtpPassthroughCtx,
 		rtpPassthroughCancelCauseFn: rtpPassthroughCancelCauseFn,
 		logger:                      logger,
@@ -681,9 +681,9 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 func (rc *rtspCamera) unsubscribeAll() {
 	rc.subsMu.Lock()
 	defer rc.subsMu.Unlock()
-	for id, subAndCB := range rc.subAndCBByID {
-		delete(rc.subAndCBByID, id)
-		subAndCB.buf.Close()
+	for id, bufAndCB := range rc.bufAndCBByID {
+		delete(rc.bufAndCBByID, id)
+		bufAndCB.buf.Close()
 	}
 }
 
