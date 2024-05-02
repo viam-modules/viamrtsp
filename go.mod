@@ -326,4 +326,4 @@ require (
 	nhooyr.io/websocket v1.8.7 // indirect
 )
 
-replace go.viam.com/rdk => github.com/nicksanford/rdk v0.0.0-20240502163355-76690bfef2f2
+replace go.viam.com/rdk => github.com/nicksanford/rdk v0.0.0-20240502213315-a403f3b6425b

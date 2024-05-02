@@ -952,8 +952,8 @@ github.com/nbutton23/zxcvbn-go v0.0.0-20201221231540-e56b841a3c88/go.mod h1:KSVJ
 github.com/nbutton23/zxcvbn-go v0.0.0-20210217022336-fa2cb2858354/go.mod h1:KSVJerMDfblTH7p5MZaTt+8zaT2iEk3AkVb9PQdZuE8=
 github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 h1:zYyBkD/k9seD2A7fsi6Oo2LfFZAehjjQMERAvZLEDnQ=
 github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646/go.mod h1:jpp1/29i3P1S/RLdc7JQKbRpFeM1dOBd8T9ki5s+AY8=
-github.com/nicksanford/rdk v0.0.0-20240502163355-76690bfef2f2 h1:edEz8gX+hj3CYXowqCnpo9avg06rCxP7EL4ss5nA3UE=
-github.com/nicksanford/rdk v0.0.0-20240502163355-76690bfef2f2/go.mod h1:aI3EYlHxdCxikqO0OEosvQ5g6mT6N1dVJYMa9mRvLvM=
+github.com/nicksanford/rdk v0.0.0-20240502213315-a403f3b6425b h1:xvBHa24+i7M4MLCcsGon0VpZGNE1cwFDdaWX2yDUBsU=
+github.com/nicksanford/rdk v0.0.0-20240502213315-a403f3b6425b/go.mod h1:aI3EYlHxdCxikqO0OEosvQ5g6mT6N1dVJYMa9mRvLvM=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=
 github.com/nishanths/exhaustive v0.1.0/go.mod h1:S1j9110vxV1ECdCudXRkeMnFQ/DQk9ajLT0Uf2MYZQQ=
 github.com/nishanths/exhaustive v0.12.0 h1:vIY9sALmw6T/yxiASewa4TQcFsVYZQQRUQJhKRf3Swg=
