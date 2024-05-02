@@ -135,7 +135,7 @@ func TestRTSPCamera(t *testing.T) {
 				defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
 				vcs, ok := rtspCam.(rtppassthrough.Source)
 				test.That(t, ok, test.ShouldBeTrue)
-				_, err = vcs.SubscribeRTP(timeoutCtx, 512, func(pkts []*rtp.Packet) {
+				_, err = vcs.SubscribeRTP(timeoutCtx, 512, func(_ []*rtp.Packet) {
 					t.Log("should not happen")
 					t.FailNow()
 				})
