@@ -16,14 +16,13 @@ import (
 	"github.com/bluenviron/gortsplib/v4/pkg/rtptime"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
 	"github.com/pion/rtp"
-	"go.viam.com/test"
-	"go.viam.com/utils"
-
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/components/camera/rtppassthrough"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/rimage/transform"
+	"go.viam.com/test"
+	"go.viam.com/utils"
 )
 
 func TestRTSPCamera(t *testing.T) {
@@ -36,8 +35,13 @@ func TestRTSPCamera(t *testing.T) {
 		forma := &format.H264{
 			PayloadTyp:        96,
 			PacketizationMode: 1,
-			SPS:               []uint8{0x67, 0x64, 0x0, 0x15, 0xac, 0xb2, 0x3, 0xc1, 0x1f, 0xd6, 0x2, 0xdc, 0x8, 0x8, 0x16, 0x94, 0x0, 0x0, 0x3, 0x0, 0x4, 0x0, 0x0, 0x3, 0x0, 0xf0, 0x3c, 0x58, 0xb9, 0x20},
-			PPS:               []uint8{0x68, 0xeb, 0xc3, 0xcb, 0x22, 0xc0},
+			SPS: []uint8{
+				0x67, 0x64, 0x00, 0x15, 0xac, 0xb2, 0x03, 0xc1,
+				0x1f, 0xd6, 0x02, 0xdc, 0x08, 0x08, 0x16, 0x94,
+				0x00, 0x00, 0x03, 0x00, 0x04, 0x00, 0x00, 0x03,
+				0x00, 0xf0, 0x3c, 0x58, 0xb9, 0x20,
+			},
+			PPS: []uint8{0x68, 0xeb, 0xc3, 0xcb, 0x22, 0xc0},
 		}
 		t.Run("init", func(t *testing.T) {
 			h, closeFunc := newH264ServerHandler(t, forma, bURL, logger)
@@ -132,7 +136,7 @@ func TestRTSPCamera(t *testing.T) {
 				defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
 				vcs, ok := rtspCam.(rtppassthrough.Source)
 				test.That(t, ok, test.ShouldBeTrue)
-				_, err = vcs.SubscribeRTP(timeoutCtx, 512, func(pkts []*rtp.Packet) error {
+				_, err = vcs.SubscribeRTP(timeoutCtx, 512, func(_ []*rtp.Packet) error {
 					t.Log("should not happen")
 					t.FailNow()
 					return nil
@@ -268,12 +272,12 @@ func newH264ServerHandler(
 			Type:    description.MediaTypeVideo,
 			Formats: []format.Format{forma},
 		},
-		OnSessionCloseFunc: func(ctx *gortsplib.ServerHandlerOnSessionCloseCtx, sh *serverHandler) {
+		OnSessionCloseFunc: func(_ *gortsplib.ServerHandlerOnSessionCloseCtx, sh *serverHandler) {
 			logger.Debug("OnSessionCloseFunc")
 			sh.mu.Lock()
 			defer sh.mu.Unlock()
 		},
-		OnDescribeFunc: func(ctx *gortsplib.ServerHandlerOnDescribeCtx, sh *serverHandler) (*base.Response, *gortsplib.ServerStream, error) {
+		OnDescribeFunc: func(_ *gortsplib.ServerHandlerOnDescribeCtx, sh *serverHandler) (*base.Response, *gortsplib.ServerStream, error) {
 			logger.Debug("OnDescribeFunc")
 			defer logger.Debug("OnDescribeFunc DONE")
 
@@ -288,19 +292,19 @@ func newH264ServerHandler(
 			logger.Debug("sh.stream.Description().Medias[0].Formats[0]: %#v ", sh.stream.Description().Medias[0].Formats[0])
 			return &base.Response{StatusCode: base.StatusOK}, sh.stream, nil
 		},
-		OnAnnounceFunc: func(ctx *gortsplib.ServerHandlerOnAnnounceCtx, sh *serverHandler) (*base.Response, error) {
+		OnAnnounceFunc: func(_ *gortsplib.ServerHandlerOnAnnounceCtx, _ *serverHandler) (*base.Response, error) {
 			logger.Debug("OnAnnounceFunc")
 			t.Log("should not be called")
 			t.FailNow()
 			return nil, errors.New("should not be called")
 		},
-		OnSetupFunc: func(ctx *gortsplib.ServerHandlerOnSetupCtx, sh *serverHandler) (*base.Response, *gortsplib.ServerStream, error) {
+		OnSetupFunc: func(_ *gortsplib.ServerHandlerOnSetupCtx, sh *serverHandler) (*base.Response, *gortsplib.ServerStream, error) {
 			logger.Debug("OnSetupFunc")
 			return &base.Response{StatusCode: base.StatusOK}, sh.stream, nil
 		},
 		// This will play an MJpeg video which only has frames which are red squares
 		// This is so that the result of GetImage is determanistic
-		OnPlayFunc: func(ctx *gortsplib.ServerHandlerOnPlayCtx, sh *serverHandler) (*base.Response, error) {
+		OnPlayFunc: func(_ *gortsplib.ServerHandlerOnPlayCtx, sh *serverHandler) (*base.Response, error) {
 			logger.Debug("OnPlayFunc")
 			sh.wg.Add(1)
 			utils.ManagedGo(func() {
@@ -361,7 +365,7 @@ func newH264ServerHandler(
 			}, sh.wg.Done)
 			return &base.Response{StatusCode: base.StatusOK}, nil
 		},
-		OnRecordFunc: func(ctx *gortsplib.ServerHandlerOnRecordCtx, sh *serverHandler) (*base.Response, error) {
+		OnRecordFunc: func(_ *gortsplib.ServerHandlerOnRecordCtx, _ *serverHandler) (*base.Response, error) {
 			logger.Debug("OnRecordFunc")
 			t.Log("should not be called")
 			t.FailNow()

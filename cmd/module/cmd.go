@@ -1,13 +1,13 @@
+// This package provides the entrypoint for the module
 package main
 
 import (
 	"context"
 
+	"github.com/erh/viamrtsp"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/module"
-
-	"github.com/erh/viamrtsp"
 	"go.viam.com/utils"
 )
 
@@ -15,7 +15,7 @@ func main() {
 	utils.ContextualMain(mainWithArgs, module.NewLoggerFromArgs("client"))
 }
 
-func mainWithArgs(ctx context.Context, args []string, logger logging.Logger) error {
+func mainWithArgs(ctx context.Context, _ []string, logger logging.Logger) error {
 	myMod, err := module.NewModuleFromArgs(ctx, logger)
 	if err != nil {
 		return err

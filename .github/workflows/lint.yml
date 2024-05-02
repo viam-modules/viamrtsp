@@ -1,0 +1,41 @@
+name: Linter and static checks
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '**/**.go'
+  pull_request:
+    paths:
+      - '**/**.go'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.21
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo add-apt-repository universe && sudo apt-get install -y libfuse2
+
+    - name: Check gofmt
+      run: |
+        if [ -n "$(gofmt -d .)" ]; then
+          echo "gofmt is unhappy with your code quality!! Please run 'make lint' and commit the changes."
+          exit 1
+        fi
+    
+    - name: Build ffmpeg and deps
+      run: make build-ffmpeg
+
+    - name: Run linter and static checks
+      run: make lint
