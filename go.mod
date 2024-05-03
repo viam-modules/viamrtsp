@@ -9,14 +9,14 @@ require (
 	github.com/bluenviron/mediacommon v1.9.2
 	github.com/edaniels/golinters v0.0.5-0.20220906153528-641155550742
 	github.com/golangci/golangci-lint v1.57.2
-	github.com/google/uuid v1.6.0
 	github.com/pion/rtp v1.8.5
 	github.com/pkg/errors v0.9.1
 	github.com/rhysd/actionlint v1.6.27
 	github.com/stretchr/testify v1.9.0
-	go.viam.com/rdk v0.25.0
+	go.uber.org/zap v1.24.0
+	go.viam.com/rdk v0.26.0-rc0.0.20240503203304-30f601249ccf
 	go.viam.com/test v1.1.1-0.20220913152726-5da9916c08a2
-	go.viam.com/utils v0.1.71
+	go.viam.com/utils v0.1.74
 )
 
 require (
@@ -54,7 +54,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/bkielbasa/cyclop v1.2.1 // indirect
-	github.com/blackjack/webcam v0.5.0 // indirect
+	github.com/blackjack/webcam v0.6.1 // indirect
 	github.com/blizzy78/varnamelen v0.8.0 // indirect
 	github.com/bombsimon/wsl/v4 v4.2.1 // indirect
 	github.com/breml/bidichk v0.2.7 // indirect
@@ -131,6 +131,7 @@ require (
 	github.com/gonuts/binary v0.2.0 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/s2a-go v0.1.7 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
 	github.com/googleapis/gax-go/v2 v2.12.0 // indirect
 	github.com/gordonklaus/ineffassign v0.1.0 // indirect
@@ -209,7 +210,7 @@ require (
 	github.com/pion/interceptor v0.1.25 // indirect
 	github.com/pion/logging v0.2.2 // indirect
 	github.com/pion/mdns v0.0.12 // indirect
-	github.com/pion/mediadevices v0.6.2 // indirect
+	github.com/pion/mediadevices v0.6.4 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
 	github.com/pion/rtcp v1.2.14 // indirect
 	github.com/pion/sctp v1.8.14 // indirect
@@ -290,8 +291,7 @@ require (
 	go.uber.org/automaxprocs v1.5.3 // indirect
 	go.uber.org/goleak v1.2.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.24.0 // indirect
-	go.viam.com/api v0.1.281 // indirect
+	go.viam.com/api v0.1.293 // indirect
 	goji.io v2.0.2+incompatible // indirect
 	golang.org/x/crypto v0.21.0 // indirect
 	golang.org/x/exp v0.0.0-20240103183307-be819d1f06fc // indirect
