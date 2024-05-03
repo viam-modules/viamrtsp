@@ -144,7 +144,6 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 				badState = true
 			} else {
 				res, err := rc.client.Options(rc.u)
-				rc.logger.Debugf("Options response: %s, err: %s", res, err)
 				// Nick S:
 				// This error happens all the time on hardware we need to support & does not affect
 				// the performance of camera streaming. As a result, we ignore this error specifically
@@ -419,7 +418,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		au, err := rtpDec.Decode(pkt)
 		if err != nil {
 			if !errors.Is(err, rtph265.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph265.ErrMorePacketsNeeded) {
-				rc.logger.Errorf("error decoding(1) h265 rstp stream %w", err)
+				rc.logger.Debugf("error decoding(1) h265 rstp stream %w", err)
 			}
 			return
 		}
@@ -427,7 +426,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		for _, nalu := range au {
 			lastImage, err := rc.rawDecoder.decode(nalu)
 			if err != nil {
-				rc.logger.Errorf("error decoding(2) h265 rtsp stream err: %s", err.Error())
+				rc.logger.Debugf("error decoding(2) h265 rtsp stream err: %s", err.Error())
 				return
 			}
 
@@ -700,8 +699,6 @@ func getAvailableCodec(session *description.Session) videoCodec {
 }
 
 func (rc *rtspCamera) storeH264Frame(au [][]byte) {
-	rc.logger.Debug("storeFrame START")
-	defer rc.logger.Debug("storeFrame END")
 	naluIndex := 0
 	for naluIndex < len(au) {
 		nalu := au[naluIndex]
@@ -712,7 +709,7 @@ func (rc *rtspCamera) storeH264Frame(au [][]byte) {
 			// spam error messages (which happens when it is fed SPS or PPS without an IDR
 			nalu, nalusCompacted := rc.compactH264SPSAndPPSAndIDR(au[naluIndex:])
 			if err := rc.decodeAndStore(nalu); err != nil {
-				rc.logger.Errorf("error decoding(2) h264 rtsp stream  %s", err.Error())
+				rc.logger.Debugf("error decoding(2) h264 rtsp stream  %s", err.Error())
 				return
 			}
 			naluIndex += nalusCompacted
@@ -720,9 +717,8 @@ func (rc *rtspCamera) storeH264Frame(au [][]byte) {
 		}
 
 		// otherwise feed in each non compactable NALU into the decoder
-		rc.logger.Debugf("received non compactable NALU: %s", naluType(nalu))
 		if err := rc.decodeAndStore(nalu); err != nil {
-			rc.logger.Errorf("error decoding(2) h264 rtsp stream  %s", err.Error())
+			rc.logger.Debugf("error decoding(2) h264 rtsp stream  %s", err.Error())
 			return
 		}
 		naluIndex++
@@ -730,15 +726,12 @@ func (rc *rtspCamera) storeH264Frame(au [][]byte) {
 }
 
 func (rc *rtspCamera) compactH264SPSAndPPSAndIDR(au [][]byte) ([]byte, int) {
-	rc.logger.Debug("compactSPSAndPPSAndIDR START")
-	defer rc.logger.Debug("compactSPSAndPPSAndIDR END")
 	compactedNALU, numCompacted := []byte{}, 0
 	for _, nalu := range au {
 		if !isCompactableH264(nalu) {
 			// return once we hit a non SPS, PPS or IDR message
 			return compactedNALU, numCompacted
 		}
-		rc.logger.Debugf("compacting NALU: %s", naluType(nalu))
 		// If this is the first iteration, don't add the start code
 		// as the first nalu has not been written yet
 		if len(compactedNALU) > 0 {
@@ -762,7 +755,6 @@ func (rc *rtspCamera) decodeAndStore(nalu []byte) error {
 		return err
 	}
 	if image != nil {
-		rc.logger.Debug("got image")
 		rc.latestFrame.Store(&image)
 	}
 	return nil
