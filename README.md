@@ -17,7 +17,9 @@ The binary is statically linked with [FFmpeg v6.1](https://github.com/FFmpeg/FFm
 
 Notes
 ===
-* Heavily cribbed from https://github.com/bluenviron/gortsplib/blob/main/examples/client-read-format-h264-convert-to-jpeg/main.go
+* Heavily cribbed from [gortsplib](https://github.com/bluenviron/gortsplib) examples:
+    * [H264 stream to JPEG](https://github.com/bluenviron/gortsplib/blob/main/examples/client-play-format-h264-convert-to-jpeg/main.go)
+    * [H265 stream to JPEG](https://github.com/bluenviron/gortsplib/blob/main/examples/client-play-format-h265-convert-to-jpeg/main.go)
 
 Sample Config
 ===
