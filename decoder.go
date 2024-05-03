@@ -16,10 +16,12 @@ import (
 	"unsafe"
 
 	"github.com/pkg/errors"
+	"go.viam.com/rdk/logging"
 )
 
 // decoder is a generic FFmpeg decoder.
 type decoder struct {
+	logger      logging.Logger
 	codecCtx    *C.AVCodecContext
 	srcFrame    *C.AVFrame
 	swsCtx      *C.struct_SwsContext
@@ -81,7 +83,7 @@ func SetLibAVLogLevelFatal() {
 }
 
 // newDecoder creates a new decoder for the given codec.
-func newDecoder(codecID C.enum_AVCodecID) (*decoder, error) {
+func newDecoder(codecID C.enum_AVCodecID, logger logging.Logger) (*decoder, error) {
 	codec := C.avcodec_find_decoder(codecID)
 	if codec == nil {
 		return nil, errors.New("avcodec_find_decoder() failed")
@@ -105,19 +107,20 @@ func newDecoder(codecID C.enum_AVCodecID) (*decoder, error) {
 	}
 
 	return &decoder{
+		logger:   logger,
 		codecCtx: codecCtx,
 		srcFrame: srcFrame,
 	}, nil
 }
 
 // newH264Decoder creates a new H264 decoder.
-func newH264Decoder() (*decoder, error) {
-	return newDecoder(C.AV_CODEC_ID_H264)
+func newH264Decoder(logger logging.Logger) (*decoder, error) {
+	return newDecoder(C.AV_CODEC_ID_H264, logger)
 }
 
 // newH265Decoder creates a new H265 decoder.
-func newH265Decoder() (*decoder, error) {
-	return newDecoder(C.AV_CODEC_ID_H265)
+func newH265Decoder(logger logging.Logger) (*decoder, error) {
+	return newDecoder(C.AV_CODEC_ID_H265, logger)
 }
 
 // close closes the decoder.
@@ -135,7 +138,7 @@ func (d *decoder) close() {
 }
 
 func (d *decoder) decode(nalu []byte) (image.Image, error) {
-	nalu = append([]uint8{0x00, 0x00, 0x00, 0x01}, nalu...)
+	nalu = append(H2645StartCode(), nalu...)
 
 	// send frame to decoder
 	var avPacket C.AVPacket
