@@ -295,7 +295,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		au, err := rtpDec.Decode(pkt)
 		if err != nil {
 			if !errors.Is(err, rtph264.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph264.ErrMorePacketsNeeded) {
-				rc.logger.Errorf("error decoding(1) h264 rstp stream %w", err)
+				rc.logger.Debugf("error decoding(1) h264 rstp stream %w", err)
 			}
 			return
 		}
