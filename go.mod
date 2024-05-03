@@ -13,7 +13,8 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/rhysd/actionlint v1.6.27
 	github.com/stretchr/testify v1.9.0
-	go.viam.com/rdk v0.25.0
+	go.uber.org/zap v1.24.0
+	go.viam.com/rdk v0.26.0-rc0.0.20240503203304-30f601249ccf
 	go.viam.com/test v1.1.1-0.20220913152726-5da9916c08a2
 	go.viam.com/utils v0.1.74
 )
@@ -290,7 +291,6 @@ require (
 	go.uber.org/automaxprocs v1.5.3 // indirect
 	go.uber.org/goleak v1.2.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.24.0 // indirect
 	go.viam.com/api v0.1.293 // indirect
 	goji.io v2.0.2+incompatible // indirect
 	golang.org/x/crypto v0.21.0 // indirect
@@ -325,5 +325,3 @@ require (
 	mvdan.cc/unparam v0.0.0-20240104100049-c549a3470d14 // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 )
-
-replace go.viam.com/rdk => github.com/nicksanford/rdk v0.0.0-20240502213315-a403f3b6425b
