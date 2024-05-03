@@ -19,7 +19,6 @@ import (
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtph265"
 	"github.com/bluenviron/gortsplib/v4/pkg/liberrors"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
-
 	"github.com/erh/viamrtsp/formatprocessor"
 	"github.com/google/uuid"
 	"github.com/pion/rtp"
@@ -302,7 +301,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		}
 
 		if !receivedFirstIDR && h264.IDRPresent(au) {
-			rc.logger.Debug("adding inital SPS & PPS")
+			rc.logger.Debug("adding initial SPS & PPS")
 			receivedFirstIDR = true
 			au = append(initialSPSAndPPS, au...)
 		}
@@ -731,8 +730,8 @@ func (rc *rtspCamera) storeH264Frame(au [][]byte) {
 }
 
 func (rc *rtspCamera) compactH264SPSAndPPSAndIDR(au [][]byte) ([]byte, int) {
-	rc.logger.Debugf("compactSPSAndPPSAndIDR START")
-	defer rc.logger.Debugf("compactSPSAndPPSAndIDR END")
+	rc.logger.Debug("compactSPSAndPPSAndIDR START")
+	defer rc.logger.Debug("compactSPSAndPPSAndIDR END")
 	compactedNALU, numCompacted := []byte{}, 0
 	for _, nalu := range au {
 		if !isCompactableH264(nalu) {
@@ -763,7 +762,7 @@ func (rc *rtspCamera) decodeAndStore(nalu []byte) error {
 		return err
 	}
 	if image != nil {
-		rc.logger.Debugf("got image")
+		rc.logger.Debug("got image")
 		rc.latestFrame.Store(&image)
 	}
 	return nil

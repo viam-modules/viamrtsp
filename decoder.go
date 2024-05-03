@@ -138,7 +138,7 @@ func (d *decoder) close() {
 }
 
 func (d *decoder) decode(nalu []byte) (image.Image, error) {
-	nalu = append(H2645StartCode(), []uint8(nalu)...)
+	nalu = append(H2645StartCode(), nalu...)
 
 	// send frame to decoder
 	var avPacket C.AVPacket
