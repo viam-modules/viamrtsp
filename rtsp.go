@@ -116,10 +116,10 @@ type rtspCamera struct {
 
 	logger logging.Logger
 
-	rtpPassthrough         bool
-	currentCodec           atomic.Int64
-	rtpPassthroughCtx      context.Context
-	rtpPassthroughCancelFn context.CancelFunc
+	rtpPassthrough              bool
+	currentCodec                atomic.Int64
+	rtpPassthroughCtx           context.Context
+	rtpPassthroughCancelCauseFn context.CancelCauseFunc
 
 	subsMu       sync.RWMutex
 	bufAndCBByID map[rtppassthrough.SubscriptionID]bufAndCB
@@ -548,7 +548,7 @@ func (rc *rtspCamera) SubscribeRTP(
 		if !ok {
 			err := errors.New("(*unit.H264) type conversion error")
 			rc.logger.Error(err.Error())
-			rc.rtpPassthroughCancelFn()
+			rc.rtpPassthroughCancelCauseFn(err)
 
 			// unsubscribeAll() needs to be run in another goroutine as it will call Close() on sub which
 			// will try to take a lock which has already been taken while unitSubscriberFunc is executing
@@ -567,7 +567,7 @@ func (rc *rtspCamera) SubscribeRTP(
 		} else if tunit.PTS < lastPTS {
 			err := errors.New("WebRTC doesn't support H264 streams with B-frames")
 			rc.logger.Error(err.Error())
-			rc.rtpPassthroughCancelFn()
+			rc.rtpPassthroughCancelCauseFn(err)
 
 			// unsubscribeAll() needs to be run in another goroutine as unsubscribeAll() will call Close() on sub which
 			// will try to take a lock which has already been taken while unitSubscriberFunc is executing
@@ -631,15 +631,15 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		logger.Error(err.Error())
 		return nil, err
 	}
-	rtpPassthroughCtx, rtpPassthroughCancel := context.WithCancel(context.Background())
+	rtpPassthroughCtx, rtpPassthroughCancelCauseFn := context.WithCancelCause(context.Background())
 	rc := &rtspCamera{
-		model:                  conf.Model,
-		u:                      u,
-		rtpPassthrough:         newConf.RTPPassthrough,
-		bufAndCBByID:           make(map[rtppassthrough.SubscriptionID]bufAndCB),
-		rtpPassthroughCtx:      rtpPassthroughCtx,
-		rtpPassthroughCancelFn: rtpPassthroughCancel,
-		logger:                 logger,
+		model:                       conf.Model,
+		u:                           u,
+		rtpPassthrough:              newConf.RTPPassthrough,
+		bufAndCBByID:                make(map[rtppassthrough.SubscriptionID]bufAndCB),
+		rtpPassthroughCtx:           rtpPassthroughCtx,
+		rtpPassthroughCancelCauseFn: rtpPassthroughCancelCauseFn,
+		logger:                      logger,
 	}
 	codecInfo, err := modelToCodec(conf.Model)
 	if err != nil {
