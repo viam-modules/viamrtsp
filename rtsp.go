@@ -116,10 +116,10 @@ type rtspCamera struct {
 
 	logger logging.Logger
 
-	rtpPassthrough              bool
-	currentCodec                atomic.Int64
-	rtpPassthroughCtx           context.Context
-	rtpPassthroughCancelCauseFn context.CancelCauseFunc
+	rtpPassthrough         bool
+	currentCodec           atomic.Int64
+	rtpPassthroughCtx      context.Context
+	rtpPassthroughCancelFn context.CancelFunc
 
 	subsMu       sync.RWMutex
 	bufAndCBByID map[rtppassthrough.SubscriptionID]bufAndCB
@@ -505,8 +505,6 @@ func (rc *rtspCamera) SubscribeRTP(
 	bufferSize int,
 	packetsCB rtppassthrough.PacketCallback,
 ) (rtppassthrough.Subscription, error) {
-	rc.logger.Info("SubscribeRTP START")
-	defer rc.logger.Info("SubscribeRTP END")
 	if err := rc.validateSupportsPassthrough(); err != nil {
 		rc.logger.Debug(err.Error())
 		return rtppassthrough.NilSubscription, ErrH264PassthroughNotEnabled
@@ -550,7 +548,7 @@ func (rc *rtspCamera) SubscribeRTP(
 		if !ok {
 			err := errors.New("(*unit.H264) type conversion error")
 			rc.logger.Error(err.Error())
-			rc.rtpPassthroughCancelCauseFn(err)
+			rc.rtpPassthroughCancelFn()
 
 			// unsubscribeAll() needs to be run in another goroutine as it will call Close() on sub which
 			// will try to take a lock which has already been taken while unitSubscriberFunc is executing
@@ -569,7 +567,7 @@ func (rc *rtspCamera) SubscribeRTP(
 		} else if tunit.PTS < lastPTS {
 			err := errors.New("WebRTC doesn't support H264 streams with B-frames")
 			rc.logger.Error(err.Error())
-			rc.rtpPassthroughCancelCauseFn(err)
+			rc.rtpPassthroughCancelFn()
 
 			// unsubscribeAll() needs to be run in another goroutine as unsubscribeAll() will call Close() on sub which
 			// will try to take a lock which has already been taken while unitSubscriberFunc is executing
@@ -611,8 +609,6 @@ func (rc *rtspCamera) SubscribeRTP(
 
 // Unsubscribe deregisters the Subscription's callback.
 func (rc *rtspCamera) Unsubscribe(_ context.Context, id rtppassthrough.SubscriptionID) error {
-	rc.logger.Info("Unsubscribe START")
-	defer rc.logger.Info("Unsubscribe END")
 	rc.subsMu.Lock()
 	defer rc.subsMu.Unlock()
 	bufAndCB, ok := rc.bufAndCBByID[id]
@@ -635,15 +631,15 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		logger.Error(err.Error())
 		return nil, err
 	}
-	rtpPassthroughCtx, rtpPassthroughCancelCauseFn := context.WithCancelCause(context.Background())
+	rtpPassthroughCtx, rtpPassthroughCancel := context.WithCancel(context.Background())
 	rc := &rtspCamera{
-		model:                       conf.Model,
-		u:                           u,
-		rtpPassthrough:              newConf.RTPPassthrough,
-		bufAndCBByID:                make(map[rtppassthrough.SubscriptionID]bufAndCB),
-		rtpPassthroughCtx:           rtpPassthroughCtx,
-		rtpPassthroughCancelCauseFn: rtpPassthroughCancelCauseFn,
-		logger:                      logger,
+		model:                  conf.Model,
+		u:                      u,
+		rtpPassthrough:         newConf.RTPPassthrough,
+		bufAndCBByID:           make(map[rtppassthrough.SubscriptionID]bufAndCB),
+		rtpPassthroughCtx:      rtpPassthroughCtx,
+		rtpPassthroughCancelFn: rtpPassthroughCancel,
+		logger:                 logger,
 	}
 	codecInfo, err := modelToCodec(conf.Model)
 	if err != nil {
