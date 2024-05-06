@@ -609,8 +609,6 @@ func (rc *rtspCamera) SubscribeRTP(
 
 // Unsubscribe deregisters the Subscription's callback.
 func (rc *rtspCamera) Unsubscribe(_ context.Context, id rtppassthrough.SubscriptionID) error {
-	rc.logger.Info("Unsubscribe START")
-	defer rc.logger.Info("Unsubscribe END")
 	rc.subsMu.Lock()
 	defer rc.subsMu.Unlock()
 	bufAndCB, ok := rc.bufAndCBByID[id]
