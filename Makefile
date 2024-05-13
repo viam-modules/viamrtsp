@@ -1,10 +1,16 @@
-BIN_OUTPUT_PATH = bin/$(shell uname -s)-$(shell uname -m)
-TOOL_BIN = bin/gotools/$(shell uname -s)-$(shell uname -m)
-UNAME_S ?= $(shell uname -s)
+UNAME_S ?= $(shell uname -s | tr '[:upper:]' '[:lower:]')
 UNAME_M ?= $(shell uname -m)
+TARGET_S ?= $(UNAME_S)
+TARGET_M ?= $(UNAME_M)
+ifeq ($(TARGET_M),aarch64)
+    TARGET_M = arm64
+endif
+BIN_OUTPUT_PATH = bin/$(TARGET_S)-$(TARGET_M)
+TOOL_BIN = bin/gotools/$(shell uname -s)-$(shell uname -m)
+
 FFMPEG_TAG ?= n6.1
 FFMPEG_VERSION ?= $(shell pwd)/FFmpeg/$(FFMPEG_TAG)
-FFMPEG_VERSION_PLATFORM ?= $(FFMPEG_VERSION)/$(UNAME_S)-$(UNAME_M)
+FFMPEG_VERSION_PLATFORM ?= $(FFMPEG_VERSION)/$(TARGET_S)-$(TARGET_M)
 FFMPEG_BUILD ?= $(FFMPEG_VERSION_PLATFORM)/build
 FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-static \
@@ -20,40 +26,35 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
 
 CGO_LDFLAGS := -L$(FFMPEG_PREFIX)/lib
 
-ifeq ($(TARGET),android)
+ifeq ($(TARGET_S),android)
+	export CGO_ENABLED = 1
 	NDK_ROOT ?= $(HOME)/Library/Android/Sdk/ndk/26.1.10909125
-	CC = $(NDK_ROOT)/toolchains/llvm/prebuilt/$(UNAME_S)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang
+	export CC = $(NDK_ROOT)/toolchains/llvm/prebuilt/$(UNAME_S)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang
 	API_LEVEL ?= 30
 	FFMPEG_OPTS += --target-os=android \
-	               --arch=aarch64 \
-				   --cpu=armv8-a \
-	               --enable-cross-compile \
-	               --sysroot=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(UNAME_S)-x86_64/sysroot \
-				   --cc=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(UNAME_S)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang \
-				   --cxx=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(UNAME_S)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang++
+	            	--arch=aarch64 \
+					--cpu=armv8-a \
+	            	--enable-cross-compile \
+	            	--sysroot=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(UNAME_S)-x86_64/sysroot \
+					--cc=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(UNAME_S)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang \
+					--cxx=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(UNAME_S)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang++
 	CGO_CFLAGS += -I$(NDK_ROOT)/toolchains/llvm/prebuilt/$(UNAME_S)-x86_64/sysroot/usr/include \
-                  -I$(NDK_ROOT)/toolchains/llvm/prebuilt/$(UNAME_S)-x86_64/sysroot/usr/include/aarch64-linux-android
+                	-I$(NDK_ROOT)/toolchains/llvm/prebuilt/$(UNAME_S)-x86_64/sysroot/usr/include/aarch64-linux-android
 	CGO_LDFLAGS += -L$(NDK_ROOT)/toolchains/llvm/prebuilt/$(UNAME_S)-x86_64/sysroot/usr/lib
+	GO_TAGS ?= -tags no_cgo
 endif
 
 CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib
-ifeq ($(UNAME_S),Linux)
+ifeq ($(UNAME_S),linux)
 	CGO_LDFLAGS := "$(CGO_LDFLAGS) -l:libjpeg.a"
 endif
 export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
 .PHONY: build-ffmpeg tool-install gofmt lint update-rdk module clean clean-all
 
-# go mod edit -replace=go.viam.com/rdk=github.com/abe-winter/rdk@droid-apk
-bin/viamrtsp: build-ffmpeg *.go cmd/module/*.go
-ifeq ($(TARGET),android)
-	go mod edit -replace=go.viam.com/rdk=go.viam.com/rdk@v0.20.1-0.20240209172210-8dc034cf4d2a
-	go mod tidy
-endif
-	PKG_CONFIG_PATH=$(FFMPEG_PREFIX)/lib/pkgconfig \
-		CGO_LDFLAGS="$(CGO_LDFLAGS)" \
-		CC=$(CC) \
-		CGO_ENABLED=1 GOOS=$(TARGET) GOARCH=$(UNAME_M) go build -v -tags no_cgo,no_media -o bin/viamrtsp cmd/module/cmd.go
+$(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
+	CGO_LDFLAGS=$(CGO_LDFLAGS) \
+		GOOS=$(TARGET_S) GOARCH=$(TARGET_M) go build $(GO_TAGS) -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
 
 tool-install:
 	GOBIN=`pwd`/$(TOOL_BIN) go install \
