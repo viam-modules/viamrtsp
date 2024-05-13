@@ -4,8 +4,8 @@ TARGET_S ?= $(UNAME_S)
 TARGET_M ?= $(UNAME_M)
 ifeq ($(TARGET_M),aarch64)
     TARGET_M = arm64
-else ifeq ($(UNAME_M),x86_64)
-	UNAME_M = amd64
+else ifeq ($(TARGET_M),x86_64)
+	TARGET_M = amd64
 endif
 BIN_OUTPUT_PATH = bin/$(TARGET_S)-$(TARGET_M)
 TOOL_BIN = bin/gotools/$(shell uname -s)-$(shell uname -m)
@@ -84,7 +84,7 @@ $(FFMPEG_BUILD): $(FFMPEG_VERSION_PLATFORM)
 
 build-ffmpeg:
 ifeq ($(UNAME_S),linux)
-ifeq ($(UNAME_M),amd64)
+ifeq ($(UNAME_M),x86_64)
 	which nasm || (sudo apt update && sudo apt install -y nasm)
 endif
 endif
