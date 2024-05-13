@@ -26,3 +26,7 @@ go.work
 
 viamrtsp
 module.tar.gz
+FFmpeg
+
+# Build artifacts
+bin

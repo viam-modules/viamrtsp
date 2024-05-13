@@ -1,16 +1,20 @@
 name: Integration test using mediamtx
 
-on:
-  push:
-    branches:
-      - '*'
-  pull_request:
-    branches:
-      - '*'
+on: [push, pull_request]
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        config:
+          - name: "h264"
+            codec: "libx264"
+          - name: "h265"
+            codec: "libx265"
+          - name: "mjpeg"
+            codec: "mjpeg"
+            extra_ffmpeg_args: "-huffman 0"
     
     steps:
     - uses: actions/checkout@v3
@@ -24,7 +28,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo add-apt-repository universe &&
-        sudo apt-get install -y libswscale-dev libavcodec-dev libavformat-dev libavutil-dev ffmpeg libfuse2
+        sudo apt-get install -y libfuse2 ffmpeg
         
     - name: Download and extract mediamtx
       run: |
@@ -35,10 +39,10 @@ jobs:
       run: ./mediamtx &
       
     - name: Run fake RTSP camera
-      run: ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec libx264 -pix_fmt yuv420p -f rtsp -rtsp_transport tcp rtsp://0.0.0.0:8554/live.stream &
+      run: ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec ${{ matrix.config.codec }} ${{ matrix.config.extra_ffmpeg_args }} -pix_fmt yuv420p -f rtsp -rtsp_transport tcp rtsp://0.0.0.0:8554/live.stream &
       
     - name: Build viamrtsp binary
-      run: make bin/viamrtsp
+      run: make
       
     - name: Install viam-server
       run: |
@@ -55,7 +59,7 @@ jobs:
               "name": "ip-cam",
               "namespace": "rdk",
               "type": "camera",
-              "model": "erh:viamrtsp:rtsp-h264",
+              "model": "erh:viamrtsp:rtsp",
               "attributes": {
                 "rtsp_address": "rtsp://localhost:8554/live.stream"
               },
@@ -66,15 +70,15 @@ jobs:
             {
               "type": "local",
               "name": "viamrtsp",
-              "executable_path": "'$(realpath bin/viamrtsp)'"
+              "executable_path": "'$(realpath bin/Linux-x86_64/viamrtsp)'"
             }
           ]
-        }' > integration-test-config.json
-        
+        }' > "integration-test-config-${{ matrix.config.name }}.json"
+
     # Sleep to give time for server to start
     - name: Run viam-server
       run: |
-        viam-server -debug -config ./integration-test-config.json &
+        viam-server -debug -config "./integration-test-config-${{ matrix.config.name }}.json" &
         sleep 10
 
     - name: Build and run test binary

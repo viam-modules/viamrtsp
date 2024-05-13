@@ -1,55 +1,27 @@
 package viamrtsp
 
+/*
+#cgo pkg-config: libavcodec libavutil libswscale
+#include <libavcodec/avcodec.h>
+#include <libavutil/imgutils.h>
+#include <libavutil/error.h>
+#include <libswscale/swscale.h>
+#include <stdlib.h>
+*/
+import "C"
+
 import (
 	"fmt"
 	"image"
 	"unsafe"
 
 	"github.com/pkg/errors"
+	"go.viam.com/rdk/logging"
 )
 
-/*
-#cgo pkg-config: libavcodec libavutil libswscale libavformat
-#include <libavcodec/avcodec.h>
-#include <libavutil/imgutils.h>
-#include <libswscale/swscale.h>
-#include <libavformat/avformat.h>
-#include <libavutil/avutil.h>
-#include <stdlib.h>
-
-// get_video_codec checks the provided AVFormatContext to find a supported video codec.
-// It prioritizes H264 over H265 if both are found.
-// If no supported codec is identified, it returns AV_CODEC_ID_NONE.
-int get_video_codec(AVFormatContext *avFormatCtx) {
-    if (avFormatCtx == NULL) {
-        return AV_CODEC_ID_NONE;
-    }
-    int found_h265 = 0;
-    for (int i = 0; i < avFormatCtx->nb_streams; i++) {
-        AVStream *stream = avFormatCtx->streams[i];
-        if (stream == NULL) {
-            continue;
-        }
-        AVCodecParameters *codecParams = stream->codecpar;
-        if (codecParams == NULL) {
-            continue;
-        }
-        if (codecParams->codec_id == AV_CODEC_ID_H264) {
-            return AV_CODEC_ID_H264;
-        } else if (codecParams->codec_id == AV_CODEC_ID_H265) {
-            found_h265 = 1;
-        }
-    }
-    if (found_h265) {
-        return AV_CODEC_ID_H265;
-    }
-    return AV_CODEC_ID_NONE;
-}
-*/
-import "C"
-
-// Decoder is a generic FFmpeg decoder.
+// decoder is a generic FFmpeg decoder.
 type decoder struct {
+	logger      logging.Logger
 	codecCtx    *C.AVCodecContext
 	srcFrame    *C.AVFrame
 	swsCtx      *C.struct_SwsContext
@@ -60,11 +32,32 @@ type decoder struct {
 type videoCodec int
 
 const (
+	// Unknown indicates an error when no available video codecs could be identified
 	Unknown videoCodec = iota
+	// Agnostic indicates that a discrete video codec has yet to be identified
 	Agnostic
+	// H264 indicates the h264 video codec
 	H264
+	// H265 indicates the h265 video codec
 	H265
+	// MJPEG indicates the mjpeg video codec
+	MJPEG
 )
+
+func (vc videoCodec) String() string {
+	switch vc {
+	case Agnostic:
+		return "Agnostic"
+	case H264:
+		return "H264"
+	case H265:
+		return "H265"
+	case MJPEG:
+		return "MJPEG"
+	default:
+		return "Unknown"
+	}
+}
 
 func frameData(frame *C.AVFrame) **C.uint8_t {
 	return (**C.uint8_t)(unsafe.Pointer(&frame.data[0]))
@@ -72,44 +65,6 @@ func frameData(frame *C.AVFrame) **C.uint8_t {
 
 func frameLineSize(frame *C.AVFrame) *C.int {
 	return (*C.int)(unsafe.Pointer(&frame.linesize[0]))
-}
-
-// getStreamInfo opens a stream URL and retrieves the video codec.
-func getStreamInfo(url string) (videoCodec, error) {
-	cUrl := C.CString(url)
-	defer C.free(unsafe.Pointer(cUrl))
-
-	var avFormatCtx *C.AVFormatContext = nil
-	ret := C.avformat_open_input(&avFormatCtx, cUrl, nil, nil)
-	if ret < 0 {
-		return Unknown, fmt.Errorf("avformat_open_input() failed: %s", avError(ret))
-	}
-	defer C.avformat_close_input(&avFormatCtx)
-
-	ret = C.avformat_find_stream_info(avFormatCtx, nil)
-	if ret < 0 {
-		return Unknown, fmt.Errorf("avformat_find_stream_info() failed: %s", avError(ret))
-	}
-
-	cCodec := C.get_video_codec(avFormatCtx)
-	codec := convertCodec(cCodec)
-
-	if codec == Unknown {
-		return Unknown, errors.New("no supported codec found")
-	}
-	return codec, nil
-}
-
-// convertCodec converts a C int to a Go videoCodec.
-func convertCodec(cCodec C.int) videoCodec {
-	switch cCodec {
-	case C.AV_CODEC_ID_H264:
-		return H264
-	case C.AV_CODEC_ID_H265:
-		return H265
-	default:
-		return Unknown
-	}
 }
 
 // avError converts an AV error code to a AV error message string.
@@ -121,44 +76,51 @@ func avError(avErr C.int) string {
 	return C.GoString(&errbuf[0])
 }
 
+// SetLibAVLogLevelFatal sets libav errors to fatal log level
+// to cut down on log spam
+func SetLibAVLogLevelFatal() {
+	C.av_log_set_level(C.AV_LOG_FATAL)
+}
+
 // newDecoder creates a new decoder for the given codec.
-func newDecoder(codecID C.enum_AVCodecID) (*decoder, error) {
+func newDecoder(codecID C.enum_AVCodecID, logger logging.Logger) (*decoder, error) {
 	codec := C.avcodec_find_decoder(codecID)
 	if codec == nil {
-		return nil, fmt.Errorf("avcodec_find_decoder() failed")
+		return nil, errors.New("avcodec_find_decoder() failed")
 	}
 
 	codecCtx := C.avcodec_alloc_context3(codec)
 	if codecCtx == nil {
-		return nil, fmt.Errorf("avcodec_alloc_context3() failed")
+		return nil, errors.New("avcodec_alloc_context3() failed")
 	}
 
 	res := C.avcodec_open2(codecCtx, codec, nil)
 	if res < 0 {
 		C.avcodec_close(codecCtx)
-		return nil, fmt.Errorf("avcodec_open2() failed")
+		return nil, errors.New("avcodec_open2() failed")
 	}
 
 	srcFrame := C.av_frame_alloc()
 	if srcFrame == nil {
 		C.avcodec_close(codecCtx)
-		return nil, fmt.Errorf("av_frame_alloc() failed")
+		return nil, errors.New("av_frame_alloc() failed")
 	}
 
 	return &decoder{
+		logger:   logger,
 		codecCtx: codecCtx,
 		srcFrame: srcFrame,
 	}, nil
 }
 
 // newH264Decoder creates a new H264 decoder.
-func newH264Decoder() (*decoder, error) {
-	return newDecoder(C.AV_CODEC_ID_H264)
+func newH264Decoder(logger logging.Logger) (*decoder, error) {
+	return newDecoder(C.AV_CODEC_ID_H264, logger)
 }
 
 // newH265Decoder creates a new H265 decoder.
-func newH265Decoder() (*decoder, error) {
-	return newDecoder(C.AV_CODEC_ID_H265)
+func newH265Decoder(logger logging.Logger) (*decoder, error) {
+	return newDecoder(C.AV_CODEC_ID_H265, logger)
 }
 
 // close closes the decoder.
@@ -176,7 +138,7 @@ func (d *decoder) close() {
 }
 
 func (d *decoder) decode(nalu []byte) (image.Image, error) {
-	nalu = append([]uint8{0x00, 0x00, 0x00, 0x01}, []uint8(nalu)...)
+	nalu = append(H2645StartCode(), nalu...)
 
 	// send frame to decoder
 	var avPacket C.AVPacket
@@ -211,13 +173,13 @@ func (d *decoder) decode(nalu []byte) (image.Image, error) {
 		d.dstFrame.color_range = C.AVCOL_RANGE_JPEG
 		res = C.av_frame_get_buffer(d.dstFrame, 1)
 		if res < 0 {
-			return nil, fmt.Errorf("av_frame_get_buffer() err")
+			return nil, errors.New("av_frame_get_buffer() err")
 		}
 
 		d.swsCtx = C.sws_getContext(d.srcFrame.width, d.srcFrame.height, C.AV_PIX_FMT_YUV420P,
 			d.dstFrame.width, d.dstFrame.height, (int32)(d.dstFrame.format), C.SWS_BILINEAR, nil, nil, nil)
 		if d.swsCtx == nil {
-			return nil, fmt.Errorf("sws_getContext() err")
+			return nil, errors.New("sws_getContext() err")
 		}
 
 		dstFrameSize := C.av_image_get_buffer_size((int32)(d.dstFrame.format), d.dstFrame.width, d.dstFrame.height, 1)
@@ -228,7 +190,7 @@ func (d *decoder) decode(nalu []byte) (image.Image, error) {
 	res = C.sws_scale(d.swsCtx, frameData(d.srcFrame), frameLineSize(d.srcFrame),
 		0, d.srcFrame.height, frameData(d.dstFrame), frameLineSize(d.dstFrame))
 	if res < 0 {
-		return nil, fmt.Errorf("sws_scale() err")
+		return nil, errors.New("sws_scale() err")
 	}
 
 	// embed frame into an image.Image
