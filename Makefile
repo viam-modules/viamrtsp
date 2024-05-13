@@ -5,7 +5,7 @@ TARGET_M ?= $(UNAME_M)
 ifeq ($(TARGET_M),aarch64)
     TARGET_M = arm64
 else ifeq ($(TARGET_M),x86_64)
-	TARGET_M = amd64
+    TARGET_M = amd64
 endif
 BIN_OUTPUT_PATH = bin/$(TARGET_S)-$(TARGET_M)
 TOOL_BIN = bin/gotools/$(shell uname -s)-$(shell uname -m)
@@ -34,14 +34,14 @@ ifeq ($(TARGET_S),android)
 	export CC = $(NDK_ROOT)/toolchains/llvm/prebuilt/$(UNAME_S)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang
 	API_LEVEL ?= 30
 	FFMPEG_OPTS += --target-os=android \
-	            	--arch=aarch64 \
-					--cpu=armv8-a \
-	            	--enable-cross-compile \
-	            	--sysroot=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(UNAME_S)-x86_64/sysroot \
-					--cc=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(UNAME_S)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang \
-					--cxx=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(UNAME_S)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang++
+                   --arch=aarch64 \
+                   --cpu=armv8-a \
+                   --enable-cross-compile \
+                   --sysroot=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(UNAME_S)-x86_64/sysroot \
+                   --cc=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(UNAME_S)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang \
+                   --cxx=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(UNAME_S)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang++
 	CGO_CFLAGS += -I$(NDK_ROOT)/toolchains/llvm/prebuilt/$(UNAME_S)-x86_64/sysroot/usr/include \
-                	-I$(NDK_ROOT)/toolchains/llvm/prebuilt/$(UNAME_S)-x86_64/sysroot/usr/include/aarch64-linux-android
+                  -I$(NDK_ROOT)/toolchains/llvm/prebuilt/$(UNAME_S)-x86_64/sysroot/usr/include/aarch64-linux-android
 	CGO_LDFLAGS += -L$(NDK_ROOT)/toolchains/llvm/prebuilt/$(UNAME_S)-x86_64/sysroot/usr/lib
 	GO_TAGS ?= -tags no_cgo
 endif
@@ -56,7 +56,7 @@ export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
 $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
 	CGO_LDFLAGS=$(CGO_LDFLAGS) \
-		GOOS=$(TARGET_S) GOARCH=$(TARGET_M) go build $(GO_TAGS) -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
+	GOOS=$(TARGET_S) GOARCH=$(TARGET_M) go build $(GO_TAGS) -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
 
 tool-install:
 	GOBIN=`pwd`/$(TOOL_BIN) go install \
