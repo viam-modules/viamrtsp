@@ -32,7 +32,13 @@ ifeq ($(TARGET_OS),android)
 ifeq ($(TARGET_ARCH),arm64)
     export CGO_ENABLED = 1
     NDK_VERSION ?= 26.1.10909125
-    NDK_ROOT ?= $(HOME)/Library/Android/Sdk/ndk/$(NDK_VERSION)
+	ifeq ($(SOURCE_OS),darwin)
+        NDK_ROOT ?= $(HOME)/Library/Android/Sdk/ndk/$(NDK_VERSION)
+    else ifeq ($(SOURCE_OS),linux)
+        NDK_ROOT ?= $(HOME)/android-ndk-r26
+	else
+		$(error Error: We do not support the source OS: $(SOURCE_OS) for Android)
+    endif
     export CC = $(NDK_ROOT)/toolchains/llvm/prebuilt/$(SOURCE_OS)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang
     API_LEVEL ?= 30
     FFMPEG_OPTS += --target-os=android \

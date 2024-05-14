@@ -30,3 +30,6 @@ FFmpeg
 
 # Build artifacts
 bin
+
+# Ignore android build files
+*.zip
