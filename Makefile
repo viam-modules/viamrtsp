@@ -29,18 +29,19 @@ CGO_LDFLAGS := -L$(FFMPEG_PREFIX)/lib
 export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
 ifeq ($(TARGET_OS),android)
-	export CGO_ENABLED = 1
-	NDK_ROOT ?= $(HOME)/Library/Android/Sdk/ndk/26.1.10909125
-	export CC = $(NDK_ROOT)/toolchains/llvm/prebuilt/$(SOURCE_OS)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang
-	API_LEVEL ?= 30
-	FFMPEG_OPTS += --target-os=android \
+    export CGO_ENABLED = 1
+    NDK_VERSION ?= 26.1.10909125
+    NDK_ROOT ?= $(HOME)/Library/Android/Sdk/ndk/$(NDK_VERSION)
+    export CC = $(NDK_ROOT)/toolchains/llvm/prebuilt/$(SOURCE_OS)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang
+    API_LEVEL ?= 30
+    FFMPEG_OPTS += --target-os=android \
                    --arch=aarch64 \
                    --cpu=armv8-a \
                    --enable-cross-compile \
                    --sysroot=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(SOURCE_OS)-x86_64/sysroot \
                    --cc=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(SOURCE_OS)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang \
                    --cxx=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(SOURCE_OS)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang++
-	GO_TAGS ?= -tags no_cgo
+    GO_TAGS ?= -tags no_cgo
 endif
 
 ifeq ($(TARGET_OS),linux)
