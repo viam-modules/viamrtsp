@@ -25,7 +25,7 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-network \
                --enable-parser=h264 \
                --enable-parser=hevc
-CGO_LDFLAGS := -L$(FFMPEG_PREFIX)/lib
+CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib
 export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
 ifeq ($(TARGET_OS),android)
