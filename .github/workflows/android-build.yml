@@ -26,4 +26,4 @@ jobs:
     
     - name: Build viamrtsp for Android
       run: |
-        TARGET_OS=android TARGET_ARCH=arm64 make android
+        TARGET_OS=android TARGET_ARCH=arm64 make
