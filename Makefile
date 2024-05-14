@@ -25,8 +25,8 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-network \
                --enable-parser=h264 \
                --enable-parser=hevc
-
 CGO_LDFLAGS := -L$(FFMPEG_PREFIX)/lib
+export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
 ifeq ($(TARGET_OS),android)
 	export CGO_ENABLED = 1
@@ -40,15 +40,12 @@ ifeq ($(TARGET_OS),android)
                    --sysroot=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(SOURCE_OS)-x86_64/sysroot \
                    --cc=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(SOURCE_OS)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang \
                    --cxx=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(SOURCE_OS)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang++
-	CGO_LDFLAGS += -L$(NDK_ROOT)/toolchains/llvm/prebuilt/$(SOURCE_OS)-x86_64/sysroot/usr/lib
 	GO_TAGS ?= -tags no_cgo
 endif
 
-CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib
 ifeq ($(TARGET_OS),linux)
 	CGO_LDFLAGS := "$(CGO_LDFLAGS) -l:libjpeg.a"
 endif
-export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
 .PHONY: build-ffmpeg tool-install gofmt lint update-rdk module clean clean-all
 
