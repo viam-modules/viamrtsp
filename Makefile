@@ -44,7 +44,7 @@ ifeq ($(TARGET_ARCH),arm64)
                    --cxx=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(SOURCE_OS)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang++
     GO_TAGS ?= -tags no_cgo
 else
-    $(error Error: We do not support the target combination: OS=$(TARGET_OS), ARCH=$(TARGET_ARCH))
+    $(error Error: We do not support the target combination: TARGET_OS=$(TARGET_OS), TARGET_ARCH=$(TARGET_ARCH))
 endif
 endif
 
