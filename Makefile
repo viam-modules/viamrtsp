@@ -29,6 +29,7 @@ CGO_LDFLAGS := -L$(FFMPEG_PREFIX)/lib
 export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
 ifeq ($(TARGET_OS),android)
+ifeq ($(TARGET_ARCH),arm64)
     export CGO_ENABLED = 1
     NDK_VERSION ?= 26.1.10909125
     NDK_ROOT ?= $(HOME)/Library/Android/Sdk/ndk/$(NDK_VERSION)
@@ -42,6 +43,9 @@ ifeq ($(TARGET_OS),android)
                    --cc=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(SOURCE_OS)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang \
                    --cxx=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(SOURCE_OS)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang++
     GO_TAGS ?= -tags no_cgo
+else
+    $(error Error: We do not support the target combination: OS=$(TARGET_OS), ARCH=$(TARGET_ARCH))
+endif
 endif
 
 ifeq ($(TARGET_OS),linux)
