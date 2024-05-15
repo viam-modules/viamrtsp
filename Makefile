@@ -93,6 +93,7 @@ $(FFMPEG_BUILD): $(FFMPEG_VERSION_PLATFORM)
 	cd $(FFMPEG_VERSION_PLATFORM) && ./configure $(FFMPEG_OPTS) && $(MAKE) -j$(shell nproc) && $(MAKE) install
 
 build-ffmpeg:
+# only need nasm to build assembly kernels for x86 targets
 ifeq ($(SOURCE_OS),linux)
 ifeq ($(SOURCE_ARCH),x86_64)
 	which nasm || (sudo apt update && sudo apt install -y nasm)
