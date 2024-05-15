@@ -66,6 +66,7 @@ endif
 
 .PHONY: build-ffmpeg tool-install gofmt lint update-rdk module clean clean-all
 
+# we set GOOS, GOARCH, and GO_TAGS to support cross-compilation for android targets
 $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
 	CGO_LDFLAGS=$(CGO_LDFLAGS) \
 	GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
