@@ -30,6 +30,9 @@ export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
 ifeq ($(TARGET_OS),android)
 ifeq ($(TARGET_ARCH),arm64)
+    # android build doesn't support most of our cgo libraries, so we use the no_cgo flag
+    GO_TAGS ?= -tags no_cgo
+    # to support android NDK cross-compilation, we need the go build command to think it's in cgo mode
     export CGO_ENABLED = 1
     NDK_VERSION ?= 26.1.10909125
 	ifeq ($(SOURCE_OS),darwin)
@@ -48,7 +51,6 @@ ifeq ($(TARGET_ARCH),arm64)
                    --sysroot=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(SOURCE_OS)-x86_64/sysroot \
                    --cc=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(SOURCE_OS)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang \
                    --cxx=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(SOURCE_OS)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang++
-    GO_TAGS ?= -tags no_cgo
 else
     $(error Error: We do not support the target combination: TARGET_OS=$(TARGET_OS), TARGET_ARCH=$(TARGET_ARCH))
 endif
