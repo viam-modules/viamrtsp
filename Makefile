@@ -28,6 +28,8 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
 CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib
 export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
+# if we are building for android, we need to set the correct flags
+# and toolchain paths for FFMPEG and go binary cross-compilation
 ifeq ($(TARGET_OS),android)
 ifeq ($(TARGET_ARCH),arm64)
     # android build doesn't support most of our cgo libraries, so we use the no_cgo flag
