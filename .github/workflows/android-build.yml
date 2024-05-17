@@ -2,6 +2,8 @@ name: Build viamrtsp for Android
 
 on:
   push:
+    paths-ignore:
+      - 'README.md'
   pull_request:
     paths-ignore:
       - 'README.md' 
