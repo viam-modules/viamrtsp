@@ -45,7 +45,9 @@ ifeq ($(TARGET_ARCH),arm64)
 		$(error Error: We do not support the source OS: $(SOURCE_OS) for Android)
     endif
     # we do not need to handle source arch for toolchain paths
-    # on darwin/arm64, rosetta is used to run x86 binaries
+    # on darwin host, android toolchain binaries and libs are mach-O universal
+    # with 2 architecture targets: x86_64 and arm64
+	# ach-O universal binary with 2 architecture
     export CC = $(NDK_ROOT)/toolchains/llvm/prebuilt/$(SOURCE_OS)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang
     API_LEVEL ?= 30
     FFMPEG_OPTS += --target-os=android \
