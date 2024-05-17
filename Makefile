@@ -28,13 +28,16 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
 CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib
 export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
-# if we are building for android, we need to set the correct flags
-# and toolchain paths for FFMPEG and go binary cross-compilation
+# If we are building for android, we need to set the correct flags
+# and toolchain paths for FFMPEG and go binary cross-compilation.
+# Make sure to install android SDK and NDK before building.
+# If you are using a different version of NDK, please set the NDK_VERSION variable.
 ifeq ($(TARGET_OS),android)
+# x86 android targets have not been tested, so we do not support them for now.
 ifeq ($(TARGET_ARCH),arm64)
-    # android build doesn't support most of our cgo libraries, so we use the no_cgo flag
+    # Android build doesn't support most of our cgo libraries, so we use the no_cgo flag.
     GO_TAGS ?= -tags no_cgo
-    # to support android NDK cross-compilation, we need the go build command to think it's in cgo mode
+    # We need the go build command to think it's in cgo mode to support android NDK cross-compilation.
     export CGO_ENABLED = 1
     NDK_VERSION ?= 26.1.10909125
 	ifeq ($(SOURCE_OS),darwin)
@@ -44,18 +47,17 @@ ifeq ($(TARGET_ARCH),arm64)
 	else
 		$(error Error: We do not support the source OS: $(SOURCE_OS) for Android)
     endif
-    # we do not need to handle source arch for toolchain paths
-    # on darwin host, android toolchain binaries and libs are mach-O universal
-    # with 2 architecture targets: x86_64 and arm64
-    export CC = $(NDK_ROOT)/toolchains/llvm/prebuilt/$(SOURCE_OS)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang
+    # We do not need to handle source arch for toolchain paths.
+    # On darwin host, android toolchain binaries and libs are mach-O universal
+    # with 2 architecture targets: x86_64 and arm64.
+	CC = $(NDK_ROOT)/toolchains/llvm/prebuilt/$(SOURCE_OS)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang
+    export CC
     API_LEVEL ?= 30
     FFMPEG_OPTS += --target-os=android \
                    --arch=aarch64 \
                    --cpu=armv8-a \
                    --enable-cross-compile \
-                   --sysroot=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(SOURCE_OS)-x86_64/sysroot \
-                   --cc=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(SOURCE_OS)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang \
-                   --cxx=$(NDK_ROOT)/toolchains/llvm/prebuilt/$(SOURCE_OS)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang++
+                   --cc=$(CC)
 else
     $(error Error: We do not support the target combination: TARGET_OS=$(TARGET_OS), TARGET_ARCH=$(TARGET_ARCH))
 endif
@@ -67,7 +69,7 @@ endif
 
 .PHONY: build-ffmpeg tool-install gofmt lint update-rdk module clean clean-all
 
-# we set GOOS, GOARCH, and GO_TAGS to support cross-compilation for android targets
+# We set GOOS, GOARCH, and GO_TAGS to support cross-compilation for android targets
 $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
 	CGO_LDFLAGS=$(CGO_LDFLAGS) \
 	GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
@@ -97,7 +99,7 @@ $(FFMPEG_BUILD): $(FFMPEG_VERSION_PLATFORM)
 	cd $(FFMPEG_VERSION_PLATFORM) && ./configure $(FFMPEG_OPTS) && $(MAKE) -j$(shell nproc) && $(MAKE) install
 
 build-ffmpeg:
-# only need nasm to build assembly kernels for x86 targets
+# Only need nasm to build assembly kernels for x86 targets.
 ifeq ($(SOURCE_OS),linux)
 ifeq ($(SOURCE_ARCH),x86_64)
 	which nasm || (sudo apt update && sudo apt install -y nasm)
