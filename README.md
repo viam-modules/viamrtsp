@@ -1,6 +1,7 @@
 
 Build
 ===
+
 The binary is statically linked with [FFmpeg v6.1](https://github.com/FFmpeg/FFmpeg/tree/release/6.1), eliminating the need for separate FFmpeg installation on target machines.
 * Build for Linux targets:
     * Install canon: `go install github.com/viamrobotics/canon@latest`
@@ -10,9 +11,17 @@ The binary is statically linked with [FFmpeg v6.1](https://github.com/FFmpeg/FFm
     * Build binary: `make`
 * Build for MacOS target:
     * Build binary: `make`
+* Build for Android target:
+    * Cross-compile from Linux or Darwin host.
+    * Build binary: `TARGET_OS=android TARGET_ARCH=arm64 make`
 * Binary will be in `bin/<OS>-<CPU>/viamrtsp`
 * Clean up build artifacts: `make clean`
 * Clean up all files not tracked in git: `make clean-all`
+
+|        | Linux | Android | Darwin |
+|--------|-------|---------|--------|
+| arm64  | ✅    | ✅       | ✅     |
+| amd64  | ✅    | ❌       | ✅     |
 
 Sample Config
 ===
