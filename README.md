@@ -3,9 +3,9 @@
 This module implements the [`"rdk:component:camera"` API](https://docs.viam.com/components/camera/) for real-time streaming protocol (RTSP) enabled cameras.
 Four models are provided:
 * `erh:viamrtsp:rtsp` - Codec agnostic. Will auto detect the codec of the `rtsp_address`.
-* `erh:viamrtsp:rtsp-h264` - Only supports H264 codec.
-* `erh:viamrtsp:rtsp-h265` - Only supports H265 codec.
-* `erh:viamrtsp:rtsp-mjpeg` - Only supports M-JPEG codec.
+* `erh:viamrtsp:rtsp-h264` - Only supports the H264 codec.
+* `erh:viamrtsp:rtsp-h265` - Only supports the H265 codec.
+* `erh:viamrtsp:rtsp-mjpeg` - Only supports the M-JPEG codec.
 
 ## Configure your `viamrtsp` camera
 
@@ -71,7 +71,7 @@ To test your camera, go to the [**CONTROL** tab](https://docs.viam.com/fleet/con
 
 ## Build for local development
 
-The binary is statically linked with [FFmpeg v6.1](https://github.com/FFmpeg/FFmpeg/tree/release/6.1), eliminating the need for separate FFmpeg installation on target machines.
+The binary is statically linked with [FFmpeg v6.1](https://github.com/FFmpeg/FFmpeg/tree/release/6.1), eliminating the need to install FFmpeg separately on target machines.
 * Build for Linux targets:
     * Install canon: `go install github.com/viamrobotics/canon@latest`
     * Startup canon dev container.
@@ -86,7 +86,7 @@ The binary is statically linked with [FFmpeg v6.1](https://github.com/FFmpeg/FFm
 
 ## Notes
 
-* Non fatal LibAV errors are suppressed unles the module is run in debug mode.
+* Non fatal LibAV errors are suppressed unless the module is run in debug mode.
 * Heavily cribbed from [gortsplib](https://github.com/bluenviron/gortsplib) examples:
     * [H264 stream to JPEG](https://github.com/bluenviron/gortsplib/blob/main/examples/client-play-format-h264-convert-to-jpeg/main.go)
     * [H265 stream to JPEG](https://github.com/bluenviron/gortsplib/blob/main/examples/client-play-format-h265-convert-to-jpeg/main.go)
