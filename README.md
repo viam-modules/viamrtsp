@@ -3,6 +3,14 @@ Build
 ===
 
 The binary is statically linked with [FFmpeg v6.1](https://github.com/FFmpeg/FFmpeg/tree/release/6.1), eliminating the need for separate FFmpeg installation on target machines.
+
+The Makefile supports building for the following targets:
+|        | Linux | Android  | Darwin |
+|--------|-------|----------|--------|
+| arm64  | ✅    | ✅       | ✅     |
+| amd64  | ✅    | ❌       | ✅     |
+
+
 * Build for Linux targets:
     * Install canon: `go install github.com/viamrobotics/canon@latest`
     * Startup canon dev container.
@@ -17,11 +25,6 @@ The binary is statically linked with [FFmpeg v6.1](https://github.com/FFmpeg/FFm
 * Binary will be in `bin/<OS>-<CPU>/viamrtsp`
 * Clean up build artifacts: `make clean`
 * Clean up all files not tracked in git: `make clean-all`
-
-|        | Linux | Android | Darwin |
-|--------|-------|---------|--------|
-| arm64  | ✅    | ✅       | ✅     |
-| amd64  | ✅    | ❌       | ✅     |
 
 Sample Config
 ===
