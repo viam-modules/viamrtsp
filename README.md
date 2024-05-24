@@ -1,7 +1,75 @@
+# [`viamrtsp` module](https://app.viam.com/module/erh/viamrtsp)
 
-Build
-===
-The binary is statically linked with [FFmpeg v6.1](https://github.com/FFmpeg/FFmpeg/tree/release/6.1), eliminating the need for separate FFmpeg installation on target machines.
+This module implements the [`"rdk:component:camera"` API](https://docs.viam.com/components/camera/) for real-time streaming protocol (RTSP) enabled cameras.
+Four models are provided:
+* `erh:viamrtsp:rtsp` - Codec agnostic. Will auto detect the codec of the `rtsp_address`.
+* `erh:viamrtsp:rtsp-h264` - Only supports the H264 codec.
+* `erh:viamrtsp:rtsp-h265` - Only supports the H265 codec.
+* `erh:viamrtsp:rtsp-mjpeg` - Only supports the M-JPEG codec.
+
+## Configure your `viamrtsp` camera
+
+Navigate to the [**CONFIGURE** tab](https://docs.viam.com/build/configure/) of your [machine](https://docs.viam.com/fleet/machines/) in the [Viam app](https://app.viam.com/).
+[Add the camera component to your machine](https://docs.viam.com/build/configure/#components), searching for `viamrtsp` and selecting your desired model.
+
+Copy and paste the following attributes template into the resulting component's attribute panel:
+
+```
+{
+   "rtp_passthrough": true,
+   "rtsp_address": "rtsp://foo:bar@192.168.10.10:554/stream"
+}
+```
+
+Edit the attributes as applicable.
+
+### Attributes
+
+The following attributes are available for all models of `viamrtsp` cameras:
+
+| Name    | Type   | Inclusion    | Description |
+| ------- | ------ | ------------ | ----------- |
+| `rtsp_address` | string | **Required** | The RTSP address where the camera streams. |
+| `rtp_passthrough` | bool | Optional | RTP passthrough mode (which improves video streaming efficiency) is supported with the H264 codec if this attribute is set to `true`. <br> Default: `false` |
+
+### Example configuration
+
+```
+{
+  "components": [
+    {
+      "name": "your-rtsp-cam",
+      "namespace": "rdk",
+      "type": "camera",
+      "model": "erh:viamrtsp:rtsp",
+      "attributes": {
+        "rtp_passthrough": true,
+        "rtsp_address": "rtsp://foo:bar@192.168.10.10:554/stream"
+      }
+    }
+  ],
+  "modules": [
+    {
+      "type": "registry",
+      "name": "erh_viamrtsp",
+      "module_id": "erh:viamrtsp",
+      "version": "latest"
+    }
+  ]
+}
+```
+
+> [!NOTE]
+> The above is a raw JSON configuration for an `rtsp` model.
+> To use another provided model, change the "model" string.
+
+### Next steps
+
+To test your camera, go to the [**CONTROL** tab](https://docs.viam.com/fleet/control/) of your machine in the [Viam app](https://app.viam.com) and expand the camera's panel.
+
+## Build for local development
+
+The binary is statically linked with [FFmpeg v6.1](https://github.com/FFmpeg/FFmpeg/tree/release/6.1), eliminating the need to install FFmpeg separately on target machines.
 * Build for Linux targets:
     * Install canon: `go install github.com/viamrobotics/canon@latest`
     * Startup canon dev container.
@@ -14,32 +82,9 @@ The binary is statically linked with [FFmpeg v6.1](https://github.com/FFmpeg/FFm
 * Clean up build artifacts: `make clean`
 * Clean up all files not tracked in git: `make clean-all`
 
-Sample Config
-===
-```
- {
-  "name": "rtsp-1",
-  "namespace": "rdk",
-  "type": "camera",
-  "model": "erh:viamrtsp:rtsp",
-  "attributes": {
-    "rtp_passthrough": true,
-    "rtsp_address": "rtsp://foo:bar@192.168.10.10:554/stream"
-  }
-}
-```
+## Notes
 
-Models:
-===
-* `erh:viamrtsp:rtsp` - Codec agnostic. Will auto detect the codec of the `rtsp_address`.
-* `erh:viamrtsp:rtsp-h264` - Only supports H264 codec.
-* `erh:viamrtsp:rtsp-h265` - Only supports H265 codec.
-* `erh:viamrtsp:rtsp-mjpeg` - Only supports M-JPEG codec.
-
-Notes
-===
-* `rtp_passthrough` (which improves video streaming efficiency) is supported with the H264 codec if the `rtp_passthrough` attrbute is set to `true`
-* Non fatal LibAV errors are suppressed unles the module is run in debug mode.
+* Non fatal LibAV errors are suppressed unless the module is run in debug mode.
 * Heavily cribbed from [gortsplib](https://github.com/bluenviron/gortsplib) examples:
     * [H264 stream to JPEG](https://github.com/bluenviron/gortsplib/blob/main/examples/client-play-format-h264-convert-to-jpeg/main.go)
     * [H265 stream to JPEG](https://github.com/bluenviron/gortsplib/blob/main/examples/client-play-format-h265-convert-to-jpeg/main.go)
