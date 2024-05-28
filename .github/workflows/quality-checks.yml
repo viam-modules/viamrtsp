@@ -1,14 +1,14 @@
-name: Linter and static checks
+name: Linter, static checks, unit tests
 
 on:
   push:
     branches:
-      - main
-    paths:
-      - '**/**.go'
-  pull_request:
-    paths:
-      - '**/**.go'
+      - '*'
+  #   paths:
+  #     - '**/**.go'
+  # pull_request:
+  #   paths:
+  #     - '**/**.go'
 
 jobs:
   lint:
@@ -39,3 +39,6 @@ jobs:
 
     - name: Run linter and static checks
       run: make lint
+
+    - name: Run unit tests
+      run: make test
