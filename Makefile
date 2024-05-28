@@ -39,11 +39,11 @@ ifeq ($(TARGET_ARCH),arm64)
     GO_TAGS ?= -tags no_cgo
     # We need the go build command to think it's in cgo mode to support android NDK cross-compilation.
     export CGO_ENABLED = 1
-    NDK_VERSION ?= 26.1.10909125
+    NDK_VERSION ?= 26
 	ifeq ($(SOURCE_OS),darwin)
-        NDK_ROOT ?= $(HOME)/Library/Android/Sdk/ndk/$(NDK_VERSION)
+        NDK_ROOT ?= $(shell ls -d $(HOME)/Library/Android/Sdk/ndk/$(NDK_VERSION)* | head -n 1)
     else ifeq ($(SOURCE_OS),linux)
-        NDK_ROOT ?= $(PWD)/android-ndk-r26
+        NDK_ROOT ?= $(PWD)/android-ndk-r$(NDK_VERSION)
 	else
 		$(error Error: We do not support the source OS: $(SOURCE_OS) for Android)
     endif
