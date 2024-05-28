@@ -24,7 +24,7 @@ ifeq ($(UNAME_S),Linux)
 endif
 export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
-.PHONY: build-ffmpeg tool-install gofmt test lint update-rdk module clean clean-all
+.PHONY: build-ffmpeg tool-install gofmt lint test update-rdk module clean clean-all
 
 $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
 	CGO_LDFLAGS=$(CGO_LDFLAGS) \

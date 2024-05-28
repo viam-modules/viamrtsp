@@ -67,7 +67,7 @@ func frameLineSize(frame *C.AVFrame) *C.int {
 	return (*C.int)(unsafe.Pointer(&frame.linesize[0]))
 }
 
-// avError converts an AV error code to a AV error message string
+// avError converts an AV error code to a AV error message string.
 func avError(avErr C.int) string {
 	var errbuf [C.AV_ERROR_MAX_STRING_SIZE]C.char
 	if C.av_strerror(avErr, &errbuf[0], C.AV_ERROR_MAX_STRING_SIZE) < 0 {
