@@ -10,7 +10,7 @@ UNAME_S=$(uname -s)
 UNAME_M=$(uname -m)
 
 artifact_path="./bin/${UNAME_S}-${UNAME_M}/module.tar.gz"
-output_path="./dist/archive.tar.gz"
+output_path="./dist/module.tar.gz"
 
 if [ -f "${artifact_path}" ]; then 
     mkdir -p ./dist
