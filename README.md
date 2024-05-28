@@ -75,7 +75,7 @@ We support building this module using the Makefile for the following targets:
 |        | Linux | Android  | Darwin |
 |--------|-------|----------|--------|
 | arm64  | ✅    | ✅       | ✅     |
-| amd64  | ✅    | ❌       | ✅     |
+| amd64  | ✅    | ❌       | ❌     |
 
 * Build for Linux targets:
     * Install canon: `go install github.com/viamrobotics/canon@latest`
@@ -86,7 +86,7 @@ We support building this module using the Makefile for the following targets:
 * Build for MacOS target:
     * Build binary: `make`
 * Build for Android target:
-    * Cross-compile from Linux or Darwin host.
+    * Cross-compile from linux/amd64 or darwin/arm64 host.
     * Build binary: `TARGET_OS=android TARGET_ARCH=arm64 make`
 * Binary will be in `bin/<OS>-<CPU>/viamrtsp`
 * Clean up build artifacts: `make clean`
