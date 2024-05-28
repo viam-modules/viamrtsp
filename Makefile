@@ -43,7 +43,7 @@ ifeq ($(TARGET_ARCH),arm64)
 	ifeq ($(SOURCE_OS),darwin)
         NDK_ROOT ?= $(HOME)/Library/Android/Sdk/ndk/$(NDK_VERSION)
     else ifeq ($(SOURCE_OS),linux)
-        NDK_ROOT ?= $(HOME)/android-ndk-r26
+        NDK_ROOT ?= $(PWD)/android-ndk-r26
 	else
 		$(error Error: We do not support the source OS: $(SOURCE_OS) for Android)
     endif
@@ -52,6 +52,8 @@ ifeq ($(TARGET_ARCH),arm64)
     # with 2 architecture targets: x86_64 and arm64.
 	CC = $(NDK_ROOT)/toolchains/llvm/prebuilt/$(SOURCE_OS)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang
     export CC
+    # Android API level is an integer value that uniquely identifies the revision of the Android platform framework API.
+    # We use API level 30 as the default value. You can change it by setting the API_LEVEL variable.
     API_LEVEL ?= 30
     FFMPEG_OPTS += --target-os=android \
                    --arch=aarch64 \
@@ -98,7 +100,7 @@ $(FFMPEG_VERSION_PLATFORM):
 $(FFMPEG_BUILD): $(FFMPEG_VERSION_PLATFORM)
 	cd $(FFMPEG_VERSION_PLATFORM) && ./configure $(FFMPEG_OPTS) && $(MAKE) -j$(shell nproc) && $(MAKE) install
 
-build-ffmpeg:
+build-ffmpeg: $(NDK_ROOT)
 # Only need nasm to build assembly kernels for x86 targets.
 ifeq ($(SOURCE_OS),linux)
 ifeq ($(SOURCE_ARCH),x86_64)
@@ -106,6 +108,19 @@ ifeq ($(SOURCE_ARCH),x86_64)
 endif
 endif
 	$(MAKE) $(FFMPEG_BUILD)
+
+# Download android NDK if it doesn't exist. Android NDK is only available
+# for linux x86_64 and darwin. On darwin, the NDK is installed via Android Studio.
+$(NDK_ROOT):
+ifeq ($(SOURCE_OS),linux)
+ifeq ($(SOURCE_ARCH),x86_64)
+ifeq ($(TARGET_OS),android)
+	sudo apt install -y unzip && \
+	wget https://dl.google.com/android/repository/android-ndk-r26-linux.zip && \
+	yes A | unzip android-ndk-r26-linux.zip
+endif
+endif
+endif
 
 module: $(BIN_OUTPUT_PATH)/viamrtsp
 	tar czf $(BIN_OUTPUT_PATH)/module.tar.gz $(BIN_OUTPUT_PATH)/viamrtsp
