@@ -27,6 +27,7 @@ go.work
 viamrtsp
 module.tar.gz
 FFmpeg
+android-ndk*
 
 # Build artifacts
 bin
