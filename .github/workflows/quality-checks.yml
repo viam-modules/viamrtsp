@@ -3,12 +3,12 @@ name: Linter, static checks, unit tests
 on:
   push:
     branches:
-      - '*'
-  #   paths:
-  #     - '**/**.go'
-  # pull_request:
-  #   paths:
-  #     - '**/**.go'
+      - main
+    paths:
+      - '**/**.go'
+  pull_request:
+    paths:
+      - '**/**.go'
 
 jobs:
   lint:
