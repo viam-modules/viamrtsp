@@ -9,14 +9,15 @@ make module
 UNAME_S=$(uname -s)
 UNAME_M=$(uname -m)
 
-output_dir="./bin/${UNAME_S}-${UNAME_M}"
-archive_name="module.tar.gz"
+artifact_dir="./bin/${UNAME_S}-${UNAME_M}"
+artifact_name="module.tar.gz"
 
-if [ -f "${output_dir}/${archive_name}" ]; then 
+if [ -f "${artifact_dir}/${artifact_name}" ]; then 
     mkdir -p ./dist
-    mv "${output_dir}/${archive_name}" "./dist/archive.tar.gz"
-    echo "Moved ${archive_name} to the current directory."
+    output_path="./dist/archive.tar.gz"
+    mv "${artifact_dir}/${artifact_name}" "${output_path}"
+    echo "Moved ${artifact_name} to the current directory."
 else
-    echo "Error: ${archive_name} not found in ${output_dir}." >&2
+    echo "Error: ${artifact_name} not found in ${artifact_dir}." >&2
     exit 1
 fi
