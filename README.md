@@ -4,7 +4,7 @@ Build
 
 The binary is statically linked with [FFmpeg v6.1](https://github.com/FFmpeg/FFmpeg/tree/release/6.1), eliminating the need for separate FFmpeg installation on target machines.
 
-The Makefile supports building for the following targets:
+We support building this module using the Makefile for the following targets:
 |        | Linux | Android  | Darwin |
 |--------|-------|----------|--------|
 | arm64  | ✅    | ✅       | ✅     |
