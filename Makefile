@@ -45,7 +45,7 @@ lint: gofmt tool-install
 	GOGC=50 $(TOOL_BIN)/golangci-lint run -v --fix --config=./etc/.golangci.yaml
 
 test:
-	go test ./...
+	go test -race -v ./...
 
 update-rdk:
 	go get go.viam.com/rdk@latest
