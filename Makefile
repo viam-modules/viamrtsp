@@ -47,13 +47,7 @@ ifeq ($(TARGET_ARCH),arm64)
     # We need the go build command to think it's in cgo mode to support android NDK cross-compilation.
     export CGO_ENABLED = 1
     NDK_VERSION ?= 26
-	ifeq ($(SOURCE_OS),darwin)
-        NDK_ROOT ?= $(shell ls -d $(HOME)/Library/Android/Sdk/ndk/$(NDK_VERSION)* | head -n 1)
-    else ifeq ($(SOURCE_OS),linux)
-        NDK_ROOT ?= $(PWD)/android-ndk-r$(NDK_VERSION)
-	else
-        $(error Error: We do not support the source OS: $(SOURCE_OS) for Android)
-    endif
+    NDK_ROOT ?= $(shell pwd)/android-ndk-r$(NDK_VERSION)
     # We do not need to handle source arch for toolchain paths.
     # On darwin host, android toolchain binaries and libs are mach-O universal
     # with 2 architecture targets: x86_64 and arm64.
@@ -116,15 +110,27 @@ endif
 endif
 	$(MAKE) $(FFMPEG_BUILD)
 
-# Download android NDK if it doesn't exist. Android NDK is only available
-# for linux x86_64 and darwin. On darwin, the NDK is installed via Android Studio.
+# Download and extract the NDK if it does not exist.
+# Warning: This will download a large file (1.2GB) and extract it to a directory.
+# If you have already downloaded the NDK, you can set the NDK_ROOT variable to the path of the NDK.
 $(NDK_ROOT):
+ifeq ($(TARGET_OS),android)
+ifeq ($(SOURCE_OS),darwin)
+	wget https://dl.google.com/android/repository/android-ndk-r26d-darwin.dmg && \
+	hdiutil attach android-ndk-r26d-darwin.dmg && \
+	mkdir -p ./android-ndk-r26 && \
+	cp -R "/Volumes/Android NDK r26d"/AndroidNDK11579264.app/Contents/NDK/* ./android-ndk-r26 && \
+	hdiutil detach "/Volumes/Android NDK r26d" && \
+	rm android-ndk-r26d-darwin.dmg
+endif
 ifeq ($(SOURCE_OS),linux)
 ifeq ($(SOURCE_ARCH),x86_64)
-ifeq ($(TARGET_OS),android)
 	sudo apt install -y unzip && \
 	wget https://dl.google.com/android/repository/android-ndk-r26-linux.zip && \
-	yes A | unzip android-ndk-r26-linux.zip
+	yes A | unzip android-ndk-r26-linux.zip && \
+	rm android-ndk-r26-linux.zip
+else
+	$(error Error: We do not support the source ARCH: $(SOURCE_ARCH) for Android target on a Linux host)
 endif
 endif
 endif
