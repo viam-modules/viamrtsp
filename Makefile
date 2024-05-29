@@ -45,7 +45,7 @@ ifeq ($(TARGET_ARCH),arm64)
     else ifeq ($(SOURCE_OS),linux)
         NDK_ROOT ?= $(PWD)/android-ndk-r$(NDK_VERSION)
 	else
-		$(error Error: We do not support the source OS: $(SOURCE_OS) for Android)
+        $(error Error: We do not support the source OS: $(SOURCE_OS) for Android)
     endif
     # We do not need to handle source arch for toolchain paths.
     # On darwin host, android toolchain binaries and libs are mach-O universal
