@@ -62,11 +62,11 @@ endif
 endif
 	$(MAKE) $(FFMPEG_BUILD)
 
-module: $(BIN_OUTPUT_PATH)/viamrtsp
-	cd $(BIN_OUTPUT_PATH) && tar czf module.tar.gz viamrtsp
+module.tar.gz: $(BIN_OUTPUT_PATH)/viamrtsp
+	tar czf module.tar.gz -C $(BIN_OUTPUT_PATH) .
 
 clean:
-	rm -rf $(BIN_OUTPUT_PATH)/viamrtsp $(BIN_OUTPUT_PATH)/module.tar.gz
+	rm -rf $(BIN_OUTPUT_PATH)/viamrtsp module.tar.gz
 
 clean-all:
 	rm -rf FFmpeg
