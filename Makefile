@@ -37,8 +37,6 @@ export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
 # If we are building for android, we need to set the correct flags
 # and toolchain paths for FFMPEG and go binary cross-compilation.
-# Make sure to install android SDK and NDK before building.
-# If you are using a different version of NDK, please set the NDK_VERSION variable.
 ifeq ($(TARGET_OS),android)
 # x86 android targets have not been tested, so we do not support them for now.
 ifeq ($(TARGET_ARCH),arm64)
@@ -46,8 +44,7 @@ ifeq ($(TARGET_ARCH),arm64)
     GO_TAGS ?= -tags no_cgo
     # We need the go build command to think it's in cgo mode to support android NDK cross-compilation.
     export CGO_ENABLED = 1
-    NDK_VERSION ?= 26
-    NDK_ROOT ?= $(shell pwd)/android-ndk-r$(NDK_VERSION)
+    NDK_ROOT ?= $(shell pwd)/android-ndk-r26
     # We do not need to handle source arch for toolchain paths.
     # On darwin host, android toolchain binaries and libs are mach-O universal
     # with 2 architecture targets: x86_64 and arm64.
