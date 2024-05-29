@@ -48,7 +48,7 @@ ifeq ($(TARGET_ARCH),arm64)
     # We do not need to handle source arch for toolchain paths.
     # On darwin host, android toolchain binaries and libs are mach-O universal
     # with 2 architecture targets: x86_64 and arm64.
-	CC = $(NDK_ROOT)/toolchains/llvm/prebuilt/$(SOURCE_OS)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang
+    CC = $(NDK_ROOT)/toolchains/llvm/prebuilt/$(SOURCE_OS)-x86_64/bin/aarch64-linux-android$(API_LEVEL)-clang
     export CC
     # Android API level is an integer value that uniquely identifies the revision of the Android platform framework API.
     # We use API level 30 as the default value. You can change it by setting the API_LEVEL variable.
