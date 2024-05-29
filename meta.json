@@ -23,7 +23,7 @@
   ],
   "build": {
     "build": "bash build.sh",
-    "path": "dist/module.tar.gz",
+    "path": "module.tar.gz",
     "arch" : ["linux/amd64", "linux/arm64"]
   },
   "entrypoint": "viamrtsp"
