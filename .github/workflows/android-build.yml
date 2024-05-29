@@ -19,6 +19,6 @@ jobs:
       with:
         go-version: 1.21
     
-    - name: Build viamrtsp for Android
+    - name: Build viamrtsp binary
       run: |
         TARGET_OS=android TARGET_ARCH=arm64 make
