@@ -7,6 +7,13 @@ ifeq ($(TARGET_ARCH),aarch64)
 else ifeq ($(TARGET_ARCH),x86_64)
     TARGET_ARCH = amd64
 endif
+ifeq ($(SOURCE_OS),linux)
+    NPROC ?= $(shell nproc)
+else ifeq ($(SOURCE_OS),darwin)
+    NPROC ?= $(shell sysctl -n hw.ncpu)
+else
+    NPROC ?= 1
+endif
 BIN_OUTPUT_PATH = bin/$(TARGET_OS)-$(TARGET_ARCH)
 TOOL_BIN = bin/gotools/$(shell uname -s)-$(shell uname -m)
 
@@ -98,7 +105,7 @@ $(FFMPEG_VERSION_PLATFORM):
 	git clone https://github.com/FFmpeg/FFmpeg.git --depth 1 --branch $(FFMPEG_TAG) $(FFMPEG_VERSION_PLATFORM)
 
 $(FFMPEG_BUILD): $(FFMPEG_VERSION_PLATFORM)
-	cd $(FFMPEG_VERSION_PLATFORM) && ./configure $(FFMPEG_OPTS) && $(MAKE) -j$(shell nproc) && $(MAKE) install
+	cd $(FFMPEG_VERSION_PLATFORM) && ./configure $(FFMPEG_OPTS) && $(MAKE) -j$(NPROC) && $(MAKE) install
 
 build-ffmpeg: $(NDK_ROOT)
 # Only need nasm to build assembly kernels for x86 targets.
