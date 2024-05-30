@@ -44,7 +44,7 @@ ifeq ($(TARGET_ARCH),arm64)
     GO_TAGS ?= -tags no_cgo
     # We need the go build command to think it's in cgo mode to support android NDK cross-compilation.
     export CGO_ENABLED = 1
-    NDK_ROOT ?= $(shell pwd)/android-ndk-r26
+    NDK_ROOT ?= $(shell pwd)/ndk/$(SOURCE_OS)/android-ndk-r26
     # We do not need to handle source arch for toolchain paths.
     # On darwin host, android toolchain binaries and libs are mach-O universal
     # with 2 architecture targets: x86_64 and arm64.
@@ -107,24 +107,24 @@ endif
 endif
 	$(MAKE) $(FFMPEG_BUILD)
 
-# Download and extract the NDK if it does not exist.
-# Warning: This will download a large file (1.2GB) and extract it to a directory.
-# If you have already downloaded the NDK, you can set the NDK_ROOT variable to the path of the NDK.
+# Warning: This will download a large file (1.5GB) and extract the contents. If you have 
+# already downloaded the NDK, you can set the NDK_ROOT variable to the path of the NDK.
 $(NDK_ROOT):
 ifeq ($(TARGET_OS),android)
 ifeq ($(SOURCE_OS),darwin)
 	wget https://dl.google.com/android/repository/android-ndk-r26d-darwin.dmg && \
 	hdiutil attach android-ndk-r26d-darwin.dmg && \
-	mkdir -p ./android-ndk-r26 && \
-	cp -R "/Volumes/Android NDK r26d"/AndroidNDK11579264.app/Contents/NDK/* ./android-ndk-r26 && \
+	mkdir -p $(NDK_ROOT) && \
+	cp -R "/Volumes/Android NDK r26d"/AndroidNDK11579264.app/Contents/NDK/* $(NDK_ROOT) && \
 	hdiutil detach "/Volumes/Android NDK r26d" && \
 	rm android-ndk-r26d-darwin.dmg
 endif
 ifeq ($(SOURCE_OS),linux)
 ifeq ($(SOURCE_ARCH),x86_64)
-	sudo apt install -y unzip && \
+	sudo apt update && sudo apt install -y unzip && \
 	wget https://dl.google.com/android/repository/android-ndk-r26-linux.zip && \
-	yes A | unzip android-ndk-r26-linux.zip && \
+	mkdir -p $(dir $(NDK_ROOT)) && \
+	yes A | unzip android-ndk-r26-linux.zip -d $(dir $(NDK_ROOT)) && \
 	rm android-ndk-r26-linux.zip
 else
 	$(error Error: We do not support the source ARCH: $(SOURCE_ARCH) for Android target on a Linux host)

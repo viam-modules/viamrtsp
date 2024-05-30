@@ -28,6 +28,7 @@ viamrtsp
 module.tar.gz
 FFmpeg
 android-ndk*
+ndk
 
 # Build artifacts
 bin
