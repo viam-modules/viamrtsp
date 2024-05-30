@@ -91,7 +91,6 @@ We support building this module using the Makefile for the following targets:
         * Startup canon: `canon -profile viam-rtsp-antique -arch amd64`
         * Build binary: `TARGET_OS=android TARGET_ARCH=arm64 make`
     * To build from Darwin/Arm64 host:
-        * Make sure that you have the Android NDK installed.
         * Build binary: `TARGET_OS=android TARGET_ARCH=arm64 make`
 * Binary will be in `bin/<OS>-<CPU>/viamrtsp`
 * Clean up build artifacts: `make clean`
