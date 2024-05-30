@@ -70,7 +70,7 @@ jobs:
             {
               "type": "local",
               "name": "viamrtsp",
-              "executable_path": "'$(realpath bin/Linux-x86_64/viamrtsp)'"
+              "executable_path": "'$(realpath bin/linux-amd64/viamrtsp)'"
             }
           ]
         }' > "integration-test-config-${{ matrix.config.name }}.json"
