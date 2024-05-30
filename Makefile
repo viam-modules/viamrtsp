@@ -72,8 +72,6 @@ ifeq ($(TARGET_ARCH),arm64)
                    --cpu=armv8-a \
                    --enable-cross-compile \
                    --cc=$(CC)
-else
-    $(error Error: We do not support the target combination: TARGET_OS=$(TARGET_OS), TARGET_ARCH=$(TARGET_ARCH))
 endif
 endif
 
@@ -140,8 +138,6 @@ ifeq ($(SOURCE_ARCH),amd64)
 	mkdir -p $(dir $(NDK_ROOT)) && \
 	yes A | unzip android-ndk-r26-linux.zip -d $(dir $(NDK_ROOT)) && \
 	rm android-ndk-r26-linux.zip
-else
-	$(error Error: We do not support the source ARCH: $(SOURCE_ARCH) for Android target on a Linux host)
 endif
 endif
 endif
