@@ -2,11 +2,25 @@ SOURCE_OS ?= $(shell uname -s | tr '[:upper:]' '[:lower:]')
 SOURCE_ARCH ?= $(shell uname -m)
 TARGET_OS ?= $(SOURCE_OS)
 TARGET_ARCH ?= $(SOURCE_ARCH)
-ifeq ($(TARGET_ARCH),aarch64)
-    TARGET_ARCH = arm64
-else ifeq ($(TARGET_ARCH),x86_64)
-    TARGET_ARCH = amd64
+normalize_arch = $(if $(filter aarch64,$(1)),arm64,$(if $(filter x86_64,$(1)),amd64,$(1)))
+# Normalize the source and target arch to arm64 or amd64 for compatibility with go build.
+SOURCE_ARCH := $(call normalize_arch,$(SOURCE_ARCH))
+TARGET_ARCH := $(call normalize_arch,$(TARGET_ARCH))
+
+# Here we will handle error cases where the host/target combinations are not supported.
+SUPPORTED_COMBINATIONS := \
+    linux-arm64-linux-arm64 \
+    linux-amd64-linux-amd64 \
+    linux-amd64-android-arm64 \
+    darwin-arm64-darwin-arm64 \
+    darwin-arm64-android-arm64
+CURRENT_COMBINATION := $(SOURCE_OS)-$(SOURCE_ARCH)-$(TARGET_OS)-$(TARGET_ARCH)
+ifneq (,$(filter $(CURRENT_COMBINATION),$(SUPPORTED_COMBINATIONS)))
+    $(info Supported combination: $(CURRENT_COMBINATION))
+else
+    $(error Error: Unsupported combination: $(CURRENT_COMBINATION))
 endif
+
 ifeq ($(SOURCE_OS),linux)
     NPROC ?= $(shell nproc)
 else ifeq ($(SOURCE_OS),darwin)
@@ -38,7 +52,7 @@ export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 # If we are building for android, we need to set the correct flags
 # and toolchain paths for FFMPEG and go binary cross-compilation.
 ifeq ($(TARGET_OS),android)
-# x86 android targets have not been tested, so we do not support them for now.
+# amd64 android targets have not been tested, so we do not support them for now.
 ifeq ($(TARGET_ARCH),arm64)
     # Android build doesn't support most of our cgo libraries, so we use the no_cgo flag.
     GO_TAGS ?= -tags no_cgo
@@ -99,9 +113,9 @@ $(FFMPEG_BUILD): $(FFMPEG_VERSION_PLATFORM)
 	cd $(FFMPEG_VERSION_PLATFORM) && ./configure $(FFMPEG_OPTS) && $(MAKE) -j$(NPROC) && $(MAKE) install
 
 build-ffmpeg: $(NDK_ROOT)
-# Only need nasm to build assembly kernels for x86 targets.
+# Only need nasm to build assembly kernels for amd64 targets.
 ifeq ($(SOURCE_OS),linux)
-ifeq ($(SOURCE_ARCH),x86_64)
+ifeq ($(SOURCE_ARCH),amd64)
 	which nasm || (sudo apt update && sudo apt install -y nasm)
 endif
 endif
@@ -120,7 +134,7 @@ ifeq ($(SOURCE_OS),darwin)
 	rm android-ndk-r26d-darwin.dmg
 endif
 ifeq ($(SOURCE_OS),linux)
-ifeq ($(SOURCE_ARCH),x86_64)
+ifeq ($(SOURCE_ARCH),amd64)
 	sudo apt update && sudo apt install -y unzip && \
 	wget https://dl.google.com/android/repository/android-ndk-r26-linux.zip && \
 	mkdir -p $(dir $(NDK_ROOT)) && \
