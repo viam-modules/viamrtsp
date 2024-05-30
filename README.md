@@ -71,11 +71,18 @@ To test your camera, go to the [**CONTROL** tab](https://docs.viam.com/fleet/con
 
 The binary is statically linked with [FFmpeg v6.1](https://github.com/FFmpeg/FFmpeg/tree/release/6.1), eliminating the need to install FFmpeg separately on target machines.
 
-We support building this module using the Makefile for the following targets:
-|        | Linux | Android  | Darwin |
-|--------|-------|----------|--------|
-| arm64  | ✅    | ✅       | ✅     |
-| amd64  | ✅    | ❌       | ❌     |
+We support building this module using the Makefile for the following host/target combinations:
+
+| Host         | Target       | Supported |
+|--------------|--------------|-----------|
+| Linux/Arm64  | Linux/Arm64  | ✅        |
+| Linux/Arm64  | Android/Arm64| ❌        |
+| Linux/Amd64  | Linux/Amd64  | ✅        |
+| Linux/Amd64  | Android/Arm64| ✅        |
+| Darwin/Arm64 | Darwin/Arm64 | ✅        |
+| Darwin/Arm64 | Android/Arm64| ✅        |
+| Darwin/Amd64 | Darwin/Amd64 | ❌        |
+| Darwin/Amd64 | Android/Arm64| ❌        |
 
 * Build for Linux targets:
     * Install canon: `go install github.com/viamrobotics/canon@latest`
