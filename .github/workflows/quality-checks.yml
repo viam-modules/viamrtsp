@@ -10,6 +10,7 @@ on:
     paths:
       - '**/**.go'
       - 'Makefile'
+      - '.github/workflows/quality-checks.yml'
 
 jobs:
   quality-checks:
