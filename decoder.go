@@ -21,12 +21,9 @@ import (
 
 // decoder is a generic FFmpeg decoder.
 type decoder struct {
-	logger      logging.Logger
-	codecCtx    *C.AVCodecContext
-	srcFrame    *C.AVFrame
-	swsCtx      *C.struct_SwsContext
-	dstFrame    *C.AVFrame
-	dstFramePtr []uint8
+	logger   logging.Logger
+	codecCtx *C.AVCodecContext
+	srcFrame *C.AVFrame
 }
 
 type videoCodec int
@@ -125,14 +122,6 @@ func newH265Decoder(logger logging.Logger) (*decoder, error) {
 
 // close closes the decoder.
 func (d *decoder) close() {
-	if d.dstFrame != nil {
-		C.av_frame_free(&d.dstFrame)
-	}
-
-	if d.swsCtx != nil {
-		C.sws_freeContext(d.swsCtx)
-	}
-
 	C.av_frame_free(&d.srcFrame)
 	C.avcodec_close(d.codecCtx)
 }
@@ -156,49 +145,37 @@ func (d *decoder) decode(nalu []byte) (image.Image, error) {
 		return nil, nil
 	}
 
-	// if frame size has changed, allocate needed objects
-	if d.dstFrame == nil || d.dstFrame.width != d.srcFrame.width || d.dstFrame.height != d.srcFrame.height {
-		if d.dstFrame != nil {
-			C.av_frame_free(&d.dstFrame)
-		}
+	pixDataSize := 4 * int(d.srcFrame.width) * int(d.srcFrame.height)
+	pixData := C.malloc(C.size_t(pixDataSize))
+	defer C.free(pixData)
 
-		if d.swsCtx != nil {
-			C.sws_freeContext(d.swsCtx)
-		}
-
-		d.dstFrame = C.av_frame_alloc()
-		d.dstFrame.format = C.AV_PIX_FMT_RGBA
-		d.dstFrame.width = d.srcFrame.width
-		d.dstFrame.height = d.srcFrame.height
-		d.dstFrame.color_range = C.AVCOL_RANGE_JPEG
-		res = C.av_frame_get_buffer(d.dstFrame, 1)
-		if res < 0 {
-			return nil, errors.New("av_frame_get_buffer() err")
-		}
-
-		d.swsCtx = C.sws_getContext(d.srcFrame.width, d.srcFrame.height, C.AV_PIX_FMT_YUV420P,
-			d.dstFrame.width, d.dstFrame.height, (int32)(d.dstFrame.format), C.SWS_BILINEAR, nil, nil, nil)
-		if d.swsCtx == nil {
-			return nil, errors.New("sws_getContext() err")
-		}
-
-		dstFrameSize := C.av_image_get_buffer_size((int32)(d.dstFrame.format), d.dstFrame.width, d.dstFrame.height, 1)
-		d.dstFramePtr = (*[1 << 30]uint8)(unsafe.Pointer(d.dstFrame.data[0]))[:dstFrameSize:dstFrameSize]
+	swsCtx := C.sws_getContext(d.srcFrame.width, d.srcFrame.height, C.AV_PIX_FMT_YUV420P,
+		d.srcFrame.width, d.srcFrame.height, C.AV_PIX_FMT_RGBA, C.SWS_BILINEAR, nil, nil, nil)
+	if swsCtx == nil {
+		return nil, errors.New("sws_getContext() err")
 	}
+	defer C.sws_freeContext(swsCtx)
 
 	// convert frame from YUV420 to RGB
-	res = C.sws_scale(d.swsCtx, frameData(d.srcFrame), frameLineSize(d.srcFrame),
-		0, d.srcFrame.height, frameData(d.dstFrame), frameLineSize(d.dstFrame))
+	lineSizes := frameLineSizeForRGBA(d.srcFrame.width)
+	res = C.sws_scale(swsCtx, frameData(d.srcFrame), frameLineSize(d.srcFrame),
+		0, d.srcFrame.height, (**C.uint8_t)(unsafe.Pointer(&pixData)), &lineSizes[0])
 	if res < 0 {
 		return nil, errors.New("sws_scale() err")
 	}
 
-	// embed frame into an image.Image
+	pixDataGo := C.GoBytes(pixData, C.int(pixDataSize))
+
 	return &image.RGBA{
-		Pix:    d.dstFramePtr,
-		Stride: 4 * (int)(d.dstFrame.width),
+		Pix:    pixDataGo,
+		Stride: 4 * int(d.srcFrame.width),
 		Rect: image.Rectangle{
-			Max: image.Point{(int)(d.dstFrame.width), (int)(d.dstFrame.height)},
+			Max: image.Point{int(d.srcFrame.width), int(d.srcFrame.height)},
 		},
 	}, nil
+}
+
+// frameLineSizeForRGBA returns the line size array for an RGBA frame
+func frameLineSizeForRGBA(width C.int) [4]C.int {
+	return [4]C.int{4 * width, 0, 0, 0}
 }
