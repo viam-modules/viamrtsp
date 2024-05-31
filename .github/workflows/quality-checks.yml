@@ -9,6 +9,7 @@ on:
   pull_request:
     paths:
       - '**/**.go'
+      - 'Makefile'
 
 jobs:
   quality-checks:
