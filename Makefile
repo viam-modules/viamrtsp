@@ -104,7 +104,7 @@ lint: gofmt tool-install
 	GOGC=50 $(TOOL_BIN)/golangci-lint run -v --fix --config=./etc/.golangci.yaml
 
 test: build-ffmpeg
-	CGO_CFLAGS=$(CGO_CFLAGS) go test -race -v ./...
+	CGO_CFLAGS=$(CGO_CFLAGS) CGO_LDFLAGS=$(CGO_LDFLAGS) go test -race -v ./...
 
 update-rdk:
 	go get go.viam.com/rdk@latest
