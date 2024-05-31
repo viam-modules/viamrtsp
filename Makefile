@@ -98,7 +98,7 @@ tool-install:
 gofmt:
 	gofmt -w -s .
 
-lint: gofmt tool-install
+lint: gofmt tool-install build-ffmpeg
 	go mod tidy
 	export pkgs="`go list -f '{{.Dir}}' ./...`" && echo "$$pkgs" | xargs go vet -vettool=$(TOOL_BIN)/combined
 	GOGC=50 $(TOOL_BIN)/golangci-lint run -v --fix --config=./etc/.golangci.yaml
