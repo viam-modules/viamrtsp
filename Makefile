@@ -24,7 +24,7 @@ ifeq ($(UNAME_S),Linux)
 endif
 export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
-.PHONY: build-ffmpeg tool-install gofmt lint update-rdk  clean clean-all
+.PHONY: build-ffmpeg tool-install gofmt lint update-rdk module clean clean-all
 
 $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
 	CGO_LDFLAGS=$(CGO_LDFLAGS) \
@@ -62,11 +62,11 @@ endif
 endif
 	$(MAKE) $(FFMPEG_BUILD)
 
-module.tar.gz: $(BIN_OUTPUT_PATH)/viamrtsp
-	tar czf module.tar.gz -C $(BIN_OUTPUT_PATH) .
+module: $(BIN_OUTPUT_PATH)/viamrtsp
+	tar czf $(BIN_OUTPUT_PATH)/module.tar.gz $(BIN_OUTPUT_PATH)/viamrtsp
 
 clean:
-	rm -rf $(BIN_OUTPUT_PATH)/viamrtsp module.tar.gz
+	rm -rf $(BIN_OUTPUT_PATH)/viamrtsp $(BIN_OUTPUT_PATH)/module.tar.gz
 
 clean-all:
 	rm -rf FFmpeg
