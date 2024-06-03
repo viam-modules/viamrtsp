@@ -1,24 +1,24 @@
 {
-  "module_id": "erh:viamrtsp",
-  "visibility": "public",
-  "url": "https://github.com/erh/viamrtsp",
+  "module_id": "seanorg:seanviamrtsp",
+  "visibility": "private",
+  "url": "https://github.com/hexbabe/sean-viamrtsp",
   "description": "module for rtsp, currently supports x264 and x265",
   "models": [
     {
       "api": "rdk:component:camera",
-      "model": "erh:viamrtsp:rtsp"
+      "model": "seanorg:seanviamrtsp:rtsp"
     },
     {
       "api": "rdk:component:camera",
-      "model": "erh:viamrtsp:rtsp-h264"
+      "model": "seanorg:seanviamrtsp:rtsp-h264"
     },
     {
       "api": "rdk:component:camera",
-      "model": "erh:viamrtsp:rtsp-h265"
+      "model": "seanorg:seanviamrtsp:rtsp-h265"
     },
     {
       "api": "rdk:component:camera",
-      "model": "erh:viamrtsp:rtsp-mjpeg"
+      "model": "seanorg:seanviamrtsp:rtsp-mjpeg"
     }
   ],
   "build": {

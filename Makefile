@@ -79,7 +79,7 @@ ifeq ($(TARGET_OS),linux)
 	CGO_LDFLAGS := "$(CGO_LDFLAGS) -l:libjpeg.a"
 endif
 
-.PHONY: build-ffmpeg tool-install gofmt lint test update-rdk module module-deploy clean clean-all
+.PHONY: build-ffmpeg tool-install gofmt lint test update-rdk module clean clean-all
 
 # We set GOOS, GOARCH, and GO_TAGS to support cross-compilation for android targets.
 $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go

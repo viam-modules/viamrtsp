@@ -59,7 +59,7 @@ jobs:
               "name": "ip-cam",
               "namespace": "rdk",
               "type": "camera",
-              "model": "erh:viamrtsp:rtsp",
+              "model": "seanorg:seanviamrtsp:rtsp",
               "attributes": {
                 "rtsp_address": "rtsp://localhost:8554/live.stream"
               },
