@@ -157,7 +157,7 @@ func (d *decoder) decode(nalu []byte) (image.Image, error) {
 	defer C.sws_freeContext(swsCtx)
 
 	// convert frame from YUV420 to RGB
-	stride := C.int(4 * d.srcFrame.width)
+	stride := 4 * d.srcFrame.width
 	res = C.sws_scale(swsCtx, frameData(d.srcFrame), frameLineSize(d.srcFrame),
 		0, d.srcFrame.height, (**C.uint8_t)(unsafe.Pointer(&pixData)), &stride)
 	if res < 0 {
