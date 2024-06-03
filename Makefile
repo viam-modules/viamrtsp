@@ -147,12 +147,8 @@ endif
 
 module: $(BIN_OUTPUT_PATH)/viamrtsp
 	cp $(BIN_OUTPUT_PATH)/viamrtsp bin/viamrtsp
-	tar czf $(BIN_OUTPUT_PATH)/module.tar.gz bin/viamrtsp
+	tar czf module.tar.gz bin/viamrtsp
 	rm bin/viamrtsp
-
-# Use only for build CI so the meta.json and build shell script can find the tarball
-module-deploy: module
-	cp $(BIN_OUTPUT_PATH)/module.tar.gz .
 
 clean:
 	rm -rf $(BIN_OUTPUT_PATH)/viamrtsp $(BIN_OUTPUT_PATH)/module.tar.gz
