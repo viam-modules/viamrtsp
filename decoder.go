@@ -157,9 +157,9 @@ func (d *decoder) decode(nalu []byte) (image.Image, error) {
 	defer C.sws_freeContext(swsCtx)
 
 	// convert frame from YUV420 to RGB
-	lineSizes := frameLineSizeForRGBA(d.srcFrame.width)
+	stride := C.int(4 * d.srcFrame.width)
 	res = C.sws_scale(swsCtx, frameData(d.srcFrame), frameLineSize(d.srcFrame),
-		0, d.srcFrame.height, (**C.uint8_t)(unsafe.Pointer(&pixData)), &lineSizes[0])
+		0, d.srcFrame.height, (**C.uint8_t)(unsafe.Pointer(&pixData)), &stride)
 	if res < 0 {
 		return nil, errors.New("sws_scale() err")
 	}
@@ -168,14 +168,9 @@ func (d *decoder) decode(nalu []byte) (image.Image, error) {
 
 	return &image.RGBA{
 		Pix:    pixDataGo,
-		Stride: 4 * int(d.srcFrame.width),
+		Stride: int(stride),
 		Rect: image.Rectangle{
 			Max: image.Point{int(d.srcFrame.width), int(d.srcFrame.height)},
 		},
 	}, nil
-}
-
-// frameLineSizeForRGBA returns the line size array for an RGBA frame
-func frameLineSizeForRGBA(width C.int) [4]C.int {
-	return [4]C.int{4 * width, 0, 0, 0}
 }
