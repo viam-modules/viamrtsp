@@ -79,7 +79,7 @@ ifeq ($(TARGET_OS),linux)
 	CGO_LDFLAGS := "$(CGO_LDFLAGS) -l:libjpeg.a"
 endif
 
-.PHONY: build-ffmpeg tool-install gofmt lint test update-rdk module clean clean-all
+.PHONY: build-ffmpeg tool-install gofmt lint test update-rdk module module-deploy clean clean-all
 
 # We set GOOS, GOARCH, and GO_TAGS to support cross-compilation for android targets.
 $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
@@ -145,11 +145,17 @@ endif
 endif
 endif
 
-module.tar.gz: $(BIN_OUTPUT_PATH)/viamrtsp
-	tar czf module.tar.gz -C $(BIN_OUTPUT_PATH) .
+module: $(BIN_OUTPUT_PATH)/viamrtsp
+	cp $(BIN_OUTPUT_PATH)/viamrtsp bin/viamrtsp
+	tar czf $(BIN_OUTPUT_PATH)/module.tar.gz bin/viamrtsp
+	rm bin/viamrtsp
+
+# Use only for build CI so the meta.json and build shell script can find the tarball
+module-deploy: module
+	cp $(BIN_OUTPUT_PATH)/module.tar.gz .
 
 clean:
-	rm -rf $(BIN_OUTPUT_PATH)/viamrtsp module.tar.gz
+	rm -rf $(BIN_OUTPUT_PATH)/viamrtsp $(BIN_OUTPUT_PATH)/module.tar.gz
 
 clean-all:
 	rm -rf FFmpeg
