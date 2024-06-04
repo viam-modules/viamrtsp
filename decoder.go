@@ -145,32 +145,42 @@ func (d *decoder) decode(nalu []byte) (image.Image, error) {
 		return nil, nil
 	}
 
-	pixDataSize := 4 * int(d.srcFrame.width) * int(d.srcFrame.height)
-	pixData := C.malloc(C.size_t(pixDataSize))
-	defer C.free(pixData)
+	// We allocate a new destination frame for every frame we decode.
+	dstFrame := C.av_frame_alloc()
+	defer C.av_frame_free(&dstFrame)
+	dstFrame.format = C.AV_PIX_FMT_RGBA
+	dstFrame.width = d.srcFrame.width
+	dstFrame.height = d.srcFrame.height
+	dstFrame.color_range = C.AVCOL_RANGE_JPEG
+	res = C.av_frame_get_buffer(dstFrame, 1)
+	if res < 0 {
+		return nil, errors.New("av_frame_get_buffer() err")
+	}
 
 	swsCtx := C.sws_getContext(d.srcFrame.width, d.srcFrame.height, C.AV_PIX_FMT_YUV420P,
-		d.srcFrame.width, d.srcFrame.height, C.AV_PIX_FMT_RGBA, C.SWS_BILINEAR, nil, nil, nil)
+		dstFrame.width, dstFrame.height, (int32)(dstFrame.format), C.SWS_BILINEAR, nil, nil, nil)
 	if swsCtx == nil {
 		return nil, errors.New("sws_getContext() err")
 	}
 	defer C.sws_freeContext(swsCtx)
 
 	// convert frame from YUV420 to RGB
-	stride := 4 * d.srcFrame.width
 	res = C.sws_scale(swsCtx, frameData(d.srcFrame), frameLineSize(d.srcFrame),
-		0, d.srcFrame.height, (**C.uint8_t)(unsafe.Pointer(&pixData)), &stride)
+		0, d.srcFrame.height, frameData(dstFrame), frameLineSize(dstFrame))
 	if res < 0 {
 		return nil, errors.New("sws_scale() err")
 	}
 
-	pixDataGo := C.GoBytes(pixData, C.int(pixDataSize))
+	// Copy the frame data into a Go byte slice. This avoids filling the go image with a dangling
+	// pointer to C memory and allows the go garbage collector to manage the memory for us.
+	dstFrameSize := C.av_image_get_buffer_size((int32)(dstFrame.format), dstFrame.width, dstFrame.height, 1)
+	dataGo := C.GoBytes(unsafe.Pointer(dstFrame.data[0]), dstFrameSize)
 
 	return &image.RGBA{
-		Pix:    pixDataGo,
-		Stride: int(stride),
+		Pix:    dataGo,
+		Stride: 4 * (int)(dstFrame.width),
 		Rect: image.Rectangle{
-			Max: image.Point{int(d.srcFrame.width), int(d.srcFrame.height)},
+			Max: image.Point{(int)(dstFrame.width), (int)(dstFrame.height)},
 		},
 	}, nil
 }
