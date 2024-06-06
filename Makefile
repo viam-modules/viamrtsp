@@ -151,7 +151,7 @@ module: $(BIN_OUTPUT_PATH)/viamrtsp
 	rm bin/viamrtsp
 
 clean:
-	rm -rf $(BIN_OUTPUT_PATH)/viamrtsp $(BIN_OUTPUT_PATH)/module.tar.gz
+	rm -rf $(BIN_OUTPUT_PATH)/viamrtsp module.tar.gz
 
 clean-all:
 	rm -rf FFmpeg
