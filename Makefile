@@ -146,10 +146,12 @@ endif
 endif
 
 module: $(BIN_OUTPUT_PATH)/viamrtsp
-	tar czf $(BIN_OUTPUT_PATH)/module.tar.gz $(BIN_OUTPUT_PATH)/viamrtsp
+	cp $(BIN_OUTPUT_PATH)/viamrtsp bin/viamrtsp
+	tar czf module.tar.gz bin/viamrtsp
+	rm bin/viamrtsp
 
 clean:
-	rm -rf $(BIN_OUTPUT_PATH)/viamrtsp $(BIN_OUTPUT_PATH)/module.tar.gz
+	rm -rf $(BIN_OUTPUT_PATH)/viamrtsp module.tar.gz
 
 clean-all:
 	rm -rf FFmpeg
