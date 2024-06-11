@@ -21,12 +21,11 @@ import (
 
 // decoder is a generic FFmpeg decoder.
 type decoder struct {
-	logger      logging.Logger
-	codecCtx    *C.AVCodecContext
-	srcFrame    *C.AVFrame
-	swsCtx      *C.struct_SwsContext
-	dstFrame    *C.AVFrame
-	dstFramePtr []uint8
+	logger   logging.Logger
+	codecCtx *C.AVCodecContext
+	srcFrame *C.AVFrame
+	swsCtx   *C.struct_SwsContext
+	dstFrame *C.AVFrame
 }
 
 type videoCodec int
@@ -181,9 +180,6 @@ func (d *decoder) decode(nalu []byte) (image.Image, error) {
 		if d.swsCtx == nil {
 			return nil, errors.New("sws_getContext() err")
 		}
-
-		dstFrameSize := C.av_image_get_buffer_size((int32)(d.dstFrame.format), d.dstFrame.width, d.dstFrame.height, 1)
-		d.dstFramePtr = (*[1 << 30]uint8)(unsafe.Pointer(d.dstFrame.data[0]))[:dstFrameSize:dstFrameSize]
 	}
 
 	// convert frame from YUV420 to RGB
@@ -193,9 +189,14 @@ func (d *decoder) decode(nalu []byte) (image.Image, error) {
 		return nil, errors.New("sws_scale() err")
 	}
 
+	// Copy the frame data into a Go byte slice. This avoids filling the go image with a dangling
+	// pointer to C memory and allows the go garbage collector to manage the memory for us.
+	dstFrameSize := C.av_image_get_buffer_size((int32)(d.dstFrame.format), d.dstFrame.width, d.dstFrame.height, 1)
+	dataGo := C.GoBytes(unsafe.Pointer(d.dstFrame.data[0]), dstFrameSize)
+
 	// embed frame into an image.Image
 	return &image.RGBA{
-		Pix:    d.dstFramePtr,
+		Pix:    dataGo,
 		Stride: 4 * (int)(d.dstFrame.width),
 		Rect: image.Rectangle{
 			Max: image.Point{(int)(d.dstFrame.width), (int)(d.dstFrame.height)},
