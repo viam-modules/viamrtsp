@@ -1,0 +1,44 @@
+name: Build & publish viamrtsp module for Android
+
+# on:
+#   release:
+#     types: [published]
+
+on:
+  pull_request:
+    types: [synchronize]
+
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.21
+    
+    - name: Build viamrtsp binary and package module
+      run: |
+        TARGET_OS=android TARGET_ARCH=arm64 make module
+    
+    - name: Debug upload params
+      run: |
+        echo "meta-path: meta.json"
+        echo "module-path: module.tar.gz"
+        echo "platform: android/arm64"
+        echo "version: ${{ github.ref_name }}"
+        echo $(ls -l module.tar.gz)
+
+    # - name: Upload viamrtsp android binary
+    #     uses: viamrobotics/upload-module@main
+    #     if: startsWith(github.ref, 'refs/tags/') 
+    #     with:
+    #       meta-path: meta.json
+    #       module-path: module.tar.gz
+    #       platform: android/arm64
+    #       version: ${{ github.ref_name }}
+    #       key-id: ${{ secrets.viam_key_id }}
+    #       key-value: ${{ secrets.viam_key_value }}
