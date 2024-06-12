@@ -9,6 +9,8 @@ on:
   pull_request:
     paths:
       - '**/**.go'
+      - 'Makefile'
+      - '.github/workflows/quality-checks.yml'
 
 jobs:
   quality-checks:
@@ -34,9 +36,6 @@ jobs:
           exit 1
         fi
     
-    - name: Build ffmpeg and deps
-      run: make build-ffmpeg
-
     - name: Run linter and static checks
       run: make lint
 

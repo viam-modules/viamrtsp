@@ -28,6 +28,7 @@ else ifeq ($(SOURCE_OS),darwin)
 else
     NPROC ?= 1
 endif
+
 BIN_OUTPUT_PATH = bin/$(TARGET_OS)-$(TARGET_ARCH)
 TOOL_BIN = bin/gotools/$(shell uname -s)-$(shell uname -m)
 
@@ -46,7 +47,9 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-network \
                --enable-parser=h264 \
                --enable-parser=hevc
+
 CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib
+CGO_CFLAGS := -I$(FFMPEG_BUILD)/include
 export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
 # If we are building for android, we need to set the correct flags
@@ -95,13 +98,13 @@ tool-install:
 gofmt:
 	gofmt -w -s .
 
-lint: gofmt tool-install
+lint: gofmt tool-install build-ffmpeg
 	go mod tidy
 	export pkgs="`go list -f '{{.Dir}}' ./...`" && echo "$$pkgs" | xargs go vet -vettool=$(TOOL_BIN)/combined
 	GOGC=50 $(TOOL_BIN)/golangci-lint run -v --fix --config=./etc/.golangci.yaml
 
-test:
-	go test -race -v ./...
+test: build-ffmpeg
+	CGO_CFLAGS=$(CGO_CFLAGS) CGO_LDFLAGS=$(CGO_LDFLAGS) go test -race -v ./...
 
 update-rdk:
 	go get go.viam.com/rdk@latest
