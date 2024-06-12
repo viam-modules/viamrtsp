@@ -4,8 +4,7 @@ name: Build & publish viamrtsp module for Android
 #   release:
 #     types: [published]
 
-on:
-  pull_request:
+on: [push, pull_request]
 
 jobs:
   build-android:
