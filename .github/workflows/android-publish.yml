@@ -6,8 +6,6 @@ name: Build & publish viamrtsp module for Android
 
 on:
   pull_request:
-    types: [synchronize]
-
 
 jobs:
   build-android:
