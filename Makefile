@@ -159,41 +159,53 @@ module: $(BIN_OUTPUT_PATH)/viamrtsp
 	rm bin/viamrtsp
 
 integration-test: $(BIN_OUTPUT_PATH)/viamrtsp
-	wget https://github.com/bluenviron/mediamtx/releases/download/v1.6.0/mediamtx_v1.6.0_linux_${MEDIAMTX_ARCH}.tar.gz && \
-	tar -xzf mediamtx_v1.6.0_linux_${MEDIAMTX_ARCH}.tar.gz && \
+	@echo "Downloading and setting up MediaMTX..."
+	@wget https://github.com/bluenviron/mediamtx/releases/download/v1.6.0/mediamtx_v1.6.0_linux_$(MEDIAMTX_ARCH).tar.gz && \
+	tar -xzf mediamtx_v1.6.0_linux_$(MEDIAMTX_ARCH).tar.gz && \
     chmod +x ./mediamtx && \
 	./mediamtx &
 
-	ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec $(FFMPEG_ARGS) -pix_fmt yuv420p -f rtsp -rtsp_transport tcp rtsp://0.0.0.0:8554/live.stream &
+	@echo "Starting RTSP stream..."
+	@ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec $(FFMPEG_ARGS) -pix_fmt yuv420p -f rtsp -rtsp_transport tcp rtsp://0.0.0.0:8554/live.stream &
 
-	curl https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-${VIAM_SERVER_ARCH}.AppImage -o viam-server && \
+	@echo "Downloading and installing Viam server..."
+	@curl https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-$(VIAM_SERVER_ARCH).AppImage -o viam-server && \
 	chmod 755 viam-server && \
 	sudo ./viam-server --aix-install
 
-	echo '{ \
-	  "components": [{ \
-	    "name": "ip-cam", \
-	    "namespace": "rdk", \
-	    "type": "camera", \
-	    "model": "erh:viamrtsp:rtsp", \
-	    "attributes": { \
-	      "rtsp_address": "rtsp://localhost:8554/live.stream" \
-	    }, \
-	    "depends_on": [] \
-	  }], \
-	  "modules": [{ \
-	    "type": "local", \
-	    "name": "viamrtsp", \
-	    "executable_path": "'"$$REALPATH $(BIN_OUTPUT_PATH)/viamrtsp"'" \
-	  }] \
-	}' > integration-test-config.json
+	@echo "Generating configuration..."
+	@cat << EOF > integration-test-config.json
+	{
+	  "components": [
+	    {
+	      "name": "ip-cam",
+	      "namespace": "rdk",
+	      "type": "camera",
+	      "model": "erh:viamrtsp:rtsp",
+	      "attributes": {
+	        "rtsp_address": "rtsp://localhost:8554/live.stream"
+	      },
+	      "depends_on": []
+	    }
+	  ],
+	  "modules": [
+	    {
+	      "type": "local",
+	      "name": "viamrtsp",
+	      "executable_path": "$(realpath $(BIN_OUTPUT_PATH)/viamrtsp)"
+	    }
+	  ]
+	}
+	EOF
 
-	viam-server -debug -config "./integration-test-config.json" & \
-	sleep 10
+	@echo "Launching Viam server with configuration..."
+	@viam-server -debug -config "./integration-test-config.json" &
+	@sleep 10
 
-	go build -o testBinary ./test/client.go && \
-	chmod +x ./testBinary && \
-	./testBinary
+	@echo "Compiling and running test binary..."
+	@go build -o testBinary ./test/client.go
+	@chmod +x testBinary
+	@./testBinary
 
 clean:
 	rm -rf $(BIN_OUTPUT_PATH)/viamrtsp module.tar.gz
