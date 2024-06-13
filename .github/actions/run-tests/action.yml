@@ -1,0 +1,57 @@
+name: 'Run Tests'
+description: 'Runs tests on configured environment'
+inputs:
+  codec:
+    description: 'Codec used for RTSP stream'
+    required: true
+  extra_ffmpeg_args:
+    description: 'Additional args for ffmpeg'
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - run: wget https://github.com/bluenviron/mediamtx/releases/download/v1.6.0/mediamtx_v1.6.0_linux_amd64.tar.gz && tar -xzf mediamtx_v1.6.0_linux_amd64.tar.gz
+      shell: bash
+
+    - run: ./mediamtx &
+      shell: bash
+
+    - run: ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec ${{ inputs.codec }} ${{ inputs.extra_ffmpeg_args }} -pix_fmt yuv420p -f rtsp -rtsp_transport tcp rtsp://0.0.0.0:8554/live.stream &
+      shell: bash
+
+    - run: make
+      shell: bash
+
+    - run: curl https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-x86_64.AppImage -o viam-server && chmod 755 viam-server && sudo ./viam-server --aix-install
+      shell: bash
+
+    - run: |
+        echo '{
+          "components": [
+            {
+              "name": "ip-cam",
+              "namespace": "rdk",
+              "type": "camera",
+              "model": "erh:viamrtsp:rtsp",
+              "attributes": {
+                "rtsp_address": "rtsp://localhost:8554/live.stream"
+              },
+              "depends_on": []
+            }
+          ],
+          "modules": [
+            {
+              "type": "local",
+              "name": "viamrtsp",
+              "executable_path": "'$(realpath bin/linux-amd64/viamrtsp)'"
+            }
+          ]
+        }' > "integration-test-config-${{ matrix.config.name }}.json"
+      shell: bash
+
+    - run: viam-server -debug -config "./integration-test-config-${{ matrix.config.name }}.json" & sleep 10
+      shell: bash
+
+    - run: go build -o testBinary ./test/client.go && chmod +x ./testBinary && ./testBinary
+      shell: bash

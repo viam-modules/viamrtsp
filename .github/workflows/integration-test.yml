@@ -3,7 +3,8 @@ name: Integration test using mediamtx
 on: [push, pull_request]
 
 jobs:
-  build-and-test:
+  test-on-ubuntu:
+    name: Test on Ubuntu Latest
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -15,74 +16,50 @@ jobs:
           - name: "mjpeg"
             codec: "mjpeg"
             extra_ffmpeg_args: "-huffman 0"
-    
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
+      - name: Set up dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y golang-go libfuse2 ffmpeg
+      - name: Run tests
+        uses: ./.github/actions/run-tests
+        with:
+          codec: ${{ matrix.config.codec }}
+          extra_ffmpeg_args: ${{ matrix.config.extra_ffmpeg_args }}
 
-    - name: Set up Go
-      uses: actions/setup-go@v2
-      with:
-        go-version: 1.21
-    
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo add-apt-repository universe &&
-        sudo apt-get install -y libfuse2 ffmpeg
-        
-    - name: Download and extract mediamtx
-      run: |
-        wget https://github.com/bluenviron/mediamtx/releases/download/v1.6.0/mediamtx_v1.6.0_linux_amd64.tar.gz
-        tar -xzf mediamtx_v1.6.0_linux_amd64.tar.gz
-        
-    - name: Run mediamtx
-      run: ./mediamtx &
-      
-    - name: Run fake RTSP camera
-      run: ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec ${{ matrix.config.codec }} ${{ matrix.config.extra_ffmpeg_args }} -pix_fmt yuv420p -f rtsp -rtsp_transport tcp rtsp://0.0.0.0:8554/live.stream &
-      
-    - name: Build viamrtsp binary
-      run: make
-      
-    - name: Install viam-server
-      run: |
-        curl https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-x86_64.AppImage -o viam-server
-        chmod 755 viam-server
-        sudo ./viam-server --aix-install
-
-    # Generate config from within yml because relative paths don't reliably work for module exec paths
-    - name: Generate viam-server config
-      run: |
-        echo '{
-          "components": [
-            {
-              "name": "ip-cam",
-              "namespace": "rdk",
-              "type": "camera",
-              "model": "erh:viamrtsp:rtsp",
-              "attributes": {
-                "rtsp_address": "rtsp://localhost:8554/live.stream"
-              },
-              "depends_on": []
-            }
-          ],
-          "modules": [
-            {
-              "type": "local",
-              "name": "viamrtsp",
-              "executable_path": "'$(realpath bin/linux-amd64/viamrtsp)'"
-            }
-          ]
-        }' > "integration-test-config-${{ matrix.config.name }}.json"
-
-    # Sleep to give time for server to start
-    - name: Run viam-server
-      run: |
-        viam-server -debug -config "./integration-test-config-${{ matrix.config.name }}.json" &
-        sleep 10
-
-    - name: Build and run test binary
-      run: |
-        go build -o testBinary ./test/client.go
-        chmod +x ./testBinary
-        ./testBinary
+  test-on-qemu:
+    name: Test on QEMU ARM64
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        config:
+          - name: "h264"
+            codec: "libx264"
+          - name: "h265"
+            codec: "libx265"
+          - name: "mjpeg"
+            codec: "mjpeg"
+            extra_ffmpeg_args: "-huffman 0"
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up QEMU and Docker
+        uses: docker/setup-qemu-action@v1
+        with:
+          platforms: all
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Start Docker container
+        run: |
+          docker run --privileged --detach --name qemu-container --workdir /github/workspace --volume "${{ github.workspace }}:${{ github.workspace }}" --volume "/var/run/docker.sock:/var/run/docker.sock" arm64v8/ubuntu tail -f /dev/null
+      - name: Install dependencies in Docker
+        run: |
+          docker exec qemu-container apt-get update
+          docker exec qemu-container apt-get install -y golang-go libfuse2 ffmpeg
+      - name: Run tests in Docker
+        run: docker exec qemu-container bash -c "cd ${{ github.workspace }} && ./.github/actions/run-tests/action.yml"
+        env:
+          CODEC: ${{ matrix.config.codec }}
+          EXTRA_FFMPEG_ARGS: ${{ matrix.config.extra_ffmpeg_args }}
+      - name: Clean up Docker
+        run: docker rm -f qemu-container
