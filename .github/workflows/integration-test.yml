@@ -56,19 +56,20 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt install binfmt-support qemu-user-static
-      - name: Install canon
-        run: |
-          go install github.com/viamrobotics/canon@latest
-      
-      - name: Launch canon
-        run: |
-          canon -profile viam-rtsp-antique -arch arm64
 
-      - name: Install deps inside Canon
+      # - name: Install canon
+      #   run: |
+      #     go install github.com/viamrobotics/canon@latest
+      
+      - name: Launch container
+        run: |
+          docker run --rm -it -p 8854:8554 --platform linux/arm64 -v $(pwd):/host ghcr.io/viamrobotics/antique2:arm64-cache
+
+      - name: Install deps inside container
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
       
-      - name: Run integration tests in canon
+      - name: Run integration tests in container
         run: |
           make integration-test FFMPEG_ARGS="${{ matrix.config.ffmpeg_args }}" MEDIAMTX_ARCH=${{ env.mediamtx_arch }} VIAM_SERVER_ARCH=${{ env.viam_server_arch }}
