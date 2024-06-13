@@ -57,7 +57,7 @@ jobs:
     
     - name: Launch canon and build module
       run: |
-        canon -profile viam-rtsp-antique -arch ${{ canon-arch }} ${{ matrix.run_command }}
+        canon -profile viam-rtsp-antique -arch ${{ matrix.canon-arch }} ${{ matrix.run_command }}
 
     # TODO: Pull version from tag or release
     - name: Upload viamrtsp module to registry
