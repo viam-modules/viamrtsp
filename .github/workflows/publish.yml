@@ -21,6 +21,7 @@ jobs:
             platform: linux/amd64
     container:
       image: ghcr.io/viamrobotics/antique2:${{ matrix.canon_arch }}-cache
+      options: --platform linux/${{ matrix.canon_arch }}
 
     steps:
     - uses: actions/checkout@v3
