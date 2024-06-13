@@ -174,29 +174,27 @@ integration-test: $(BIN_OUTPUT_PATH)/viamrtsp
 	sudo ./viam-server --aix-install
 
 	@echo "Generating configuration..."
-	@cat << EOF > integration-test-config.json
-	{
-	  "components": [
-	    {
-	      "name": "ip-cam",
-	      "namespace": "rdk",
-	      "type": "camera",
-	      "model": "erh:viamrtsp:rtsp",
-	      "attributes": {
-	        "rtsp_address": "rtsp://localhost:8554/live.stream"
-	      },
-	      "depends_on": []
-	    }
-	  ],
-	  "modules": [
-	    {
-	      "type": "local",
-	      "name": "viamrtsp",
-	      "executable_path": "$(realpath $(BIN_OUTPUT_PATH)/viamrtsp)"
-	    }
-	  ]
-	}
-	EOF
+	@echo "{" > integration-test-config.json
+	@echo "  \"components\": [" >> integration-test-config.json
+	@echo "    {" >> integration-test-config.json
+	@echo "      \"name\": \"ip-cam\"," >> integration-test-config.json
+	@echo "      \"namespace\": \"rdk\"," >> integration-test-config.json
+	@echo "      \"type\": \"camera\"," >> integration-test-config.json
+	@echo "      \"model\": \"erh:viamrtsp:rtsp\"," >> integration-test-config.json
+	@echo "      \"attributes\": {" >> integration-test-config.json
+	@echo "        \"rtsp_address\": \"rtsp://localhost:8554/live.stream\"" >> integration-test-config.json
+	@echo "      }," >> integration-test-config.json
+	@echo "      \"depends_on\": []" >> integration-test-config.json
+	@echo "    }" >> integration-test-config.json
+	@echo "  ]," >> integration-test-config.json
+	@echo "  \"modules\": [" >> integration-test-config.json
+	@echo "    {" >> integration-test-config.json
+	@echo "      \"type\": \"local\"," >> integration-test-config.json
+	@echo "      \"name\": \"viamrtsp\"," >> integration-test-config.json
+	@echo "      \"executable_path\": \"$(realpath $(BIN_OUTPUT_PATH)/viamrtsp)\"" >> integration-test-config.json
+	@echo "    }" >> integration-test-config.json
+	@echo "  ]" >> integration-test-config.json
+	@echo "}" >> integration-test-config.json
 
 	@echo "Launching Viam server with configuration..."
 	@viam-server -debug -config "./integration-test-config.json" &
