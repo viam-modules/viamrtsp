@@ -61,7 +61,7 @@ jobs:
       - name: Install dependencies in Docker
         run: |
           docker exec qemu-container apt-get update
-          docker exec qemu-container apt-get install -y golang-go libfuse2 ffmpeg
+          docker exec qemu-container apt-get install -y make golang-go libfuse2 ffmpeg
       - name: Run tests in Docker
         run: docker exec qemu-container bash -c "cd ${{ github.workspace }} && make integration-test FFMPEG_ARGS="${{ matrix.config.ffmpeg_args }}" MEDIAMTX_ARCH=${{ env.mediamtx_arch }} VIAM_SERVER_ARCH=${{ env.viam_server_arch }}"
         env:
