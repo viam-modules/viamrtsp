@@ -45,7 +45,7 @@ jobs:
             codec: "mjpeg"
             extra_ffmpeg_args: "-huffman 0"
     env:
-      mediamtx_arch: "armv7"
+      mediamtx_arch: "arm64v8"
       viam_server_arch: "aarch64"
     steps:
       - uses: actions/checkout@v3

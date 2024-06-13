@@ -84,7 +84,7 @@ endif
 
 # Default values integration testing with ffmpeg
 FFMPEG_ARGS ?= "libx264"
-MEDIAMTX_ARCH ?= armv7
+MEDIAMTX_ARCH ?= arm64v8
 VIAM_SERVER_ARCH ?= aarch64
 
 .PHONY: build-ffmpeg tool-install gofmt lint test update-rdk module integration-test clean clean-all
@@ -160,8 +160,8 @@ module: $(BIN_OUTPUT_PATH)/viamrtsp
 
 integration-test: $(BIN_OUTPUT_PATH)/viamrtsp
 	echo "Downloading and setting up MediaMTX..."
-	wget https://github.com/bluenviron/mediamtx/releases/download/v1.6.0/mediamtx_v1.6.0_linux_$(MEDIAMTX_ARCH).tar.gz && \
-	tar -xzf mediamtx_v1.6.0_linux_$(MEDIAMTX_ARCH).tar.gz && \
+	wget https://github.com/bluenviron/mediamtx/releases/download/v1.8.3/mediamtx_v1.8.3_linux_$(MEDIAMTX_ARCH).tar.gz && \
+	tar -xzf mediamtx_v1.8.3_linux_$(MEDIAMTX_ARCH).tar.gz && \
     chmod +x ./mediamtx && \
 	./mediamtx &
 
