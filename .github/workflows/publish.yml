@@ -12,17 +12,16 @@ jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
-      max-parallel: 1
       matrix:
         include:
           - run_command: "TARGET_OS=android TARGET_ARCH=arm64 make module"
-            canon-arch: "amd64"
+            canon_arch: "amd64"
             platform: android/arm64
           - run_command: "make module"
-            canon-arch: "arm64"
+            canon_arch: "arm64"
             platform: linux/arm64
           - run_command: "make module"
-            canon-arch: "amd64"
+            canon_arch: "amd64"
             platform: linux/amd64
 
     steps:
@@ -47,7 +46,7 @@ jobs:
         sudo apt-get update
         sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin
 
-    - name: Intall QEMU dependencies
+    - name: Intall QEMU
       run: |
         sudo apt-get update
         sudo apt install binfmt-support qemu-user-static
@@ -56,11 +55,11 @@ jobs:
       run: |
         go install github.com/viamrobotics/canon@latest
     
-    - name: Launch canon and build module
+    - name: Launch canon
       run: |
-        canon -profile viam-rtsp-antique -arch ${{ matrix.canon-arch }}
+        canon -profile viam-rtsp-antique -arch ${{ matrix.canon_arch }}
 
-    - name: Run build command
+    - name: Build module
       run: ${{ matrix.run_command }}
 
     # TODO: Pull version from tag or release
