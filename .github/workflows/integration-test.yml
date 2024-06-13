@@ -38,12 +38,11 @@ jobs:
       matrix:
         config:
           - name: "h264"
-            codec: "libx264"
+            ffmpeg_args: "libx264"
           - name: "h265"
-            codec: "libx265"
+            ffmpeg_args: "libx265"
           - name: "mjpeg"
-            codec: "mjpeg"
-            extra_ffmpeg_args: "-huffman 0"
+            ffmpeg_args: "mjpeg -huffman 0"
     env:
       mediamtx_arch: "arm64v8"
       viam_server_arch: "aarch64"
