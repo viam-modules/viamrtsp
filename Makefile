@@ -82,8 +82,8 @@ ifeq ($(TARGET_OS),linux)
 	CGO_LDFLAGS := "$(CGO_LDFLAGS) -l:libjpeg.a"
 endif
 
-# Default values integration testing with ffmpeg
-FFMPEG_ARGS ?= "libx264"
+# Default values integration testing with ffmpeg and mediamtx
+FFMPEG_ARGS ?= libx264
 MEDIAMTX_ARCH ?= arm64v8
 VIAM_SERVER_ARCH ?= aarch64
 
@@ -158,17 +158,22 @@ module: $(BIN_OUTPUT_PATH)/viamrtsp
 	tar czf module.tar.gz bin/viamrtsp
 	rm bin/viamrtsp
 
-integration-test: $(BIN_OUTPUT_PATH)/viamrtsp
+mediamtx:
 	wget https://github.com/bluenviron/mediamtx/releases/download/v1.8.3/mediamtx_v1.8.3_linux_$(MEDIAMTX_ARCH).tar.gz
 	tar -xzf mediamtx_v1.8.3_linux_$(MEDIAMTX_ARCH).tar.gz
 	chmod +x ./mediamtx
+
+test-binary:
+	go build -o test-binary ./test/client.go
+	chmod +x test-binary
+
+integration-test: $(BIN_OUTPUT_PATH)/viamrtsp mediamtx test-binary
 	./mediamtx &
 
 	ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec $(FFMPEG_ARGS) -pix_fmt yuv420p -f rtsp -rtsp_transport tcp rtsp://localhost:8554/live.stream &
 
 	curl https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-$(VIAM_SERVER_ARCH) -o viam-server
 	chmod 755 viam-server
-	sudo ./viam-server
 
 	echo "{" > integration-test-config.json
 	echo "  \"components\": [" >> integration-test-config.json
@@ -195,9 +200,7 @@ integration-test: $(BIN_OUTPUT_PATH)/viamrtsp
 	./viam-server -debug -config "./integration-test-config.json" &
 	sleep 10
 
-	go build -o testBinary ./test/client.go
-	chmod +x testBinary
-	./testBinary
+	./test-binary
 
 clean:
 	rm -rf $(BIN_OUTPUT_PATH)/viamrtsp module.tar.gz

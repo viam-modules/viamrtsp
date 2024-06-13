@@ -15,7 +15,7 @@ import (
 
 func main() {
 	if err := run(); err != nil {
-		log.Fatalf("Fatal error: %v", err)
+		log.Fatalf("Fatal error encountered in integration tests client: %v", err)
 	}
 	log.Println("All tests passed! Success :)")
 }
