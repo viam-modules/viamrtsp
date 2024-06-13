@@ -19,6 +19,8 @@ jobs:
           - run_command: "make module"
             canon_arch: "amd64"
             platform: linux/amd64
+    container:
+      image: ghcr.io/viamrobotics/antique2:${{ matrix.canon_arch }}-cache
 
     steps:
     - uses: actions/checkout@v3
@@ -28,18 +30,18 @@ jobs:
       with:
         go-version: 1.21
 
-    - name: Install QEMU
-      run: |
-        sudo apt-get update
-        sudo apt install binfmt-support qemu-user-static
+    # - name: Install QEMU
+    #   run: |
+    #     sudo apt-get update
+    #     sudo apt install binfmt-support qemu-user-static
 
-    - name: Install canon
-      run: |
-        go install github.com/viamrobotics/canon@latest
+    # - name: Install canon
+    #   run: |
+    #     go install github.com/viamrobotics/canon@latest
     
-    - name: Launch canon
-      run: |
-        canon -profile viam-rtsp-antique -arch ${{ matrix.canon_arch }}
+    # - name: Launch canon
+    #   run: |
+    #     canon -profile viam-rtsp-antique -arch ${{ matrix.canon_arch }}
 
     - name: Build module
       run: ${{ matrix.run_command }}
