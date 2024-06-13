@@ -33,10 +33,10 @@ import (
 )
 
 var (
-	family = resource.ModelNamespace("erh").WithFamily("viamrtsp")
+	family = resource.ModelNamespace("sean-dev").WithFamily("viamrtsp")
 	// ModelAgnostic selects the best available codec.
 	ModelAgnostic = family.WithModel("rtsp")
-	// ModelH264 uses the h264 codec.
+	// ModelH264 uses the h264 codec.j
 	ModelH264 = family.WithModel("rtsp-h264")
 	// ModelH265 uses the h265 codec.
 	ModelH265 = family.WithModel("rtsp-h265")
