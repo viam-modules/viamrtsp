@@ -82,7 +82,12 @@ ifeq ($(TARGET_OS),linux)
 	CGO_LDFLAGS := "$(CGO_LDFLAGS) -l:libjpeg.a"
 endif
 
-.PHONY: build-ffmpeg tool-install gofmt lint test update-rdk module clean clean-all
+# Default values integration testing with ffmpeg
+FFMPEG_ARGS ?= "libx264"
+MEDIAMTX_ARCH ?= armv7
+VIAM_SERVER_ARCH ?= aarch64
+
+.PHONY: build-ffmpeg tool-install gofmt lint test update-rdk module integration-test clean clean-all
 
 # We set GOOS, GOARCH, and GO_TAGS to support cross-compilation for android targets.
 $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
@@ -152,6 +157,43 @@ module: $(BIN_OUTPUT_PATH)/viamrtsp
 	cp $(BIN_OUTPUT_PATH)/viamrtsp bin/viamrtsp
 	tar czf module.tar.gz bin/viamrtsp
 	rm bin/viamrtsp
+
+integration-test: $(BIN_OUTPUT_PATH)/viamrtsp
+	wget https://github.com/bluenviron/mediamtx/releases/download/v1.6.0/mediamtx_v1.6.0_linux_${MEDIAMTX_ARCH}.tar.gz && \
+	tar -xzf mediamtx_v1.6.0_linux_${MEDIAMTX_ARCH}.tar.gz && \
+    chmod +x ./mediamtx && \
+	./mediamtx &
+
+	ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec $(FFMPEG_ARGS) -pix_fmt yuv420p -f rtsp -rtsp_transport tcp rtsp://0.0.0.0:8554/live.stream &
+
+	curl https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-${VIAM_SERVER_ARCH}.AppImage -o viam-server && \
+	chmod 755 viam-server && \
+	sudo ./viam-server --aix-install
+
+	echo '{ \
+	  "components": [{ \
+	    "name": "ip-cam", \
+	    "namespace": "rdk", \
+	    "type": "camera", \
+	    "model": "erh:viamrtsp:rtsp", \
+	    "attributes": { \
+	      "rtsp_address": "rtsp://localhost:8554/live.stream" \
+	    }, \
+	    "depends_on": [] \
+	  }], \
+	  "modules": [{ \
+	    "type": "local", \
+	    "name": "viamrtsp", \
+	    "executable_path": "'"$$REALPATH $(BIN_OUTPUT_PATH)/viamrtsp"'" \
+	  }] \
+	}' > integration-test-config.json
+
+	viam-server -debug -config "./integration-test-config.json" & \
+	sleep 10
+
+	go build -o testBinary ./test/client.go && \
+	chmod +x ./testBinary && \
+	./testBinary
 
 clean:
 	rm -rf $(BIN_OUTPUT_PATH)/viamrtsp module.tar.gz

@@ -10,12 +10,14 @@ jobs:
       matrix:
         config:
           - name: "h264"
-            codec: "libx264"
+            ffmpeg_args: "libx264"
           - name: "h265"
-            codec: "libx265"
+            ffmpeg_args: "libx265"
           - name: "mjpeg"
-            codec: "mjpeg"
-            extra_ffmpeg_args: "-huffman 0"
+            ffmpeg_args: "mjpeg -huffman 0"
+    env:
+      mediamtx_arch: "amd64"
+      viam_server_arch: "x86_64"
     steps:
       - uses: actions/checkout@v3
       - name: Set up dependencies
@@ -23,10 +25,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y golang-go libfuse2 ffmpeg
       - name: Run tests
-        uses: ./.github/actions/run-tests
-        with:
-          codec: ${{ matrix.config.codec }}
-          extra_ffmpeg_args: ${{ matrix.config.extra_ffmpeg_args }}
+        run: make integration-test FFMPEG_ARGS="${{ matrix.config.ffmpeg_args }}" MEDIAMTX_ARCH=${{ env.mediamtx_arch }} VIAM_SERVER_ARCH=${{ env.viam_server_arch }}
 
   test-on-qemu:
     name: Test on QEMU ARM64
@@ -41,6 +40,9 @@ jobs:
           - name: "mjpeg"
             codec: "mjpeg"
             extra_ffmpeg_args: "-huffman 0"
+    env:
+      mediamtx_arch: "armv7"
+      viam_server_arch: "aarch64"
     steps:
       - uses: actions/checkout@v3
       - name: Set up QEMU and Docker
@@ -51,13 +53,13 @@ jobs:
         uses: docker/setup-buildx-action@v1
       - name: Start Docker container
         run: |
-          docker run --privileged --detach --name qemu-container --workdir /github/workspace --volume "${{ github.workspace }}:${{ github.workspace }}" --volume "/var/run/docker.sock:/var/run/docker.sock" arm64v8/ubuntu tail -f /dev/null
+          docker run --privileged --detach --name qemu-container --workdir /github/workspace --volume "${{ github.workspace }}:${{ github.workspace }}" --volume "/var/run/docker.sock:/var/run/docker.sock" --net=host arm64v8/ubuntu tail -f /dev/null
       - name: Install dependencies in Docker
         run: |
           docker exec qemu-container apt-get update
           docker exec qemu-container apt-get install -y golang-go libfuse2 ffmpeg
       - name: Run tests in Docker
-        run: docker exec qemu-container bash -c "cd ${{ github.workspace }} && ./.github/actions/run-tests/action.yml"
+        run: docker exec qemu-container bash -c "cd ${{ github.workspace }} && make integration-test FFMPEG_ARGS="${{ matrix.config.ffmpeg_args }}" MEDIAMTX_ARCH=${{ env.mediamtx_arch }} VIAM_SERVER_ARCH=${{ env.viam_server_arch }}"
         env:
           CODEC: ${{ matrix.config.codec }}
           EXTRA_FFMPEG_ARGS: ${{ matrix.config.extra_ffmpeg_args }}
