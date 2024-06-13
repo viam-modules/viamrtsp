@@ -164,11 +164,11 @@ integration-test: $(BIN_OUTPUT_PATH)/viamrtsp
 	chmod +x ./mediamtx
 	./mediamtx &
 
-	ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec $(FFMPEG_ARGS) -pix_fmt yuv420p -f rtsp -rtsp_transport tcp rtsp://localhost:8554/live.stream &
+	ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec $(FFMPEG_ARGS) -pix_fmt yuv420p -f rtsp -rtsp_transport tcp rtsp://0.0.0.0:8554/live.stream &
 
-	curl https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-$(VIAM_SERVER_ARCH).AppImage -o viam-server
+	curl https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-$(VIAM_SERVER_ARCH) -o viam-server
 	chmod 755 viam-server
-	sudo ./viam-server --aix-install
+	sudo ./viam-server
 
 	echo "Generating configuration..."
 	echo "{" > integration-test-config.json
@@ -193,7 +193,7 @@ integration-test: $(BIN_OUTPUT_PATH)/viamrtsp
 	echo "  ]" >> integration-test-config.json
 	echo "}" >> integration-test-config.json
 
-	viam-server -debug -config "./integration-test-config.json" &
+	./viam-server -debug -config "./integration-test-config.json" &
 	sleep 10
 
 	go build -o testBinary ./test/client.go
