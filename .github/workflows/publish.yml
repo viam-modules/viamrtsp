@@ -1,57 +1,17 @@
 name: Build & publish module to registry 
 
-# on:
-#   release:
-#     types: [published]
-
 on:
-  pull_request:
-  push:
+  release:
+    types: [published]
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - run_command: "TARGET_OS=android TARGET_ARCH=arm64 make module"
-            canon_arch: "amd64"
-            platform: android/arm64
-          - run_command: "make module"
-            canon_arch: "arm64"
-            platform: linux/arm64
-          - run_command: "make module"
-            canon_arch: "amd64"
-            platform: linux/amd64
-
     steps:
     - uses: actions/checkout@v3
-
-    - name: Set up Go
-      uses: actions/setup-go@v2
+    - uses: viamrobotics/build-action@v1
       with:
-        go-version: 1.21
-
-    - name: Install QEMU
-      run: |
-        sudo apt-get update
-        sudo apt install binfmt-support qemu-user-static
-
-    - name: Install canon
-      run: |
-        go install github.com/viamrobotics/canon@latest
-    
-    - name: Launch canon and build module
-      run: |
-        canon -profile viam-rtsp-antique -arch ${{ matrix.canon_arch }} bash -l -c "${{ matrix.run_command }}" && mv module.tar.gz ${{ github.workspace }}/module.tar.gz
-
-    - name: Upload viamrtsp module to registry
-      uses: viamrobotics/upload-module@main
-      # if: startsWith(github.ref, 'refs/tags/') 
-      with:
-        meta-path: meta.json
-        module-path: module.tar.gz
-        platform: ${{ matrix.platform }}
-        version: 0.0.6
+        version: ${{ github.ref_name }}
+        ref: ${{ github.sha }}
         key-id: ${{ secrets.viam_key_id }}
         key-value: ${{ secrets.viam_key_value }}
