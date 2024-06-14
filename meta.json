@@ -1,5 +1,5 @@
 {
-  "module_id": "sean-dev:viamrtsp",
+  "module_id": "eacb3d64-4eab-43db-a9ef-e01e246f527a:viamrtsp",
   "visibility": "private",
   "url": "https://github.com/seanavery/viamrtsp",
   "description": "module for rtsp, currently supports x264 and x265",
