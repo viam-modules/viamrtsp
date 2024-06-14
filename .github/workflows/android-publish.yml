@@ -21,7 +21,6 @@ jobs:
     
     - name: Upload viamrtsp module to registry
       uses: viamrobotics/upload-module@main
-      if: github.event_name == 'release'
       with:
         meta-path: meta.json
         module-path: module.tar.gz
