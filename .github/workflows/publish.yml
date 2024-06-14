@@ -35,29 +35,26 @@ jobs:
       with:
         go-version: 1.21
 
-    # - name: Install QEMU
-    #   run: |
-    #     sudo apt-get update
-    #     sudo apt install binfmt-support qemu-user-static
+    - name: Install QEMU
+      run: |
+        sudo apt-get update
+        sudo apt install binfmt-support qemu-user-static
 
-    # - name: Install canon
-    #   run: |
-    #     go install github.com/viamrobotics/canon@latest
+    - name: Install canon
+      run: |
+        go install github.com/viamrobotics/canon@latest
     
-    # - name: Launch canon
-    #   run: |
-    #     canon -profile viam-rtsp-antique -arch ${{ matrix.canon_arch }}
-
-    - name: Build module
-      run: ${{ matrix.run_command }}
+    - name: Launch canon and build module
+      run: |
+        canon -profile viam-rtsp-antique -arch ${{ matrix.canon_arch }} bash -l -c "${{ matrix.run_command }}"
 
     - name: Upload viamrtsp module to registry
       uses: viamrobotics/upload-module@main
-      if: startsWith(github.ref, 'refs/tags/') 
+      # if: startsWith(github.ref, 'refs/tags/') 
       with:
         meta-path: meta.json
         module-path: module.tar.gz
         platform: ${{ matrix.platform }}
-        version: ${{ github.ref_name }}
+        version: 0.0.6
         key-id: ${{ secrets.viam_key_id }}
         key-value: ${{ secrets.viam_key_value }}
