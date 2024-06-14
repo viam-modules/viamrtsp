@@ -44,6 +44,7 @@ jobs:
     - name: Launch canon and build module
       run: |
         canon -profile viam-rtsp-antique -arch ${{ matrix.canon_arch }} bash -l -c "${{ matrix.run_command }}"
+        mv module.tar.gz ${{ github.workspace }}/module.tar.gz
 
     - name: Upload viamrtsp module to registry
       uses: viamrobotics/upload-module@main
