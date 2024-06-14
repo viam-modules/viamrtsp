@@ -59,6 +59,6 @@ jobs:
       
       - name: Launch container and run tests
         run: |
-          docker run --rm -d --name antique-arm64 -P --platform linux/arm64 -v $(pwd):/host -w /host ghcr.io/viamrobotics/antique2:arm64-cache tail -f /dev/null
+          docker run --rm -d --name antique-arm64 --network host --platform linux/arm64 -v $(pwd):/host -w /host ghcr.io/viamrobotics/antique2:arm64-cache tail -f /dev/null
           sleep 5  # Wait for the container to fully start and stabilize
           docker exec antique-arm64 bash -l -c "sudo apt-get update && sudo apt-get install -y ffmpeg && make integration-test FFMPEG_ARGS='${{ matrix.config.ffmpeg_args }}' MEDIAMTX_ARCH='${{ env.mediamtx_arch }}' VIAM_SERVER_ARCH='${{ env.viam_server_arch }}'"
