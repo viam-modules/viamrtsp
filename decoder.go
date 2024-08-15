@@ -13,19 +13,58 @@ import "C"
 import (
 	"fmt"
 	"image"
+	"sync"
 	"unsafe"
 
 	"github.com/pkg/errors"
 	"go.viam.com/rdk/logging"
 )
 
+// FrameWrapper wraps a C AVFrame and safely manages its memory in Go.
+type FrameWrapper struct {
+	frame *C.AVFrame
+	freed bool
+	mu    sync.Mutex
+}
+
+// newFrameWrapper creates a new FrameWrapper.
+func newFrameWrapper(frame *C.AVFrame) *FrameWrapper {
+	return &FrameWrapper{frame: frame}
+}
+
+// Data provides access to the underlying frame data
+func (fw *FrameWrapper) Data() []uint8 {
+	fw.mu.Lock()
+	defer fw.mu.Unlock()
+
+	if fw.freed {
+		panic("attempt to access freed memory")
+	}
+
+	size := C.av_image_get_buffer_size((int32)(fw.frame.format), fw.frame.width, fw.frame.height, 1)
+	return (*[1 << 30]uint8)(unsafe.Pointer(fw.frame.data[0]))[:size:size]
+}
+
+// Close releases the memory associated with the frame.
+func (fw *FrameWrapper) Close() {
+	fw.mu.Lock()
+	defer fw.mu.Unlock()
+
+	if fw.freed {
+		return
+	}
+
+	C.av_frame_free(&fw.frame)
+	fw.freed = true
+}
+
 // decoder is a generic FFmpeg decoder.
 type decoder struct {
-	logger   logging.Logger
-	codecCtx *C.AVCodecContext
-	srcFrame *C.AVFrame
-	swsCtx   *C.struct_SwsContext
-	dstFrame *C.AVFrame
+	logger      logging.Logger
+	codecCtx    *C.AVCodecContext
+	srcFrame    *FrameWrapper
+	swsCtx      *C.struct_SwsContext
+	dstFrame    *FrameWrapper
 }
 
 type videoCodec int
@@ -108,7 +147,7 @@ func newDecoder(codecID C.enum_AVCodecID, logger logging.Logger) (*decoder, erro
 	return &decoder{
 		logger:   logger,
 		codecCtx: codecCtx,
-		srcFrame: srcFrame,
+		srcFrame: newFrameWrapper(srcFrame),
 	}, nil
 }
 
@@ -122,18 +161,23 @@ func newH265Decoder(logger logging.Logger) (*decoder, error) {
 	return newDecoder(C.AV_CODEC_ID_H265, logger)
 }
 
-// close closes the decoder.
+// close closes the decoder and cleans up C resources.
 func (d *decoder) close() {
 	if d.dstFrame != nil {
-		C.av_frame_free(&d.dstFrame)
+		d.dstFrame.Close()
 	}
 
 	if d.swsCtx != nil {
 		C.sws_freeContext(d.swsCtx)
 	}
 
-	C.av_frame_free(&d.srcFrame)
-	C.avcodec_close(d.codecCtx)
+	if d.srcFrame != nil {
+		d.srcFrame.Close()
+	}
+
+	if d.codecCtx != nil {
+		C.avcodec_close(d.codecCtx)
+	}
 }
 
 func (d *decoder) decode(nalu []byte) (image.Image, error) {
@@ -149,57 +193,50 @@ func (d *decoder) decode(nalu []byte) (image.Image, error) {
 		return nil, nil
 	}
 
-	// receive frame if available
-	res = C.avcodec_receive_frame(d.codecCtx, d.srcFrame)
+	res = C.avcodec_receive_frame(d.codecCtx, d.srcFrame.frame)
 	if res < 0 {
 		return nil, nil
 	}
 
-	// if frame size has changed, allocate needed objects
-	if d.dstFrame == nil || d.dstFrame.width != d.srcFrame.width || d.dstFrame.height != d.srcFrame.height {
+	if d.dstFrame == nil || d.dstFrame.frame.width != d.srcFrame.frame.width || d.dstFrame.frame.height != d.srcFrame.frame.height {
 		if d.dstFrame != nil {
-			C.av_frame_free(&d.dstFrame)
+			d.dstFrame.Close()
 		}
 
 		if d.swsCtx != nil {
 			C.sws_freeContext(d.swsCtx)
 		}
 
-		d.dstFrame = C.av_frame_alloc()
-		d.dstFrame.format = C.AV_PIX_FMT_RGBA
-		d.dstFrame.width = d.srcFrame.width
-		d.dstFrame.height = d.srcFrame.height
-		d.dstFrame.color_range = C.AVCOL_RANGE_JPEG
-		res = C.av_frame_get_buffer(d.dstFrame, 1)
+		dstFrame := C.av_frame_alloc()
+		dstFrame.format = C.AV_PIX_FMT_RGBA
+		dstFrame.width = d.srcFrame.frame.width
+		dstFrame.height = d.srcFrame.frame.height
+		dstFrame.color_range = C.AVCOL_RANGE_JPEG
+		res = C.av_frame_get_buffer(dstFrame, 1)
 		if res < 0 {
 			return nil, errors.New("av_frame_get_buffer() err")
 		}
 
-		d.swsCtx = C.sws_getContext(d.srcFrame.width, d.srcFrame.height, C.AV_PIX_FMT_YUV420P,
-			d.dstFrame.width, d.dstFrame.height, (int32)(d.dstFrame.format), C.SWS_BILINEAR, nil, nil, nil)
+		d.dstFrame = newFrameWrapper(dstFrame)
+
+		d.swsCtx = C.sws_getContext(d.srcFrame.frame.width, d.srcFrame.frame.height, C.AV_PIX_FMT_YUV420P,
+			d.dstFrame.frame.width, d.dstFrame.frame.height, (int32)(d.dstFrame.frame.format), C.SWS_BILINEAR, nil, nil, nil)
 		if d.swsCtx == nil {
 			return nil, errors.New("sws_getContext() err")
 		}
 	}
 
-	// convert frame from YUV420 to RGB
-	res = C.sws_scale(d.swsCtx, frameData(d.srcFrame), frameLineSize(d.srcFrame),
-		0, d.srcFrame.height, frameData(d.dstFrame), frameLineSize(d.dstFrame))
+	res = C.sws_scale(d.swsCtx, frameData(d.srcFrame.frame), frameLineSize(d.srcFrame.frame),
+		0, d.srcFrame.frame.height, frameData(d.dstFrame.frame), frameLineSize(d.dstFrame.frame))
 	if res < 0 {
 		return nil, errors.New("sws_scale() err")
 	}
 
-	// Copy the frame data into a Go byte slice. This avoids filling the go image with a dangling
-	// pointer to C memory and allows the go garbage collector to manage the memory for us.
-	dstFrameSize := C.av_image_get_buffer_size((int32)(d.dstFrame.format), d.dstFrame.width, d.dstFrame.height, 1)
-	dataGo := C.GoBytes(unsafe.Pointer(d.dstFrame.data[0]), dstFrameSize)
-
-	// embed frame into an image.Image
 	return &image.RGBA{
-		Pix:    dataGo,
-		Stride: 4 * (int)(d.dstFrame.width),
+		Pix:    d.dstFrame.Data(),
+		Stride: 4 * (int)(d.dstFrame.frame.width),
 		Rect: image.Rectangle{
-			Max: image.Point{(int)(d.dstFrame.width), (int)(d.dstFrame.height)},
+			Max: image.Point{(int)(d.dstFrame.frame.width), (int)(d.dstFrame.frame.height)},
 		},
 	}, nil
 }
