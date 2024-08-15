@@ -145,15 +145,22 @@ func newH265Decoder(avFramePool *sync.Pool, logger logging.Logger) (*decoder, er
 // close closes the decoder.
 func (d *decoder) close() {
 	if d.dstFrame != nil {
-		C.av_frame_free(&d.dstFrame)
+		// no need to manually free; finalizers will handle it
+		d.dstFrame = nil  // explicitly set to nil to break the reference
 	}
 
 	if d.swsCtx != nil {
 		C.sws_freeContext(d.swsCtx)
 	}
 
-	C.av_frame_free(&d.srcFrame)
-	C.avcodec_close(d.codecCtx)
+	if d.srcFrame != nil {
+		d.srcFrame = nil
+	}
+
+	if d.codecCtx != nil {
+		C.avcodec_close(d.codecCtx)
+		d.codecCtx = nil
+	}
 }
 
 func (d *decoder) decode(nalu []byte) (*imageAndAVFrame, error) {
@@ -183,10 +190,6 @@ func (d *decoder) decode(nalu []byte) (*imageAndAVFrame, error) {
 
 	// if frame size has changed, reinitialize dstFrame
 	if d.dstFrame.width != d.srcFrame.width || d.dstFrame.height != d.srcFrame.height {
-		if d.dstFrame != nil {
-			C.av_frame_free(&d.dstFrame)
-		}
-
 		if d.swsCtx != nil {
 			C.sws_freeContext(d.swsCtx)
 		}
