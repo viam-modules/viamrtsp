@@ -223,10 +223,10 @@ func (d *decoder) decode(nalu []byte) (*imageAndPoolItem, error) {
 		if d.swsCtx == nil {
 			return nil, errors.New("sws_getContext() err")
 		}
-
-		dstFrameSize := C.av_image_get_buffer_size((int32)(d.dst.frame.format), d.dst.frame.width, d.dst.frame.height, 1)
-		d.dstFramePtr = (*[1 << 30]uint8)(unsafe.Pointer(d.dst.frame.data[0]))[:dstFrameSize:dstFrameSize]
 	}
+
+	dstFrameSize := C.av_image_get_buffer_size((int32)(d.dst.frame.format), d.dst.frame.width, d.dst.frame.height, 1)
+	d.dstFramePtr = (*[1 << 30]uint8)(unsafe.Pointer(d.dst.frame.data[0]))[:dstFrameSize:dstFrameSize]
 
 	// convert frame from YUV420 to RGB
 	res = C.sws_scale(d.swsCtx, frameData(d.src.frame), frameLineSize(d.src.frame),
