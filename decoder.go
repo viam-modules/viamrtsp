@@ -28,7 +28,6 @@ type decoder struct {
 	src         *avFrameWrapper
 	swsCtx      *C.struct_SwsContext
 	dst         *avFrameWrapper
-	dstFramePtr []uint8
 	avFramePool *sync.Pool
 }
 
@@ -226,7 +225,7 @@ func (d *decoder) decode(nalu []byte) (*imageAndPoolItem, error) {
 	}
 
 	dstFrameSize := C.av_image_get_buffer_size((int32)(d.dst.frame.format), d.dst.frame.width, d.dst.frame.height, 1)
-	d.dstFramePtr = (*[1 << 30]uint8)(unsafe.Pointer(d.dst.frame.data[0]))[:dstFrameSize:dstFrameSize]
+	dstFramePtr := (*[1 << 30]uint8)(unsafe.Pointer(d.dst.frame.data[0]))[:dstFrameSize:dstFrameSize]
 
 	// convert frame from YUV420 to RGB
 	res = C.sws_scale(d.swsCtx, frameData(d.src.frame), frameLineSize(d.src.frame),
@@ -237,7 +236,7 @@ func (d *decoder) decode(nalu []byte) (*imageAndPoolItem, error) {
 
 	// embed frame into an image.Image
 	img := &image.RGBA{
-		Pix:    d.dstFramePtr,
+		Pix:    dstFramePtr,
 		Stride: 4 * (int)(d.dst.frame.width),
 		Rect: image.Rectangle{
 			Max: image.Point{(int)(d.dst.frame.width), (int)(d.dst.frame.height)},
