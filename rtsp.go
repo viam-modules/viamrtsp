@@ -98,7 +98,7 @@ type (
 	}
 	imageAndPoolItem struct {
 		img      image.Image
-		poolItem *AVFrameWrapper
+		poolItem *avFrameWrapper
 	}
 )
 

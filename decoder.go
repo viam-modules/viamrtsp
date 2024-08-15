@@ -25,9 +25,9 @@ import (
 type decoder struct {
 	logger      logging.Logger
 	codecCtx    *C.AVCodecContext
-	src         *AVFrameWrapper
+	src         *avFrameWrapper
 	swsCtx      *C.struct_SwsContext
-	dst         *AVFrameWrapper
+	dst         *avFrameWrapper
 	dstFramePtr []uint8
 	avFramePool *sync.Pool
 }
@@ -62,19 +62,19 @@ func (vc videoCodec) String() string {
 	}
 }
 
-type AVFrameWrapper struct {
+type avFrameWrapper struct {
 	frame *C.AVFrame
 }
 
 // allocateAVFrame allocates a new AVFrame using C code with safety checks and returns the Go wrapper of it.
-func allocateAVFrame() (*AVFrameWrapper, error) {
+func allocateAVFrame() (*avFrameWrapper, error) {
 	avFrame := C.av_frame_alloc()
 	if avFrame == nil {
 		return nil, errors.New("failed to allocate AVFrame: out of memory or C libav internal error")
 	}
-	wrapper := &AVFrameWrapper{frame: avFrame}
+	wrapper := &avFrameWrapper{frame: avFrame}
 	// Set a finalizer on the wrapper to ensure the C memory is freed
-	runtime.SetFinalizer(wrapper, func(w *AVFrameWrapper) {
+	runtime.SetFinalizer(wrapper, func(w *avFrameWrapper) {
 		if w.frame != nil {
 			C.av_frame_free(&w.frame)
 		}
@@ -181,17 +181,19 @@ func (d *decoder) decode(nalu []byte) (*imageAndPoolItem, error) {
 	avPacket.size = C.int(len(nalu))
 	res := C.avcodec_send_packet(d.codecCtx, &avPacket)
 	if res < 0 {
+		//nolint:nilnil // avcodec_send_packet raises non-critical errors
 		return nil, nil
 	}
 
 	// receive frame if available
 	res = C.avcodec_receive_frame(d.codecCtx, d.src.frame)
 	if res < 0 {
+		//nolint:nilnil // avcodec_receive_frame raises non-critical errors
 		return nil, nil
 	}
 
 	// get a frame from the pool
-	d.dst = d.avFramePool.Get().(*AVFrameWrapper)
+	d.dst = d.avFramePool.Get().(*avFrameWrapper)
 	if d.dst == nil {
 		return nil, errors.New("failed to obtain AVFrame from pool")
 	}
