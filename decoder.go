@@ -152,8 +152,7 @@ func newH265Decoder(avFramePool *sync.Pool, logger logging.Logger) (*decoder, er
 // close closes the decoder.
 func (d *decoder) close() {
 	if d.dst != nil {
-		// no need to manually free; finalizers will handle it
-		d.dst = nil // explicitly set to nil to break the reference
+		d.dst = nil
 	}
 
 	if d.swsCtx != nil {
