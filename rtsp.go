@@ -96,6 +96,10 @@ type (
 		cb  unitSubscriberFunc
 		buf *rtppassthrough.Buffer
 	}
+	imageAndAVFrame struct {
+		img        image.Image
+		avFramePtr *_Ctype_struct_AVFrame
+	}
 )
 
 // rtspCamera contains the rtsp client, and the reader function that fulfills the camera interface.
@@ -112,7 +116,8 @@ type rtspCamera struct {
 
 	activeBackgroundWorkers sync.WaitGroup
 
-	latestFrame atomic.Pointer[image.Image]
+	latestOutput atomic.Pointer[imageAndAVFrame]
+	avFramePool  *sync.Pool
 
 	logger logging.Logger
 
@@ -283,7 +288,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 	}
 
 	// setup H264 -> raw frames decoder
-	rc.rawDecoder, err = newH264Decoder(rc.logger)
+	rc.rawDecoder, err = newH264Decoder(rc.avFramePool, rc.logger)
 	if err != nil {
 		return errors.Wrap(err, "creating H264 raw decoder")
 	}
@@ -392,7 +397,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		return errors.Wrap(err, "creating H265 RTP decoder")
 	}
 
-	rc.rawDecoder, err = newH265Decoder(rc.logger)
+	rc.rawDecoder, err = newH265Decoder(rc.avFramePool, rc.logger)
 	if err != nil {
 		return errors.Wrap(err, "creating H265 raw decoder")
 	}
@@ -438,7 +443,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		}
 
 		for _, nalu := range au {
-			lastImage, err := rc.rawDecoder.decode(nalu)
+			output, err := rc.rawDecoder.decode(nalu)
 			if err != nil {
 				// This error is created with `github.com/pkg/errors`. Explicitly call `Error()` to
 				// avoid logging the stacktrace.
@@ -446,8 +451,8 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 				return
 			}
 
-			if lastImage != nil {
-				rc.latestFrame.Store(&lastImage)
+			if output != nil {
+				rc.latestOutput.Store(output)
 			}
 		}
 	})
@@ -495,7 +500,8 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 			return
 		}
 
-		rc.latestFrame.Store(&img)
+		// manually set nil for avFramePtr since we don't use a pool for mjpeg frames
+		rc.latestOutput.Store(&imageAndAVFrame{img: img, avFramePtr: nil})
 	})
 
 	return nil
@@ -635,6 +641,19 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		logger.Error(err.Error())
 		return nil, err
 	}
+
+	// initialize a pool to manage AVFrames so they don't bog down the garbage collector
+	framePool := &sync.Pool{
+		New: func() interface{} {
+			avFrame, err := allocateAVFrame()
+			if err != nil {
+				logger.Errorf("Failed to allocate AVFrame in frame pool: %v", err)
+				return nil
+			}
+			return avFrame
+		},
+	}
+
 	rtpPassthroughCtx, rtpPassthroughCancelCauseFn := context.WithCancelCause(context.Background())
 	rc := &rtspCamera{
 		model:                       conf.Model,
@@ -643,6 +662,7 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		bufAndCBByID:                make(map[rtppassthrough.SubscriptionID]bufAndCB),
 		rtpPassthroughCtx:           rtpPassthroughCtx,
 		rtpPassthroughCancelCauseFn: rtpPassthroughCancelCauseFn,
+		avFramePool:                 framePool,
 		logger:                      logger,
 	}
 	codecInfo, err := modelToCodec(conf.Model)
@@ -658,11 +678,18 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 	}
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	reader := gostream.VideoReaderFunc(func(_ context.Context) (image.Image, func(), error) {
-		latest := rc.latestFrame.Load()
+		latest := rc.latestOutput.Load()
 		if latest == nil {
 			return nil, func() {}, errors.New("no frame yet")
 		}
-		return *latest, func() {}, nil
+
+		poolCleanupCallback := func() {
+			if latest.avFramePtr != nil {
+				rc.avFramePool.Put(latest.avFramePtr)
+			}
+		}
+
+		return latest.img, poolCleanupCallback, nil
 	})
 	rc.VideoReader = reader
 	rc.cancelCtx = cancelCtx
@@ -798,12 +825,12 @@ func H2645StartCode() []byte {
 }
 
 func (rc *rtspCamera) decodeAndStore(nalu []byte) error {
-	image, err := rc.rawDecoder.decode(nalu)
+	output, err := rc.rawDecoder.decode(nalu)
 	if err != nil {
 		return err
 	}
-	if image != nil {
-		rc.latestFrame.Store(&image)
+	if output != nil {
+		rc.latestOutput.Store(output)
 	}
 	return nil
 }

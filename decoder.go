@@ -13,6 +13,8 @@ import "C"
 import (
 	"fmt"
 	"image"
+	"runtime"
+	"sync"
 	"unsafe"
 
 	"github.com/pkg/errors"
@@ -27,6 +29,7 @@ type decoder struct {
 	swsCtx      *C.struct_SwsContext
 	dstFrame    *C.AVFrame
 	dstFramePtr []uint8
+	avFramePool *sync.Pool
 }
 
 type videoCodec int
@@ -59,6 +62,18 @@ func (vc videoCodec) String() string {
 	}
 }
 
+// allocateAVFrame allocates a new AVFrame using C code with safety checks.
+func allocateAVFrame() (*C.AVFrame, error) {
+	avFrame := C.av_frame_alloc()
+	if avFrame == nil {
+		return nil, errors.New("failed to allocate AVFrame: out of memory or C libav internal error")
+	}
+	runtime.SetFinalizer(avFrame, func(f *C.AVFrame) {
+		C.av_frame_free(&f)
+	})
+	return avFrame, nil
+}
+
 func frameData(frame *C.AVFrame) **C.uint8_t {
 	return (**C.uint8_t)(unsafe.Pointer(&frame.data[0]))
 }
@@ -83,7 +98,7 @@ func SetLibAVLogLevelFatal() {
 }
 
 // newDecoder creates a new decoder for the given codec.
-func newDecoder(codecID C.enum_AVCodecID, logger logging.Logger) (*decoder, error) {
+func newDecoder(codecID C.enum_AVCodecID, avFramePool *sync.Pool, logger logging.Logger) (*decoder, error) {
 	codec := C.avcodec_find_decoder(codecID)
 	if codec == nil {
 		return nil, errors.New("avcodec_find_decoder() failed")
@@ -100,27 +115,31 @@ func newDecoder(codecID C.enum_AVCodecID, logger logging.Logger) (*decoder, erro
 		return nil, errors.New("avcodec_open2() failed")
 	}
 
-	srcFrame := C.av_frame_alloc()
+	srcFrame, err := allocateAVFrame()
+	if err != nil {
+		return nil, errors.Errorf("AV Frame allocation error during decoder init: %v", err)
+	}
 	if srcFrame == nil {
 		C.avcodec_close(codecCtx)
 		return nil, errors.New("av_frame_alloc() failed")
 	}
 
 	return &decoder{
-		logger:   logger,
-		codecCtx: codecCtx,
-		srcFrame: srcFrame,
+		logger:      logger,
+		codecCtx:    codecCtx,
+		srcFrame:    srcFrame,
+		avFramePool: avFramePool,
 	}, nil
 }
 
 // newH264Decoder creates a new H264 decoder.
-func newH264Decoder(logger logging.Logger) (*decoder, error) {
-	return newDecoder(C.AV_CODEC_ID_H264, logger)
+func newH264Decoder(avFramePool *sync.Pool, logger logging.Logger) (*decoder, error) {
+	return newDecoder(C.AV_CODEC_ID_H264, avFramePool, logger)
 }
 
 // newH265Decoder creates a new H265 decoder.
-func newH265Decoder(logger logging.Logger) (*decoder, error) {
-	return newDecoder(C.AV_CODEC_ID_H265, logger)
+func newH265Decoder(avFramePool *sync.Pool, logger logging.Logger) (*decoder, error) {
+	return newDecoder(C.AV_CODEC_ID_H265, avFramePool, logger)
 }
 
 // close closes the decoder.
@@ -137,7 +156,7 @@ func (d *decoder) close() {
 	C.avcodec_close(d.codecCtx)
 }
 
-func (d *decoder) decode(nalu []byte) (image.Image, error) {
+func (d *decoder) decode(nalu []byte) (*imageAndAVFrame, error) {
 	nalu = append(H2645StartCode(), nalu...)
 
 	// send frame to decoder
@@ -156,8 +175,14 @@ func (d *decoder) decode(nalu []byte) (image.Image, error) {
 		return nil, nil
 	}
 
-	// if frame size has changed, allocate needed objects
-	if d.dstFrame == nil || d.dstFrame.width != d.srcFrame.width || d.dstFrame.height != d.srcFrame.height {
+	// get a frame from the pool
+	d.dstFrame = d.avFramePool.Get().(*C.AVFrame)
+	if d.dstFrame == nil {
+		return nil, errors.New("failed to obtain AVFrame from pool")
+	}
+
+	// if frame size has changed, reinitialize dstFrame
+	if d.dstFrame.width != d.srcFrame.width || d.dstFrame.height != d.srcFrame.height {
 		if d.dstFrame != nil {
 			C.av_frame_free(&d.dstFrame)
 		}
@@ -166,7 +191,11 @@ func (d *decoder) decode(nalu []byte) (image.Image, error) {
 			C.sws_freeContext(d.swsCtx)
 		}
 
-		d.dstFrame = C.av_frame_alloc()
+		dstFrame, err := allocateAVFrame()
+		if err != nil {
+			return nil, errors.Errorf("AV frame allocation error while decoding: %v", err)
+		}
+		d.dstFrame = dstFrame
 		d.dstFrame.format = C.AV_PIX_FMT_RGBA
 		d.dstFrame.width = d.srcFrame.width
 		d.dstFrame.height = d.srcFrame.height
@@ -194,11 +223,16 @@ func (d *decoder) decode(nalu []byte) (image.Image, error) {
 	}
 
 	// embed frame into an image.Image
-	return &image.RGBA{
+	img := &image.RGBA{
 		Pix:    d.dstFramePtr,
 		Stride: 4 * (int)(d.dstFrame.width),
 		Rect: image.Rectangle{
 			Max: image.Point{(int)(d.dstFrame.width), (int)(d.dstFrame.height)},
 		},
+	}
+
+	return &imageAndAVFrame{
+		img:        img,
+		avFramePtr: d.dstFrame,
 	}, nil
 }
