@@ -23,12 +23,12 @@ import (
 
 // decoder is a generic FFmpeg decoder.
 type decoder struct {
-	logger      logging.Logger
-	codecCtx    *C.AVCodecContext
-	src         *avFrameWrapper
-	swsCtx      *C.struct_SwsContext
-	dst         *avFrameWrapper
-	avFramePool *sync.Pool
+	logger            logging.Logger
+	codecCtx          *C.AVCodecContext
+	yuv420FrameBuffer *C.AVFrame
+	swsCtx            *C.struct_SwsContext
+	dst               *avFrameWrapper
+	avFramePool       *sync.Pool
 }
 
 type videoCodec int
@@ -61,6 +61,8 @@ func (vc videoCodec) String() string {
 	}
 }
 
+// avFrameWrapper wraps the libav AVFrame to safely free it, and also to place it in the
+// sync.Pool as items are required to be pointers to Go structs.
 type avFrameWrapper struct {
 	frame   *C.AVFrame
 	isFreed bool
@@ -128,20 +130,17 @@ func newDecoder(codecID C.enum_AVCodecID, avFramePool *sync.Pool, logger logging
 		return nil, errors.New("avcodec_open2() failed")
 	}
 
-	srcFrame, err := allocateAVFrame()
-	if err != nil {
-		return nil, errors.Errorf("AV Frame allocation error during decoder init: %v", err)
-	}
-	if srcFrame == nil {
+	yuv420FrameBuffer := C.av_frame_alloc()
+	if yuv420FrameBuffer == nil {
 		C.avcodec_close(codecCtx)
 		return nil, errors.New("av_frame_alloc() failed")
 	}
 
 	return &decoder{
-		logger:      logger,
-		codecCtx:    codecCtx,
-		src:         srcFrame,
-		avFramePool: avFramePool,
+		logger:            logger,
+		codecCtx:          codecCtx,
+		yuv420FrameBuffer: yuv420FrameBuffer,
+		avFramePool:       avFramePool,
 	}, nil
 }
 
@@ -165,8 +164,8 @@ func (d *decoder) close() {
 		C.sws_freeContext(d.swsCtx)
 	}
 
-	if d.src != nil {
-		d.src = nil
+	if d.yuv420FrameBuffer != nil {
+		C.av_frame_free(&d.yuv420FrameBuffer)
 	}
 
 	if d.codecCtx != nil {
@@ -190,7 +189,7 @@ func (d *decoder) decode(nalu []byte) (*decoderOutput, error) {
 	}
 
 	// receive frame if available
-	res = C.avcodec_receive_frame(d.codecCtx, d.src.frame)
+	res = C.avcodec_receive_frame(d.codecCtx, d.yuv420FrameBuffer)
 	if res < 0 {
 		//nolint:nilnil // TODO RSDK-8575: change to not nil, nil
 		return nil, nil
@@ -208,7 +207,7 @@ func (d *decoder) decode(nalu []byte) (*decoderOutput, error) {
 	}
 
 	// If the frame from the pool has the wrong size, (re-)initialize it.
-	if d.dst.frame.width != d.src.frame.width || d.dst.frame.height != d.src.frame.height {
+	if d.dst.frame.width != d.yuv420FrameBuffer.width || d.dst.frame.height != d.yuv420FrameBuffer.height {
 		if d.swsCtx != nil {
 			// When the resolution changes, we must also free+reallocate the `swsCtx`.
 			C.sws_freeContext(d.swsCtx)
@@ -224,8 +223,8 @@ func (d *decoder) decode(nalu []byte) (*decoderOutput, error) {
 		d.dst.freeAVFrameWrapper()
 		d.dst = dstFrame
 		d.dst.frame.format = C.AV_PIX_FMT_RGBA
-		d.dst.frame.width = d.src.frame.width
-		d.dst.frame.height = d.src.frame.height
+		d.dst.frame.width = d.yuv420FrameBuffer.width
+		d.dst.frame.height = d.yuv420FrameBuffer.height
 		d.dst.frame.color_range = C.AVCOL_RANGE_JPEG
 		// This allocates the underlying byte array to contain the image data.
 		res = C.av_frame_get_buffer(d.dst.frame, 1)
@@ -235,7 +234,7 @@ func (d *decoder) decode(nalu []byte) (*decoderOutput, error) {
 
 		// Create a scratch space for converting YUV420 to RGB. In our use-case, the src + dst
 		// resolutions always match.
-		d.swsCtx = C.sws_getContext(d.src.frame.width, d.src.frame.height, C.AV_PIX_FMT_YUV420P,
+		d.swsCtx = C.sws_getContext(d.yuv420FrameBuffer.width, d.yuv420FrameBuffer.height, C.AV_PIX_FMT_YUV420P,
 			d.dst.frame.width, d.dst.frame.height, (int32)(d.dst.frame.format), C.SWS_BILINEAR, nil, nil, nil)
 		if d.swsCtx == nil {
 			return nil, errors.New("sws_getContext() err")
@@ -243,8 +242,8 @@ func (d *decoder) decode(nalu []byte) (*decoderOutput, error) {
 	}
 
 	// convert frame from YUV420 to RGB
-	res = C.sws_scale(d.swsCtx, frameData(d.src.frame), frameLineSize(d.src.frame),
-		0, d.src.frame.height, frameData(d.dst.frame), frameLineSize(d.dst.frame))
+	res = C.sws_scale(d.swsCtx, frameData(d.yuv420FrameBuffer), frameLineSize(d.yuv420FrameBuffer),
+		0, d.yuv420FrameBuffer.height, frameData(d.dst.frame), frameLineSize(d.dst.frame))
 	if res < 0 {
 		return nil, errors.New("sws_scale() err")
 	}
