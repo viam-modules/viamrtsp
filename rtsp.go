@@ -648,7 +648,7 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 	// resolution that does not match the current image. The user of the pool is responsible for
 	// checking the `avFrameWrapper` contents and further initializing it and/or throwing it away.
 	framePool := &sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			avFrame, err := allocateAVFrame()
 			if err != nil {
 				logger.Errorf("Failed to allocate AVFrame in frame pool: %v", err)
