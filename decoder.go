@@ -179,14 +179,14 @@ func (d *decoder) decode(nalu []byte) (*imageAndPoolItem, error) {
 	avPacket.size = C.int(len(nalu))
 	res := C.avcodec_send_packet(d.codecCtx, &avPacket)
 	if res < 0 {
-		//nolint:nilnil // avcodec_send_packet raises non-critical errors
+		//nolint:nilnil // TODO RSDK-8575: change to not nil, nil
 		return nil, nil
 	}
 
 	// receive frame if available
 	res = C.avcodec_receive_frame(d.codecCtx, d.src.frame)
 	if res < 0 {
-		//nolint:nilnil // avcodec_receive_frame raises non-critical errors
+		//nolint:nilnil // TODO RSDK-8575: change to not nil, nil
 		return nil, nil
 	}
 
