@@ -96,7 +96,7 @@ type (
 		cb  unitSubscriberFunc
 		buf *rtppassthrough.Buffer
 	}
-	imageAndPoolItem struct {
+	decoderOutput struct {
 		img      image.Image
 		poolItem *avFrameWrapper
 	}
@@ -116,7 +116,7 @@ type rtspCamera struct {
 
 	activeBackgroundWorkers sync.WaitGroup
 
-	latestOutput atomic.Pointer[imageAndPoolItem]
+	latestOutput atomic.Pointer[decoderOutput]
 	avFramePool  *sync.Pool
 
 	logger logging.Logger
@@ -501,7 +501,7 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 		}
 
 		// manually set nil since we don't use a pool for mjpeg frames
-		rc.latestOutput.Store(&imageAndPoolItem{img: img, poolItem: nil})
+		rc.latestOutput.Store(&decoderOutput{img: img, poolItem: nil})
 	})
 
 	return nil

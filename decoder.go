@@ -74,9 +74,7 @@ func allocateAVFrame() (*avFrameWrapper, error) {
 	wrapper := &avFrameWrapper{frame: avFrame}
 	// Set a finalizer on the wrapper to ensure the C memory is freed
 	runtime.SetFinalizer(wrapper, func(w *avFrameWrapper) {
-		if w.frame != nil {
-			C.av_frame_free(&w.frame)
-		}
+		C.av_frame_free(&w.frame)
 	})
 	return wrapper, nil
 }
@@ -169,7 +167,7 @@ func (d *decoder) close() {
 	}
 }
 
-func (d *decoder) decode(nalu []byte) (*imageAndPoolItem, error) {
+func (d *decoder) decode(nalu []byte) (*decoderOutput, error) {
 	nalu = append(H2645StartCode(), nalu...)
 
 	// send frame to decoder
@@ -253,7 +251,7 @@ func (d *decoder) decode(nalu []byte) (*imageAndPoolItem, error) {
 		},
 	}
 
-	return &imageAndPoolItem{
+	return &decoderOutput{
 		img:      img,
 		poolItem: d.dst,
 	}, nil
