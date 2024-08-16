@@ -13,7 +13,6 @@ import "C"
 import (
 	"fmt"
 	"image"
-	"runtime"
 	"sync"
 	"unsafe"
 
@@ -23,12 +22,12 @@ import (
 
 // decoder is a generic FFmpeg decoder.
 type decoder struct {
-	logger      logging.Logger
-	codecCtx    *C.AVCodecContext
-	src         *avFrameWrapper
-	swsCtx      *C.struct_SwsContext
-	dst         *avFrameWrapper
-	avFramePool *sync.Pool
+	logger   logging.Logger
+	codecCtx *C.AVCodecContext
+	srcFrame *C.AVFrame
+	swsCtx   *C.struct_SwsContext
+	dstFrame *C.AVFrame
+	pool     *sync.Pool
 }
 
 type videoCodec int
@@ -59,26 +58,6 @@ func (vc videoCodec) String() string {
 	default:
 		return "Unknown"
 	}
-}
-
-type avFrameWrapper struct {
-	frame *C.AVFrame
-}
-
-// allocateAVFrame allocates a new AVFrame using C code with safety checks and returns the Go wrapper of it.
-func allocateAVFrame() (*avFrameWrapper, error) {
-	avFrame := C.av_frame_alloc()
-	if avFrame == nil {
-		return nil, errors.New("failed to allocate AVFrame: out of memory or C libav internal error")
-	}
-	wrapper := &avFrameWrapper{frame: avFrame}
-	// Set a finalizer on the wrapper to ensure the C memory is freed
-	runtime.SetFinalizer(wrapper, func(w *avFrameWrapper) {
-		if w.frame != nil {
-			C.av_frame_free(&w.frame)
-		}
-	})
-	return wrapper, nil
 }
 
 func frameData(frame *C.AVFrame) **C.uint8_t {
@@ -122,20 +101,17 @@ func newDecoder(codecID C.enum_AVCodecID, avFramePool *sync.Pool, logger logging
 		return nil, errors.New("avcodec_open2() failed")
 	}
 
-	srcFrame, err := allocateAVFrame()
-	if err != nil {
-		return nil, errors.Errorf("AV Frame allocation error during decoder init: %v", err)
-	}
+	srcFrame := C.av_frame_alloc()
 	if srcFrame == nil {
 		C.avcodec_close(codecCtx)
-		return nil, errors.New("av_frame_alloc() failed")
+		return nil, errors.New("av_frame_alloc() failed for source frame")
 	}
 
 	return &decoder{
-		logger:      logger,
-		codecCtx:    codecCtx,
-		src:         srcFrame,
-		avFramePool: avFramePool,
+		logger:   logger,
+		codecCtx: codecCtx,
+		srcFrame: srcFrame,
+		pool:     avFramePool,
 	}, nil
 }
 
@@ -151,25 +127,26 @@ func newH265Decoder(avFramePool *sync.Pool, logger logging.Logger) (*decoder, er
 
 // close closes the decoder.
 func (d *decoder) close() {
-	if d.dst != nil {
-		d.dst = nil
+	if d.dstFrame != nil {
+		C.av_frame_free(&d.dstFrame)
 	}
 
 	if d.swsCtx != nil {
 		C.sws_freeContext(d.swsCtx)
 	}
 
-	if d.src != nil {
-		d.src = nil
-	}
-
-	if d.codecCtx != nil {
-		C.avcodec_close(d.codecCtx)
-		d.codecCtx = nil
-	}
+	C.av_frame_free(&d.srcFrame)
+	C.avcodec_close(d.codecCtx)
 }
 
-func (d *decoder) decode(nalu []byte) (*imageAndPoolItem, error) {
+// allocateFrame allocates a bytes slice using frame info.
+func (d *decoder) allocateFrame() (*[]byte) {
+	dstFrameSize := int(C.av_image_get_buffer_size((int32)(d.dstFrame.format), d.dstFrame.width, d.dstFrame.height, 1))
+	dataGo := make([]byte, dstFrameSize)
+	return &dataGo
+}
+
+func (d *decoder) decode(nalu []byte) (decoderOutput, error) {
 	nalu = append(H2645StartCode(), nalu...)
 
 	// send frame to decoder
@@ -179,71 +156,78 @@ func (d *decoder) decode(nalu []byte) (*imageAndPoolItem, error) {
 	avPacket.size = C.int(len(nalu))
 	res := C.avcodec_send_packet(d.codecCtx, &avPacket)
 	if res < 0 {
-		//nolint:nilnil // avcodec_send_packet raises non-critical errors
-		return nil, nil
+		return decoderOutput{}, nil
 	}
 
 	// receive frame if available
-	res = C.avcodec_receive_frame(d.codecCtx, d.src.frame)
+	res = C.avcodec_receive_frame(d.codecCtx, d.srcFrame)
 	if res < 0 {
-		//nolint:nilnil // avcodec_receive_frame raises non-critical errors
-		return nil, nil
+		return decoderOutput{}, nil
 	}
 
-	// get a frame from the pool
-	d.dst = d.avFramePool.Get().(*avFrameWrapper)
-	if d.dst == nil {
-		return nil, errors.New("failed to obtain AVFrame from pool")
-	}
+	// if frame size has changed, allocate needed objects
+	if d.dstFrame == nil || d.dstFrame.width != d.srcFrame.width || d.dstFrame.height != d.srcFrame.height {
+		if d.dstFrame != nil {
+			C.av_frame_free(&d.dstFrame)
+		}
 
-	// if frame size has changed, reinitialize dstFrame
-	if d.dst.frame.width != d.src.frame.width || d.dst.frame.height != d.src.frame.height {
 		if d.swsCtx != nil {
 			C.sws_freeContext(d.swsCtx)
 		}
 
-		dstFrame, err := allocateAVFrame()
-		if err != nil {
-			return nil, errors.Errorf("AV frame allocation error while decoding: %v", err)
+		d.dstFrame = C.av_frame_alloc()
+		if d.dstFrame == nil {
+			return decoderOutput{}, errors.New("av_frame_alloc() failed for destination frame")
 		}
-		d.dst = dstFrame
-		d.dst.frame.format = C.AV_PIX_FMT_RGBA
-		d.dst.frame.width = d.src.frame.width
-		d.dst.frame.height = d.src.frame.height
-		d.dst.frame.color_range = C.AVCOL_RANGE_JPEG
-		res = C.av_frame_get_buffer(d.dst.frame, 1)
+		d.dstFrame.format = C.AV_PIX_FMT_RGBA
+		d.dstFrame.width = d.srcFrame.width
+		d.dstFrame.height = d.srcFrame.height
+		d.dstFrame.color_range = C.AVCOL_RANGE_JPEG
+		res = C.av_frame_get_buffer(d.dstFrame, 1)
 		if res < 0 {
-			return nil, errors.New("av_frame_get_buffer() err")
+			return decoderOutput{}, errors.New("av_frame_get_buffer() err")
 		}
 
-		d.swsCtx = C.sws_getContext(d.src.frame.width, d.src.frame.height, C.AV_PIX_FMT_YUV420P,
-			d.dst.frame.width, d.dst.frame.height, (int32)(d.dst.frame.format), C.SWS_BILINEAR, nil, nil, nil)
+		d.swsCtx = C.sws_getContext(d.srcFrame.width, d.srcFrame.height, C.AV_PIX_FMT_YUV420P,
+			d.dstFrame.width, d.dstFrame.height, (int32)(d.dstFrame.format), C.SWS_BILINEAR, nil, nil, nil)
 		if d.swsCtx == nil {
-			return nil, errors.New("sws_getContext() err")
+			return decoderOutput{}, errors.New("sws_getContext() err")
 		}
 	}
-
-	dstFrameSize := C.av_image_get_buffer_size((int32)(d.dst.frame.format), d.dst.frame.width, d.dst.frame.height, 1)
-	dstFramePtr := (*[1 << 30]uint8)(unsafe.Pointer(d.dst.frame.data[0]))[:dstFrameSize:dstFrameSize]
 
 	// convert frame from YUV420 to RGB
-	res = C.sws_scale(d.swsCtx, frameData(d.src.frame), frameLineSize(d.src.frame),
-		0, d.src.frame.height, frameData(d.dst.frame), frameLineSize(d.dst.frame))
+	res = C.sws_scale(d.swsCtx, frameData(d.srcFrame), frameLineSize(d.srcFrame),
+		0, d.srcFrame.height, frameData(d.dstFrame), frameLineSize(d.dstFrame))
 	if res < 0 {
-		return nil, errors.New("sws_scale() err")
+		return decoderOutput{}, errors.New("sws_scale() err")
+	}
+	dataGoPtr := d.pool.Get().(*[]byte)
+	dstFrameSize := C.av_image_get_buffer_size((int32)(d.dstFrame.format), d.dstFrame.width, d.dstFrame.height, 1)
+	if dstFrameSize < 0 {
+		return decoderOutput{}, errors.New("failed to get image buffer size")
+	}
+	
+	// ensure the slice from the pool is large enough
+	if cap(*dataGoPtr) < int(dstFrameSize) {
+		newSize := int(dstFrameSize)
+		*dataGoPtr = make([]byte, newSize)
+	} else {
+		*dataGoPtr = (*dataGoPtr)[:dstFrameSize]
 	}
 
-	// embed frame into an image.Image
+	// Copy the data from C memory to Go memory
+	C.memcpy(unsafe.Pointer(&(*dataGoPtr)[0]), unsafe.Pointer(d.dstFrame.data[0]), C.size_t(dstFrameSize))
+
 	img := &image.RGBA{
-		Pix:    dstFramePtr,
-		Stride: 4 * (int)(d.dst.frame.width),
+		Pix:    *dataGoPtr,
+		Stride: 4 * int(d.dstFrame.width),
 		Rect: image.Rectangle{
-			Max: image.Point{(int)(d.dst.frame.width), (int)(d.dst.frame.height)},
+			Max: image.Point{int(d.dstFrame.width), int(d.dstFrame.height)},
 		},
 	}
 
-	return &imageAndPoolItem{
+	return decoderOutput{
 		img:      img,
-		poolItem: d.dst,
+		poolItem: dataGoPtr,
 	}, nil
 }

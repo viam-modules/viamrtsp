@@ -96,9 +96,11 @@ type (
 		cb  unitSubscriberFunc
 		buf *rtppassthrough.Buffer
 	}
-	imageAndPoolItem struct {
+	decoderOutput struct {
 		img      image.Image
-		poolItem *avFrameWrapper
+		// The decoder also outputs a pool item to put back into the pool
+		// after we are done using them.
+		poolItem *[]byte
 	}
 )
 
@@ -116,8 +118,8 @@ type rtspCamera struct {
 
 	activeBackgroundWorkers sync.WaitGroup
 
-	latestOutput atomic.Pointer[imageAndPoolItem]
-	avFramePool  *sync.Pool
+	latestOutput atomic.Pointer[decoderOutput]
+	pool         *sync.Pool
 
 	logger logging.Logger
 
@@ -288,7 +290,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 	}
 
 	// setup H264 -> raw frames decoder
-	rc.rawDecoder, err = newH264Decoder(rc.avFramePool, rc.logger)
+	rc.rawDecoder, err = newH264Decoder(rc.pool, rc.logger)
 	if err != nil {
 		return errors.Wrap(err, "creating H264 raw decoder")
 	}
@@ -397,7 +399,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		return errors.Wrap(err, "creating H265 RTP decoder")
 	}
 
-	rc.rawDecoder, err = newH265Decoder(rc.avFramePool, rc.logger)
+	rc.rawDecoder, err = newH265Decoder(rc.pool, rc.logger)
 	if err != nil {
 		return errors.Wrap(err, "creating H265 raw decoder")
 	}
@@ -451,8 +453,8 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 				return
 			}
 
-			if output != nil {
-				rc.latestOutput.Store(output)
+			if output != (decoderOutput{}) {
+				rc.latestOutput.Store(&output)
 			}
 		}
 	})
@@ -501,7 +503,7 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 		}
 
 		// manually set nil for avFramePtr since we don't use a pool for mjpeg frames
-		rc.latestOutput.Store(&imageAndPoolItem{img: img, poolItem: nil})
+		rc.latestOutput.Store(&decoderOutput{img: img, poolItem: nil})
 	})
 
 	return nil
@@ -642,18 +644,6 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		return nil, err
 	}
 
-	// initialize a pool to manage AVFrames so they don't bog down the garbage collector
-	framePool := &sync.Pool{
-		New: func() interface{} {
-			avFrame, err := allocateAVFrame()
-			if err != nil {
-				logger.Errorf("Failed to allocate AVFrame in frame pool: %v", err)
-				return nil
-			}
-			return avFrame
-		},
-	}
-
 	rtpPassthroughCtx, rtpPassthroughCancelCauseFn := context.WithCancelCause(context.Background())
 	rc := &rtspCamera{
 		model:                       conf.Model,
@@ -662,9 +652,15 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		bufAndCBByID:                make(map[rtppassthrough.SubscriptionID]bufAndCB),
 		rtpPassthroughCtx:           rtpPassthroughCtx,
 		rtpPassthroughCancelCauseFn: rtpPassthroughCancelCauseFn,
-		avFramePool:                 framePool,
 		logger:                      logger,
 	}
+
+	rc.pool = &sync.Pool{
+		New: func() interface{} {
+			return rc.rawDecoder.allocateFrame()
+		},
+	}
+
 	codecInfo, err := modelToCodec(conf.Model)
 	if err != nil {
 		logger.Error(err.Error())
@@ -685,7 +681,7 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 
 		poolCleanupCallback := func() {
 			if latest.poolItem != nil {
-				rc.avFramePool.Put(latest.poolItem)
+				rc.pool.Put(latest.poolItem)
 			}
 		}
 
@@ -829,8 +825,8 @@ func (rc *rtspCamera) decodeAndStore(nalu []byte) error {
 	if err != nil {
 		return err
 	}
-	if output != nil {
-		rc.latestOutput.Store(output)
+	if output != (decoderOutput{}) {
+		rc.latestOutput.Store(&output)
 	}
 	return nil
 }
