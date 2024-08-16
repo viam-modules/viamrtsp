@@ -500,7 +500,7 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 			return
 		}
 
-		// manually set nil for avFramePtr since we don't use a pool for mjpeg frames
+		// manually set nil since we don't use a pool for mjpeg frames
 		rc.latestOutput.Store(&imageAndPoolItem{img: img, poolItem: nil})
 	})
 
