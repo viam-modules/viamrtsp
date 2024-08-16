@@ -62,7 +62,15 @@ func (vc videoCodec) String() string {
 }
 
 type avFrameWrapper struct {
-	frame *C.AVFrame
+	frame   *C.AVFrame
+	isFreed bool
+}
+
+func (w *avFrameWrapper) freeAVFrameWrapper() {
+	if !w.isFreed {
+		C.av_frame_free(&w.frame)
+		w.isFreed = true
+	}
 }
 
 // allocateAVFrame allocates a new AVFrame using C code with safety checks and returns the Go wrapper of it.
@@ -74,7 +82,7 @@ func allocateAVFrame() (*avFrameWrapper, error) {
 	wrapper := &avFrameWrapper{frame: avFrame}
 	// Set a finalizer on the wrapper to ensure the C memory is freed
 	runtime.SetFinalizer(wrapper, func(w *avFrameWrapper) {
-		C.av_frame_free(&w.frame)
+		w.freeAVFrameWrapper()
 	})
 	return wrapper, nil
 }
@@ -212,6 +220,8 @@ func (d *decoder) decode(nalu []byte) (*decoderOutput, error) {
 		if err != nil {
 			return nil, errors.Errorf("AV frame allocation error while decoding: %v", err)
 		}
+		// Free the old frame that isn't in the right format.
+		d.dst.freeAVFrameWrapper()
 		d.dst = dstFrame
 		d.dst.frame.format = C.AV_PIX_FMT_RGBA
 		d.dst.frame.width = d.src.frame.width
@@ -232,15 +242,15 @@ func (d *decoder) decode(nalu []byte) (*decoderOutput, error) {
 		}
 	}
 
-	dstFrameSize := C.av_image_get_buffer_size((int32)(d.dst.frame.format), d.dst.frame.width, d.dst.frame.height, 1)
-	dstFramePtr := (*[1 << 30]uint8)(unsafe.Pointer(d.dst.frame.data[0]))[:dstFrameSize:dstFrameSize]
-
 	// convert frame from YUV420 to RGB
 	res = C.sws_scale(d.swsCtx, frameData(d.src.frame), frameLineSize(d.src.frame),
 		0, d.src.frame.height, frameData(d.dst.frame), frameLineSize(d.dst.frame))
 	if res < 0 {
 		return nil, errors.New("sws_scale() err")
 	}
+
+	dstFrameSize := C.av_image_get_buffer_size((int32)(d.dst.frame.format), d.dst.frame.width, d.dst.frame.height, 1)
+	dstFramePtr := (*[1 << 30]uint8)(unsafe.Pointer(d.dst.frame.data[0]))[:dstFrameSize:dstFrameSize]
 
 	// embed frame into an image.Image
 	img := &image.RGBA{
