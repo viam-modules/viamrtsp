@@ -82,7 +82,10 @@ func allocateAVFrame() (*avFrameWrapper, error) {
 		return nil, errors.New("failed to allocate AVFrame: out of memory or C libav internal error")
 	}
 	wrapper := &avFrameWrapper{frame: avFrame}
-	// Set a finalizer on the wrapper to ensure the C memory is freed
+	// Set a finalizer on the wrapper to ensure the C memory is freed as a last resort.
+	// Currently we know this will happen if the throughput of frames decreases e.g. frame rate is changed.
+	// When that happens, stale frame wrapper structs will accumulate in the pool and eventually be GC-ed,
+	// hopefully calling the finalizer.
 	runtime.SetFinalizer(wrapper, func(w *avFrameWrapper) {
 		w.freeAVFrameWrapper()
 	})
