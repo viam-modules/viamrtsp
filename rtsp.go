@@ -642,7 +642,11 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		return nil, err
 	}
 
-	// initialize a pool to manage AVFrames so they don't bog down the garbage collector
+	// Initialize a pool to amortize the allocation cost of AVFrames and reduce pressure on memory
+	// management. We create one pool for the entire lifetime of the RTSP camera. The `New` function
+	// returns an empty hull of an AV frame. Additionally frames from the pool may be for a
+	// resolution that does not match the current image. The user of the pool is responsible for
+	// checking the `avFrameWrapper` contents and further initializing it and/or throwing it away.
 	framePool := &sync.Pool{
 		New: func() interface{} {
 			avFrame, err := allocateAVFrame()
@@ -684,6 +688,8 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		}
 
 		poolCleanupCallback := func() {
+			// When the caller is done with the image, we return the AVFrame to the pool such
+			// that we can re-use its allocated byte buffer.
 			if latest.poolItem != nil {
 				rc.avFramePool.Put(latest.poolItem)
 			}

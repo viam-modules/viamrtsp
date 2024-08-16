@@ -190,18 +190,26 @@ func (d *decoder) decode(nalu []byte) (*imageAndPoolItem, error) {
 		return nil, nil
 	}
 
-	// get a frame from the pool
+	// Get a frame from the pool. This frame will be in one of three states:
+	// - The frame is uninitialized. The width/height will be set to 0 and the frame's byte buffer
+	//   will be empty.
+	// - The frame is initialized with a height/width/buffer, all of the desired values/size.
+	// - The frame is initialized with an old height/width/buffer that no longer matches the
+	//   `src.frame`
 	d.dst = d.avFramePool.Get().(*avFrameWrapper)
 	if d.dst == nil {
 		return nil, errors.New("failed to obtain AVFrame from pool")
 	}
 
-	// if frame size has changed, reinitialize dstFrame
+	// If the frame from the pool has the wrong size, (re-)initialize it.
 	if d.dst.frame.width != d.src.frame.width || d.dst.frame.height != d.src.frame.height {
 		if d.swsCtx != nil {
+			// When the resolution changes, we must also free+reallocate the `swsCtx`.
 			C.sws_freeContext(d.swsCtx)
 		}
 
+		// We didn't like the frame we got from the pool, so we'll throw the old one away and create
+		// a fresh frame.
 		dstFrame, err := allocateAVFrame()
 		if err != nil {
 			return nil, errors.Errorf("AV frame allocation error while decoding: %v", err)
@@ -211,11 +219,14 @@ func (d *decoder) decode(nalu []byte) (*imageAndPoolItem, error) {
 		d.dst.frame.width = d.src.frame.width
 		d.dst.frame.height = d.src.frame.height
 		d.dst.frame.color_range = C.AVCOL_RANGE_JPEG
+		// This allocates the underlying byte array to contain the image data.
 		res = C.av_frame_get_buffer(d.dst.frame, 1)
 		if res < 0 {
 			return nil, errors.New("av_frame_get_buffer() err")
 		}
 
+		// Create a scratch space for converting YUV420 to RGB. In our use-case, the src + dst
+		// resolutions always match.
 		d.swsCtx = C.sws_getContext(d.src.frame.width, d.src.frame.height, C.AV_PIX_FMT_YUV420P,
 			d.dst.frame.width, d.dst.frame.height, (int32)(d.dst.frame.format), C.SWS_BILINEAR, nil, nil, nil)
 		if d.swsCtx == nil {
