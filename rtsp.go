@@ -97,7 +97,7 @@ type (
 		buf *rtppassthrough.Buffer
 	}
 	decoderOutput struct {
-		img      image.Image
+		img image.Image
 		// The decoder also outputs a pool item to put back into the pool
 		// after we are done using them.
 		poolItem *[]byte

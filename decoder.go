@@ -140,7 +140,7 @@ func (d *decoder) close() {
 }
 
 // allocateFrame allocates a bytes slice using frame info.
-func (d *decoder) allocateFrame() (*[]byte) {
+func (d *decoder) allocateFrame() *[]byte {
 	dstFrameSize := int(C.av_image_get_buffer_size((int32)(d.dstFrame.format), d.dstFrame.width, d.dstFrame.height, 1))
 	dataGo := make([]byte, dstFrameSize)
 	return &dataGo
@@ -206,7 +206,7 @@ func (d *decoder) decode(nalu []byte) (decoderOutput, error) {
 	if dstFrameSize < 0 {
 		return decoderOutput{}, errors.New("failed to get image buffer size")
 	}
-	
+
 	// ensure the slice from the pool is large enough
 	if cap(*dataGoPtr) < int(dstFrameSize) {
 		newSize := int(dstFrameSize)
