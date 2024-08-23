@@ -681,7 +681,7 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		}
 
 		release := func() {}
-		// When model is mjpeg, frame wrapper will be nil.
+		// When model is mjpeg, latest frame wrapper will be nil.
 		if latest.frameWrapper != nil {
 			latest.frameWrapper.mu.Lock()
 			latest.frameWrapper.isBeingServed = true
@@ -693,7 +693,7 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 				latest.frameWrapper.mu.Lock()
 				latest.frameWrapper.isBeingServed = false
 				latest.frameWrapper.mu.Unlock()
-				rc.avFramePool.tryPut(latest.frameWrapper)
+				rc.avFramePool.safelyPut(latest.frameWrapper)
 			}
 		}
 
@@ -843,12 +843,13 @@ func (rc *rtspCamera) decodeAndStore(nalu []byte) error {
 	return nil
 }
 
-// handleLatestDecoderOutput sets the new latest output,
-// and cleans up the prevous output.
+// handleLatestDecoderOutput sets the new latest output, and cleans up
+// the prevous output by trying to put it back in the pool. It might not make
+// it back into the pool immediately or at all depending on its state.
 func (rc *rtspCamera) handleLatestDecoderOutput(latestOutput *decoderOutput) {
 	prevOutput := rc.latestOutput.Swap(latestOutput)
 	if prevOutput != nil && prevOutput.frameWrapper != nil {
-		rc.avFramePool.tryPut(prevOutput.frameWrapper)
+		rc.avFramePool.safelyPut(prevOutput.frameWrapper)
 	}
 }
 

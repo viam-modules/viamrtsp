@@ -74,6 +74,10 @@ func (p *framePool) get() *avFrameWrapper {
 
 	p.logger.Debugf("Item was gotten from the pool. Len now: %d", len(p.items))
 	p.getCount++
+
+	item.frameWrapper.mu.Lock()
+	defer item.frameWrapper.mu.Unlock()
+	item.frameWrapper.isInPool = false
 	return item.frameWrapper
 }
 
@@ -84,17 +88,23 @@ func (p *framePool) put(frame *avFrameWrapper) {
 	p.items = append(p.items, poolItem{frameWrapper: frame, lastAccess: time.Now()})
 	p.logger.Debugf("Item was put in pool. Len now: %d", len(p.items))
 	p.putCount++
+
+	frame.mu.Lock()
+	defer frame.mu.Unlock()
+	frame.isInPool = true
 }
 
-func (p *framePool) tryPut(frame *avFrameWrapper) {
+func (p *framePool) safelyPut(frame *avFrameWrapper) {
 	frame.mu.Lock()
 	defer frame.mu.Unlock()
 	p.logger.Debug("Trying to safely put frame back into pool.")
 
-	if !frame.isFreed || frame.isBeingServed {
+	if !frame.isFreed && !frame.isBeingServed && !frame.isInPool {
 		p.put(frame)
 	} else {
-		p.logger.Debug("Frame was already freed (%t) or is currently being served (%t). Cannot put.", frame.isFreed, frame.isBeingServed)
+		p.logger.Debug("Frame was already freed (%t) or is currently being served (%t) or is already in the pool (%t). Cannot put.",
+			frame.isFreed, frame.isBeingServed, frame.isInPool,
+		)
 	}
 }
 

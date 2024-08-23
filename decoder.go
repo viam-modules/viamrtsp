@@ -62,11 +62,14 @@ func (vc videoCodec) String() string {
 
 // avFrameWrapper wraps the libav AVFrame.
 type avFrameWrapper struct {
-	frame   *C.AVFrame
+	frame *C.AVFrame
+	// isFreed indicates whether or not the underlying C memory is freed
 	isFreed bool
-	// "being served" means some API (e.g. GetImage) is using the frame
+	// isBeingServed indicates if some service API (e.g. GetImage) is currently referencing the frame
 	isBeingServed bool
-	mu            sync.Mutex
+	// isInPool indicates whether or not the frame wrapper is currently an item in the avFramePool
+	isInPool bool
+	mu       sync.Mutex
 }
 
 func (w *avFrameWrapper) free() {
