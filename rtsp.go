@@ -680,14 +680,16 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 			return nil, func() {}, errors.New("no frame yet")
 		}
 
-		latest.frameWrapper.mu.Lock()
-		latest.frameWrapper.isBeingServed = true
-		latest.frameWrapper.mu.Unlock()
+		release := func() {}
+		// When model is mjpeg, frame wrapper will be nil.
+		if latest.frameWrapper != nil {
+			latest.frameWrapper.mu.Lock()
+			latest.frameWrapper.isBeingServed = true
+			latest.frameWrapper.mu.Unlock()
 
-		poolCleanupCallback := func() {
-			// When the caller is done with the image, we return the AVFrame to the pool such
-			// that we can re-use its allocated byte buffer.
-			if latest.frameWrapper != nil {
+			release = func() {
+				// When the caller is done with the image, we return the AVFrame to the pool such
+				// that we can re-use its allocated byte buffer.
 				latest.frameWrapper.mu.Lock()
 				latest.frameWrapper.isBeingServed = false
 				latest.frameWrapper.mu.Unlock()
@@ -695,7 +697,7 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 			}
 		}
 
-		return latest.img, poolCleanupCallback, nil
+		return latest.img, release, nil
 	})
 	rc.VideoReader = reader
 	rc.cancelCtx = cancelCtx
