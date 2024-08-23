@@ -97,8 +97,10 @@ type (
 		buf *rtppassthrough.Buffer
 	}
 	decoderOutput struct {
-		img      image.Image
-		poolItem *avFrameWrapper
+		// img is the decoded image pointing to protected C bytes
+		img image.Image
+		// frameWrapper is a pointer that will be put in the pool
+		frameWrapper *avFrameWrapper
 	}
 )
 
@@ -117,7 +119,11 @@ type rtspCamera struct {
 	activeBackgroundWorkers sync.WaitGroup
 
 	latestOutput atomic.Pointer[decoderOutput]
-	avFramePool  *sync.Pool
+	// We use a pool data structure to amortize the malloc cost of AVFrames and reduce pressure on memory
+	// management. We create one pool for the entire lifetime of the RTSP camera. Additionally, frames
+	// from the pool may be for a resolution that does not match the current image. The user of the pool
+	// is responsible for the underlying frame contents and further initializing it and/or throwing it away.
+	avFramePool *framePool
 
 	logger logging.Logger
 
@@ -136,6 +142,7 @@ func (rc *rtspCamera) Close(_ context.Context) error {
 	rc.unsubscribeAll()
 	rc.activeBackgroundWorkers.Wait()
 	rc.closeConnection()
+	rc.avFramePool.close()
 	return nil
 }
 
@@ -452,7 +459,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 			}
 
 			if output != nil {
-				rc.latestOutput.Store(output)
+				rc.handleLatestDecoderOutput(output)
 			}
 		}
 	})
@@ -500,8 +507,8 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 			return
 		}
 
-		// manually set nil since we don't use a pool for mjpeg frames
-		rc.latestOutput.Store(&decoderOutput{img: img, poolItem: nil})
+		// Manually handle store here since we don't use a pool for mjpeg frames.
+		rc.latestOutput.Store(&decoderOutput{img: img, frameWrapper: nil})
 	})
 
 	return nil
@@ -642,21 +649,7 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		return nil, err
 	}
 
-	// Initialize a pool to amortize the allocation cost of AVFrames and reduce pressure on memory
-	// management. We create one pool for the entire lifetime of the RTSP camera. The `New` function
-	// returns an empty hull of an AV frame. Additionally frames from the pool may be for a
-	// resolution that does not match the current image. The user of the pool is responsible for
-	// checking the `avFrameWrapper` contents and further initializing it and/or throwing it away.
-	framePool := &sync.Pool{
-		New: func() any {
-			avFrame, err := allocateAVFrame()
-			if err != nil {
-				logger.Errorf("Failed to allocate AVFrame in frame pool: %v", err)
-				return nil
-			}
-			return avFrame
-		},
-	}
+	framePool := newFramePool(10*time.Second, 5*time.Second, 5, logger)
 
 	rtpPassthroughCtx, rtpPassthroughCancelCauseFn := context.WithCancelCause(context.Background())
 	rc := &rtspCamera{
@@ -687,11 +680,18 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 			return nil, func() {}, errors.New("no frame yet")
 		}
 
+		latest.frameWrapper.mu.Lock()
+		latest.frameWrapper.isBeingServed = true
+		latest.frameWrapper.mu.Unlock()
+
 		poolCleanupCallback := func() {
 			// When the caller is done with the image, we return the AVFrame to the pool such
 			// that we can re-use its allocated byte buffer.
-			if latest.poolItem != nil {
-				rc.avFramePool.Put(latest.poolItem)
+			if latest.frameWrapper != nil {
+				latest.frameWrapper.mu.Lock()
+				latest.frameWrapper.isBeingServed = false
+				latest.frameWrapper.mu.Unlock()
+				rc.avFramePool.tryPut(latest.frameWrapper)
 			}
 		}
 
@@ -836,9 +836,18 @@ func (rc *rtspCamera) decodeAndStore(nalu []byte) error {
 		return err
 	}
 	if output != nil {
-		rc.latestOutput.Store(output)
+		rc.handleLatestDecoderOutput(output)
 	}
 	return nil
+}
+
+// handleLatestDecoderOutput sets the new latest output,
+// and cleans up the prevous output.
+func (rc *rtspCamera) handleLatestDecoderOutput(latestOutput *decoderOutput) {
+	prevOutput := rc.latestOutput.Swap(latestOutput)
+	if prevOutput != nil && prevOutput.frameWrapper != nil {
+		rc.avFramePool.tryPut(prevOutput.frameWrapper)
+	}
 }
 
 func naluType(nalu []byte) h264.NALUType {
