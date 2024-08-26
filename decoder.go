@@ -13,7 +13,7 @@ import "C"
 import (
 	"fmt"
 	"image"
-	"sync"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/pkg/errors"
@@ -64,20 +64,17 @@ func (vc videoCodec) String() string {
 type avFrameWrapper struct {
 	frame *C.AVFrame
 	// isFreed indicates whether or not the underlying C memory is freed
-	isFreed bool
+	isFreed atomic.Bool
 	// isBeingServed indicates if some service API (e.g. GetImage) is currently referencing the frame
-	isBeingServed bool
+	isBeingServed atomic.Bool
 	// isInPool indicates whether or not the frame wrapper is currently an item in the avFramePool
-	isInPool bool
-	mu       sync.Mutex
+	isInPool atomic.Bool
 }
 
 func (w *avFrameWrapper) free() {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	if !w.isFreed {
+	if !w.isFreed.Load() {
 		C.av_frame_free(&w.frame)
-		w.isFreed = true
+		w.isFreed.Store(true)
 	}
 }
 
@@ -208,11 +205,9 @@ func (d *decoder) decode(nalu []byte) (*decoderOutput, error) {
 	if d.dst == nil {
 		return nil, errors.New("failed to obtain AVFrame from pool")
 	}
-	d.dst.mu.Lock()
-	if d.dst.isFreed {
+	if d.dst.isFreed.Load() {
 		return nil, errors.New("got frame from pool that was already freed")
 	}
-	d.dst.mu.Unlock()
 
 	// If the frame from the pool has the wrong size, (re-)initialize it.
 	if d.dst.frame.width != d.yuv420FrameBuffer.width || d.dst.frame.height != d.yuv420FrameBuffer.height {

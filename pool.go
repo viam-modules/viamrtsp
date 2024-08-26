@@ -75,9 +75,7 @@ func (p *framePool) get() *avFrameWrapper {
 	p.logger.Debugf("Item was gotten from the pool. Len now: %d", len(p.items))
 	p.getCount++
 
-	item.frameWrapper.mu.Lock()
-	defer item.frameWrapper.mu.Unlock()
-	item.frameWrapper.isInPool = false
+	item.frameWrapper.isInPool.Store(false)
 	return item.frameWrapper
 }
 
@@ -89,21 +87,21 @@ func (p *framePool) put(frame *avFrameWrapper) {
 	p.logger.Debugf("Item was put in pool. Len now: %d", len(p.items))
 	p.putCount++
 
-	frame.mu.Lock()
-	defer frame.mu.Unlock()
-	frame.isInPool = true
+	frame.isInPool.Store(true)
 }
 
 func (p *framePool) safelyPut(frame *avFrameWrapper) {
-	frame.mu.Lock()
-	defer frame.mu.Unlock()
 	p.logger.Debug("Trying to safely put frame back into pool.")
 
-	if !frame.isFreed && !frame.isBeingServed && !frame.isInPool {
+	isFreed := frame.isFreed.Load()
+	isBeingServed := frame.isBeingServed.Load()
+	isInPool := frame.isInPool.Load()
+
+	if !isFreed && !isBeingServed && !isInPool {
 		p.put(frame)
 	} else {
-		p.logger.Debug("Frame was already freed (%t) or is currently being served (%t) or is already in the pool (%t). Cannot put.",
-			frame.isFreed, frame.isBeingServed, frame.isInPool,
+		p.logger.Debugf("Frame was already freed (%t) or is currently being served (%t) or is already in the pool (%t). Cannot put.",
+			isFreed, isBeingServed, isInPool,
 		)
 	}
 }

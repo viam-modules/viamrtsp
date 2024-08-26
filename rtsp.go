@@ -683,16 +683,12 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		release := func() {}
 		// When model is mjpeg, latest frame wrapper will be nil.
 		if latest.frameWrapper != nil {
-			latest.frameWrapper.mu.Lock()
-			latest.frameWrapper.isBeingServed = true
-			latest.frameWrapper.mu.Unlock()
+			latest.frameWrapper.isBeingServed.Store(true)
 
 			release = func() {
 				// When the caller is done with the image, we return the AVFrame to the pool such
 				// that we can re-use its allocated byte buffer.
-				latest.frameWrapper.mu.Lock()
-				latest.frameWrapper.isBeingServed = false
-				latest.frameWrapper.mu.Unlock()
+				latest.frameWrapper.isBeingServed.Store(false)
 				rc.avFramePool.safelyPut(latest.frameWrapper)
 			}
 		}
