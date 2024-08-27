@@ -132,8 +132,9 @@ func (p *framePool) cleanup() {
 	updatedItems := make([]poolItem, 0, len(p.items))
 	for _, item := range p.items {
 		if now.Sub(item.lastAccess) < p.maxAge {
-			item.frameWrapper.free()
 			updatedItems = append(updatedItems, item)
+		} else {
+			item.frameWrapper.free()
 			p.cleanCount++
 		}
 	}
