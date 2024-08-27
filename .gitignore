@@ -29,6 +29,8 @@ module.tar.gz
 FFmpeg
 android-ndk*
 ndk
+cpu-profile.txt
+mem-profile.txt
 
 # Build artifacts
 bin
