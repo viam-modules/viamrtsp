@@ -688,6 +688,7 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 			release = func() {
 				// When the caller is done with the image, we return the AVFrame to the pool such
 				// that we can re-use its allocated byte buffer.
+				rc.logger.Debug("Release was called.")
 				latest.frameWrapper.isBeingServed.Store(false)
 				rc.avFramePool.safelyPut(latest.frameWrapper)
 			}

@@ -72,9 +72,12 @@ type avFrameWrapper struct {
 }
 
 func (w *avFrameWrapper) free() {
-	if !w.isFreed.Load() {
+	if w.isFreed.Load() {
+		return
+	}
+
+	if w.isFreed.CompareAndSwap(false, true) {
 		C.av_frame_free(&w.frame)
-		w.isFreed.Store(true)
 	}
 }
 
@@ -201,6 +204,9 @@ func (d *decoder) decode(nalu []byte) (*decoderOutput, error) {
 	// - The frame is initialized with an old height/width/buffer that no longer matches the
 	//   `src.frame`
 	d.dst = d.avFramePool.get()
+	if d.dst == nil {
+		d.dst = d.avFramePool.new()
+	}
 
 	if d.dst == nil {
 		return nil, errors.New("failed to obtain AVFrame from pool")

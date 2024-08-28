@@ -22,7 +22,7 @@ type framePool struct {
 	cleanCount int
 	newCount   int
 
-	mu           sync.Mutex
+	mu           sync.RWMutex
 	stopCleaning chan struct{}
 	logger       logging.Logger
 }
@@ -42,7 +42,6 @@ func newFramePool(maxAge, cleanupInterval time.Duration, preseededCount int, log
 			frameWrapper: pool.new(),
 			lastAccess:   time.Now(),
 		})
-		pool.newCount++
 	}
 
 	go pool.cleanupRoutine(cleanupInterval)
@@ -57,16 +56,16 @@ func (p *framePool) new() *avFrameWrapper {
 		p.logger.Errorf("Failed to allocate AVFrame in frame pool: %v", err)
 		return nil
 	}
+	p.newCount++
 	return avFrame
 }
 
 func (p *framePool) get() *avFrameWrapper {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 
 	if len(p.items) == 0 {
-		p.newCount++
-		return p.new()
+		return nil
 	}
 
 	item := p.items[0]
