@@ -842,7 +842,7 @@ func (rc *rtspCamera) decodeAndStore(nalu []byte) error {
 
 // handleLatestDecoderOutput sets the new latest output, and cleans up
 // the prevous output by trying to put it back in the pool. It might not make
-// it back into the pool immediately or at all depending on its state.
+// it back into the pool immediately or not at all depending on its state.
 func (rc *rtspCamera) handleLatestDecoderOutput(latestOutput *decoderOutput) {
 	prevOutput := rc.latestOutput.Swap(latestOutput)
 	if prevOutput != nil && prevOutput.frameWrapper != nil {
