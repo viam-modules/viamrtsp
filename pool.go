@@ -2,165 +2,116 @@ package viamrtsp
 
 import (
 	"sync"
-	"time"
 
 	"go.viam.com/rdk/logging"
 )
 
-type poolItem struct {
-	frameWrapper *avFrameWrapper
-	lastAccess   time.Time
-}
-
 type framePool struct {
-	items          []poolItem
-	maxAge         time.Duration
-	preseededCount int
+	frames       []*avFrameWrapper
+	maxNumFrames int
+	mu           sync.Mutex
+	logger       logging.Logger
 
 	putCount   int
 	getCount   int
 	cleanCount int
 	newCount   int
-
-	mu           sync.RWMutex
-	stopCleaning chan struct{}
-	logger       logging.Logger
 }
 
-func newFramePool(maxAge, cleanupInterval time.Duration, preseededCount int, logger logging.Logger) *framePool {
+func newFramePool(maxNumFrames int, logger logging.Logger) *framePool {
 	pool := &framePool{
-		items:          make([]poolItem, 0, preseededCount),
-		maxAge:         maxAge,
-		preseededCount: preseededCount,
-		stopCleaning:   make(chan struct{}),
-		logger:         logger,
+		frames:       make([]*avFrameWrapper, 0, maxNumFrames),
+		maxNumFrames: maxNumFrames,
+		logger:       logger,
 	}
-
-	// Pre-seed the pool
-	for i := 0; i < preseededCount; i++ {
-		pool.items = append(pool.items, poolItem{
-			frameWrapper: pool.new(),
-			lastAccess:   time.Now(),
-		})
-	}
-
-	go pool.cleanupRoutine(cleanupInterval)
 
 	return pool
 }
 
-func (p *framePool) new() *avFrameWrapper {
-	p.logger.Debug("newFunc for pool was called!")
-	avFrame, err := newAVFrameWrapper()
-	if err != nil {
-		p.logger.Errorf("Failed to allocate AVFrame in frame pool: %v", err)
-		return nil
-	}
-	p.newCount++
-	return avFrame
-}
-
 func (p *framePool) get() *avFrameWrapper {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
-	if len(p.items) == 0 {
-		return nil
-	}
-
-	item := p.items[0]
-	p.items = p.items[1:]
-
-	p.logger.Debugf("Item was gotten from the pool. Len now: %d", len(p.items))
-	p.getCount++
-
-	item.frameWrapper.isInPool.Store(false)
-	return item.frameWrapper
-}
-
-func (p *framePool) put(frame *avFrameWrapper) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	p.items = append(p.items, poolItem{frameWrapper: frame, lastAccess: time.Now()})
-	p.logger.Debugf("Item was put in pool. Len now: %d", len(p.items))
+	if len(p.frames) == 0 {
+		p.logger.Debug("No frames available in pool. Constructing new frame!")
+		frame, err := newAVFrameWrapper()
+		if err != nil {
+			p.logger.Errorf("Failed to allocate AVFrame in frame pool: %v", err)
+			return nil
+		}
+		frame.refs.Store(1)
+		p.newCount++
+		return frame
+	}
+
+	lastIndex := len(p.frames) - 1
+	frame := p.frames[lastIndex]
+	p.frames = p.frames[:lastIndex]
+
+	p.logger.Debugf("Item was gotten from the pool. Len now: %d", len(p.frames))
+	p.getCount++
+
+	frame.isInPool.Store(false)
+	frame.refs.Add(1)
+	return frame
+}
+
+func (p *framePool) put(frame *avFrameWrapper) {
+	p.logger.Debug("Trying to put frame back into pool.")
+
+	if frame.isFreed.Load() {
+		p.logger.Warn("Frame was already freed. Cannot put.")
+		return
+	}
+	if frame.isInPool.Load() {
+		p.logger.Warn("Frame is already in pool. Cannot put")
+		return
+	}
+	if frame.isBeingServed.Load() {
+		p.logger.Debug("Frame is currently being served. Cannot put")
+	}
+
+	refs := frame.refs.Add(-1)
+	if refs < 0 {
+		panic("deref at 0 refs")
+	} else if refs > 0 {
+		p.logger.Debugf("Frame has %d refs, but must have 0 to be put back into pool.", refs)
+		return
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if len(p.frames) >= p.maxNumFrames {
+		// Cleanup logic: free the last item and truncate the slice
+		lastFrame := p.frames[len(p.frames)-1]
+		lastFrame.free()
+		p.frames = p.frames[:len(p.frames)-1]
+		p.cleanCount++
+	}
+
+	p.frames = append(p.frames, frame)
+	p.logger.Debugf("Frame was put in pool. Len now: %d", len(p.frames))
 	p.putCount++
 
 	frame.isInPool.Store(true)
 }
 
-func (p *framePool) safelyPut(frame *avFrameWrapper) {
-	p.logger.Debug("Trying to safely put frame back into pool.")
-
-	isFreed := frame.isFreed.Load()
-	isBeingServed := frame.isBeingServed.Load()
-	isInPool := frame.isInPool.Load()
-
-	if !isFreed && !isBeingServed && !isInPool {
-		p.put(frame)
-	} else {
-		p.logger.Debugf("Frame was already freed (%t) or is currently being served (%t) or is already in the pool (%t). Cannot put.",
-			isFreed, isBeingServed, isInPool,
-		)
-	}
-}
-
-func (p *framePool) cleanupRoutine(interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			p.cleanup()
-		case <-p.stopCleaning:
-			return
-		}
-	}
-}
-
-func (p *framePool) cleanup() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if len(p.items) <= p.preseededCount {
-		return
-	}
-
-	now := time.Now()
-	updatedItems := make([]poolItem, 0, len(p.items))
-	for _, item := range p.items {
-		if now.Sub(item.lastAccess) < p.maxAge {
-			updatedItems = append(updatedItems, item)
-		} else {
-			item.frameWrapper.free()
-			p.cleanCount++
-		}
-	}
-
-	p.logger.Debugf("Post cleanup() num old items: %d", len(p.items))
-	p.logger.Debugf("Post cleanup() num new items: %d", len(updatedItems))
-	p.items = updatedItems
-}
-
 func (p *framePool) close() {
-	close(p.stopCleaning)
-
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	// Free remaining pool item frames
-	p.logger.Debugf("Num pool items remaining at close: %d", len(p.items))
-	for _, item := range p.items {
-		item.frameWrapper.free()
+	// Free remaining pool frames
+	p.logger.Debugf("Num pool frames remaining at close: %d", len(p.frames))
+	for _, frame := range p.frames {
+		frame.free()
 	}
 
 	// Clear the slice to release references
-	p.items = nil
+	p.frames = nil
 
 	// Report stats
 	p.logger.Debugf("getCount: %d", p.getCount)
 	p.logger.Debugf("putCount: %d", p.putCount)
 	p.logger.Debugf("newCount: %d", p.newCount)
-	p.logger.Debugf("cleanCount: %d", p.cleanCount)
 }

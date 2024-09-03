@@ -96,12 +96,6 @@ type (
 		cb  unitSubscriberFunc
 		buf *rtppassthrough.Buffer
 	}
-	decoderOutput struct {
-		// img is the decoded image pointing to protected C bytes
-		img image.Image
-		// frameWrapper is a pointer that will be put in the pool
-		frameWrapper *avFrameWrapper
-	}
 )
 
 // rtspCamera contains the rtsp client, and the reader function that fulfills the camera interface.
@@ -118,7 +112,8 @@ type rtspCamera struct {
 
 	activeBackgroundWorkers sync.WaitGroup
 
-	latestOutput atomic.Pointer[decoderOutput]
+	latestMJPEGImage atomic.Pointer[image.Image]
+	latestFrame      atomic.Pointer[avFrameWrapper]
 	// We use a pool data structure to amortize the malloc cost of AVFrames and reduce pressure on memory
 	// management. We create one pool for the entire lifetime of the RTSP camera. Additionally, frames
 	// from the pool may be for a resolution that does not match the current image. The user of the pool
@@ -459,7 +454,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 			}
 
 			if output != nil {
-				rc.handleLatestDecoderOutput(output)
+				rc.handleLatestFrame(output)
 			}
 		}
 	})
@@ -507,8 +502,7 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 			return
 		}
 
-		// Manually handle store here since we don't use a pool for mjpeg frames.
-		rc.latestOutput.Store(&decoderOutput{img: img, frameWrapper: nil})
+		rc.latestMJPEGImage.Store(&img)
 	})
 
 	return nil
@@ -649,7 +643,7 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		return nil, err
 	}
 
-	framePool := newFramePool(10*time.Second, 5*time.Second, 5, logger)
+	framePool := newFramePool(5, logger)
 
 	rtpPassthroughCtx, rtpPassthroughCancelCauseFn := context.WithCancelCause(context.Background())
 	rc := &rtspCamera{
@@ -675,26 +669,33 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 	}
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	reader := gostream.VideoReaderFunc(func(_ context.Context) (image.Image, func(), error) {
-		latest := rc.latestOutput.Load()
-		if latest == nil {
+		if videoCodec(rc.currentCodec.Load()) == MJPEG {
+			img := rc.latestMJPEGImage.Load()
+			if img == nil {
+				return nil, func() {}, errors.New("no mjpeg frame yet")
+			}
+			return *img, func() {}, nil
+		}
+
+		frame := rc.latestFrame.Load()
+		if frame == nil {
 			return nil, func() {}, errors.New("no frame yet")
 		}
 
-		release := func() {}
-		// When model is mjpeg, latest frame wrapper will be nil.
-		if latest.frameWrapper != nil {
-			latest.frameWrapper.isBeingServed.Store(true)
-
-			release = func() {
-				// When the caller is done with the image, we return the AVFrame to the pool such
-				// that we can re-use its allocated byte buffer.
-				rc.logger.Debug("Release was called.")
-				latest.frameWrapper.isBeingServed.Store(false)
-				rc.avFramePool.safelyPut(latest.frameWrapper)
-			}
+		release := func() {
+			// When the caller is done with the image, we return the AVFrame to the pool such
+			// that we can re-use its allocated byte buffer.
+			rc.logger.Debug("Release was called.")
+			frame.isBeingServed.Store(false)
+			frame.refs.Add(-1)
+			rc.avFramePool.put(frame)
 		}
 
-		return latest.img, release, nil
+		defer func() {
+			frame.isBeingServed.Store(true)
+			frame.refs.Add(1)
+		}()
+		return frame.toImage(), release, nil
 	})
 	rc.VideoReader = reader
 	rc.cancelCtx = cancelCtx
@@ -835,18 +836,18 @@ func (rc *rtspCamera) decodeAndStore(nalu []byte) error {
 		return err
 	}
 	if output != nil {
-		rc.handleLatestDecoderOutput(output)
+		rc.handleLatestFrame(output)
 	}
 	return nil
 }
 
-// handleLatestDecoderOutput sets the new latest output, and cleans up
-// the prevous output by trying to put it back in the pool. It might not make
+// handleLatestFrame sets the new latest frame, and cleans up
+// the prevous frame by trying to put it back in the pool. It might not make
 // it back into the pool immediately or not at all depending on its state.
-func (rc *rtspCamera) handleLatestDecoderOutput(latestOutput *decoderOutput) {
-	prevOutput := rc.latestOutput.Swap(latestOutput)
-	if prevOutput != nil && prevOutput.frameWrapper != nil {
-		rc.avFramePool.safelyPut(prevOutput.frameWrapper)
+func (rc *rtspCamera) handleLatestFrame(latestFrame *avFrameWrapper) {
+	prevFrame := rc.latestFrame.Swap(latestFrame)
+	if prevFrame != nil {
+		rc.avFramePool.put(prevFrame)
 	}
 }
 

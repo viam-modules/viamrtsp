@@ -69,6 +69,8 @@ type avFrameWrapper struct {
 	isBeingServed atomic.Bool
 	// isInPool indicates whether or not the frame wrapper is currently an item in the avFramePool
 	isInPool atomic.Bool
+	// refs counts how many times the frame is being referenced
+	refs atomic.Int32
 }
 
 func (w *avFrameWrapper) free() {
@@ -78,6 +80,19 @@ func (w *avFrameWrapper) free() {
 
 	if w.isFreed.CompareAndSwap(false, true) {
 		C.av_frame_free(&w.frame)
+	}
+}
+
+func (w *avFrameWrapper) toImage() image.Image {
+	dstFrameSize := C.av_image_get_buffer_size((int32)(w.frame.format), w.frame.width, w.frame.height, 1)
+	dstFramePtr := (*[1 << 30]uint8)(unsafe.Pointer(w.frame.data[0]))[:dstFrameSize:dstFrameSize]
+
+	return &image.RGBA{
+		Pix:    dstFramePtr,
+		Stride: 4 * (int)(w.frame.width),
+		Rect: image.Rectangle{
+			Max: image.Point{(int)(w.frame.width), (int)(w.frame.height)},
+		},
 	}
 }
 
@@ -176,7 +191,7 @@ func (d *decoder) close() {
 	}
 }
 
-func (d *decoder) decode(nalu []byte) (*decoderOutput, error) {
+func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 	nalu = append(H2645StartCode(), nalu...)
 
 	// send frame to decoder
@@ -204,9 +219,6 @@ func (d *decoder) decode(nalu []byte) (*decoderOutput, error) {
 	// - The frame is initialized with an old height/width/buffer that no longer matches the
 	//   `src.frame`
 	d.dst = d.avFramePool.get()
-	if d.dst == nil {
-		d.dst = d.avFramePool.new()
-	}
 
 	if d.dst == nil {
 		return nil, errors.New("failed to obtain AVFrame from pool")
@@ -228,6 +240,7 @@ func (d *decoder) decode(nalu []byte) (*decoderOutput, error) {
 		// a fresh frame.
 		d.dst.free()
 		dstFrame, err := newAVFrameWrapper()
+		dstFrame.refs.Store(1)
 		if err != nil {
 			return nil, errors.Errorf("AV frame allocation error while decoding: %v", err)
 		}
@@ -259,20 +272,5 @@ func (d *decoder) decode(nalu []byte) (*decoderOutput, error) {
 		return nil, errors.New("sws_scale() err")
 	}
 
-	dstFrameSize := C.av_image_get_buffer_size((int32)(d.dst.frame.format), d.dst.frame.width, d.dst.frame.height, 1)
-	dstFramePtr := (*[1 << 30]uint8)(unsafe.Pointer(d.dst.frame.data[0]))[:dstFrameSize:dstFrameSize]
-
-	// embed frame into an image.Image
-	img := &image.RGBA{
-		Pix:    dstFramePtr,
-		Stride: 4 * (int)(d.dst.frame.width),
-		Rect: image.Rectangle{
-			Max: image.Point{(int)(d.dst.frame.width), (int)(d.dst.frame.height)},
-		},
-	}
-
-	return &decoderOutput{
-		img:          img,
-		frameWrapper: d.dst,
-	}, nil
+	return d.dst, nil
 }
