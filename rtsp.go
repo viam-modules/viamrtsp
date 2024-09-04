@@ -692,6 +692,7 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		}
 
 		defer func() {
+			// Handle refs and flags after we pass the frame on to the server
 			frame.isBeingServed.Store(true)
 			frame.refs.Add(1)
 		}()

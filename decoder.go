@@ -240,7 +240,7 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 		// a fresh frame.
 		d.dst.free()
 		dstFrame, err := newAVFrameWrapper()
-		dstFrame.refs.Store(1)
+		dstFrame.refs.Add(1)
 		if err != nil {
 			return nil, errors.Errorf("AV frame allocation error while decoding: %v", err)
 		}

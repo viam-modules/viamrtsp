@@ -39,7 +39,7 @@ func (p *framePool) get() *avFrameWrapper {
 			p.logger.Errorf("Failed to allocate AVFrame in frame pool: %v", err)
 			return nil
 		}
-		frame.refs.Store(1)
+		frame.refs.Add(1)
 		p.newCount++
 		return frame
 	}
@@ -69,6 +69,7 @@ func (p *framePool) put(frame *avFrameWrapper) {
 	}
 	if frame.isBeingServed.Load() {
 		p.logger.Debug("Frame is currently being served. Cannot put")
+		return
 	}
 
 	refs := frame.refs.Add(-1)
@@ -83,11 +84,9 @@ func (p *framePool) put(frame *avFrameWrapper) {
 	defer p.mu.Unlock()
 
 	if len(p.frames) >= p.maxNumFrames {
-		// Cleanup logic: free the last item and truncate the slice
-		lastFrame := p.frames[len(p.frames)-1]
-		lastFrame.free()
-		p.frames = p.frames[:len(p.frames)-1]
+		frame.free()
 		p.cleanCount++
+		return
 	}
 
 	p.frames = append(p.frames, frame)
