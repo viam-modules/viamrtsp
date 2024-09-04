@@ -692,14 +692,12 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 			defer rc.latestFrameMu.Unlock()
 
 			rc.logger.Debug("Release was called.")
-			rc.latestFrame.isBeingServed.Store(false)
 			hasZeroRefs := rc.latestFrame.decrementRef()
 			if hasZeroRefs {
 				rc.avFramePool.put(rc.latestFrame)
 			}
 		}
 
-		rc.latestFrame.isBeingServed.Store(true)
 		rc.latestFrame.incrementRef()
 		return rc.latestFrame.toImage(), release, nil
 	})

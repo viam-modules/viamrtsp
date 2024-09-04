@@ -65,8 +65,6 @@ type avFrameWrapper struct {
 	frame *C.AVFrame
 	// isFreed indicates whether or not the underlying C memory is freed
 	isFreed atomic.Bool
-	// isBeingServed indicates if some service API (e.g. GetImage) is currently referencing the frame
-	isBeingServed atomic.Bool
 	// isInPool indicates whether or not the frame wrapper is currently an item in the avFramePool
 	isInPool atomic.Bool
 	// refCount counts how many times the frame is being referenced
@@ -90,7 +88,7 @@ func (w *avFrameWrapper) decrementRef() bool {
 // free frees the underlying avFrame if it hasn't already been freed.
 func (w *avFrameWrapper) free() {
 	if w.isFreed.Load() {
-		return
+		panic("av frame was double freed")
 	}
 
 	if w.isFreed.CompareAndSwap(false, true) {

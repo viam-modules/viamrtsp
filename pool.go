@@ -65,10 +65,6 @@ func (p *framePool) put(frame *avFrameWrapper) {
 		p.logger.Error("Frame is already in pool. Cannot put")
 		return
 	}
-	if frame.isBeingServed.Load() {
-		p.logger.Error("Frame is currently being served. Cannot put")
-		return
-	}
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
