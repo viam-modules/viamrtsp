@@ -113,7 +113,8 @@ type rtspCamera struct {
 	activeBackgroundWorkers sync.WaitGroup
 
 	latestMJPEGImage atomic.Pointer[image.Image]
-	latestFrame      atomic.Pointer[avFrameWrapper]
+	latestFrame      *avFrameWrapper
+	latestFrameMu    sync.Mutex
 	// We use a pool data structure to amortize the malloc cost of AVFrames and reduce pressure on memory
 	// management. We create one pool for the entire lifetime of the RTSP camera. Additionally, frames
 	// from the pool may be for a resolution that does not match the current image. The user of the pool
@@ -677,8 +678,10 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 			return *img, func() {}, nil
 		}
 
-		frame := rc.latestFrame.Load()
-		if frame == nil {
+		rc.latestFrameMu.Lock()
+		defer rc.latestFrameMu.Unlock()
+
+		if rc.latestFrame == nil {
 			return nil, func() {}, errors.New("no frame yet")
 		}
 
@@ -686,17 +689,16 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 			// When the caller is done with the image, we return the AVFrame to the pool such
 			// that we can re-use its allocated byte buffer.
 			rc.logger.Debug("Release was called.")
-			frame.isBeingServed.Store(false)
-			frame.refs.Add(-1)
-			rc.avFramePool.put(frame)
+			rc.latestFrame.isBeingServed.Store(false)
+			hasZeroRefs := rc.latestFrame.decrementRef()
+			if hasZeroRefs {
+				rc.avFramePool.put(rc.latestFrame)
+			}
 		}
 
-		defer func() {
-			// Handle refs and flags after we pass the frame on to the server
-			frame.isBeingServed.Store(true)
-			frame.refs.Add(1)
-		}()
-		return frame.toImage(), release, nil
+		rc.latestFrame.isBeingServed.Store(true)
+		rc.latestFrame.incrementRef()
+		return rc.latestFrame.toImage(), release, nil
 	})
 	rc.VideoReader = reader
 	rc.cancelCtx = cancelCtx
@@ -832,12 +834,12 @@ func H2645StartCode() []byte {
 }
 
 func (rc *rtspCamera) decodeAndStore(nalu []byte) error {
-	output, err := rc.rawDecoder.decode(nalu)
+	frame, err := rc.rawDecoder.decode(nalu)
 	if err != nil {
 		return err
 	}
-	if output != nil {
-		rc.handleLatestFrame(output)
+	if frame != nil {
+		rc.handleLatestFrame(frame)
 	}
 	return nil
 }
@@ -846,9 +848,18 @@ func (rc *rtspCamera) decodeAndStore(nalu []byte) error {
 // the prevous frame by trying to put it back in the pool. It might not make
 // it back into the pool immediately or not at all depending on its state.
 func (rc *rtspCamera) handleLatestFrame(latestFrame *avFrameWrapper) {
-	prevFrame := rc.latestFrame.Swap(latestFrame)
+	rc.latestFrameMu.Lock()
+	defer rc.latestFrameMu.Unlock()
+
+	// Swap previous for new
+	prevFrame := rc.latestFrame
+	rc.latestFrame = latestFrame
+
 	if prevFrame != nil {
-		rc.avFramePool.put(prevFrame)
+		hasZeroRefs := prevFrame.decrementRef()
+		if hasZeroRefs {
+			rc.avFramePool.put(prevFrame)
+		}
 	}
 }
 

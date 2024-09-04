@@ -39,7 +39,6 @@ func (p *framePool) get() *avFrameWrapper {
 			p.logger.Errorf("Failed to allocate AVFrame in frame pool: %v", err)
 			return nil
 		}
-		frame.refs.Add(1)
 		p.newCount++
 		return frame
 	}
@@ -52,7 +51,6 @@ func (p *framePool) get() *avFrameWrapper {
 	p.getCount++
 
 	frame.isInPool.Store(false)
-	frame.refs.Add(1)
 	return frame
 }
 
@@ -60,23 +58,15 @@ func (p *framePool) put(frame *avFrameWrapper) {
 	p.logger.Debug("Trying to put frame back into pool.")
 
 	if frame.isFreed.Load() {
-		p.logger.Warn("Frame was already freed. Cannot put.")
+		p.logger.Error("Frame was already freed. Cannot put.")
 		return
 	}
 	if frame.isInPool.Load() {
-		p.logger.Warn("Frame is already in pool. Cannot put")
+		p.logger.Error("Frame is already in pool. Cannot put")
 		return
 	}
 	if frame.isBeingServed.Load() {
-		p.logger.Debug("Frame is currently being served. Cannot put")
-		return
-	}
-
-	refs := frame.refs.Add(-1)
-	if refs < 0 {
-		panic("deref at 0 refs")
-	} else if refs > 0 {
-		p.logger.Debugf("Frame has %d refs, but must have 0 to be put back into pool.", refs)
+		p.logger.Error("Frame is currently being served. Cannot put")
 		return
 	}
 

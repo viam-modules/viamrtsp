@@ -69,10 +69,25 @@ type avFrameWrapper struct {
 	isBeingServed atomic.Bool
 	// isInPool indicates whether or not the frame wrapper is currently an item in the avFramePool
 	isInPool atomic.Bool
-	// refs counts how many times the frame is being referenced
-	refs atomic.Int32
+	// refCount counts how many times the frame is being referenced
+	refCount atomic.Int32
 }
 
+// incrementRef increments the ref count by 1.
+func (w *avFrameWrapper) incrementRef() {
+	w.refCount.Add(1)
+}
+
+// decrementRef decrements ref count by 1 and returns if ref count is now 0.
+func (w *avFrameWrapper) decrementRef() bool {
+	refCount := w.refCount.Add(-1)
+	if refCount < 0 {
+		panic("ref count is negative")
+	}
+	return refCount == 0
+}
+
+// free frees the underlying avFrame if it hasn't already been freed.
 func (w *avFrameWrapper) free() {
 	if w.isFreed.Load() {
 		return
@@ -83,6 +98,7 @@ func (w *avFrameWrapper) free() {
 	}
 }
 
+// toImage takes the underlying av frame and embeds it into a RGBA image struct.
 func (w *avFrameWrapper) toImage() image.Image {
 	dstFrameSize := C.av_image_get_buffer_size((int32)(w.frame.format), w.frame.width, w.frame.height, 1)
 	dstFramePtr := (*[1 << 30]uint8)(unsafe.Pointer(w.frame.data[0]))[:dstFrameSize:dstFrameSize]
@@ -219,6 +235,7 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 	// - The frame is initialized with an old height/width/buffer that no longer matches the
 	//   `src.frame`
 	d.dst = d.avFramePool.get()
+	d.dst.incrementRef()
 
 	if d.dst == nil {
 		return nil, errors.New("failed to obtain AVFrame from pool")
@@ -239,12 +256,12 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 		// We didn't like the frame we got from the pool, so we'll release the old one and create
 		// a fresh frame.
 		d.dst.free()
-		dstFrame, err := newAVFrameWrapper()
-		dstFrame.refs.Add(1)
+		newDst, err := newAVFrameWrapper()
+		newDst.incrementRef()
 		if err != nil {
 			return nil, errors.Errorf("AV frame allocation error while decoding: %v", err)
 		}
-		d.dst = dstFrame
+		d.dst = newDst
 		d.dst.frame.format = C.AV_PIX_FMT_RGBA
 		d.dst.frame.width = d.yuv420FrameBuffer.width
 		d.dst.frame.height = d.yuv420FrameBuffer.height
