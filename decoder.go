@@ -233,7 +233,7 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 	//   will be empty.
 	// - The frame is initialized with a height/width/buffer, all of the desired values/size.
 	// - The frame is initialized with an old height/width/buffer that no longer matches the
-	//   `src.frame`
+	//   source yuv frame.
 	d.dst = d.avFramePool.get()
 	d.dst.incrementRef()
 
@@ -273,7 +273,7 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 			return nil, errors.New("av_frame_get_buffer() err")
 		}
 
-		// Create a scratch space for converting YUV420 to RGB. In our use-case, the src + dst
+		// Create a scratch space for converting YUV420 to RGB. In our use-case, the yuv source + dst
 		// resolutions always match.
 		d.swsCtx = C.sws_getContext(d.yuv420FrameBuffer.width, d.yuv420FrameBuffer.height, C.AV_PIX_FMT_YUV420P,
 			d.dst.frame.width, d.dst.frame.height, (int32)(d.dst.frame.format), C.SWS_BILINEAR, nil, nil, nil)
