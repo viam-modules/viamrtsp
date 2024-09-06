@@ -221,11 +221,9 @@ func TestRTSPCameraPerformance(t *testing.T) {
 		var im image.Image
 		var frameAvailable bool
 
-		stream, err := rtspCam.Stream(timeoutCtx)
-		test.That(t, err, test.ShouldBeNil)
 		// A loop to keep trying to get the first image until a frame is available.
 		for {
-			img, f, err := stream.Next(timeoutCtx)
+			img, f, err := camera.ReadImage(timeoutCtx, rtspCam)
 			if err == nil && img != nil {
 				f()
 				im = img
@@ -247,7 +245,7 @@ func TestRTSPCameraPerformance(t *testing.T) {
 
 		// Performance testing: Loop over multiple GetImage calls
 		for i := 0; i < iterations; i++ {
-			img, f, err := stream.Next(timeoutCtx)
+			img, f, err := camera.ReadImage(timeoutCtx, rtspCam)
 			test.That(t, err, test.ShouldBeNil)
 			f()
 			test.That(t, img.Bounds(), test.ShouldResemble, image.Rect(0, 0, 480, 270))

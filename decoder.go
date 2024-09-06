@@ -13,6 +13,7 @@ import "C"
 import (
 	"fmt"
 	"image"
+	"sync"
 	"sync/atomic"
 	"unsafe"
 
@@ -68,21 +69,23 @@ type avFrameWrapper struct {
 	// isInPool indicates whether or not the frame wrapper is currently an item in the avFramePool
 	isInPool atomic.Bool
 	// refCount counts how many times the frame is being referenced
-	refCount atomic.Int32
+	refCount int
+	// mu protects critical sections involving the frame
+	mu sync.Mutex
 }
 
-// incrementRef increments the ref count by 1.
+// incrementRef increments the ref count by 1. Assumes mutex is acquired.
 func (w *avFrameWrapper) incrementRef() {
-	w.refCount.Add(1)
+	w.refCount++
 }
 
-// decrementRef decrements ref count by 1 and returns if ref count is now 0.
-func (w *avFrameWrapper) decrementRef() bool {
-	refCount := w.refCount.Add(-1)
-	if refCount < 0 {
-		panic("ref count is negative")
+// decrementRef decrements ref count by 1 and returns the new ref count. Assumes mutex is acquired.
+func (w *avFrameWrapper) decrementRef() int {
+	w.refCount--
+	if w.refCount < 0 {
+		panic("ref count became negative")
 	}
-	return refCount == 0
+	return w.refCount
 }
 
 // free frees the underlying avFrame if it hasn't already been freed.
@@ -233,7 +236,6 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 	// - The frame is initialized with an old height/width/buffer that no longer matches the
 	//   source yuv frame.
 	d.dst = d.avFramePool.get()
-	d.dst.incrementRef()
 
 	if d.dst == nil {
 		return nil, errors.New("failed to obtain AVFrame from pool")
@@ -255,7 +257,6 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 		// a fresh frame.
 		d.dst.free()
 		newDst, err := newAVFrameWrapper()
-		newDst.incrementRef()
 		if err != nil {
 			return nil, errors.Errorf("AV frame allocation error while decoding: %v", err)
 		}

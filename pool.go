@@ -99,4 +99,5 @@ func (p *framePool) close() {
 	p.logger.Debugf("getCount: %d", p.getCount)
 	p.logger.Debugf("putCount: %d", p.putCount)
 	p.logger.Debugf("newCount: %d", p.newCount)
+	p.logger.Debugf("cleanCount: %d", p.cleanCount)
 }
