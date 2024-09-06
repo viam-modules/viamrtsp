@@ -113,7 +113,10 @@ type rtspCamera struct {
 	activeBackgroundWorkers sync.WaitGroup
 
 	latestMJPEGImage atomic.Pointer[image.Image]
-	latestFrame      atomic.Pointer[avFrameWrapper]
+	latestFrame      *avFrameWrapper
+	// frameSwapMu protects critical sections where frame state changes (e.g. ref counting) need to be atomic
+	// with swapping out the latest frame.
+	frameSwapMu sync.Mutex
 	// We use a pool data structure to amortize the malloc cost of AVFrames and reduce pressure on memory
 	// management. We create one pool for the entire lifetime of the RTSP camera. Additionally, frames
 	// from the pool may be for a resolution that does not match the current image. The user of the pool
@@ -677,10 +680,15 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 			return *img, func() {}, nil
 		}
 
-		if rc.latestFrame.Load() == nil {
+		rc.frameSwapMu.Lock()
+		defer rc.frameSwapMu.Unlock()
+
+		if rc.latestFrame == nil {
 			return nil, func() {}, errors.New("no frame yet")
 		}
-		frame := rc.latestFrame.Load()
+		// Makes sure we use the same frame pointer in release as we do in this VideoReaderFunc.
+		frame := rc.latestFrame
+
 		frame.mu.Lock()
 		defer frame.mu.Unlock()
 
@@ -846,12 +854,15 @@ func (rc *rtspCamera) decodeAndStore(nalu []byte) error {
 // the previous frame by trying to put it back in the pool. It might not make
 // it back into the pool immediately or at all depending on its state.
 func (rc *rtspCamera) handleLatestFrame(newFrame *avFrameWrapper) {
+	rc.frameSwapMu.Lock()
+	defer rc.frameSwapMu.Unlock()
+
 	newFrame.mu.Lock()
 	defer newFrame.mu.Unlock()
 
 	newFrame.incrementRefs()
 
-	prevFrame := rc.latestFrame.Swap(newFrame)
+	prevFrame := rc.latestFrame
 	if prevFrame != nil {
 		prevFrame.mu.Lock()
 		defer prevFrame.mu.Unlock()
@@ -860,6 +871,7 @@ func (rc *rtspCamera) handleLatestFrame(newFrame *avFrameWrapper) {
 			rc.avFramePool.put(prevFrame)
 		}
 	}
+	rc.latestFrame = newFrame
 }
 
 func naluType(nalu []byte) h264.NALUType {

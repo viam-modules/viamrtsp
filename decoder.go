@@ -70,7 +70,7 @@ type avFrameWrapper struct {
 	isInPool atomic.Bool
 	// refCount counts how many times the frame is being referenced
 	refCount int
-	// mu protects critical sections involving the frame
+	// mu protects critical sections involving the frame and concurrent accesses to ref count
 	mu sync.Mutex
 }
 
