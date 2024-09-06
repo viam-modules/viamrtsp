@@ -9,7 +9,7 @@ import (
 type framePool struct {
 	frames       []*avFrameWrapper
 	maxNumFrames int
-	mu           sync.Mutex
+	framesMu     sync.Mutex
 	logger       logging.Logger
 
 	putCount   int
@@ -29,8 +29,8 @@ func newFramePool(maxNumFrames int, logger logging.Logger) *framePool {
 }
 
 func (p *framePool) get() *avFrameWrapper {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.framesMu.Lock()
+	defer p.framesMu.Unlock()
 
 	if len(p.frames) == 0 {
 		p.logger.Debug("No frames available in pool. Constructing new frame!")
@@ -66,8 +66,8 @@ func (p *framePool) put(frame *avFrameWrapper) {
 		return
 	}
 
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.framesMu.Lock()
+	defer p.framesMu.Unlock()
 
 	if len(p.frames) >= p.maxNumFrames {
 		frame.free()
@@ -83,8 +83,8 @@ func (p *framePool) put(frame *avFrameWrapper) {
 }
 
 func (p *framePool) close() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.framesMu.Lock()
+	defer p.framesMu.Unlock()
 
 	// Free remaining pool frames
 	p.logger.Debugf("Num pool frames remaining at close: %d", len(p.frames))

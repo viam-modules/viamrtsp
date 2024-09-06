@@ -23,12 +23,12 @@ import (
 
 // decoder is a generic FFmpeg decoder.
 type decoder struct {
-	logger            logging.Logger
-	codecCtx          *C.AVCodecContext
-	yuv420FrameBuffer *C.AVFrame
-	swsCtx            *C.struct_SwsContext
-	dst               *avFrameWrapper
-	avFramePool       *framePool
+	logger   logging.Logger
+	codecCtx *C.AVCodecContext
+	// The source yuv420 frame buffer we are decoding from
+	src         *C.AVFrame
+	swsCtx      *C.struct_SwsContext
+	avFramePool *framePool
 }
 
 type videoCodec int
@@ -74,13 +74,13 @@ type avFrameWrapper struct {
 	mu sync.Mutex
 }
 
-// incrementRef increments the ref count by 1. Assumes mutex is acquired.
-func (w *avFrameWrapper) incrementRef() {
+// incrementRefs increments the ref count by 1. Assumes mutex is acquired.
+func (w *avFrameWrapper) incrementRefs() {
 	w.refCount++
 }
 
-// decrementRef decrements ref count by 1 and returns the new ref count. Assumes mutex is acquired.
-func (w *avFrameWrapper) decrementRef() int {
+// decrementRefs decrements ref count by 1 and returns the new ref count. Assumes mutex is acquired.
+func (w *avFrameWrapper) decrementRefs() int {
 	w.refCount--
 	if w.refCount < 0 {
 		panic("ref count became negative")
@@ -90,12 +90,10 @@ func (w *avFrameWrapper) decrementRef() int {
 
 // free frees the underlying avFrame if it hasn't already been freed.
 func (w *avFrameWrapper) free() {
-	if w.isFreed.Load() {
-		panic("av frame was double freed")
-	}
-
 	if w.isFreed.CompareAndSwap(false, true) {
 		C.av_frame_free(&w.frame)
+	} else {
+		panic("av frame was double freed")
 	}
 }
 
@@ -164,17 +162,17 @@ func newDecoder(codecID C.enum_AVCodecID, avFramePool *framePool, logger logging
 		return nil, errors.New("avcodec_open2() failed")
 	}
 
-	yuv420FrameBuffer := C.av_frame_alloc()
-	if yuv420FrameBuffer == nil {
+	src := C.av_frame_alloc()
+	if src == nil {
 		C.avcodec_close(codecCtx)
 		return nil, errors.New("av_frame_alloc() failed")
 	}
 
 	return &decoder{
-		logger:            logger,
-		codecCtx:          codecCtx,
-		yuv420FrameBuffer: yuv420FrameBuffer,
-		avFramePool:       avFramePool,
+		logger:      logger,
+		codecCtx:    codecCtx,
+		src:         src,
+		avFramePool: avFramePool,
 	}, nil
 }
 
@@ -190,21 +188,16 @@ func newH265Decoder(avFramePool *framePool, logger logging.Logger) (*decoder, er
 
 // close closes the decoder.
 func (d *decoder) close() {
-	if d.dst != nil {
-		d.dst = nil
-	}
-
 	if d.swsCtx != nil {
 		C.sws_freeContext(d.swsCtx)
 	}
 
-	if d.yuv420FrameBuffer != nil {
-		C.av_frame_free(&d.yuv420FrameBuffer)
+	if d.src != nil {
+		C.av_frame_free(&d.src)
 	}
 
 	if d.codecCtx != nil {
 		C.avcodec_close(d.codecCtx)
-		d.codecCtx = nil
 	}
 }
 
@@ -223,7 +216,7 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 	}
 
 	// receive frame if available
-	res = C.avcodec_receive_frame(d.codecCtx, d.yuv420FrameBuffer)
+	res = C.avcodec_receive_frame(d.codecCtx, d.src)
 	if res < 0 {
 		//nolint:nilnil // TODO RSDK-8575: change to not nil, nil
 		return nil, nil
@@ -235,19 +228,19 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 	// - The frame is initialized with a height/width/buffer, all of the desired values/size.
 	// - The frame is initialized with an old height/width/buffer that no longer matches the
 	//   source yuv frame.
-	d.dst = d.avFramePool.get()
+	dst := d.avFramePool.get()
 
-	if d.dst == nil {
+	if dst == nil {
 		return nil, errors.New("failed to obtain AVFrame from pool")
 	}
-	if d.dst.isFreed.Load() {
+	if dst.isFreed.Load() {
 		return nil, errors.New("got frame from pool that was already freed")
 	}
 
 	// If the frame from the pool has the wrong size, (re-)initialize it.
-	if d.dst.frame.width != d.yuv420FrameBuffer.width || d.dst.frame.height != d.yuv420FrameBuffer.height {
+	if dst.frame.width != d.src.width || dst.frame.height != d.src.height {
 		d.logger.Debugf("(re)making frame due to AVFrame dimension discrepancy: Dst (width: %d, height: %d) vs Src (width: %d, height: %d)",
-			d.dst.frame.width, d.dst.frame.height, d.yuv420FrameBuffer.width, d.yuv420FrameBuffer.height)
+			dst.frame.width, dst.frame.height, d.src.width, d.src.height)
 		if d.swsCtx != nil {
 			// When the resolution changes, we must also free+reallocate the `swsCtx`.
 			C.sws_freeContext(d.swsCtx)
@@ -255,38 +248,38 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 
 		// We didn't like the frame we got from the pool, so we'll release the old one and create
 		// a fresh frame.
-		d.dst.free()
+		dst.free()
 		newDst, err := newAVFrameWrapper()
 		if err != nil {
 			return nil, errors.Errorf("AV frame allocation error while decoding: %v", err)
 		}
-		d.dst = newDst
-		d.dst.frame.format = C.AV_PIX_FMT_RGBA
-		d.dst.frame.width = d.yuv420FrameBuffer.width
-		d.dst.frame.height = d.yuv420FrameBuffer.height
-		d.dst.frame.color_range = C.AVCOL_RANGE_JPEG
+		dst = newDst
+		dst.frame.format = C.AV_PIX_FMT_RGBA
+		dst.frame.width = d.src.width
+		dst.frame.height = d.src.height
+		dst.frame.color_range = C.AVCOL_RANGE_JPEG
 
 		// This allocates the underlying byte array to contain the image data.
-		res = C.av_frame_get_buffer(d.dst.frame, 1)
+		res = C.av_frame_get_buffer(dst.frame, 1)
 		if res < 0 {
 			return nil, errors.New("av_frame_get_buffer() err")
 		}
 
 		// Create a scratch space for converting YUV420 to RGB. In our use-case, the yuv source + dst
 		// resolutions always match.
-		d.swsCtx = C.sws_getContext(d.yuv420FrameBuffer.width, d.yuv420FrameBuffer.height, C.AV_PIX_FMT_YUV420P,
-			d.dst.frame.width, d.dst.frame.height, (int32)(d.dst.frame.format), C.SWS_BILINEAR, nil, nil, nil)
+		d.swsCtx = C.sws_getContext(d.src.width, d.src.height, C.AV_PIX_FMT_YUV420P,
+			dst.frame.width, dst.frame.height, (int32)(dst.frame.format), C.SWS_BILINEAR, nil, nil, nil)
 		if d.swsCtx == nil {
 			return nil, errors.New("sws_getContext() err")
 		}
 	}
 
 	// convert frame from YUV420 to RGB
-	res = C.sws_scale(d.swsCtx, frameData(d.yuv420FrameBuffer), frameLineSize(d.yuv420FrameBuffer),
-		0, d.yuv420FrameBuffer.height, frameData(d.dst.frame), frameLineSize(d.dst.frame))
+	res = C.sws_scale(d.swsCtx, frameData(d.src), frameLineSize(d.src),
+		0, d.src.height, frameData(dst.frame), frameLineSize(dst.frame))
 	if res < 0 {
 		return nil, errors.New("sws_scale() err")
 	}
 
-	return d.dst, nil
+	return dst, nil
 }

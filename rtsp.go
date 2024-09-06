@@ -680,7 +680,7 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		if rc.latestFrame.Load() == nil {
 			return nil, func() {}, errors.New("no frame yet")
 		}
-		frame := rc.latestFrame.Load() // makes sure we reference the correct pointer for release.
+		frame := rc.latestFrame.Load()
 		frame.mu.Lock()
 		defer frame.mu.Unlock()
 
@@ -690,12 +690,12 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 			frame.mu.Lock()
 			defer frame.mu.Unlock()
 
-			if refCount := frame.decrementRef(); refCount == 0 {
+			if refCount := frame.decrementRefs(); refCount == 0 {
 				rc.avFramePool.put(frame)
 			}
 		}
 
-		frame.incrementRef()
+		frame.incrementRefs()
 		return frame.toImage(), release, nil
 	})
 	rc.VideoReader = reader
@@ -849,14 +849,14 @@ func (rc *rtspCamera) handleLatestFrame(newFrame *avFrameWrapper) {
 	newFrame.mu.Lock()
 	defer newFrame.mu.Unlock()
 
-	newFrame.incrementRef()
+	newFrame.incrementRefs()
 
 	prevFrame := rc.latestFrame.Swap(newFrame)
 	if prevFrame != nil {
 		prevFrame.mu.Lock()
 		defer prevFrame.mu.Unlock()
 
-		if refCount := prevFrame.decrementRef(); refCount == 0 {
+		if refCount := prevFrame.decrementRefs(); refCount == 0 {
 			rc.avFramePool.put(prevFrame)
 		}
 	}
