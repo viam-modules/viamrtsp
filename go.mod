@@ -1,4 +1,4 @@
-module github.com/erh/viamrtsp
+module github.com/viam-modules/viamrtsp
 
 go 1.21
 
