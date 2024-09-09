@@ -19,9 +19,9 @@ import (
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtph265"
 	"github.com/bluenviron/gortsplib/v4/pkg/liberrors"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
-	"github.com/erh/viamrtsp/formatprocessor"
 	"github.com/pion/rtp"
 	"github.com/pkg/errors"
+	"github.com/viam-modules/viamrtsp/formatprocessor"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/components/camera/rtppassthrough"
 	"go.viam.com/rdk/gostream"
@@ -33,7 +33,7 @@ import (
 )
 
 var (
-	family = resource.ModelNamespace("erh").WithFamily("viamrtsp")
+	family = resource.ModelNamespace("viam").WithFamily("viamrtsp")
 	// ModelAgnostic selects the best available codec.
 	ModelAgnostic = family.WithModel("rtsp")
 	// ModelH264 uses the h264 codec.
