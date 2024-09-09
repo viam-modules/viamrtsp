@@ -107,12 +107,12 @@ test: build-ffmpeg
 	CGO_CFLAGS=$(CGO_CFLAGS) CGO_LDFLAGS=$(CGO_LDFLAGS) go test -race -v ./...
 
 profile-cpu:
-	go test -v -cpuprofile cpu.prof -run "^TestRTSPCameraPerformance$$" -bench github.com/erh/viamrtsp
+	go test -v -cpuprofile cpu.prof -run "^TestRTSPCameraPerformance$$" -bench github.com/viam-modules/viamrtsp
 	go tool pprof -top cpu.prof > cpu-profile.txt
 	rm cpu.prof
 
 profile-memory:
-	go test -v -memprofile mem.prof -run "^TestRTSPCameraPerformance$$" -bench github.com/erh/viamrtsp
+	go test -v -memprofile mem.prof -run "^TestRTSPCameraPerformance$$" -bench github.com/viam-modules/viamrtsp
 	go tool pprof -top mem.prof > mem-profile.txt
 	rm mem.prof
 
