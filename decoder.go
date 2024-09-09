@@ -13,7 +13,6 @@ import "C"
 import (
 	"fmt"
 	"image"
-	"sync"
 	"sync/atomic"
 	"unsafe"
 
@@ -69,23 +68,21 @@ type avFrameWrapper struct {
 	// isInPool indicates whether or not the frame wrapper is currently an item in the avFramePool
 	isInPool atomic.Bool
 	// refCount counts how many times the frame is being referenced
-	refCount int
-	// mu protects critical sections involving the frame and concurrent accesses to ref count
-	mu sync.Mutex
+	refCount atomic.Int64
 }
 
-// incrementRefs increments the ref count by 1. Assumes mutex is acquired.
+// incrementRefs increments the ref count by 1.
 func (w *avFrameWrapper) incrementRefs() {
-	w.refCount++
+	w.refCount.Add(1)
 }
 
-// decrementRefs decrements ref count by 1 and returns the new ref count. Assumes mutex is acquired.
-func (w *avFrameWrapper) decrementRefs() int {
-	w.refCount--
-	if w.refCount < 0 {
+// decrementRefs decrements ref count by 1 and returns the new ref count.
+func (w *avFrameWrapper) decrementRefs() int64 {
+	refCount := w.refCount.Add(-1)
+	if refCount < 0 {
 		panic("ref count became negative")
 	}
-	return w.refCount
+	return refCount
 }
 
 // free frees the underlying avFrame if it hasn't already been freed.

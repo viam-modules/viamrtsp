@@ -688,22 +688,16 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		}
 		// Makes sure we use the same frame pointer in release as we do in this VideoReaderFunc.
 		frame := rc.latestFrame
-
-		frame.mu.Lock()
-		defer frame.mu.Unlock()
+		frame.incrementRefs()
 
 		release := func() {
 			// When the caller is done with the image, we return the AVFrame to the pool such
 			// that we can re-use its allocated byte buffer.
-			frame.mu.Lock()
-			defer frame.mu.Unlock()
-
 			if refCount := frame.decrementRefs(); refCount == 0 {
 				rc.avFramePool.put(frame)
 			}
 		}
 
-		frame.incrementRefs()
 		return frame.toImage(), release, nil
 	})
 	rc.VideoReader = reader
@@ -857,20 +851,13 @@ func (rc *rtspCamera) handleLatestFrame(newFrame *avFrameWrapper) {
 	rc.frameSwapMu.Lock()
 	defer rc.frameSwapMu.Unlock()
 
-	newFrame.mu.Lock()
-	defer newFrame.mu.Unlock()
-
-	newFrame.incrementRefs()
-
 	prevFrame := rc.latestFrame
 	if prevFrame != nil {
-		prevFrame.mu.Lock()
-		defer prevFrame.mu.Unlock()
-
 		if refCount := prevFrame.decrementRefs(); refCount == 0 {
 			rc.avFramePool.put(prevFrame)
 		}
 	}
+	newFrame.incrementRefs()
 	rc.latestFrame = newFrame
 }
 
