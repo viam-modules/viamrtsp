@@ -182,6 +182,78 @@ func TestRTSPConfig(t *testing.T) {
 	test.That(t, err, test.ShouldBeNil)
 }
 
+// Dedicated test for performance benchmarking.
+func TestRTSPCameraPerformance(t *testing.T) {
+	SetLibAVLogLevelFatal()
+	logger := logging.NewTestLogger(t)
+	bURL, err := base.ParseURL("rtsp://127.0.0.1:32512")
+	test.That(t, err, test.ShouldBeNil)
+
+	t.Run("PerformanceTestGetImage", func(t *testing.T) {
+		forma := &format.H264{
+			PayloadTyp:        96,
+			PacketizationMode: 1,
+			SPS: []uint8{
+				0x67, 0x64, 0x00, 0x15, 0xac, 0xb2, 0x03, 0xc1,
+				0x1f, 0xd6, 0x02, 0xdc, 0x08, 0x08, 0x16, 0x94,
+				0x00, 0x00, 0x03, 0x00, 0x04, 0x00, 0x00, 0x03,
+				0x00, 0xf0, 0x3c, 0x58, 0xb9, 0x20,
+			},
+			PPS: []uint8{0x68, 0xeb, 0xc3, 0xcb, 0x22, 0xc0},
+		}
+
+		h, closeFunc := newH264ServerHandler(t, forma, bURL, logger)
+		defer closeFunc()
+		test.That(t, h.s.Start(), test.ShouldBeNil)
+
+		timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
+		defer timeoutCancel()
+		config := resource.NewEmptyConfig(camera.Named("foo"), ModelAgnostic)
+		config.ConvertedAttributes = &Config{Address: "rtsp://" + h.s.RTSPAddress}
+		rtspCam, err := newRTSPCamera(timeoutCtx, nil, config, logger)
+		test.That(t, err, test.ShouldBeNil)
+		defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
+
+		imageTimeoutCtx, imageTimeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
+		defer imageTimeoutCancel()
+
+		const iterations = 100
+		var im image.Image
+		var frameAvailable bool
+
+		// A loop to keep trying to get the first image until a frame is available.
+		for {
+			img, f, err := camera.ReadImage(timeoutCtx, rtspCam)
+			if err == nil && img != nil {
+				f()
+				im = img
+				frameAvailable = true
+				break
+			}
+
+			if imageTimeoutCtx.Err() != nil {
+				t.Fatalf("Timeout waiting for the first frame")
+			}
+		}
+
+		// Validate the first retrieved image
+		test.That(t, im.Bounds(), test.ShouldResemble, image.Rect(0, 0, 480, 270))
+
+		if !frameAvailable {
+			t.Fatal("No frame became available before starting the performance test")
+		}
+
+		// Performance testing: Loop over multiple GetImage calls
+		for i := 0; i < iterations; i++ {
+			img, f, err := camera.ReadImage(timeoutCtx, rtspCam)
+			test.That(t, err, test.ShouldBeNil)
+			f()
+			test.That(t, img.Bounds(), test.ShouldResemble, image.Rect(0, 0, 480, 270))
+			time.Sleep(50 * time.Millisecond)
+		}
+	})
+}
+
 type serverHandler struct {
 	s                  *gortsplib.Server
 	wg                 sync.WaitGroup
@@ -327,6 +399,7 @@ func newH264ServerHandler(
 				aus, err := h264.AnnexBUnmarshal(b)
 				test.That(t, err, test.ShouldBeNil)
 
+				// Continuously send packets until the server is stopped
 				for range ticker.C {
 					if stopCtx.Err() != nil {
 						return

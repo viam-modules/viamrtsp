@@ -112,7 +112,16 @@ type rtspCamera struct {
 
 	activeBackgroundWorkers sync.WaitGroup
 
-	latestFrame atomic.Pointer[image.Image]
+	latestMJPEGImage atomic.Pointer[image.Image]
+	latestFrame      *avFrameWrapper
+	// frameSwapMu protects critical sections where frame state changes (e.g. ref counting) need to be atomic
+	// with swapping out the latest frame.
+	frameSwapMu sync.Mutex
+	// We use a pool data structure to amortize the malloc cost of AVFrames and reduce pressure on memory
+	// management. We create one pool for the entire lifetime of the RTSP camera. Additionally, frames
+	// from the pool may be for a resolution that does not match the current image. The user of the pool
+	// is responsible for the underlying frame contents and further initializing it and/or throwing it away.
+	avFramePool *framePool
 
 	logger logging.Logger
 
@@ -131,6 +140,7 @@ func (rc *rtspCamera) Close(_ context.Context) error {
 	rc.unsubscribeAll()
 	rc.activeBackgroundWorkers.Wait()
 	rc.closeConnection()
+	rc.avFramePool.close()
 	return nil
 }
 
@@ -283,7 +293,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 	}
 
 	// setup H264 -> raw frames decoder
-	rc.rawDecoder, err = newH264Decoder(rc.logger)
+	rc.rawDecoder, err = newH264Decoder(rc.avFramePool, rc.logger)
 	if err != nil {
 		return errors.Wrap(err, "creating H264 raw decoder")
 	}
@@ -392,7 +402,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		return errors.Wrap(err, "creating H265 RTP decoder")
 	}
 
-	rc.rawDecoder, err = newH265Decoder(rc.logger)
+	rc.rawDecoder, err = newH265Decoder(rc.avFramePool, rc.logger)
 	if err != nil {
 		return errors.Wrap(err, "creating H265 raw decoder")
 	}
@@ -438,7 +448,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		}
 
 		for _, nalu := range au {
-			lastImage, err := rc.rawDecoder.decode(nalu)
+			frame, err := rc.rawDecoder.decode(nalu)
 			if err != nil {
 				// This error is created with `github.com/pkg/errors`. Explicitly call `Error()` to
 				// avoid logging the stacktrace.
@@ -446,8 +456,8 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 				return
 			}
 
-			if lastImage != nil {
-				rc.latestFrame.Store(&lastImage)
+			if frame != nil {
+				rc.handleLatestFrame(frame)
 			}
 		}
 	})
@@ -495,7 +505,7 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 			return
 		}
 
-		rc.latestFrame.Store(&img)
+		rc.latestMJPEGImage.Store(&img)
 	})
 
 	return nil
@@ -635,6 +645,9 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		logger.Error(err.Error())
 		return nil, err
 	}
+
+	framePool := newFramePool(5, logger)
+
 	rtpPassthroughCtx, rtpPassthroughCancelCauseFn := context.WithCancelCause(context.Background())
 	rc := &rtspCamera{
 		model:                       conf.Model,
@@ -643,6 +656,7 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		bufAndCBByID:                make(map[rtppassthrough.SubscriptionID]bufAndCB),
 		rtpPassthroughCtx:           rtpPassthroughCtx,
 		rtpPassthroughCancelCauseFn: rtpPassthroughCancelCauseFn,
+		avFramePool:                 framePool,
 		logger:                      logger,
 	}
 	codecInfo, err := modelToCodec(conf.Model)
@@ -658,11 +672,33 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 	}
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	reader := gostream.VideoReaderFunc(func(_ context.Context) (image.Image, func(), error) {
-		latest := rc.latestFrame.Load()
-		if latest == nil {
+		if videoCodec(rc.currentCodec.Load()) == MJPEG {
+			img := rc.latestMJPEGImage.Load()
+			if img == nil {
+				return nil, func() {}, errors.New("no mjpeg frame yet")
+			}
+			return *img, func() {}, nil
+		}
+
+		rc.frameSwapMu.Lock()
+		defer rc.frameSwapMu.Unlock()
+
+		if rc.latestFrame == nil {
 			return nil, func() {}, errors.New("no frame yet")
 		}
-		return *latest, func() {}, nil
+		// Makes sure we use the same frame pointer in release as we do in this VideoReaderFunc.
+		frame := rc.latestFrame
+		frame.incrementRefs()
+
+		release := func() {
+			// When the caller is done with the image, we return the AVFrame to the pool such
+			// that we can re-use its allocated byte buffer.
+			if refCount := frame.decrementRefs(); refCount == 0 {
+				rc.avFramePool.put(frame)
+			}
+		}
+
+		return frame.toImage(), release, nil
 	})
 	rc.VideoReader = reader
 	rc.cancelCtx = cancelCtx
@@ -798,14 +834,31 @@ func H2645StartCode() []byte {
 }
 
 func (rc *rtspCamera) decodeAndStore(nalu []byte) error {
-	image, err := rc.rawDecoder.decode(nalu)
+	frame, err := rc.rawDecoder.decode(nalu)
 	if err != nil {
 		return err
 	}
-	if image != nil {
-		rc.latestFrame.Store(&image)
+	if frame != nil {
+		rc.handleLatestFrame(frame)
 	}
 	return nil
+}
+
+// handleLatestFrame sets the new latest frame, and cleans up
+// the previous frame by trying to put it back in the pool. It might not make
+// it back into the pool immediately or at all depending on its state.
+func (rc *rtspCamera) handleLatestFrame(newFrame *avFrameWrapper) {
+	rc.frameSwapMu.Lock()
+	defer rc.frameSwapMu.Unlock()
+
+	prevFrame := rc.latestFrame
+	if prevFrame != nil {
+		if refCount := prevFrame.decrementRefs(); refCount == 0 {
+			rc.avFramePool.put(prevFrame)
+		}
+	}
+	newFrame.incrementRefs()
+	rc.latestFrame = newFrame
 }
 
 func naluType(nalu []byte) h264.NALUType {
