@@ -82,7 +82,7 @@ ifeq ($(TARGET_OS),linux)
 	CGO_LDFLAGS := "$(CGO_LDFLAGS) -l:libjpeg.a"
 endif
 
-.PHONY: build-ffmpeg tool-install gofmt lint test update-rdk module clean clean-all
+.PHONY: build-ffmpeg tool-install gofmt lint test profile-cpu profile-memory update-rdk module clean clean-all
 
 # We set GOOS, GOARCH, and GO_TAGS to support cross-compilation for android targets.
 $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
@@ -105,6 +105,16 @@ lint: gofmt tool-install build-ffmpeg
 
 test: build-ffmpeg
 	CGO_CFLAGS=$(CGO_CFLAGS) CGO_LDFLAGS=$(CGO_LDFLAGS) go test -race -v ./...
+
+profile-cpu:
+	go test -v -cpuprofile cpu.prof -run "^TestRTSPCameraPerformance$$" -bench github.com/erh/viamrtsp
+	go tool pprof -top cpu.prof > cpu-profile.txt
+	rm cpu.prof
+
+profile-memory:
+	go test -v -memprofile mem.prof -run "^TestRTSPCameraPerformance$$" -bench github.com/erh/viamrtsp
+	go tool pprof -top mem.prof > mem-profile.txt
+	rm mem.prof
 
 update-rdk:
 	go get go.viam.com/rdk@latest
