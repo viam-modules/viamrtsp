@@ -26,7 +26,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v2
       with:
-        go-version: 1.21
+        go-version: 1.21.13
 
     - name: Build viamrtsp binary and package module
       run: |
