@@ -1,16 +1,8 @@
 name: Build & publish module to registry
 
-# on:
-#   release:
-#     types: [published]
-
 on:
-  push:
-    branches:
-      - "**"
-  pull_request:
-    branches:
-      - "**"
+  release:
+    types: [published]
 
 jobs:
   publish:
@@ -28,7 +20,7 @@ jobs:
       with:
         go-version: 1.21.13
 
-    - name: Build viamrtsp binary and package module
+    - name: Build and package
       run: |
         if [[ "${{ matrix.platform }}" == "linux/amd64" ]]; then
           TARGET_OS=linux TARGET_ARCH=amd64 make module
@@ -44,6 +36,6 @@ jobs:
         meta-path: meta.json
         module-path: module.tar.gz
         platform: ${{ matrix.platform }}
-        version: "0.1.0-rc-2"
-        key-id: ${{ secrets.viam_key_id }}
-        key-value: ${{ secrets.viam_key_value }}
+        version: ${{ github.ref_name }}
+        key-id: ${{ secrets.VIAM_DEV_API_KEY_ID }}
+        key-value: ${{ secrets.VIAM_DEV_API_KEY }}

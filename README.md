@@ -1,11 +1,11 @@
-# [`viamrtsp` module](https://app.viam.com/module/erh/viamrtsp)
+# [`viamrtsp` module](https://app.viam.com/module/viam/viamrtsp)
 
 This module implements the [`"rdk:component:camera"` API](https://docs.viam.com/components/camera/) for real-time streaming protocol (RTSP) enabled cameras.
 Four models are provided:
-* `erh:viamrtsp:rtsp` - Codec agnostic. Will auto detect the codec of the `rtsp_address`.
-* `erh:viamrtsp:rtsp-h264` - Only supports the H264 codec.
-* `erh:viamrtsp:rtsp-h265` - Only supports the H265 codec.
-* `erh:viamrtsp:rtsp-mjpeg` - Only supports the M-JPEG codec.
+* `viam:viamrtsp:rtsp` - Codec agnostic. Will auto detect the codec of the `rtsp_address`.
+* `viam:viamrtsp:rtsp-h264` - Only supports the H264 codec.
+* `viam:viamrtsp:rtsp-h265` - Only supports the H265 codec.
+* `viam:viamrtsp:rtsp-mjpeg` - Only supports the M-JPEG codec.
 
 ## Configure your `viamrtsp` camera
 
@@ -41,7 +41,7 @@ The following attributes are available for all models of `viamrtsp` cameras:
       "name": "your-rtsp-cam",
       "namespace": "rdk",
       "type": "camera",
-      "model": "erh:viamrtsp:rtsp",
+      "model": "viam:viamrtsp:rtsp",
       "attributes": {
         "rtp_passthrough": true,
         "rtsp_address": "rtsp://foo:bar@192.168.10.10:554/stream"
@@ -51,8 +51,8 @@ The following attributes are available for all models of `viamrtsp` cameras:
   "modules": [
     {
       "type": "registry",
-      "name": "erh_viamrtsp",
-      "module_id": "erh:viamrtsp",
+      "name": "viam_viamrtsp",
+      "module_id": "viam:viamrtsp",
       "version": "latest"
     }
   ]

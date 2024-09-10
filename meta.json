@@ -1,24 +1,24 @@
 {
-  "module_id": "erh:viamrtsp",
+  "module_id": "viam:viamrtsp",
   "visibility": "public",
-  "url": "https://github.com/erh/viamrtsp",
+  "url": "https://github.com/viam-modules/viamrtsp",
   "description": "module for rtsp, currently supports x264 and x265",
   "models": [
     {
       "api": "rdk:component:camera",
-      "model": "erh:viamrtsp:rtsp"
+      "model": "viam:viamrtsp:rtsp"
     },
     {
       "api": "rdk:component:camera",
-      "model": "erh:viamrtsp:rtsp-h264"
+      "model": "viam:viamrtsp:rtsp-h264"
     },
     {
       "api": "rdk:component:camera",
-      "model": "erh:viamrtsp:rtsp-h265"
+      "model": "viam:viamrtsp:rtsp-h265"
     },
     {
       "api": "rdk:component:camera",
-      "model": "erh:viamrtsp:rtsp-mjpeg"
+      "model": "viam:viamrtsp:rtsp-mjpeg"
     }
   ],
   "entrypoint": "bin/viamrtsp"

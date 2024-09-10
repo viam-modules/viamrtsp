@@ -4,7 +4,7 @@ package main
 import (
 	"context"
 
-	"github.com/erh/viamrtsp"
+	"github.com/viam-modules/viamrtsp"
 	"go.uber.org/zap/zapcore"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
