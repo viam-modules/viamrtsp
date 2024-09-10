@@ -1,24 +1,24 @@
-name: Build & publish module to registry 
+name: Build & publish module to registry
+
+# on:
+#   release:
+#     types: [published]
 
 on:
-  release:
-    types: [published]
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - "**"
 
 jobs:
   publish:
     strategy:
       matrix:
         platform: [linux/amd64, linux/arm64, android/arm64]
-        runner: [ubuntu-latest, buildjet-8vcpu-ubuntu-2204-arm]
-        include:
-          - platform: linux/amd64
-            runner: ubuntu-latest
-          - platform: linux/arm64
-            runner: buildjet-8vcpu-ubuntu-2204-arm
-          - platform: android/arm64
-            runner: ubuntu-latest
-
-    runs-on: ${{ matrix.runner }}
+      
+    runs-on: ${{ matrix.platform == 'linux/arm64' && 'buildjet-8vcpu-ubuntu-2204-arm' || 'ubuntu-latest' }}
 
     steps:
     - uses: actions/checkout@v3
@@ -44,6 +44,6 @@ jobs:
         meta-path: meta.json
         module-path: module.tar.gz
         platform: ${{ matrix.platform }}
-        version: ${{ github.ref_name }}
+        version: "0.1.0-rc-2"
         key-id: ${{ secrets.viam_key_id }}
         key-value: ${{ secrets.viam_key_value }}
