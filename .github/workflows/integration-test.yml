@@ -6,14 +6,15 @@ jobs:
   build-and-test:
     strategy:
       matrix:
-        runner: [ubuntu-latest, buildjet-8vcpu-ubuntu-2204-arm]
-        platform: 
-          - name: linux/amd64
+        platform:
+          - runner: ubuntu-latest
+            arch: amd64
             mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.6.0/mediamtx_v1.6.0_linux_amd64.tar.gz
             viam_server_url: https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-x86_64.AppImage
             executable_path: "'$(realpath bin/linux-amd64/viamrtsp)'"
-          - name: linux/arm64
-            mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.6.0/mediamtx_v1.6.0_linux_arm64.tar.gz
+          - runner: buildjet-8vcpu-ubuntu-2204-arm
+            arch: arm64
+            mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.6.0/mediamtx_v1.6.0_linux_arm64v8.tar.gz
             viam_server_url: https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-aarch64.AppImage
             executable_path: "'$(realpath bin/linux-arm64/viamrtsp)'"
         config:
@@ -25,7 +26,7 @@ jobs:
             codec: "mjpeg"
             extra_ffmpeg_args: "-huffman 0"
 
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ matrix.platform.runner }}
 
     steps:
     - uses: actions/checkout@v3
@@ -61,7 +62,7 @@ jobs:
         chmod 755 viam-server
         sudo ./viam-server --aix-install
 
-    # Generate config from within yml because relative paths don't reliably work for module exec paths
+    # Generate config with the correct executable path for each platform
     - name: Generate viam-server config
       run: |
         echo '{
