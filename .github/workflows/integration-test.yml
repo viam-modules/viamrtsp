@@ -11,12 +11,10 @@ jobs:
             arch: amd64
             mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.6.0/mediamtx_v1.6.0_linux_amd64.tar.gz
             viam_server_url: https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-x86_64.AppImage
-            executable_path: "'$(realpath bin/linux-amd64/viamrtsp)'"
           - runner: buildjet-8vcpu-ubuntu-2204-arm
             arch: arm64
             mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.6.0/mediamtx_v1.6.0_linux_arm64v8.tar.gz
             viam_server_url: https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-aarch64.AppImage
-            executable_path: "'$(realpath bin/linux-arm64/viamrtsp)'"
         config:
           - name: "h264"
             codec: "libx264"
@@ -34,7 +32,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v2
       with:
-        go-version: 1.21
+        go-version: 1.21.13
     
     - name: Install dependencies
       run: |
@@ -54,7 +52,8 @@ jobs:
       run: ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec ${{ matrix.config.codec }} ${{ matrix.config.extra_ffmpeg_args }} -pix_fmt yuv420p -f rtsp -rtsp_transport tcp rtsp://0.0.0.0:8554/live.stream &
       
     - name: Build viamrtsp binary
-      run: make
+      run: |
+        TARGET_OS=linux TARGET_ARCH=${{ matrix.platform.arch }} make module
       
     - name: Install viam-server
       run: |
@@ -62,9 +61,10 @@ jobs:
         chmod 755 viam-server
         sudo ./viam-server --aix-install
 
-    # Generate config with the correct executable path for each platform
+    # Find the viamrtsp binary dynamically and generate the config
     - name: Generate viam-server config
       run: |
+        VIAMRTSP_PATH=$(find $(pwd) -name viamrtsp -type f) && \
         echo '{
           "components": [
             {
@@ -82,7 +82,7 @@ jobs:
             {
               "type": "local",
               "name": "viamrtsp",
-              "executable_path": '${{ matrix.platform.executable_path }}'
+              "executable_path": "'$VIAMRTSP_PATH'"
             }
           ]
         }' > "integration-test-config-${{ matrix.config.name }}.json"
