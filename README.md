@@ -16,8 +16,9 @@ Copy and paste the following attributes template into the resulting component's 
 
 ```
 {
-   "rtp_passthrough": true,
-   "rtsp_address": "rtsp://foo:bar@192.168.10.10:554/stream"
+  "rtsp_address": "rtsp://foo:bar@192.168.10.10:554/stream",
+  "rtp_passthrough": true,
+  "multicast_address": "239.255.255.250:3702"
 }
 ```
 
@@ -31,6 +32,7 @@ The following attributes are available for all models of `viamrtsp` cameras:
 | ------- | ------ | ------------ | ----------- |
 | `rtsp_address` | string | **Required** | The RTSP address where the camera streams. |
 | `rtp_passthrough` | bool | Optional | RTP passthrough mode (which improves video streaming efficiency) is supported with the H264 codec if this attribute is set to `true`. <br> Default: `false` |
+| `multicast_address` | string | Optional | The multicast address field specifies the UDP multicast address used for ONVIF RTSP camera discovery. Default: `"239.255.255.250:3702"`|
 
 ### Example configuration
 

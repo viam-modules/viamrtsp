@@ -13,6 +13,10 @@ import (
 	"go.viam.com/rdk/logging"
 )
 
+const (
+	defaultMulticastAddress = "239.255.255.250:3702"
+)
+
 // RTSPDiscovery is responsible for discovering RTSP camera devices using WS-Discovery and ONVIF.
 type RTSPDiscovery struct {
 	multicastAddress string
@@ -20,13 +24,17 @@ type RTSPDiscovery struct {
 }
 
 // NewRTSPDiscovery creates a new RTSPDiscovery instance with default values.
-func NewRTSPDiscovery(logger logging.Logger) *RTSPDiscovery {
+func NewRTSPDiscovery(multicastAddress string, logger logging.Logger) *RTSPDiscovery {
+	if multicastAddress == "" {
+		multicastAddress = defaultMulticastAddress
+	}
 	return &RTSPDiscovery{
-		multicastAddress: "239.255.255.250:3702", // Standard WS-Discovery multicast address
+		multicastAddress: multicastAddress,
 		logger:           logger,
 	}
 }
 
+// generateDiscoveryMessage adds a message ID per xml message to adhere to standard formatting.
 func (d *RTSPDiscovery) generateDiscoveryMessage() string {
 	messageID := uuid.New().String()
 	return fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
@@ -46,7 +54,7 @@ func (d *RTSPDiscovery) generateDiscoveryMessage() string {
 	</SOAP-ENV:Envelope>`, messageID)
 }
 
-// discoverRTSPAddresses performs a WS-Discovery and extracts RTSP addresses from the XAddrs field.
+// discoverRTSPAddresses performs a WS-Discovery and extracts http IP addresses from the XAddrs field.
 func (d *RTSPDiscovery) discoverRTSPAddresses() ([]string, error) {
 	var discoveredAddresses []string
 
@@ -61,7 +69,6 @@ func (d *RTSPDiscovery) discoverRTSPAddresses() ([]string, error) {
 	}
 	defer conn.Close()
 
-	// Send the dynamically generated discovery message
 	_, err = conn.WriteToUDP([]byte(d.generateDiscoveryMessage()), addr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send discovery message: %w", err)

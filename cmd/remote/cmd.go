@@ -40,7 +40,7 @@ func mainWithArgs(ctx context.Context, _ []string, logger logging.Logger) error 
 					"rtsp_address": os.Args[2],
 				},
 				ConvertedAttributes: &viamrtsp.Config{
-					Address: os.Args[2],
+					RTSPAddress: os.Args[2],
 				},
 			},
 		},

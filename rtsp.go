@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"image"
 	"image/jpeg"
+	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -58,7 +59,8 @@ func init() {
 
 // Config are the config attributes for an RTSP camera model.
 type Config struct {
-	Address          string                             `json:"rtsp_address"`
+	RTSPAddress      string                             `json:"rtsp_address"`
+	MulticastAddress string                             `json:"multicast_address"`
 	RTPPassthrough   bool                               `json:"rtp_passthrough"`
 	IntrinsicParams  *transform.PinholeCameraIntrinsics `json:"intrinsic_parameters,omitempty"`
 	DistortionParams *transform.BrownConrady            `json:"distortion_parameters,omitempty"`
@@ -72,10 +74,17 @@ type codecFormat struct {
 
 // Validate checks to see if the attributes of the model are valid.
 func (conf *Config) Validate(path string) ([]string, error) {
-	_, err := base.ParseURL(conf.Address)
+	_, err := base.ParseURL(conf.RTSPAddress)
 	if err != nil {
-		return nil, fmt.Errorf("invalid address '%s' for component at path '%s': %w", conf.Address, path, err)
+		return nil, fmt.Errorf("invalid address '%s' for component at path '%s': %w", conf.RTSPAddress, path, err)
 	}
+
+	if conf.MulticastAddress != "" {
+		if err := ValidateMulticastAddress(conf.MulticastAddress); err != nil {
+			return nil, fmt.Errorf("invalid multicast address '%s' for component at path '%s': %w", conf.MulticastAddress, path, err)
+		}
+	}
+
 	if conf.IntrinsicParams != nil {
 		if err := conf.IntrinsicParams.CheckValid(); err != nil {
 			return nil, fmt.Errorf("invalid intrinsic parameters for component at path '%s': %w", path, err)
@@ -88,6 +97,25 @@ func (conf *Config) Validate(path string) ([]string, error) {
 	}
 
 	return nil, nil
+}
+
+// ValidateMulticastAddress validates a multicast IP address.
+func ValidateMulticastAddress(address string) error {
+	ip := net.ParseIP(address)
+	if ip == nil {
+		return fmt.Errorf("invalid IP address: %s", address)
+	}
+
+	if !ip.IsMulticast() {
+		return fmt.Errorf("%s is not a multicast address", address)
+	}
+
+	// Check if the address is within the valid multicast range
+	if ip.To4()[0] < 224 || ip.To4()[0] > 239 {
+		return fmt.Errorf("%s is not a valid multicast address", address)
+	}
+
+	return nil
 }
 
 type (
@@ -178,11 +206,12 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 				}
 			}
 
+			// TODO(hexbabe): Delete when actual discovery API is in.
 			addresses, err := rc.discoverer.discoverRTSPAddresses()
 			if err != nil {
-				rc.logger.Errorf("RTSP address discovery error: %s", err)
+				rc.logger.Debugf("RTSP address discovery error: %s", err)
 			}
-			rc.logger.Infof("Discovered addresses: %v\n", addresses)
+			rc.logger.Debugf("Discovered addresses: %v", addresses)
 		}
 	}, rc.activeBackgroundWorkers.Done)
 }
@@ -647,7 +676,7 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		logger.Error(err.Error())
 		return nil, err
 	}
-	u, err := base.ParseURL(newConf.Address)
+	u, err := base.ParseURL(newConf.RTSPAddress)
 	if err != nil {
 		logger.Error(err.Error())
 		return nil, err
@@ -663,7 +692,7 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		bufAndCBByID:                make(map[rtppassthrough.SubscriptionID]bufAndCB),
 		rtpPassthroughCtx:           rtpPassthroughCtx,
 		rtpPassthroughCancelCauseFn: rtpPassthroughCancelCauseFn,
-		discoverer:                  NewRTSPDiscovery(logger),
+		discoverer:                  NewRTSPDiscovery(newConf.MulticastAddress, logger),
 		avFramePool:                 framePool,
 		logger:                      logger,
 	}

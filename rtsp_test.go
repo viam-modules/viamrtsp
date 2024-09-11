@@ -49,7 +49,7 @@ func TestRTSPCamera(t *testing.T) {
 			timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
 			defer timeoutCancel()
 			config := resource.NewEmptyConfig(camera.Named("foo"), ModelAgnostic)
-			config.ConvertedAttributes = &Config{Address: "rtsp://" + h.s.RTSPAddress}
+			config.ConvertedAttributes = &Config{RTSPAddress: "rtsp://" + h.s.RTSPAddress}
 			rtspCam, err := newRTSPCamera(timeoutCtx, nil, config, logger)
 			test.That(t, err, test.ShouldBeNil)
 			defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
@@ -64,7 +64,7 @@ func TestRTSPCamera(t *testing.T) {
 			timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
 			defer timeoutCancel()
 			config := resource.NewEmptyConfig(camera.Named("foo"), ModelAgnostic)
-			config.ConvertedAttributes = &Config{Address: "rtsp://" + h.s.RTSPAddress}
+			config.ConvertedAttributes = &Config{RTSPAddress: "rtsp://" + h.s.RTSPAddress}
 			rtspCam, err := newRTSPCamera(timeoutCtx, nil, config, logger)
 			test.That(t, err, test.ShouldBeNil)
 			defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
@@ -94,7 +94,7 @@ func TestRTSPCamera(t *testing.T) {
 				timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
 				defer timeoutCancel()
 				config := resource.NewEmptyConfig(camera.Named("foo"), ModelAgnostic)
-				config.ConvertedAttributes = &Config{Address: "rtsp://" + h.s.RTSPAddress, RTPPassthrough: true}
+				config.ConvertedAttributes = &Config{RTSPAddress: "rtsp://" + h.s.RTSPAddress, RTPPassthrough: true}
 				rtspCam, err := newRTSPCamera(timeoutCtx, nil, config, logger)
 				test.That(t, err, test.ShouldBeNil)
 				defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
@@ -129,7 +129,7 @@ func TestRTSPCamera(t *testing.T) {
 				timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
 				defer timeoutCancel()
 				config := resource.NewEmptyConfig(camera.Named("foo"), ModelAgnostic)
-				config.ConvertedAttributes = &Config{Address: "rtsp://" + h.s.RTSPAddress}
+				config.ConvertedAttributes = &Config{RTSPAddress: "rtsp://" + h.s.RTSPAddress}
 				rtspCam, err := newRTSPCamera(timeoutCtx, nil, config, logger)
 				test.That(t, err, test.ShouldBeNil)
 				defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
@@ -147,25 +147,28 @@ func TestRTSPCamera(t *testing.T) {
 
 func TestRTSPConfig(t *testing.T) {
 	// success
-	rtspConf := &Config{Address: "rtsp://example.com:5000"}
+	rtspConf := &Config{RTSPAddress: "rtsp://example.com:5000"}
 	_, err := rtspConf.Validate("path")
 	test.That(t, err, test.ShouldBeNil)
+
 	// badly formatted rtsp address
-	rtspConf = &Config{Address: "http://example.com"}
+	rtspConf = &Config{RTSPAddress: "http://example.com"}
 	_, err = rtspConf.Validate("path")
 	test.That(t, err, test.ShouldNotBeNil)
 	test.That(t, err.Error(), test.ShouldContainSubstring, "unsupported scheme")
+
 	// bad intrinsic parameters
 	rtspConf = &Config{
-		Address:         "rtsp://example.com:5000",
+		RTSPAddress:     "rtsp://example.com:5000",
 		IntrinsicParams: &transform.PinholeCameraIntrinsics{},
 	}
 	_, err = rtspConf.Validate("path")
 	test.That(t, err, test.ShouldNotBeNil)
 	test.That(t, err, test.ShouldWrap, transform.ErrNoIntrinsics)
+
 	// good intrinsic parameters
 	rtspConf = &Config{
-		Address: "rtsp://example.com:5000",
+		RTSPAddress: "rtsp://example.com:5000",
 		IntrinsicParams: &transform.PinholeCameraIntrinsics{
 			Width:  1,
 			Height: 2,
@@ -177,9 +180,39 @@ func TestRTSPConfig(t *testing.T) {
 	}
 	_, err = rtspConf.Validate("path")
 	test.That(t, err, test.ShouldBeNil)
+
 	// no distortion parameters is OK
 	rtspConf.DistortionParams = &transform.BrownConrady{}
+	_, err = rtspConf.Validate("path")
 	test.That(t, err, test.ShouldBeNil)
+
+	// Multicast address test cases
+
+	// valid multicast address
+	rtspConf = &Config{
+		RTSPAddress:      "rtsp://example.com:5000",
+		MulticastAddress: "239.255.255.250",
+	}
+	_, err = rtspConf.Validate("path")
+	test.That(t, err, test.ShouldBeNil)
+
+	// invalid multicast address (not multicast range)
+	rtspConf = &Config{
+		RTSPAddress:      "rtsp://example.com:5000",
+		MulticastAddress: "192.168.1.1", // not a multicast address
+	}
+	_, err = rtspConf.Validate("path")
+	test.That(t, err, test.ShouldNotBeNil)
+	test.That(t, err.Error(), test.ShouldContainSubstring, "is not a multicast address")
+
+	// invalid multicast address (not an IP address)
+	rtspConf = &Config{
+		RTSPAddress:      "rtsp://example.com:5000",
+		MulticastAddress: "invalid_ip_address", // not a valid IP
+	}
+	_, err = rtspConf.Validate("path")
+	test.That(t, err, test.ShouldNotBeNil)
+	test.That(t, err.Error(), test.ShouldContainSubstring, "invalid IP address")
 }
 
 // Dedicated test for performance benchmarking.
@@ -209,7 +242,7 @@ func TestRTSPCameraPerformance(t *testing.T) {
 		timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
 		defer timeoutCancel()
 		config := resource.NewEmptyConfig(camera.Named("foo"), ModelAgnostic)
-		config.ConvertedAttributes = &Config{Address: "rtsp://" + h.s.RTSPAddress}
+		config.ConvertedAttributes = &Config{RTSPAddress: "rtsp://" + h.s.RTSPAddress}
 		rtspCam, err := newRTSPCamera(timeoutCtx, nil, config, logger)
 		test.That(t, err, test.ShouldBeNil)
 		defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
