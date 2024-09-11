@@ -1,8 +1,6 @@
 module github.com/viam-modules/viamrtsp
 
-go 1.21
-
-toolchain go1.21.8
+go 1.21.13
 
 require (
 	github.com/bluenviron/gortsplib/v4 v4.8.0
@@ -14,9 +12,9 @@ require (
 	github.com/rhysd/actionlint v1.6.27
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.24.0
-	go.viam.com/rdk v0.40.0
+	go.viam.com/rdk v0.41.0
 	go.viam.com/test v1.1.1-0.20220913152726-5da9916c08a2
-	go.viam.com/utils v0.1.97
+	go.viam.com/utils v0.1.98
 )
 
 require (
@@ -271,7 +269,7 @@ require (
 	github.com/ultraware/funlen v0.1.0 // indirect
 	github.com/ultraware/whitespace v0.1.0 // indirect
 	github.com/uudashr/gocognit v1.1.2 // indirect
-	github.com/viamrobotics/webrtc/v3 v3.99.9 // indirect
+	github.com/viamrobotics/webrtc/v3 v3.99.10 // indirect
 	github.com/wlynxg/anet v0.0.3 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.2 // indirect
