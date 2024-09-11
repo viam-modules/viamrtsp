@@ -9,11 +9,11 @@ jobs:
         platform:
           - runner: ubuntu-latest
             arch: amd64
-            mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.6.0/mediamtx_v1.6.0_linux_amd64.tar.gz
+            mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_linux_amd64.tar.gz
             viam_server_url: https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-x86_64.AppImage
           - runner: buildjet-8vcpu-ubuntu-2204-arm
             arch: arm64
-            mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.6.0/mediamtx_v1.6.0_linux_arm64v8.tar.gz
+            mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_linux_arm64v8.tar.gz
             viam_server_url: https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-aarch64.AppImage
         config:
           - name: "h264"
