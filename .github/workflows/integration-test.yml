@@ -4,9 +4,18 @@ on: [push, pull_request]
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
     strategy:
       matrix:
+        runner: [ubuntu-latest, buildjet-8vcpu-ubuntu-2204-arm]
+        platform: 
+          - name: linux/amd64
+            mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.6.0/mediamtx_v1.6.0_linux_amd64.tar.gz
+            viam_server_url: https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-x86_64.AppImage
+            executable_path: "'$(realpath bin/linux-amd64/viamrtsp)'"
+          - name: linux/arm64
+            mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.6.0/mediamtx_v1.6.0_linux_arm64.tar.gz
+            viam_server_url: https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-aarch64.AppImage
+            executable_path: "'$(realpath bin/linux-arm64/viamrtsp)'"
         config:
           - name: "h264"
             codec: "libx264"
@@ -15,7 +24,9 @@ jobs:
           - name: "mjpeg"
             codec: "mjpeg"
             extra_ffmpeg_args: "-huffman 0"
-    
+
+    runs-on: ${{ matrix.runner }}
+
     steps:
     - uses: actions/checkout@v3
 
@@ -32,8 +43,8 @@ jobs:
         
     - name: Download and extract mediamtx
       run: |
-        wget https://github.com/bluenviron/mediamtx/releases/download/v1.6.0/mediamtx_v1.6.0_linux_amd64.tar.gz
-        tar -xzf mediamtx_v1.6.0_linux_amd64.tar.gz
+        wget ${{ matrix.platform.mediamtx_url }}
+        tar -xzf $(basename ${{ matrix.platform.mediamtx_url }})
         
     - name: Run mediamtx
       run: ./mediamtx &
@@ -46,7 +57,7 @@ jobs:
       
     - name: Install viam-server
       run: |
-        curl https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-x86_64.AppImage -o viam-server
+        wget ${{ matrix.platform.viam_server_url }} -O viam-server
         chmod 755 viam-server
         sudo ./viam-server --aix-install
 
@@ -70,7 +81,7 @@ jobs:
             {
               "type": "local",
               "name": "viamrtsp",
-              "executable_path": "'$(realpath bin/linux-amd64/viamrtsp)'"
+              "executable_path": '${{ matrix.platform.executable_path }}'
             }
           ]
         }' > "integration-test-config-${{ matrix.config.name }}.json"
