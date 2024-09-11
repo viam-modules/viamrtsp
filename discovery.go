@@ -27,6 +27,7 @@ func NewRTSPDiscovery(logger logging.Logger) *RTSPDiscovery {
 	}
 }
 
+// generateDiscoveryMessage formats an xml discovery message properly.
 func (d *RTSPDiscovery) generateDiscoveryMessage() string {
 	messageID := uuid.New().String()
 	return fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
@@ -61,7 +62,6 @@ func (d *RTSPDiscovery) discoverRTSPAddresses() ([]string, error) {
 	}
 	defer conn.Close()
 
-	// Send the dynamically generated discovery message
 	_, err = conn.WriteToUDP([]byte(d.generateDiscoveryMessage()), addr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send discovery message: %w", err)

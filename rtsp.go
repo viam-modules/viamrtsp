@@ -178,6 +178,7 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 				}
 			}
 
+			// TODO(hexbabe): Delete when discovery API is available.
 			addresses, err := rc.discoverer.discoverRTSPAddresses()
 			if err != nil {
 				rc.logger.Errorf("RTSP address discovery error: %s", err)
