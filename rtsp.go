@@ -166,6 +166,12 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 					rc.logger.Infof("reconnected to rtsp server url: %s", rc.u)
 				}
 			}
+
+			addresses, err := discoverRTSPAddresses()
+			if err != nil {
+				rc.logger.Errorf("RTSP address discovery error: %s", err)
+			}
+			fmt.Printf("Discovered addresses: %v", addresses)
 		}
 	}, rc.activeBackgroundWorkers.Done)
 }
