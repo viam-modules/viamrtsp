@@ -106,6 +106,7 @@ type rtspCamera struct {
 
 	client     *gortsplib.Client
 	rawDecoder *decoder
+	discoverer *RTSPDiscovery
 
 	cancelCtx  context.Context
 	cancelFunc context.CancelFunc
@@ -167,11 +168,11 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 				}
 			}
 
-			addresses, err := discoverRTSPAddresses()
+			addresses, err := rc.discoverer.discoverRTSPAddresses()
 			if err != nil {
 				rc.logger.Errorf("RTSP address discovery error: %s", err)
 			}
-			fmt.Printf("Discovered addresses: %v", addresses)
+			rc.logger.Infof("Discovered addresses: %v\n", addresses)
 		}
 	}, rc.activeBackgroundWorkers.Done)
 }
@@ -649,6 +650,7 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		bufAndCBByID:                make(map[rtppassthrough.SubscriptionID]bufAndCB),
 		rtpPassthroughCtx:           rtpPassthroughCtx,
 		rtpPassthroughCancelCauseFn: rtpPassthroughCancelCauseFn,
+		discoverer:                  NewRTSPDiscovery(logger),
 		logger:                      logger,
 	}
 	codecInfo, err := modelToCodec(conf.Model)
