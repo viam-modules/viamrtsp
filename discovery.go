@@ -72,7 +72,7 @@ func (d *RTSPDiscovery) discoverRTSPAddresses() ([]string, error) {
 		return nil, fmt.Errorf("failed to set read deadline: %w", err)
 	}
 
-	buffer := make([]byte, 8192)
+	buffer := make([]byte, 1536)
 	for {
 		n, _, err := conn.ReadFromUDP(buffer)
 		if err != nil {
