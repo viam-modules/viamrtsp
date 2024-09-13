@@ -12,9 +12,18 @@ jobs:
   publish:
     strategy:
       matrix:
-        platform: [linux/amd64, linux/arm64, android/arm64]
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+            canon_command: canon --profile viam-rtsp-antique
+          - platform: linux/arm64
+            runner: buildjet-8vcpu-ubuntu-2204-arm
+            canon_command: canon --profile viam-rtsp-antique
+          - platform: android/arm64
+            runner: buildjet-8vcpu-ubuntu-2204-arm
+            canon_command: canon --profile viam-rtsp-antique
       
-    runs-on: ${{ matrix.platform == 'linux/amd64' && 'ubuntu-latest' || 'buildjet-8vcpu-ubuntu-2204-arm' }}
+    runs-on: ${{ matrix.runner }}
 
     steps:
     - uses: actions/checkout@v3
@@ -27,24 +36,19 @@ jobs:
     - name: Install canon
       run: |
         export PATH="$(go env GOPATH)/bin:$PATH"
-        go install github.com/viamrobotics/canon@latest
-    
-    - name: Set canon command with args
-      run: |
-        if [[ "${{ matrix.platform }}" == "linux/amd64" ]]; then
-          CANON_COMMAND="canon -profile viam-rtsp-antique -arch amd64"
-        else
-          CANON_COMMAND="canon -profile viam-rtsp-antique -arch arm64"
-        fi
+        go install github.com/viamrobotics/canon@v1.1.1
 
     - name: Build and package
       run: |
         if [[ "${{ matrix.platform }}" == "linux/amd64" ]]; then
-          $CANON_COMMAND TARGET_OS=linux TARGET_ARCH=amd64 make module
+          ${{ matrix.canon_command }}
+          TARGET_OS=linux TARGET_ARCH=amd64 make module
         elif [[ "${{ matrix.platform }}" == "linux/arm64" ]]; then
-          $CANON_COMMAND TARGET_OS=linux TARGET_ARCH=arm64 make module
+          ${{ matrix.canon_command }}
+          TARGET_OS=linux TARGET_ARCH=arm64 make module
         elif [[ "${{ matrix.platform }}" == "android/arm64" ]]; then
-          $CANON_COMMAND TARGET_OS=android TARGET_ARCH=arm64 make module
+          ${{ matrix.canon_command }}
+          TARGET_OS=android TARGET_ARCH=arm64 make module
         fi
 
     - name: Upload viamrtsp module to registry
