@@ -13,6 +13,11 @@ import (
 	"go.viam.com/rdk/logging"
 )
 
+const (
+    MaxUDPMessageBytesSize = 1536
+    StandardWSDiscoveryAddress = "239.255.255.250:3702"
+)
+
 // RTSPDiscovery is responsible for discovering RTSP camera devices using WS-Discovery and ONVIF.
 type RTSPDiscovery struct {
 	multicastAddress string
@@ -22,7 +27,7 @@ type RTSPDiscovery struct {
 // NewRTSPDiscovery creates a new RTSPDiscovery instance with default values.
 func NewRTSPDiscovery(logger logging.Logger) *RTSPDiscovery {
 	return &RTSPDiscovery{
-		multicastAddress: "239.255.255.250:3702", // Standard WS-Discovery multicast address
+		multicastAddress: StandardWSDiscoveryAddress,
 		logger:           logger,
 	}
 }
@@ -72,7 +77,7 @@ func (d *RTSPDiscovery) discoverRTSPAddresses() ([]string, error) {
 		return nil, fmt.Errorf("failed to set read deadline: %w", err)
 	}
 
-	buffer := make([]byte, 1536)
+	buffer := make([]byte, MaxUDPMessageBytesSize)
 	for {
 		n, _, err := conn.ReadFromUDP(buffer)
 		if err != nil {
