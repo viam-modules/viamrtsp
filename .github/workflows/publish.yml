@@ -13,15 +13,18 @@ jobs:
     strategy:
       matrix:
         include:
-          - platform: linux/amd64
-            runner: ubuntu-latest
-            canon_command: canon --profile viam-rtsp-antique
+          # - platform: linux/amd64
+          #   runner: ubuntu-latest
+          #   target_os: linux
+          #   target_arch: amd64
           - platform: linux/arm64
             runner: buildjet-8vcpu-ubuntu-2204-arm
-            canon_command: canon --profile viam-rtsp-antique
+            target_os: linux
+            target_arch: arm64
           - platform: android/arm64
             runner: buildjet-8vcpu-ubuntu-2204-arm
-            canon_command: canon --profile viam-rtsp-antique
+            target_os: android
+            target_arch: arm64
       
     runs-on: ${{ matrix.runner }}
 
@@ -40,16 +43,8 @@ jobs:
 
     - name: Build and package
       run: |
-        if [[ "${{ matrix.platform }}" == "linux/amd64" ]]; then
-          ${{ matrix.canon_command }}
-          TARGET_OS=linux TARGET_ARCH=amd64 make module
-        elif [[ "${{ matrix.platform }}" == "linux/arm64" ]]; then
-          ${{ matrix.canon_command }}
-          TARGET_OS=linux TARGET_ARCH=arm64 make module
-        elif [[ "${{ matrix.platform }}" == "android/arm64" ]]; then
-          ${{ matrix.canon_command }}
-          TARGET_OS=android TARGET_ARCH=arm64 make module
-        fi
+        canon --profile viam-rtsp-antique
+        TARGET_OS=${{ matrix.target_os }} TARGET_ARCH=${{ matrix.target_arch }} make module
 
     - name: Upload viamrtsp module to registry
       uses: viamrobotics/upload-module@main
