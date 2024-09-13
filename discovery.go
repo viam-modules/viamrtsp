@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	MaxUDPMessageBytesSize     = 1536
-	StandardWSDiscoveryAddress = "239.255.255.250:3702"
-	DiscoveryTimeout           = 10 * time.Second
+	maxUDPMessageBytesSize     = 1536
+	standardWSDiscoveryAddress = "239.255.255.250:3702"
+	discoveryTimeout           = 10 * time.Second
 )
 
 // RTSPDiscovery is responsible for discovering RTSP camera devices using WS-Discovery and ONVIF.
@@ -29,7 +29,7 @@ type RTSPDiscovery struct {
 // newRTSPDiscovery creates a new RTSPDiscovery instance with default values.
 func newRTSPDiscovery(logger logging.Logger) *RTSPDiscovery {
 	return &RTSPDiscovery{
-		multicastAddress: StandardWSDiscoveryAddress,
+		multicastAddress: standardWSDiscoveryAddress,
 		logger:           logger,
 	}
 }
@@ -84,12 +84,12 @@ func (d *RTSPDiscovery) discoverRTSPAddresses() ([]string, error) {
 		return nil, fmt.Errorf("failed to send discovery message: %w", err)
 	}
 
-	err = d.conn.SetReadDeadline(time.Now().Add(DiscoveryTimeout))
+	err = d.conn.SetReadDeadline(time.Now().Add(discoveryTimeout))
 	if err != nil {
 		return nil, fmt.Errorf("failed to set read deadline: %w", err)
 	}
 
-	buffer := make([]byte, MaxUDPMessageBytesSize)
+	buffer := make([]byte, maxUDPMessageBytesSize)
 	for {
 		n, _, err := d.conn.ReadFromUDP(buffer)
 		if err != nil {
