@@ -29,22 +29,22 @@ jobs:
         export PATH="$(go env GOPATH)/bin:$PATH"
         go install github.com/viamrobotics/canon@latest
     
-    - name: Launch canon
+    - name: Set canon command with args
       run: |
         if [[ "${{ matrix.platform }}" == "linux/amd64" ]]; then
-          canon -profile viam-rtsp-antique -arch amd64
+          CANON_COMMAND="canon -profile viam-rtsp-antique -arch amd64"
         else
-          canon -profile viam-rtsp-antique -arch arm64
+          CANON_COMMAND="canon -profile viam-rtsp-antique -arch arm64"
         fi
 
     - name: Build and package
       run: |
         if [[ "${{ matrix.platform }}" == "linux/amd64" ]]; then
-          canon TARGET_OS=linux TARGET_ARCH=amd64 make module
+          $CANON_COMMAND TARGET_OS=linux TARGET_ARCH=amd64 make module
         elif [[ "${{ matrix.platform }}" == "linux/arm64" ]]; then
-          canon TARGET_OS=linux TARGET_ARCH=arm64 make module
+          $CANON_COMMAND TARGET_OS=linux TARGET_ARCH=arm64 make module
         elif [[ "${{ matrix.platform }}" == "android/arm64" ]]; then
-          canon TARGET_OS=android TARGET_ARCH=arm64 make module
+          $CANON_COMMAND TARGET_OS=android TARGET_ARCH=arm64 make module
         fi
 
     - name: Upload viamrtsp module to registry
