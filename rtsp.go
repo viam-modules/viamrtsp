@@ -664,7 +664,7 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		bufAndCBByID:                make(map[rtppassthrough.SubscriptionID]bufAndCB),
 		rtpPassthroughCtx:           rtpPassthroughCtx,
 		rtpPassthroughCancelCauseFn: rtpPassthroughCancelCauseFn,
-		discoverer:                  NewRTSPDiscovery(logger),
+		discoverer:                  newRTSPDiscovery(logger),
 		avFramePool:                 framePool,
 		logger:                      logger,
 	}

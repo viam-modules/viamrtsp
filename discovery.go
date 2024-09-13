@@ -14,22 +14,34 @@ import (
 )
 
 const (
-    MaxUDPMessageBytesSize = 1536
-    StandardWSDiscoveryAddress = "239.255.255.250:3702"
+	MaxUDPMessageBytesSize     = 1536
+	StandardWSDiscoveryAddress = "239.255.255.250:3702"
+	DiscoveryTimeout           = 10 * time.Second
 )
 
 // RTSPDiscovery is responsible for discovering RTSP camera devices using WS-Discovery and ONVIF.
 type RTSPDiscovery struct {
 	multicastAddress string
 	logger           logging.Logger
+	conn             *net.UDPConn
 }
 
-// NewRTSPDiscovery creates a new RTSPDiscovery instance with default values.
-func NewRTSPDiscovery(logger logging.Logger) *RTSPDiscovery {
+// newRTSPDiscovery creates a new RTSPDiscovery instance with default values.
+func newRTSPDiscovery(logger logging.Logger) *RTSPDiscovery {
 	return &RTSPDiscovery{
 		multicastAddress: StandardWSDiscoveryAddress,
 		logger:           logger,
 	}
+}
+
+// Close closes the UDP connection if it exists.
+func (d *RTSPDiscovery) close() error {
+	if d.conn != nil {
+		err := d.conn.Close()
+		d.conn = nil
+		return err
+	}
+	return nil
 }
 
 // generateDiscoveryMessage formats an xml discovery message properly.
@@ -61,29 +73,29 @@ func (d *RTSPDiscovery) discoverRTSPAddresses() ([]string, error) {
 		return nil, fmt.Errorf("failed to resolve UDP address: %w", err)
 	}
 
-	conn, err := net.ListenUDP("udp4", nil)
+	d.conn, err = net.ListenUDP("udp4", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create UDP socket: %w", err)
 	}
-	defer conn.Close()
+	defer d.close()
 
-	_, err = conn.WriteToUDP([]byte(d.generateDiscoveryMessage()), addr)
+	_, err = d.conn.WriteToUDP([]byte(d.generateDiscoveryMessage()), addr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send discovery message: %w", err)
 	}
 
-	err = conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+	err = d.conn.SetReadDeadline(time.Now().Add(DiscoveryTimeout))
 	if err != nil {
 		return nil, fmt.Errorf("failed to set read deadline: %w", err)
 	}
 
 	buffer := make([]byte, MaxUDPMessageBytesSize)
 	for {
-		n, _, err := conn.ReadFromUDP(buffer)
+		n, _, err := d.conn.ReadFromUDP(buffer)
 		if err != nil {
 			var netErr net.Error
 			if errors.As(err, &netErr) && netErr.Timeout() {
-				d.logger.Debug("Timed out after waiting.")
+				d.logger.Debug("Discovery timed out after waiting.")
 				return discoveredAddresses, nil
 			}
 			return nil, fmt.Errorf("error reading from UDP: %w", err)
