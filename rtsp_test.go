@@ -254,6 +254,72 @@ func TestRTSPCameraPerformance(t *testing.T) {
 	})
 }
 
+func TestExtractXAddrsFromProbeMatch(t *testing.T) {
+	t.Run("Happy path", func(t *testing.T) {
+		response := []byte(`
+			<Envelope>
+				<Body>
+					<ProbeMatches>
+						<ProbeMatch>
+							<XAddrs>http://192.168.1.100 http://192.168.1.101</XAddrs>
+						</ProbeMatch>
+					</ProbeMatches>
+				</Body>
+			</Envelope>`)
+
+		expected := []string{"http://192.168.1.100", "http://192.168.1.101"}
+		rtspDiscovery := &RTSPDiscovery{}
+		xaddrs, err := rtspDiscovery.extractXAddrsFromProbeMatch(response)
+
+		test.That(t, err, test.ShouldBeNil)
+		test.That(t, xaddrs, test.ShouldResemble, expected)
+	})
+
+	t.Run("Garbage data", func(t *testing.T) {
+		response := []byte(`garbage data: ;//\\<>httphttp://ddddddd</</>/>`)
+		rtspDiscovery := &RTSPDiscovery{}
+		xaddrs, err := rtspDiscovery.extractXAddrsFromProbeMatch(response)
+
+		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, xaddrs, test.ShouldBeNil)
+	})
+
+	t.Run("Empty Response", func(t *testing.T) {
+		response := []byte(`
+			<Envelope>
+				<Body>
+					<ProbeMatches>
+					</ProbeMatches>
+				</Body>
+			</Envelope>`)
+
+		rtspDiscovery := &RTSPDiscovery{}
+		xaddrs, err := rtspDiscovery.extractXAddrsFromProbeMatch(response)
+
+		test.That(t, err, test.ShouldBeNil)
+		test.That(t, xaddrs, test.ShouldBeEmpty)
+	})
+
+	t.Run("No HTTP prefix", func(t *testing.T) {
+		response := []byte(`
+			<Envelope>
+				<Body>
+					<ProbeMatches>
+						<ProbeMatch>
+							<XAddrs>https://192.168.1.100 ftp://192.168.1.101</XAddrs>
+						</ProbeMatch>
+					</ProbeMatches>
+				</Body>
+			</Envelope>`)
+
+		rtspDiscovery := &RTSPDiscovery{}
+		xaddrs, err := rtspDiscovery.extractXAddrsFromProbeMatch(response)
+
+		test.That(t, err, test.ShouldBeNil)
+		test.That(t, xaddrs, test.ShouldBeEmpty)
+	})
+}
+
 type serverHandler struct {
 	s                  *gortsplib.Server
 	wg                 sync.WaitGroup
