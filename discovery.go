@@ -3,13 +3,13 @@ package viamrtsp
 import (
 	"bytes"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
 	"go.viam.com/rdk/logging"
 )
 
