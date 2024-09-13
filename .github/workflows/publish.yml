@@ -22,7 +22,7 @@ jobs:
             target_os: linux
             target_arch: arm64
           - platform: android/arm64
-            runner: buildjet-8vcpu-ubuntu-2204-arm
+            runner: ubuntu-latest
             target_os: android
             target_arch: arm64
       
