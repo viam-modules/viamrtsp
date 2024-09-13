@@ -1,8 +1,12 @@
 name: Build & publish module to registry
 
 on:
-  release:
-    types: [published]
+  push:
+    branches:
+      - '*'
+  pull_request:
+    branches:
+      - '*'
 
 jobs:
   publish:
@@ -18,16 +22,34 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v2
       with:
-        go-version: 1.21.13
+        go-version: 1.23
+
+    - name: Install canon
+      run: |
+        export PATH="$(go env GOPATH)/bin:$PATH"
+        go install github.com/viamrobotics/canon@latest
+    
+    - name: Launch canon
+      run: |
+        if [[ "${{ matrix.platform }}" == "linux/amd64" ]]; then
+          canon -profile viam-rtsp-antique -arch amd64
+        else
+          canon -profile viam-rtsp-antique -arch arm64
+        fi
+
+    - name: Install deps inside Canon
+      run: |
+        canon sudo apt-get update
+        canon sudo apt-get install -y ffmpeg
 
     - name: Build and package
       run: |
         if [[ "${{ matrix.platform }}" == "linux/amd64" ]]; then
-          TARGET_OS=linux TARGET_ARCH=amd64 make module
+          canon TARGET_OS=linux TARGET_ARCH=amd64 make module
         elif [[ "${{ matrix.platform }}" == "linux/arm64" ]]; then
-          TARGET_OS=linux TARGET_ARCH=arm64 make module
+          canon TARGET_OS=linux TARGET_ARCH=arm64 make module
         elif [[ "${{ matrix.platform }}" == "android/arm64" ]]; then
-          TARGET_OS=android TARGET_ARCH=arm64 make module
+          canon TARGET_OS=android TARGET_ARCH=arm64 make module
         fi
 
     - name: Upload viamrtsp module to registry
