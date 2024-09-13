@@ -21,11 +21,11 @@ jobs:
             runner: buildjet-8vcpu-ubuntu-2204-arm
             target_os: linux
             target_arch: arm64
-          - platform: android/arm64
-            runner: ubuntu-latest
-            target_os: android
-            target_arch: arm64
-      
+          # - platform: android/arm64
+          #   runner: ubuntu-latest
+          #   target_os: android
+          #   target_arch: arm64
+
     runs-on: ${{ matrix.runner }}
 
     steps:
@@ -34,16 +34,19 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v2
       with:
-        go-version: 1.23
+        go-version: 1.21.13
 
-    - name: Install canon
+    - name: Install canon (only for non-Android platforms)
+      if: ${{ matrix.target_os != 'android' }}
       run: |
         export PATH="$(go env GOPATH)/bin:$PATH"
-        go install github.com/viamrobotics/canon@v1.1.1
+        go install github.com/viamrobotics/canon@v1.0.0
 
     - name: Build and package
       run: |
-        canon --profile viam-rtsp-antique
+        if [ "${{ matrix.target_os }}" != "android" ]; then
+          canon --profile viam-rtsp-antique
+        fi
         TARGET_OS=${{ matrix.target_os }} TARGET_ARCH=${{ matrix.target_arch }} make module
 
     - name: Upload viamrtsp module to registry
