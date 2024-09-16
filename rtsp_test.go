@@ -268,19 +268,15 @@ func TestExtractXAddrsFromProbeMatch(t *testing.T) {
 			</Envelope>`)
 
 		expected := []string{"http://192.168.1.100", "http://192.168.1.101"}
-		rtspDiscovery := &RTSPDiscovery{}
-		xaddrs, err := rtspDiscovery.extractXAddrsFromProbeMatch(response)
-
-		test.That(t, err, test.ShouldBeNil)
+		rtspDiscovery := &RTSPDiscovery{logger: logging.NewTestLogger(t)}
+		xaddrs := rtspDiscovery.extractXAddrsFromProbeMatch(response)
 		test.That(t, xaddrs, test.ShouldResemble, expected)
 	})
 
 	t.Run("Garbage data", func(t *testing.T) {
 		response := []byte(`garbage data: ;//\\<>httphttp://ddddddd</</>/>`)
-		rtspDiscovery := &RTSPDiscovery{}
-		xaddrs, err := rtspDiscovery.extractXAddrsFromProbeMatch(response)
-
-		test.That(t, err, test.ShouldNotBeNil)
+		rtspDiscovery := &RTSPDiscovery{logger: logging.NewTestLogger(t)}
+		xaddrs := rtspDiscovery.extractXAddrsFromProbeMatch(response)
 		test.That(t, xaddrs, test.ShouldBeNil)
 	})
 
@@ -293,10 +289,8 @@ func TestExtractXAddrsFromProbeMatch(t *testing.T) {
 				</Body>
 			</Envelope>`)
 
-		rtspDiscovery := &RTSPDiscovery{}
-		xaddrs, err := rtspDiscovery.extractXAddrsFromProbeMatch(response)
-
-		test.That(t, err, test.ShouldBeNil)
+		rtspDiscovery := &RTSPDiscovery{logger: logging.NewTestLogger(t)}
+		xaddrs := rtspDiscovery.extractXAddrsFromProbeMatch(response)
 		test.That(t, xaddrs, test.ShouldBeEmpty)
 	})
 
@@ -312,10 +306,8 @@ func TestExtractXAddrsFromProbeMatch(t *testing.T) {
 				</Body>
 			</Envelope>`)
 
-		rtspDiscovery := &RTSPDiscovery{}
-		xaddrs, err := rtspDiscovery.extractXAddrsFromProbeMatch(response)
-
-		test.That(t, err, test.ShouldBeNil)
+		rtspDiscovery := &RTSPDiscovery{logger: logging.NewTestLogger(t)}
+		xaddrs := rtspDiscovery.extractXAddrsFromProbeMatch(response)
 		test.That(t, xaddrs, test.ShouldBeEmpty)
 	})
 }

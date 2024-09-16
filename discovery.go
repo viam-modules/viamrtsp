@@ -102,18 +102,14 @@ func (d *RTSPDiscovery) discoverRTSPAddresses() ([]string, error) {
 		}
 
 		response := buffer[:n]
-		xaddrs, err := d.extractXAddrsFromProbeMatch(response)
-		if err != nil {
-			d.logger.Warnf("Failed to parse response: %w\n", err)
-			continue
-		}
+		xaddrs := d.extractXAddrsFromProbeMatch(response)
 
 		discoveredAddresses = append(discoveredAddresses, xaddrs...)
 	}
 }
 
 // extractXAddrsFromProbeMatch extracts XAddrs from the WS-Discovery ProbeMatch response.
-func (d *RTSPDiscovery) extractXAddrsFromProbeMatch(response []byte) ([]string, error) {
+func (d *RTSPDiscovery) extractXAddrsFromProbeMatch(response []byte) []string {
 	type ProbeMatch struct {
 		XMLName xml.Name `xml:"Envelope"`
 		Body    struct {
@@ -128,7 +124,7 @@ func (d *RTSPDiscovery) extractXAddrsFromProbeMatch(response []byte) ([]string, 
 	var probeMatch ProbeMatch
 	err := xml.NewDecoder(bytes.NewReader(response)).Decode(&probeMatch)
 	if err != nil {
-		return nil, fmt.Errorf("error unmarshalling probe match: %w", err)
+		d.logger.Warnf("error unmarshalling ONVIF discovery xml response: %w", err)
 	}
 
 	var xaddrs []string
@@ -140,5 +136,5 @@ func (d *RTSPDiscovery) extractXAddrsFromProbeMatch(response []byte) ([]string, 
 		}
 	}
 
-	return xaddrs, nil
+	return xaddrs
 }
