@@ -8,9 +8,21 @@ jobs:
   publish:
     strategy:
       matrix:
-        platform: [linux/amd64, linux/arm64, android/arm64]
-      
-    runs-on: ${{ matrix.platform == 'linux/arm64' && 'buildjet-8vcpu-ubuntu-2204-arm' || 'ubuntu-latest' }}
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+            target_os: linux
+            target_arch: amd64
+          - platform: linux/arm64
+            runner: buildjet-8vcpu-ubuntu-2204-arm
+            target_os: linux
+            target_arch: arm64
+          - platform: android/arm64
+            runner: ubuntu-latest
+            target_os: android
+            target_arch: arm64
+
+    runs-on: ${{ matrix.runner }}
 
     steps:
     - uses: actions/checkout@v3
@@ -20,15 +32,18 @@ jobs:
       with:
         go-version: 1.21.13
 
+    - name: Install canon (only for non-Android platforms)
+      if: ${{ matrix.target_os != 'android' }}
+      run: |
+        export PATH="$(go env GOPATH)/bin:$PATH"
+        go install github.com/viamrobotics/canon@v1.0.0
+
     - name: Build and package
       run: |
-        if [[ "${{ matrix.platform }}" == "linux/amd64" ]]; then
-          TARGET_OS=linux TARGET_ARCH=amd64 make module
-        elif [[ "${{ matrix.platform }}" == "linux/arm64" ]]; then
-          TARGET_OS=linux TARGET_ARCH=arm64 make module
-        elif [[ "${{ matrix.platform }}" == "android/arm64" ]]; then
-          TARGET_OS=android TARGET_ARCH=arm64 make module
+        if [ "${{ matrix.target_os }}" != "android" ]; then
+          canon --profile viam-rtsp-antique
         fi
+        TARGET_OS=${{ matrix.target_os }} TARGET_ARCH=${{ matrix.target_arch }} make module
 
     - name: Upload viamrtsp module to registry
       uses: viamrobotics/upload-module@main
