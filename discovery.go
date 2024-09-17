@@ -84,8 +84,7 @@ func (d *RTSPDiscovery) discoverRTSPAddresses() ([]string, error) {
 		return nil, fmt.Errorf("failed to send discovery message: %w", err)
 	}
 
-	err = d.conn.SetReadDeadline(time.Now().Add(discoveryTimeout))
-	if err != nil {
+	if err = d.conn.SetReadDeadline(time.Now().Add(discoveryTimeout)); err != nil {
 		return nil, fmt.Errorf("failed to set read deadline: %w", err)
 	}
 
