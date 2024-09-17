@@ -60,6 +60,21 @@ func (vc videoCodec) String() string {
 	}
 }
 
+// RecoverableAVError should be used when libav returns an error code, but we deem it non-severe,
+// and can choose to ignore/recover from it.
+type RecoverableAVError struct {
+	Message string
+	Code    int
+}
+
+func (e *RecoverableAVError) Error() string {
+	return fmt.Sprintf("libav error status: %s (code: %d)", e.Message, e.Code)
+}
+
+func newRecoverableAVError(code int, message string) *RecoverableAVError {
+	return &RecoverableAVError{Code: code, Message: message}
+}
+
 // avFrameWrapper wraps the libav AVFrame.
 type avFrameWrapper struct {
 	frame *C.AVFrame
@@ -124,15 +139,6 @@ func frameData(frame *C.AVFrame) **C.uint8_t {
 
 func frameLineSize(frame *C.AVFrame) *C.int {
 	return (*C.int)(unsafe.Pointer(&frame.linesize[0]))
-}
-
-// avError converts an AV error code to a AV error message string.
-func avError(avErr C.int) string {
-	var errbuf [C.AV_ERROR_MAX_STRING_SIZE]C.char
-	if C.av_strerror(avErr, &errbuf[0], C.AV_ERROR_MAX_STRING_SIZE) < 0 {
-		return fmt.Sprintf("Unknown error with code %d", avErr)
-	}
-	return C.GoString(&errbuf[0])
 }
 
 // SetLibAVLogLevelFatal sets libav errors to fatal log level
@@ -208,15 +214,13 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 	avPacket.size = C.int(len(nalu))
 	res := C.avcodec_send_packet(d.codecCtx, &avPacket)
 	if res < 0 {
-		//nolint:nilnil // TODO RSDK-8575: change to not nil, nil
-		return nil, nil
+		return nil, newRecoverableAVError(int(res), "error sending packet to the decoder")
 	}
 
 	// receive frame if available
 	res = C.avcodec_receive_frame(d.codecCtx, d.src)
 	if res < 0 {
-		//nolint:nilnil // TODO RSDK-8575: change to not nil, nil
-		return nil, nil
+		return nil, newRecoverableAVError(int(res), "error receiving decoded frame from the decoder")
 	}
 
 	// Get a frame from the pool. This frame will be in one of three states:

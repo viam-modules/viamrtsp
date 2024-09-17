@@ -457,6 +457,9 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 
 		for _, nalu := range au {
 			frame, err := rc.rawDecoder.decode(nalu)
+			if errors.Is(err, &RecoverableAVError{}) {
+				continue
+			}
 			if err != nil {
 				// This error is created with `github.com/pkg/errors`. Explicitly call `Error()` to
 				// avoid logging the stacktrace.
@@ -501,9 +504,6 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 	rc.client.OnPacketRTP(media, f, func(pkt *rtp.Packet) {
 		frame, err := mjpegDecoder.Decode(pkt)
 		if err != nil {
-			return
-		}
-		if frame == nil {
 			return
 		}
 
@@ -844,6 +844,9 @@ func H2645StartCode() []byte {
 
 func (rc *rtspCamera) decodeAndStore(nalu []byte) error {
 	frame, err := rc.rawDecoder.decode(nalu)
+	if errors.Is(err, &RecoverableAVError{}) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
