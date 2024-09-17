@@ -457,7 +457,8 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 
 		for _, nalu := range au {
 			frame, err := rc.rawDecoder.decode(nalu)
-			if errors.Is(err, &RecoverableAVError{}) {
+			var recoverableErr *RecoverableAVError
+			if errors.As(err, &recoverableErr) {
 				continue
 			}
 			if err != nil {
@@ -844,7 +845,8 @@ func H2645StartCode() []byte {
 
 func (rc *rtspCamera) decodeAndStore(nalu []byte) error {
 	frame, err := rc.rawDecoder.decode(nalu)
-	if errors.Is(err, &RecoverableAVError{}) {
+	var recoverableErr *RecoverableAVError
+	if errors.As(err, &recoverableErr) {
 		return nil
 	}
 	if err != nil {
