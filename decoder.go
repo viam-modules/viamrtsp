@@ -137,35 +137,39 @@ func getAvErrorStr(avErr C.int) string {
 
 // avError represents an C AV error in Golang.
 type avError struct {
-	Message    string
-	Code       int
-	AvErrorMsg string
+	message  string
+	code     int
+	avErrStr string
 }
 
 // Error implements the standard Error method that string-ifies the error.
 func (e *avError) Error() string {
-	return fmt.Sprintf("%s: av_error (code %d): %s", e.Message, e.Code, e.AvErrorMsg)
+	return fmt.Sprintf("%s: av_error (code %d): %s", e.message, e.code, e.avErrStr)
 }
 
 // newAvError is a constructor that creates an avError and gets the underlying av error message.
 func newAvError(code C.int, message string) *avError {
 	avErrorMsg := getAvErrorStr(code)
 	return &avError{
-		Code:       int(code),
-		Message:    message,
-		AvErrorMsg: avErrorMsg,
+		code:     int(code),
+		message:  message,
+		avErrStr: avErrorMsg,
 	}
 }
 
-// recoverableAvError is used when libav returns an error code, but it can be ignored or recovered from.
-type recoverableAvError struct {
-	*avError
+// recoverableError is used when the decoder should return an error, but it can be ignored or recovered from.
+type recoverableError struct {
+	err error
 }
 
-// newRecoverableAVError creates a new recoverableError.
-func newRecoverableAVError(code C.int, message string) *recoverableAvError {
-	return &recoverableAvError{
-		avError: newAvError(code, message),
+func (e *recoverableError) Error() string {
+	return e.err.Error()
+}
+
+// newRecoverableError creates a wrapped error that can be caught and recovered from.
+func newRecoverableError(err error) *recoverableError {
+	return &recoverableError{
+		err: err,
 	}
 }
 
@@ -242,13 +246,13 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 	avPacket.size = C.int(len(nalu))
 	res := C.avcodec_send_packet(d.codecCtx, &avPacket)
 	if res < 0 {
-		return nil, newRecoverableAVError(res, "error sending packet to the decoder")
+		return nil, newRecoverableError(newAvError(res, "error sending packet to the decoder"))
 	}
 
 	// receive frame if available
 	res = C.avcodec_receive_frame(d.codecCtx, d.src)
 	if res < 0 {
-		return nil, newRecoverableAVError(res, "error receiving decoded frame from the decoder")
+		return nil, newRecoverableError(newAvError(res, "error receiving decoded frame from the decoder"))
 	}
 
 	// Get a frame from the pool. This frame will be in one of three states:
@@ -280,7 +284,7 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 		dst.free()
 		newDst, err := newAVFrameWrapper()
 		if err != nil {
-			return nil, errors.Errorf("AV frame allocation error while decoding: %v", err)
+			return nil, newRecoverableError(errors.Errorf("AV frame allocation error while decoding: %v", err))
 		}
 		dst = newDst
 		dst.frame.format = C.AV_PIX_FMT_RGBA
