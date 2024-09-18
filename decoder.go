@@ -60,19 +60,19 @@ func (vc videoCodec) String() string {
 	}
 }
 
-// RecoverableAVError should be used when libav returns an error code, but we deem it non-severe,
+// recoverableError should be used when libav returns an error code, but we deem it non-severe,
 // and can choose to ignore/recover from it.
-type RecoverableAVError struct {
+type recoverableError struct {
 	Message string
 	Code    int
 }
 
-func (e *RecoverableAVError) Error() string {
+func (e *recoverableError) Error() string {
 	return fmt.Sprintf("libav error status: %s (code: %d)", e.Message, e.Code)
 }
 
-func newRecoverableAVError(code int, message string) *RecoverableAVError {
-	return &RecoverableAVError{Code: code, Message: message}
+func newRecoverableAVError(code int, message string) *recoverableError {
+	return &recoverableError{Code: code, Message: message}
 }
 
 // avFrameWrapper wraps the libav AVFrame.
