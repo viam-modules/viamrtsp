@@ -240,7 +240,8 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 			dst.frame.width, dst.frame.height, d.src.width, d.src.height)
 
 		// Handle size changes while having previously initialized frames to avoid https://github.com/erh/viamrtsp/pull/41#discussion_r1719998891
-		if dst.frame.width > 0 || dst.frame.height > 0 {
+		frameWasPreviouslyInitialized := dst.frame.width > 0 && dst.frame.height > 0
+		if frameWasPreviouslyInitialized {
 			d.avFramePool.clear()
 			// Release old size frame
 			dst.free()
