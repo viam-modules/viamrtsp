@@ -238,19 +238,23 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 	if dst.frame.width != d.src.width || dst.frame.height != d.src.height {
 		d.logger.Debugf("(re)making frame due to AVFrame dimension discrepancy: Dst (width: %d, height: %d) vs Src (width: %d, height: %d)",
 			dst.frame.width, dst.frame.height, d.src.width, d.src.height)
+
+		// Handle size changes while having previously initialized frames to avoid https://github.com/erh/viamrtsp/pull/41#discussion_r1719998891
+		if dst.frame.width > 0 || dst.frame.height > 0 {
+			d.avFramePool.clear()
+			// Release old size frame
+			dst.free()
+			newDst, err := newAVFrameWrapper()
+			if err != nil {
+				return nil, errors.Errorf("AV frame allocation error while decoding: %v", err)
+			}
+			dst = newDst
+		}
 		if d.swsCtx != nil {
 			// When the resolution changes, we must also free+reallocate the `swsCtx`.
 			C.sws_freeContext(d.swsCtx)
 		}
 
-		// We didn't like the frame we got from the pool, so we'll release the old one and create
-		// a fresh frame.
-		dst.free()
-		newDst, err := newAVFrameWrapper()
-		if err != nil {
-			return nil, errors.Errorf("AV frame allocation error while decoding: %v", err)
-		}
-		dst = newDst
 		dst.frame.format = C.AV_PIX_FMT_RGBA
 		dst.frame.width = d.src.width
 		dst.frame.height = d.src.height

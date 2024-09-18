@@ -82,6 +82,16 @@ func (p *framePool) put(frame *avFrameWrapper) {
 	frame.isInPool.Store(true)
 }
 
+func (p *framePool) clear() {
+	p.framesMu.Lock()
+	defer p.framesMu.Unlock()
+
+	for _, frame := range p.frames {
+		frame.free()
+	}
+	p.frames = make([]*avFrameWrapper, 0, p.maxNumFrames)
+}
+
 func (p *framePool) close() {
 	p.framesMu.Lock()
 	defer p.framesMu.Unlock()
