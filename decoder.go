@@ -242,9 +242,10 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 		// Handle size changes while having previously initialized frames to avoid https://github.com/erh/viamrtsp/pull/41#discussion_r1719998891
 		frameWasPreviouslyInitialized := dst.frame.width > 0 && dst.frame.height > 0
 		if frameWasPreviouslyInitialized {
+			// Release previously initialized frames
 			d.avFramePool.clear()
-			// Release old size frame
 			dst.free()
+			// Make new frame to be initialized with new size
 			newDst, err := newAVFrameWrapper()
 			if err != nil {
 				return nil, errors.Errorf("AV frame allocation error while decoding: %v", err)
@@ -256,6 +257,7 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 			C.sws_freeContext(d.swsCtx)
 		}
 
+		// Prepare the fresh frame
 		dst.frame.format = C.AV_PIX_FMT_RGBA
 		dst.frame.width = d.src.width
 		dst.frame.height = d.src.height
