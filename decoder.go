@@ -63,6 +63,11 @@ func (vc videoCodec) String() string {
 // avFrameWrapper wraps the libav AVFrame.
 type avFrameWrapper struct {
 	frame *C.AVFrame
+	// generation indicates which generation of frame formats the frame is on. It should only be set once and read from.
+	// It determines whether the pool can return to the pool or not.
+	// If the generation matches that of the pool, then it can return, else it cannot. We need this because otherwise, when resolution changes
+	// occur, we would observe undefinied behavior. See https://github.com/erh/viamrtsp/pull/41#discussion_r1719998891
+	generation int
 	// isFreed indicates whether or not the underlying C memory is freed
 	isFreed atomic.Bool
 	// isInPool indicates whether or not the frame wrapper is currently an item in the avFramePool
@@ -114,7 +119,7 @@ func newAVFrameWrapper() (*avFrameWrapper, error) {
 	if avFrame == nil {
 		return nil, errors.New("failed to allocate AVFrame: out of memory or C libav internal error")
 	}
-	wrapper := &avFrameWrapper{frame: avFrame}
+	wrapper := &avFrameWrapper{frame: avFrame, generation: -1}
 	return wrapper, nil
 }
 

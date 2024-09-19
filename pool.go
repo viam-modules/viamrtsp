@@ -10,7 +10,9 @@ type framePool struct {
 	frames       []*avFrameWrapper
 	maxNumFrames int
 	framesMu     sync.Mutex
-	logger       logging.Logger
+	// The pool's frame format generation. See avFrameWrapper's `generation` doc comment for more context.
+	generation int
+	logger     logging.Logger
 
 	putCount   int
 	getCount   int
@@ -22,6 +24,7 @@ func newFramePool(maxNumFrames int, logger logging.Logger) *framePool {
 	pool := &framePool{
 		frames:       make([]*avFrameWrapper, 0, maxNumFrames),
 		maxNumFrames: maxNumFrames,
+		generation:   0,
 		logger:       logger,
 	}
 
@@ -35,6 +38,7 @@ func (p *framePool) get() *avFrameWrapper {
 	if len(p.frames) == 0 {
 		p.logger.Debug("No frames available in pool. Constructing new frame!")
 		frame, err := newAVFrameWrapper()
+		frame.generation = p.generation // set generation on frame creation
 		if err != nil {
 			p.logger.Errorf("Failed to allocate AVFrame in frame pool: %v", err)
 			return nil
@@ -69,6 +73,14 @@ func (p *framePool) put(frame *avFrameWrapper) {
 	p.framesMu.Lock()
 	defer p.framesMu.Unlock()
 
+	if frame.generation < 0 {
+		panic("fatal error: frame's generation was not set properly by pool")
+	}
+	if p.generation != frame.generation {
+		p.logger.Debug("frame was not returned to pool due to generation difference")
+		return
+	}
+
 	if len(p.frames) >= p.maxNumFrames {
 		frame.free()
 		p.cleanCount++
@@ -90,6 +102,8 @@ func (p *framePool) clear() {
 		frame.free()
 	}
 	p.frames = make([]*avFrameWrapper, 0, p.maxNumFrames)
+
+	p.generation++
 }
 
 func (p *framePool) close() {
