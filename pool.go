@@ -94,7 +94,7 @@ func (p *framePool) put(frame *avFrameWrapper) {
 	frame.isInPool.Store(true)
 }
 
-func (p *framePool) clear() {
+func (p *framePool) clearAndStartNewGeneration() {
 	p.framesMu.Lock()
 	defer p.framesMu.Unlock()
 
