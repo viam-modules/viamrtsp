@@ -126,13 +126,51 @@ func frameLineSize(frame *C.AVFrame) *C.int {
 	return (*C.int)(unsafe.Pointer(&frame.linesize[0]))
 }
 
-// avError converts an AV error code to a AV error message string.
-func avError(avErr C.int) string {
+// getAvErrorStr converts an AV error code to a AV error message string.
+func getAvErrorStr(avErr C.int) string {
 	var errbuf [C.AV_ERROR_MAX_STRING_SIZE]C.char
 	if C.av_strerror(avErr, &errbuf[0], C.AV_ERROR_MAX_STRING_SIZE) < 0 {
 		return fmt.Sprintf("Unknown error with code %d", avErr)
 	}
 	return C.GoString(&errbuf[0])
+}
+
+// avError represents an C AV error in Golang.
+type avError struct {
+	message  string
+	code     int
+	avErrStr string
+}
+
+// Error implements the standard Error method that string-ifies the error.
+func (e *avError) Error() string {
+	return fmt.Sprintf("%s: av_error (code %d): %s", e.message, e.code, e.avErrStr)
+}
+
+// newAvError is a constructor that creates an avError and gets the underlying av error message.
+func newAvError(code C.int, message string) *avError {
+	avErrorMsg := getAvErrorStr(code)
+	return &avError{
+		code:     int(code),
+		message:  message,
+		avErrStr: avErrorMsg,
+	}
+}
+
+// recoverableError is used when the decoder should return an error, but it can be ignored or recovered from.
+type recoverableError struct {
+	err error
+}
+
+func (e *recoverableError) Error() string {
+	return e.err.Error()
+}
+
+// newRecoverableError creates a wrapped error that can be caught and recovered from.
+func newRecoverableError(err error) *recoverableError {
+	return &recoverableError{
+		err: err,
+	}
 }
 
 // SetLibAVLogLevelFatal sets libav errors to fatal log level
@@ -156,7 +194,7 @@ func newDecoder(codecID C.enum_AVCodecID, avFramePool *framePool, logger logging
 	res := C.avcodec_open2(codecCtx, codec, nil)
 	if res < 0 {
 		C.avcodec_close(codecCtx)
-		return nil, errors.New("avcodec_open2() failed")
+		return nil, newAvError(res, "avcodec_open2() failed")
 	}
 
 	src := C.av_frame_alloc()
@@ -208,15 +246,13 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 	avPacket.size = C.int(len(nalu))
 	res := C.avcodec_send_packet(d.codecCtx, &avPacket)
 	if res < 0 {
-		//nolint:nilnil // TODO RSDK-8575: change to not nil, nil
-		return nil, nil
+		return nil, newRecoverableError(newAvError(res, "error sending packet to the decoder"))
 	}
 
 	// receive frame if available
 	res = C.avcodec_receive_frame(d.codecCtx, d.src)
 	if res < 0 {
-		//nolint:nilnil // TODO RSDK-8575: change to not nil, nil
-		return nil, nil
+		return nil, newRecoverableError(newAvError(res, "error receiving decoded frame from the decoder"))
 	}
 
 	// Get a frame from the pool. This frame will be in one of three states:
@@ -248,7 +284,7 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 		dst.free()
 		newDst, err := newAVFrameWrapper()
 		if err != nil {
-			return nil, errors.Errorf("AV frame allocation error while decoding: %v", err)
+			return nil, newRecoverableError(errors.Errorf("AV frame allocation error while decoding: %v", err))
 		}
 		dst = newDst
 		dst.frame.format = C.AV_PIX_FMT_RGBA
@@ -259,7 +295,7 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 		// This allocates the underlying byte array to contain the image data.
 		res = C.av_frame_get_buffer(dst.frame, 1)
 		if res < 0 {
-			return nil, errors.New("av_frame_get_buffer() err")
+			return nil, newAvError(res, "av_frame_get_buffer() err")
 		}
 
 		// Create a scratch space for converting YUV420 to RGB. In our use-case, the yuv source + dst
@@ -275,7 +311,7 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 	res = C.sws_scale(d.swsCtx, frameData(d.src), frameLineSize(d.src),
 		0, d.src.height, frameData(dst.frame), frameLineSize(dst.frame))
 	if res < 0 {
-		return nil, errors.New("sws_scale() err")
+		return nil, newAvError(res, "sws_scale() err")
 	}
 
 	return dst, nil
