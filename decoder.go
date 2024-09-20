@@ -64,7 +64,7 @@ func (vc videoCodec) String() string {
 type avFrameWrapper struct {
 	frame *C.AVFrame
 	// generation indicates which generation of frame formats the frame is on. It should only be set once and read from.
-	// It determines whether the pool can return to the pool or not.
+	// It determines whether the frame can return to the pool or not.
 	// If the generation matches that of the pool, then it can return, else it cannot. We need this because otherwise, when resolution changes
 	// occur, we would observe undefinied behavior. See https://github.com/erh/viamrtsp/pull/41#discussion_r1719998891
 	generation int
@@ -114,12 +114,12 @@ func (w *avFrameWrapper) toImage() image.Image {
 }
 
 // newAVFrameWrapper allocates a new AVFrame using C code with safety checks and returns the Go wrapper of it.
-func newAVFrameWrapper() (*avFrameWrapper, error) {
+func newAVFrameWrapper(generation int) (*avFrameWrapper, error) {
 	avFrame := C.av_frame_alloc()
 	if avFrame == nil {
 		return nil, errors.New("failed to allocate AVFrame: out of memory or C libav internal error")
 	}
-	wrapper := &avFrameWrapper{frame: avFrame, generation: -1}
+	wrapper := &avFrameWrapper{frame: avFrame, generation: generation}
 	return wrapper, nil
 }
 
@@ -285,9 +285,9 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 		if frameWasPreviouslyInitialized {
 			// Release previously initialized frames, and block old prev gen frames from returning to pool
 			dst.free()
-			d.avFramePool.clearAndStartNewGeneration()
+			generation := d.avFramePool.clearAndStartNewGeneration()
 			// Make new frame to be initialized with new size
-			newDst, err := newAVFrameWrapper()
+			newDst, err := newAVFrameWrapper(generation)
 			if err != nil {
 				return nil, errors.Errorf("AV frame allocation error while decoding: %v", err)
 			}

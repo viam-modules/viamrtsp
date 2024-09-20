@@ -37,8 +37,7 @@ func (p *framePool) get() *avFrameWrapper {
 
 	if len(p.frames) == 0 {
 		p.logger.Debug("No frames available in pool. Constructing new frame!")
-		frame, err := newAVFrameWrapper()
-		frame.generation = p.generation // set generation on frame creation
+		frame, err := newAVFrameWrapper(p.generation)
 		if err != nil {
 			p.logger.Errorf("Failed to allocate AVFrame in frame pool: %v", err)
 			return nil
@@ -73,9 +72,6 @@ func (p *framePool) put(frame *avFrameWrapper) {
 	p.framesMu.Lock()
 	defer p.framesMu.Unlock()
 
-	if frame.generation < 0 {
-		panic("fatal error: frame's generation was not set properly by pool")
-	}
 	if p.generation != frame.generation {
 		p.logger.Debug("frame was not returned to pool due to generation difference")
 		return
@@ -94,7 +90,7 @@ func (p *framePool) put(frame *avFrameWrapper) {
 	frame.isInPool.Store(true)
 }
 
-func (p *framePool) clearAndStartNewGeneration() {
+func (p *framePool) clearAndStartNewGeneration() int {
 	p.framesMu.Lock()
 	defer p.framesMu.Unlock()
 
@@ -104,6 +100,7 @@ func (p *framePool) clearAndStartNewGeneration() {
 	p.frames = make([]*avFrameWrapper, 0, p.maxNumFrames)
 
 	p.generation++
+	return p.generation
 }
 
 func (p *framePool) close() {
