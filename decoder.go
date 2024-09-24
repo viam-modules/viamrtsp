@@ -63,6 +63,11 @@ func (vc videoCodec) String() string {
 // avFrameWrapper wraps the libav AVFrame.
 type avFrameWrapper struct {
 	frame *C.AVFrame
+	// generation indicates which generation of frame formats the frame is on. It should only be set once and read from.
+	// It determines whether the frame can return to the pool or not.
+	// If the generation matches that of the pool, then it can return, else it cannot. We need this because otherwise, when resolution changes
+	// occur, we would observe undefinied behavior. See https://github.com/erh/viamrtsp/pull/41#discussion_r1719998891
+	generation int
 	// isFreed indicates whether or not the underlying C memory is freed
 	isFreed atomic.Bool
 	// isInPool indicates whether or not the frame wrapper is currently an item in the avFramePool
@@ -109,12 +114,12 @@ func (w *avFrameWrapper) toImage() image.Image {
 }
 
 // newAVFrameWrapper allocates a new AVFrame using C code with safety checks and returns the Go wrapper of it.
-func newAVFrameWrapper() (*avFrameWrapper, error) {
+func newAVFrameWrapper(generation int) (*avFrameWrapper, error) {
 	avFrame := C.av_frame_alloc()
 	if avFrame == nil {
 		return nil, errors.New("failed to allocate AVFrame: out of memory or C libav internal error")
 	}
-	wrapper := &avFrameWrapper{frame: avFrame}
+	wrapper := &avFrameWrapper{frame: avFrame, generation: generation}
 	return wrapper, nil
 }
 
@@ -274,19 +279,26 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 	if dst.frame.width != d.src.width || dst.frame.height != d.src.height {
 		d.logger.Debugf("(re)making frame due to AVFrame dimension discrepancy: Dst (width: %d, height: %d) vs Src (width: %d, height: %d)",
 			dst.frame.width, dst.frame.height, d.src.width, d.src.height)
+
+		// Handle size changes while having previously initialized frames to avoid https://github.com/erh/viamrtsp/pull/41#discussion_r1719998891
+		frameWasPreviouslyInitialized := dst.frame.width > 0 && dst.frame.height > 0
+		if frameWasPreviouslyInitialized {
+			// Release previously initialized frames, and block old prev gen frames from returning to pool
+			dst.free()
+			generation := d.avFramePool.clearAndStartNewGeneration()
+			// Make new frame to be initialized with new size
+			newDst, err := newAVFrameWrapper(generation)
+			if err != nil {
+				return nil, errors.Errorf("AV frame allocation error while decoding: %v", err)
+			}
+			dst = newDst
+		}
 		if d.swsCtx != nil {
 			// When the resolution changes, we must also free+reallocate the `swsCtx`.
 			C.sws_freeContext(d.swsCtx)
 		}
 
-		// We didn't like the frame we got from the pool, so we'll release the old one and create
-		// a fresh frame.
-		dst.free()
-		newDst, err := newAVFrameWrapper()
-		if err != nil {
-			return nil, newRecoverableError(errors.Errorf("AV frame allocation error while decoding: %v", err))
-		}
-		dst = newDst
+		// Prepare the fresh frame
 		dst.frame.format = C.AV_PIX_FMT_RGBA
 		dst.frame.width = d.src.width
 		dst.frame.height = d.src.height
