@@ -11,12 +11,12 @@ package viamrtsp
 import "C"
 
 import (
+	"errors"
 	"fmt"
 	"image"
 	"sync/atomic"
 	"unsafe"
 
-	"github.com/pkg/errors"
 	"go.viam.com/rdk/logging"
 )
 
@@ -289,7 +289,7 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 			// Make new frame to be initialized with new size
 			newDst, err := newAVFrameWrapper(generation)
 			if err != nil {
-				return nil, errors.Errorf("AV frame allocation error while decoding: %v", err)
+				return nil, fmt.Errorf("AV frame allocation error while decoding: %w", err)
 			}
 			dst = newDst
 		}
