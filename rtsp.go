@@ -65,8 +65,8 @@ func init() {
 	for _, model := range Models {
 		resource.RegisterComponent(camera.API, model, resource.Registration[camera.Camera, *Config]{
 			Constructor: newRTSPCamera,
-			Discover: func(ctx context.Context, logger logging.Logger, extra map[string]interface{}) (interface{}, error) {
-				logger.Infof("viamrtsp discovery received extra credentials: %v", extra)
+			Discover: func(_ context.Context, logger logging.Logger, extra map[string]interface{}) (interface{}, error) {
+				logger.Debugf("viamrtsp discovery received extra credentials: %v", extra)
 				username, err := getStringFromExtra(extra, "username")
 				if err != nil {
 					return nil, err
@@ -75,11 +75,11 @@ func init() {
 				if err != nil {
 					return nil, err
 				}
-				info, err := viamonvif.DiscoverCameras(username, password, logger)
+				camInfoList, err := viamonvif.DiscoverCameras(username, password, logger)
 				if err != nil {
 					return nil, err
 				}
-				return info, nil
+				return camInfoList, nil
 			},
 		})
 	}

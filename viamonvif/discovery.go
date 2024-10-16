@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"net/url"
 	"strings"
 
@@ -23,6 +24,12 @@ const (
 	streamTypeRTPUnicast  = "RTP-Unicast"
 	transportProtocolRTSP = "RTSP"
 )
+
+// OnvifDevice is an interface to abstract device methods used in the code.
+// Used instead of onvif.Device to allow for mocking in tests.
+type OnvifDevice interface {
+	CallMethod(request interface{}) (*http.Response, error)
+}
 
 // getProfilesResponse is the schema the GetProfiles response is formatted in.
 type getProfilesResponse struct {
@@ -105,11 +112,21 @@ func DiscoverCameras(username, password string, logger logging.Logger) (*CameraI
 		// Parse responses and extract XAddrs
 		for _, response := range discoveryResponses {
 			xaddrs := extractXAddrsFromProbeMatch([]byte(response), logger)
-			logger.Infof("Discovered XAddrs: %v", xaddrs)
+			logger.Infof("Discovered IPs/XAddrs: %v", xaddrs)
 
 			// Convert XAddrs to RTSP addresses and camera info using ONVIF media service
 			for _, xaddr := range xaddrs {
-				cameraInfo, err := getCameraInfo(xaddr, username, password, logger)
+				logger.Infof("Connecting to ONVIF device with URL: %s", xaddr)
+				deviceInstance, err := onvif.NewDevice(onvif.DeviceParams{
+					Xaddr:    xaddr,
+					Username: username,
+					Password: password,
+				})
+				if err != nil {
+					logger.Warnf("failed to connect to ONVIF device: %w", err)
+					continue
+				}
+				cameraInfo, err := getCameraInfo(deviceInstance, username, password, logger)
 				if err != nil {
 					logger.Warnf("Failed to get camera info from %s: %v\n", xaddr, err)
 					continue
@@ -164,19 +181,7 @@ func extractXAddrsFromProbeMatch(response []byte, logger logging.Logger) []strin
 }
 
 // getCameraInfo uses the ONVIF Media service to get the RTSP stream URLs and camera details.
-func getCameraInfo(deviceServiceURL, username, password string, logger logging.Logger) (CameraInfo, error) {
-	logger.Infof("Connecting to ONVIF device with URL: %s", deviceServiceURL)
-
-	// Create the device instance once and reuse it in other method calls.
-	deviceInstance, err := onvif.NewDevice(onvif.DeviceParams{
-		Xaddr:    deviceServiceURL,
-		Username: username,
-		Password: password,
-	})
-	if err != nil {
-		return CameraInfo{}, fmt.Errorf("failed to connect to ONVIF device: %w", err)
-	}
-
+func getCameraInfo(deviceInstance OnvifDevice, username, password string, logger logging.Logger) (CameraInfo, error) {
 	// Fetch device information (manufacturer, serial number, etc.)
 	getDeviceInfo := device.GetDeviceInformation{}
 	deviceInfoResponse, err := deviceInstance.CallMethod(getDeviceInfo)
@@ -199,7 +204,7 @@ func getCameraInfo(deviceServiceURL, username, password string, logger logging.L
 	}
 
 	// Call the ONVIF Media service to get the available media profiles using the same device instance
-	rtspURLs, err := getRTSPStreamURLs(deviceInstance, logger)
+	rtspURLs, err := getRTSPStreamURLs(deviceInstance, username, password, logger)
 	if err != nil {
 		return CameraInfo{}, fmt.Errorf("failed to get RTSP URLs: %w", err)
 	}
@@ -215,7 +220,7 @@ func getCameraInfo(deviceServiceURL, username, password string, logger logging.L
 }
 
 // getRTSPStreamURLs uses the ONVIF Media service to get the RTSP stream URLs for all available profiles.
-func getRTSPStreamURLs(deviceInstance *onvif.Device, logger logging.Logger) ([]string, error) {
+func getRTSPStreamURLs(deviceInstance OnvifDevice, username, password string, logger logging.Logger) ([]string, error) {
 	getProfiles := media.GetProfiles{}
 	profilesResponse, err := deviceInstance.CallMethod(getProfiles)
 	if err != nil {
@@ -247,11 +252,8 @@ func getRTSPStreamURLs(deviceInstance *onvif.Device, logger logging.Logger) ([]s
 		logger.Debugf("Profile %d: Token=%s, Name=%s", i, profile.Token, profile.Name)
 	}
 
-	// Use a hashset-like map to store URIs and prevent duplicates
-	rtspUrisSet := make(map[string]struct{})
-	// Actual accumulated slice we will return
+	// Resultant slice of RTSP URIs
 	var rtspUris []string
-
 	// Iterate over all profiles and get the RTSP stream URI for each one
 	for _, profile := range envelope.Body.GetProfilesResponse.Profiles {
 		logger.Debugf("Using profile token: %s", profile.Token)
@@ -290,10 +292,16 @@ func getRTSPStreamURLs(deviceInstance *onvif.Device, logger logging.Logger) ([]s
 		}
 
 		uri := string(streamURI.Body.GetStreamURIResponse.MediaURI.Uri)
-		if _, exists := rtspUrisSet[uri]; !exists {
-			rtspUrisSet[uri] = struct{}{}
-			rtspUris = append(rtspUris, uri)
+		if parsedURI, err := url.Parse(uri); err == nil {
+			if username != "" && password != "" {
+				parsedURI.User = url.UserPassword(username, password)
+				uri = parsedURI.String()
+			}
+		} else {
+			logger.Warnf("Failed to parse URI %s: %v", uri, err)
+			continue
 		}
+		rtspUris = append(rtspUris, uri)
 	}
 
 	return rtspUris, nil
