@@ -14,6 +14,15 @@ import (
 	"github.com/pion/rtp"
 )
 
+const (
+	// headerSizeRTP is the size of the RTP header in bytes.
+	headerSizeRTP = 12
+	// maxNALUTypeValue is the maximum value of the NALU type.
+	maxNALUTypeValue = 0x1F
+	// headerNALUByteLength is the length of the NALU header in bytes.
+	headerNALUByteLength = 2
+)
+
 // Unit is the elementary data unit routed across the server.
 type Unit interface {
 	// returns RTP packets contained into the unit.
@@ -89,7 +98,7 @@ func rtpH264ExtractParams(payload []byte) ([]byte, []byte) {
 		return nil, nil
 	}
 
-	typ := h264.NALUType(payload[0] & 0x1F)
+	typ := h264.NALUType(payload[0] & maxNALUTypeValue)
 
 	switch typ {
 	case h264.NALUTypeSPS:
@@ -104,10 +113,14 @@ func rtpH264ExtractParams(payload []byte) ([]byte, []byte) {
 		var pps []byte
 
 		for len(payload) > 0 {
-			if len(payload) < 2 {
+			if len(payload) < headerNALUByteLength {
 				break
 			}
 
+			// Extract the size of the NALU from the first two bytes of the payload.
+			// This is done by shifting the first byte 8 bits to the left and combining
+			// it with the second byte.
+			//nolint:mnd
 			size := uint16(payload[0])<<8 | uint16(payload[1])
 			payload = payload[2:]
 
@@ -122,7 +135,7 @@ func rtpH264ExtractParams(payload []byte) ([]byte, []byte) {
 			nalu := payload[:size]
 			payload = payload[size:]
 
-			typ = h264.NALUType(nalu[0] & 0x1F)
+			typ = h264.NALUType(nalu[0] & maxNALUTypeValue)
 
 			switch typ {
 			case h264.NALUTypeSPS:
@@ -228,7 +241,7 @@ func (t *formatProcessorH264) createEncoder(
 	initialSequenceNumber *uint16,
 ) error {
 	t.encoder = &rtph264.Encoder{
-		PayloadMaxSize:        t.udpMaxPayloadSize - 12,
+		PayloadMaxSize:        t.udpMaxPayloadSize - headerSizeRTP,
 		PayloadType:           t.format.PayloadTyp,
 		SSRC:                  ssrc,
 		InitialSequenceNumber: initialSequenceNumber,
@@ -258,7 +271,7 @@ func (t *formatProcessorH264) updateTrackParametersFromAU(au [][]byte) {
 	update := false
 
 	for _, nalu := range au {
-		typ := h264.NALUType(nalu[0] & 0x1F)
+		typ := h264.NALUType(nalu[0] & maxNALUTypeValue)
 
 		switch typ {
 		case h264.NALUTypeSPS:
@@ -314,7 +327,7 @@ func (t *formatProcessorH264) remuxAccessUnit(au [][]byte) [][]byte {
 	n := 0
 
 	for _, nalu := range au {
-		typ := h264.NALUType(nalu[0] & 0x1F)
+		typ := h264.NALUType(nalu[0] & maxNALUTypeValue)
 
 		switch typ {
 		case h264.NALUTypeSPS, h264.NALUTypePPS: // parameters: remove
@@ -376,7 +389,7 @@ func (t *formatProcessorH264) remuxAccessUnit(au [][]byte) [][]byte {
 	}
 
 	for _, nalu := range au {
-		typ := h264.NALUType(nalu[0] & 0x1F)
+		typ := h264.NALUType(nalu[0] & maxNALUTypeValue)
 
 		switch typ {
 		case h264.NALUTypeSPS, h264.NALUTypePPS:
@@ -433,6 +446,8 @@ func (t *formatProcessorH264) ProcessUnit(uu Unit) error {
 		}
 		u.RTPPackets = pkts
 
+		// wraparound is expected for rtp timestamps
+		//nolint:gosec
 		ts := uint32(multiplyAndDivide(u.PTS, time.Duration(t.format.ClockRate()), time.Second))
 		for _, pkt := range u.RTPPackets {
 			pkt.Timestamp += ts

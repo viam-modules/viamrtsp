@@ -32,6 +32,19 @@ import (
 	"go.viam.com/utils"
 )
 
+const (
+	// reconnectIntervalSeconds is the interval in secs to wait before reconnecting the background worker.
+	reconnectIntervalSeconds = 5
+	// webRTCPayloadMaxSize is the maximum size of a WebRTC RTP payload, calculated as 1200 - 12 (RTP header).
+	webRTCPayloadMaxSize = 1188
+	// defaultPayloadType is the default payload type for RTP packets.
+	defaultPayloadType = 96
+	// h264NALUTypeMask is the mask to extract the NALU type from the first byte of an H264 NALU.
+	h264NALUTypeMask = 0x1F
+	// initialFramePoolSize is the initial size of the frame pool.
+	initialFramePoolSize = 5
+)
+
 var (
 	family = resource.ModelNamespace("viam").WithFamily("viamrtsp")
 	// ModelAgnostic selects the best available codec.
@@ -145,11 +158,12 @@ func (rc *rtspCamera) Close(_ context.Context) error {
 	return nil
 }
 
-// clientReconnectBackgroundWorker checks every 5 sec to see if the client is connected to the server, and reconnects if not.
+// clientReconnectBackgroundWorker checks every reconnectIntervalSeconds to see if the client is connected to the server,
+// and reconnects if not.
 func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 	rc.activeBackgroundWorkers.Add(1)
 	utils.ManagedGo(func() {
-		for utils.SelectContextOrWait(rc.cancelCtx, 5*time.Second) {
+		for utils.SelectContextOrWait(rc.cancelCtx, reconnectIntervalSeconds*time.Second) {
 			badState := false
 
 			// use an OPTIONS request to see if the server is still responding to requests
@@ -343,7 +357,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 	}
 
 	if rc.rtpPassthrough {
-		fp, err := formatprocessor.New(1472, f, true)
+		fp, err := formatprocessor.New(webRTCPayloadMaxSize, f, true)
 		if err != nil {
 			return errors.Wrap(err, "unable to create new h264 rtp formatprocessor")
 		}
@@ -544,7 +558,7 @@ func (rc *rtspCamera) SubscribeRTP(
 
 	webrtcPayloadMaxSize := 1188 // 1200 - 12 (RTP header)
 	encoder := &rtph264.Encoder{
-		PayloadType:    96,
+		PayloadType:    defaultPayloadType,
 		PayloadMaxSize: webrtcPayloadMaxSize,
 	}
 
@@ -655,7 +669,7 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		return nil, err
 	}
 
-	framePool := newFramePool(5, logger)
+	framePool := newFramePool(initialFramePoolSize, logger)
 
 	rtpPassthroughCtx, rtpPassthroughCancelCauseFn := context.WithCancelCause(context.Background())
 	rc := &rtspCamera{
@@ -838,7 +852,7 @@ func (rc *rtspCamera) compactH264SPSAndPPSAndIDR(au [][]byte) ([]byte, int) {
 	return compactedNALU, numCompacted
 }
 
-// H2645StartCode is start code byte sequence for H264/H265 NALs.
+// H2645StartCode is the start code byte sequence for H264/H265 NALs.
 func H2645StartCode() []byte {
 	return []uint8{0x00, 0x00, 0x00, 0x01}
 }
@@ -876,7 +890,7 @@ func (rc *rtspCamera) handleLatestFrame(newFrame *avFrameWrapper) {
 }
 
 func naluType(nalu []byte) h264.NALUType {
-	return h264.NALUType(nalu[0] & 0x1F)
+	return h264.NALUType(nalu[0] & h264NALUTypeMask)
 }
 
 func isCompactableH264(nalu []byte) bool {

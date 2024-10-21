@@ -13,6 +13,8 @@ import (
 	"go.viam.com/rdk/robot/client"
 )
 
+const ctxTimeoutDuration = 30 * time.Second
+
 func main() {
 	if err := run(); err != nil {
 		log.Fatalf("Fatal error: %v", err)
@@ -21,7 +23,7 @@ func main() {
 }
 
 func run() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeoutDuration)
 	defer cancel()
 
 	logger := logging.NewDebugLogger("client")
