@@ -63,6 +63,12 @@ The following attributes are available for all models of `viamrtsp` cameras:
 > The above is a raw JSON configuration for an `rtsp` model.
 > To use another provided model, change the "model" string.
 
+## Discover Available RTSP Streams
+Each model in `viamrtsp` registers a `Discover` method that can be invoked via a `DiscoverComponents` robot API call. This method discovers IP cameras connected to your LAN
+and returns their respective RTSP addresses. See [examples/discovery-client](examples/discovery-client/client.go) for an example usage of RTSP discovery.
+
+As of time of writing, Viam supports `DiscoverComponents` in Flutter and Golang.
+
 ### Next steps
 
 To test your camera, go to the [**CONTROL** tab](https://docs.viam.com/fleet/control/) of your machine in the [Viam app](https://app.viam.com) and expand the camera's panel.
