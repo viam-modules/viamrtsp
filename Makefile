@@ -48,6 +48,7 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-parser=h264 \
                --enable-parser=hevc
 
+GO_LDFLAGS ?= ""
 CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib
 CGO_CFLAGS := -I$(FFMPEG_BUILD)/include
 export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
@@ -75,6 +76,8 @@ ifeq ($(TARGET_ARCH),arm64)
                    --cpu=armv8-a \
                    --enable-cross-compile \
                    --cc=$(CC)
+    # Add linker flag -checklinkname=0 for anet https://github.com/wlynxg/anet?tab=readme-ov-file#how-to-build-with-go-1230-or-later.
+    GO_LDFLAGS += -ldflags="-linkname=0"
 endif
 endif
 
@@ -84,10 +87,10 @@ endif
 
 .PHONY: build-ffmpeg tool-install gofmt lint test profile-cpu profile-memory update-rdk module clean clean-all
 
-# We set GOOS, GOARCH, and GO_TAGS to support cross-compilation for android targets.
+# We set GOOS, GOARCH, GO_TAGS, and GO_LDFLAGS to support cross-compilation for android targets.
 $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
 	CGO_LDFLAGS=$(CGO_LDFLAGS) \
-	GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
+	GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) $(GO_LDFLAGS) -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
 
 tool-install:
 	GOBIN=`pwd`/$(TOOL_BIN) go install \
