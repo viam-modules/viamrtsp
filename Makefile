@@ -48,7 +48,8 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-parser=h264 \
                --enable-parser=hevc
 
-GO_LDFLAGS ?= ""
+# Add linker flag -checklinkname=0 for anet https://github.com/wlynxg/anet?tab=readme-ov-file#how-to-build-with-go-1230-or-later.
+GO_LDFLAGS ?= -ldflags="-checklinkname=0"
 CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib
 CGO_CFLAGS := -I$(FFMPEG_BUILD)/include
 export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
@@ -76,8 +77,6 @@ ifeq ($(TARGET_ARCH),arm64)
                    --cpu=armv8-a \
                    --enable-cross-compile \
                    --cc=$(CC)
-    # Add linker flag -checklinkname=0 for anet https://github.com/wlynxg/anet?tab=readme-ov-file#how-to-build-with-go-1230-or-later.
-    GO_LDFLAGS += -ldflags="-linkname=0"
 endif
 endif
 
