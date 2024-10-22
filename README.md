@@ -63,11 +63,25 @@ The following attributes are available for all models of `viamrtsp` cameras:
 > The above is a raw JSON configuration for an `rtsp` model.
 > To use another provided model, change the "model" string.
 
-## Discover Available RTSP Streams
-Each model in `viamrtsp` registers a `Discover` method that can be invoked via a `DiscoverComponents` robot API call. This method discovers IP cameras connected to your LAN
-and returns their respective RTSP addresses. See [examples/discovery-client](examples/discovery-client/client.go) for an example usage of RTSP discovery.
+## RTSP Stream Discovery
+### Using `DiscoverComponents`
+In addition to being able to manually specify RTSP addresses to stream from, `viamrtsp` also offers a discovery utility to search for IP cameras connected to your LAN
+and return their respective RTSP addresses.
+
+Each model in `viamrtsp` registers a `Discover` method that can be invoked via a `DiscoverComponents` robot API call. See [examples/discovery-client](examples/discovery-client/client.go) for an example usage of discovery.
 
 As of time of writing, Viam supports `DiscoverComponents` in Flutter and Golang.
+
+### Common RTSP Discovery Pitfalls
+#### DHCP
+IP camera does not support DHCP, and does not have an assigned IP after connecting to your LAN. In this case, you'll have to assign the camera's IP manually. This can be done over your network provider's UI.
+Some network provider UIs also allow you to find a camera using its MAC address or the specific Ethernet port it's connected to, and manually assign an IP address from there.
+
+#### ONVIF Adherence
+Discovery relies on the IP camera adhering to standard ONVIF methods such as getting device metadata, media profiles, and stream URIs. It will not work with non-existent or incompatible ONVIF camera integrations.
+
+#### ONVIF Authentication
+For some IP cameras, ONVIF authentication may be flaky or broken. A workaround is to disable the camera's ONVIF authentication temporarily to discover the RTSP address, then (optionally) re-enable the setting.
 
 ### Next steps
 
