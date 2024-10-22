@@ -4,6 +4,7 @@ package viamrtsp
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"image"
 	"image/jpeg"
@@ -20,7 +21,6 @@ import (
 	"github.com/bluenviron/gortsplib/v4/pkg/liberrors"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
 	"github.com/pion/rtp"
-	"github.com/pkg/errors"
 	"github.com/viam-modules/viamrtsp/formatprocessor"
 	"github.com/viam-modules/viamrtsp/viamonvif"
 	"go.viam.com/rdk/components/camera"
@@ -31,6 +31,19 @@ import (
 	"go.viam.com/rdk/rimage/transform"
 	rutils "go.viam.com/rdk/utils"
 	"go.viam.com/utils"
+)
+
+const (
+	// reconnectIntervalSeconds is the interval in secs to wait before reconnecting the background worker.
+	reconnectIntervalSeconds = 5
+	// webRTCPayloadMaxSize is the maximum size of a WebRTC RTP payload, calculated as 1200 - 12 (RTP header).
+	webRTCPayloadMaxSize = 1188
+	// defaultPayloadType is the default payload type for RTP packets.
+	defaultPayloadType = 96
+	// h264NALUTypeMask is the mask to extract the NALU type from the first byte of an H264 NALU.
+	h264NALUTypeMask = 0x1F
+	// initialFramePoolSize is the initial size of the frame pool.
+	initialFramePoolSize = 5
 )
 
 var (
@@ -173,11 +186,12 @@ func (rc *rtspCamera) Close(_ context.Context) error {
 	return nil
 }
 
-// clientReconnectBackgroundWorker checks every 5 sec to see if the client is connected to the server, and reconnects if not.
+// clientReconnectBackgroundWorker checks every reconnectIntervalSeconds to see if the client is connected to the server,
+// and reconnects if not.
 func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 	rc.activeBackgroundWorkers.Add(1)
 	utils.ManagedGo(func() {
-		for utils.SelectContextOrWait(rc.cancelCtx, 5*time.Second) {
+		for utils.SelectContextOrWait(rc.cancelCtx, reconnectIntervalSeconds*time.Second) {
 			badState := false
 
 			// use an OPTIONS request to see if the server is still responding to requests
@@ -240,7 +254,7 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec) error {
 	}
 
 	if err := rc.client.Start(rc.u.Scheme, rc.u.Host); err != nil {
-		return errors.Wrapf(err, "when calling RTSP START on Scheme: %s, Host: %s", rc.u.Scheme, rc.u.Host)
+		return fmt.Errorf("when calling RTSP START on Scheme: %s, Host: %s, Error: %w", rc.u.Scheme, rc.u.Host, err)
 	}
 
 	var clientSuccessful bool
@@ -252,7 +266,7 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec) error {
 
 	session, _, err := rc.client.Describe(rc.u)
 	if err != nil {
-		return errors.Wrapf(err, "when calling RTSP DESCRIBE on %s", rc.u)
+		return fmt.Errorf("when calling RTSP DESCRIBE on %s: %w", rc.u, err)
 	}
 
 	if codecInfo == Agnostic {
@@ -280,7 +294,7 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec) error {
 	case Agnostic:
 		return errors.New("codecInfo should not be Agnostic after getting stream info")
 	default:
-		return errors.Errorf("codec not supported %v", codecInfo)
+		return fmt.Errorf("codec not supported: %s", codecInfo.String())
 	}
 
 	if _, err := rc.client.Play(nil); err != nil {
@@ -318,13 +332,13 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 	// setup RTP/H264 -> H264 decoder
 	rtpDec, err := f.CreateDecoder()
 	if err != nil {
-		return errors.Wrap(err, "creating H264 RTP decoder")
+		return fmt.Errorf("creating H264 RTP decoder: %w", err)
 	}
 
 	// setup H264 -> raw frames decoder
 	rc.rawDecoder, err = newH264Decoder(rc.avFramePool, rc.logger)
 	if err != nil {
-		return errors.Wrap(err, "creating H264 raw decoder")
+		return fmt.Errorf("creating H264 raw decoder: %w", err)
 	}
 
 	// if SPS and PPS are present into the SDP, send them to the decoder
@@ -364,9 +378,9 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 	}
 
 	if rc.rtpPassthrough {
-		fp, err := formatprocessor.New(1472, f, true)
+		fp, err := formatprocessor.New(webRTCPayloadMaxSize, f, true)
 		if err != nil {
-			return errors.Wrap(err, "unable to create new h264 rtp formatprocessor")
+			return fmt.Errorf("unable to create new h264 rtp formatprocessor: %w", err)
 		}
 
 		publishToWebRTC := func(pkt *rtp.Packet) {
@@ -402,7 +416,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 
 	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
 	if err != nil {
-		return errors.Wrapf(err, "when calling RTSP Setup on %s for H264", session.BaseURL)
+		return fmt.Errorf("when calling RTSP Setup on %s for H264: %w", session.BaseURL, err)
 	}
 
 	rc.client.OnPacketRTP(media, f, onPacketRTP)
@@ -428,12 +442,12 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 
 	rtpDec, err := f.CreateDecoder()
 	if err != nil {
-		return errors.Wrap(err, "creating H265 RTP decoder")
+		return fmt.Errorf("creating H265 RTP decoder: %w", err)
 	}
 
 	rc.rawDecoder, err = newH265Decoder(rc.avFramePool, rc.logger)
 	if err != nil {
-		return errors.Wrap(err, "creating H265 raw decoder")
+		return fmt.Errorf("creating H265 raw decoder: %w", err)
 	}
 
 	// For H.265, handle VPS, SPS, and PPS
@@ -460,7 +474,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 
 	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
 	if err != nil {
-		return errors.Wrapf(err, "when calling RTSP Setup on %s for H265", session.BaseURL)
+		return fmt.Errorf("when calling RTSP Setup on %s for H265: %w", session.BaseURL, err)
 	}
 
 	// On packet retreival, turn it into an image, and store it in shared memory
@@ -515,12 +529,12 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 
 	mjpegDecoder, err := f.CreateDecoder()
 	if err != nil {
-		return errors.Wrap(err, "creating MJPEG RTP decoder")
+		return fmt.Errorf("creating MJPEG RTP decoder: %w", err)
 	}
 
 	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
 	if err != nil {
-		return errors.Wrapf(err, "when calling RTSP Setup on %s for MJPEG", session.BaseURL)
+		return fmt.Errorf("when calling RTSP Setup on %s for MJPEG: %w", session.BaseURL, err)
 	}
 
 	rc.client.OnPacketRTP(media, f, func(pkt *rtp.Packet) {
@@ -565,7 +579,7 @@ func (rc *rtspCamera) SubscribeRTP(
 
 	webrtcPayloadMaxSize := 1188 // 1200 - 12 (RTP header)
 	encoder := &rtph264.Encoder{
-		PayloadType:    96,
+		PayloadType:    defaultPayloadType,
 		PayloadMaxSize: webrtcPayloadMaxSize,
 	}
 
@@ -676,7 +690,7 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		return nil, err
 	}
 
-	framePool := newFramePool(5, logger)
+	framePool := newFramePool(initialFramePoolSize, logger)
 
 	rtpPassthroughCtx, rtpPassthroughCancelCauseFn := context.WithCancelCause(context.Background())
 	rc := &rtspCamera{
@@ -768,7 +782,7 @@ func (rc *rtspCamera) validateSupportsPassthrough() error {
 	}
 
 	if err := context.Cause(rc.rtpPassthroughCtx); err != nil {
-		return errors.Wrap(err, "rtp_passthrough was determined to not be supported at runtime due to")
+		return fmt.Errorf("rtp_passthrough was determined to not be supported at runtime due to %w", err)
 	}
 
 	return nil
@@ -858,7 +872,7 @@ func (rc *rtspCamera) compactH264SPSAndPPSAndIDR(au [][]byte) ([]byte, int) {
 	return compactedNALU, numCompacted
 }
 
-// H2645StartCode is start code byte sequence for H264/H265 NALs.
+// H2645StartCode is the start code byte sequence for H264/H265 NALs.
 func H2645StartCode() []byte {
 	return []uint8{0x00, 0x00, 0x00, 0x01}
 }
@@ -896,7 +910,7 @@ func (rc *rtspCamera) handleLatestFrame(newFrame *avFrameWrapper) {
 }
 
 func naluType(nalu []byte) h264.NALUType {
-	return h264.NALUType(nalu[0] & 0x1F)
+	return h264.NALUType(nalu[0] & h264NALUTypeMask)
 }
 
 func isCompactableH264(nalu []byte) bool {

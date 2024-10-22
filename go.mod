@@ -10,12 +10,11 @@ require (
 	github.com/edaniels/golinters v0.0.5-0.20220906153528-641155550742
 	github.com/golangci/golangci-lint v1.61.0
 	github.com/pion/rtp v1.8.7
-	github.com/pkg/errors v0.9.1
 	github.com/rhysd/actionlint v1.6.27
 	github.com/stretchr/testify v1.9.0
 	github.com/use-go/onvif v0.0.9
 	go.uber.org/zap v1.27.0
-	go.viam.com/rdk v0.47.0-rc0
+	go.viam.com/rdk v0.47.0
 	go.viam.com/test v1.1.1-0.20220913152726-5da9916c08a2
 	go.viam.com/utils v0.1.106
 )
@@ -235,6 +234,7 @@ require (
 	github.com/pion/transport/v2 v2.2.10 // indirect
 	github.com/pion/turn/v2 v2.1.6 // indirect
 	github.com/pion/webrtc/v3 v3.2.36 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/polyfloyd/go-errorlint v1.6.0 // indirect
 	github.com/prometheus/client_golang v1.12.2 // indirect

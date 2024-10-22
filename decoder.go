@@ -11,12 +11,12 @@ package viamrtsp
 import "C"
 
 import (
+	"errors"
 	"fmt"
 	"image"
 	"sync/atomic"
 	"unsafe"
 
-	"github.com/pkg/errors"
 	"go.viam.com/rdk/logging"
 )
 
@@ -33,6 +33,9 @@ type decoder struct {
 type videoCodec int
 
 const (
+	// Number of bytes per pixel for RGBA format
+	bytesPerPixel = 4
+
 	// Unknown indicates an error when no available video codecs could be identified
 	Unknown videoCodec = iota
 	// Agnostic indicates that a discrete video codec has yet to be identified
@@ -106,7 +109,7 @@ func (w *avFrameWrapper) toImage() image.Image {
 
 	return &image.RGBA{
 		Pix:    dstFramePtr,
-		Stride: 4 * (int)(w.frame.width),
+		Stride: bytesPerPixel * (int)(w.frame.width),
 		Rect: image.Rectangle{
 			Max: image.Point{(int)(w.frame.width), (int)(w.frame.height)},
 		},
@@ -289,7 +292,7 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 			// Make new frame to be initialized with new size
 			newDst, err := newAVFrameWrapper(generation)
 			if err != nil {
-				return nil, errors.Errorf("AV frame allocation error while decoding: %v", err)
+				return nil, fmt.Errorf("AV frame allocation error while decoding: %w", err)
 			}
 			dst = newDst
 		}

@@ -244,7 +244,7 @@ func TestRTSPCameraPerformance(t *testing.T) {
 		}
 
 		// Performance testing: Loop over multiple GetImage calls
-		for i := 0; i < iterations; i++ {
+		for range make([]int, iterations) {
 			img, f, err := camera.ReadImage(timeoutCtx, rtspCam)
 			test.That(t, err, test.ShouldBeNil)
 			f()
