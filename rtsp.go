@@ -65,7 +65,7 @@ var (
 func getStringFromExtra(extra map[string]interface{}, key string) (string, error) {
 	extraVal, ok := extra[key]
 	if !ok {
-		return "", errors.New("'extra' value must be a string")
+		return "", fmt.Errorf("key not found in 'extra': %s", key)
 	}
 	extraValStr, ok := extraVal.(string)
 	if !ok {
