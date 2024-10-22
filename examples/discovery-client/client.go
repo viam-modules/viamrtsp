@@ -15,13 +15,13 @@ func main() {
 	logger := logging.NewDebugLogger("client")
 	machine, err := client.New(
 		context.Background(),
-		"rawr-seanorg-main.nahz2tk7xm.viam.cloud",
+		"<machine-address>", // replace with your machine address, api key etc.
 		logger,
-		client.WithDialOptions(rpc.WithEntityCredentials( 
-			"23c7c65f-7a77-401d-b551-b9288ec73b16",
+		client.WithDialOptions(rpc.WithEntityCredentials(
+			"<api-key-id>",
 			rpc.Credentials{
-				Type:    rpc.CredentialsTypeAPIKey, 
-				Payload: "0tgr1rhxjltjpwxnvcwfalnn0ecpxr9y",
+				Type:    rpc.CredentialsTypeAPIKey,
+				Payload: "<api-key>",
 			})),
 	)
 	if err != nil {
