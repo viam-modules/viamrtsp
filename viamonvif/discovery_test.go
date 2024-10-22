@@ -72,26 +72,35 @@ func (m *MockDevice) CallMethod(request interface{}) (*http.Response, error) {
 }
 
 func TestGetCameraInfo(t *testing.T) {
-	mockDevice := &MockDevice{}
-	logger := logging.NewTestLogger(t)
+	t.Run("GetCameraInfo", func(t *testing.T) {
+		mockDevice := &MockDevice{}
+		logger := logging.NewTestLogger(t)
 
-	cameraInfo, err := getCameraInfo(mockDevice, "username", "password", logger)
-	test.That(t, err, test.ShouldBeNil)
-	test.That(t, cameraInfo.Manufacturer, test.ShouldEqual, "Evil Inc.")
-	test.That(t, cameraInfo.Model, test.ShouldEqual, "Doom Ray Camera of Certain Annihilation")
-	test.That(t, cameraInfo.SerialNumber, test.ShouldEqual, "44444444")
-	test.That(t, len(cameraInfo.RTSPURLs), test.ShouldEqual, 1)
-	test.That(t, cameraInfo.RTSPURLs[0], test.ShouldEqual, "rtsp://username:password@192.168.1.100/stream")
+		cameraInfo, err := getCameraInfo(mockDevice, "username", "password", logger)
+		test.That(t, err, test.ShouldBeNil)
+		test.That(t, cameraInfo.Manufacturer, test.ShouldEqual, "Evil Inc.")
+		test.That(t, cameraInfo.Model, test.ShouldEqual, "Doom Ray Camera of Certain Annihilation")
+		test.That(t, cameraInfo.SerialNumber, test.ShouldEqual, "44444444")
+		test.That(t, len(cameraInfo.RTSPURLs), test.ShouldEqual, 1)
+		test.That(t, cameraInfo.RTSPURLs[0], test.ShouldEqual, "rtsp://username:password@192.168.1.100/stream")
+	})
 }
 
 func TestGetRTSPStreamURLs(t *testing.T) {
 	mockDevice := &MockDevice{}
 	logger := logging.NewTestLogger(t)
-
-	rtspURLs, err := getRTSPStreamURLs(mockDevice, "username", "password", logger)
-	test.That(t, err, test.ShouldBeNil)
-	test.That(t, len(rtspURLs), test.ShouldEqual, 1)
-	test.That(t, rtspURLs[0], test.ShouldEqual, "rtsp://username:password@192.168.1.100/stream")
+	t.Run("GetRTSPStreamURLs with credentials", func(t *testing.T) {
+		rtspURLs, err := getRTSPStreamURLs(mockDevice, "username", "password", logger)
+		test.That(t, err, test.ShouldBeNil)
+		test.That(t, len(rtspURLs), test.ShouldEqual, 1)
+		test.That(t, rtspURLs[0], test.ShouldEqual, "rtsp://username:password@192.168.1.100/stream")
+	})
+	t.Run("GetRTSPStreamURLs without credentials", func(t *testing.T) {
+		rtspURLs, err := getRTSPStreamURLs(mockDevice, "", "", logger)
+		test.That(t, err, test.ShouldBeNil)
+		test.That(t, len(rtspURLs), test.ShouldEqual, 1)
+		test.That(t, rtspURLs[0], test.ShouldEqual, "rtsp://192.168.1.100/stream")
+	})
 }
 
 func TestExtractXAddrsFromProbeMatch(t *testing.T) {
