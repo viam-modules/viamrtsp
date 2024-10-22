@@ -15,7 +15,7 @@ require (
 	github.com/rhysd/actionlint v1.6.27
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
-	go.viam.com/rdk v0.47.0-rc0
+	go.viam.com/rdk v0.47.0
 	go.viam.com/test v1.1.1-0.20220913152726-5da9916c08a2
 	go.viam.com/utils v0.1.106
 )
