@@ -22,6 +22,7 @@ import (
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
 	"github.com/pion/rtp"
 	"github.com/viam-modules/viamrtsp/formatprocessor"
+	"github.com/viam-modules/viamrtsp/viamonvif"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/components/camera/rtppassthrough"
 	"go.viam.com/rdk/gostream"
@@ -61,10 +62,38 @@ var (
 	ErrH264PassthroughNotEnabled = errors.New("H264 passthrough is not enabled")
 )
 
+func getStringFromExtra(extra map[string]interface{}, key string) (string, error) {
+	extraVal, ok := extra[key]
+	if !ok {
+		return "", fmt.Errorf("key not found in 'extra': %s", key)
+	}
+	extraValStr, ok := extraVal.(string)
+	if !ok {
+		return "", errors.New("'extra' value must be a string")
+	}
+	return extraValStr, nil
+}
+
 func init() {
 	for _, model := range Models {
 		resource.RegisterComponent(camera.API, model, resource.Registration[camera.Camera, *Config]{
 			Constructor: newRTSPCamera,
+			Discover: func(_ context.Context, logger logging.Logger, extra map[string]interface{}) (interface{}, error) {
+				logger.Debugf("viamrtsp discovery received extra credentials: %v", extra)
+				username, err := getStringFromExtra(extra, "username")
+				if err != nil {
+					return nil, err
+				}
+				password, err := getStringFromExtra(extra, "password")
+				if err != nil {
+					return nil, err
+				}
+				camInfoList, err := viamonvif.DiscoverCameras(username, password, logger)
+				if err != nil {
+					return nil, err
+				}
+				return camInfoList, nil
+			},
 		})
 	}
 }
@@ -119,7 +148,6 @@ type rtspCamera struct {
 
 	client     *gortsplib.Client
 	rawDecoder *decoder
-	discoverer *RTSPDiscovery
 
 	cancelCtx  context.Context
 	cancelFunc context.CancelFunc
@@ -191,13 +219,6 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 					rc.logger.Infof("reconnected to rtsp server url: %s", rc.u)
 				}
 			}
-
-			// TODO(hexbabe): Delete when discovery API is available.
-			addresses, err := rc.discoverer.discoverRTSPAddresses()
-			if err != nil {
-				rc.logger.Errorf("RTSP address discovery error: %s", err)
-			}
-			rc.logger.Infof("Discovered addresses: %v\n", addresses)
 		}
 	}, rc.activeBackgroundWorkers.Done)
 }
@@ -679,7 +700,6 @@ func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		bufAndCBByID:                make(map[rtppassthrough.SubscriptionID]bufAndCB),
 		rtpPassthroughCtx:           rtpPassthroughCtx,
 		rtpPassthroughCancelCauseFn: rtpPassthroughCancelCauseFn,
-		discoverer:                  newRTSPDiscovery(logger),
 		avFramePool:                 framePool,
 		logger:                      logger,
 	}
