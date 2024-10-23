@@ -3,6 +3,7 @@ package viamonvif
 
 import (
 	"bytes"
+	"context"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 
 	"github.com/use-go/onvif"
 	"github.com/use-go/onvif/device"
@@ -18,11 +20,11 @@ import (
 	wsdiscovery "github.com/use-go/onvif/ws-discovery"
 	onvifxsd "github.com/use-go/onvif/xsd/onvif"
 	"go.viam.com/rdk/logging"
+	"go.viam.com/utils"
 )
 
 const (
-	streamTypeRTPUnicast  = "RTP-Unicast"
-	transportProtocolRTSP = "RTSP"
+	streamTypeRTPUnicast = "RTP-Unicast"
 )
 
 // OnvifDevice is an interface to abstract device methods used in the code.
@@ -80,42 +82,74 @@ type CameraInfoList struct {
 // then uses ONVIF queries to get available RTSP addresses and supplementary info.
 func DiscoverCameras(username, password string, logger logging.Logger) (*CameraInfoList, error) {
 	var discoveredCameras []CameraInfo
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
 
 	interfaces, err := net.Interfaces()
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve network interfaces: %w", err)
 	}
 
-	// discovery parameters
-	scopes := []string{}
-	types := []string{"dn:NetworkVideoTransmitter"}
-	namespaces := map[string]string{}
-
+	// Filter out unsuitable interfaces
+	var validInterfaces []net.Interface
 	for _, iface := range interfaces {
-		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
-			continue // skip inactive interfaces and loopback interfaces
+		if iface.Flags&net.FlagUp != 0 && iface.Flags&net.FlagMulticast != 0 && iface.Flags&net.FlagLoopback == 0 {
+			validInterfaces = append(validInterfaces, iface)
+		} else {
+			logger.Debugf("skipping interface %s: does not meet WS-Discovery requirements", iface.Name)
 		}
+	}
+	// If no valid interfaces, return an error
+	if len(validInterfaces) == 0 {
+		return nil, errors.New("no valid net interfaces for WS-Discovery")
+	}
 
-		logger.Debugf("sending WS-Discovery probe using interface: %s", iface.Name)
+	resultsChan := make(chan []CameraInfo, len(validInterfaces))
+	activeWorkers := sync.WaitGroup{}
+	for _, iface := range validInterfaces {
+		activeWorkers.Add(1)
+		utils.ManagedGo(func() {
+			logger.Debugf("sending WS-Discovery probe using interface: %s", iface.Name)
+			var discoveryResps []string
+			iterations := 3 // run ws-discovery probe 3 times due to sync flakiness between announcer and requester
+			for i := range make([]int, iterations) {
+				if ctx.Err() != nil {
+					logger.Infof("context canceled for interface: %s", iface.Name)
+					return
+				}
 
-		discoveryResponses, err := wsdiscovery.SendProbe(iface.Name, scopes, types, namespaces)
-		if err != nil {
-			logger.Warnf("failed to send WS-Discovery probe on interface %s: %v", iface.Name, err)
-			continue
-		}
+				// other ws-discovery args
+				scopes := []string{}
+				types := []string{"dn:NetworkVideoTransmitter"}
+				namespaces := map[string]string{}
+				resp, err := wsdiscovery.SendProbe(iface.Name, scopes, types, namespaces)
+				if err != nil {
+					logger.Warnf("attempt %d: failed to send WS-Discovery probe on interface %s: %v", i+1, iface.Name, err)
+					break
+				}
+				discoveryResps = append(discoveryResps, resp...)
+			}
 
-		if len(discoveryResponses) == 0 {
-			logger.Warnf("no discovery responses received on interface %s", iface.Name)
-			continue
-		}
+			if len(discoveryResps) == 0 {
+				logger.Warnf("no unique discovery responses received on interface %s after multiple attempts", iface.Name)
+				return
+			}
 
-		// Parse responses and extract XAddrs
-		for _, response := range discoveryResponses {
-			xaddrs := extractXAddrsFromProbeMatch([]byte(response), logger)
-			logger.Infof("Discovered IPs/XAddrs: %v", xaddrs)
+			xaddrsSet := make(map[string]struct{})
+			for _, response := range discoveryResps {
+				xaddrs := extractXAddrsFromProbeMatch([]byte(response), logger)
+				for _, xaddr := range xaddrs {
+					xaddrsSet[xaddr] = struct{}{}
+				}
+			}
 
-			// Convert XAddrs to RTSP addresses and camera info using ONVIF media service
-			for _, xaddr := range xaddrs {
+			var cameraInfos []CameraInfo
+			for xaddr := range xaddrsSet {
+				if ctx.Err() != nil {
+					logger.Infof("context canceled while connecting to ONVIF device: %s", xaddr)
+					return
+				}
+
 				logger.Infof("Connecting to ONVIF device with URL: %s", xaddr)
 				deviceInstance, err := onvif.NewDevice(onvif.DeviceParams{
 					Xaddr:    xaddr,
@@ -131,9 +165,24 @@ func DiscoverCameras(username, password string, logger logging.Logger) (*CameraI
 					logger.Warnf("Failed to get camera info from %s: %v\n", xaddr, err)
 					continue
 				}
-				discoveredCameras = append(discoveredCameras, cameraInfo)
+				cameraInfos = append(cameraInfos, cameraInfo)
 			}
-		}
+
+			if len(cameraInfos) > 0 {
+				resultsChan <- cameraInfos
+			}
+		}, func() {
+			defer activeWorkers.Done()
+		})
+	}
+
+	go func() {
+		activeWorkers.Wait()
+		close(resultsChan)
+	}()
+
+	for cameraInfos := range resultsChan {
+		discoveredCameras = append(discoveredCameras, cameraInfos...)
 	}
 
 	return &CameraInfoList{Cameras: discoveredCameras}, nil
@@ -261,9 +310,6 @@ func getRTSPStreamURLs(deviceInstance OnvifDevice, username, password string, lo
 		getStreamURI := media.GetStreamUri{
 			StreamSetup: onvifxsd.StreamSetup{
 				Stream: onvifxsd.StreamType(streamTypeRTPUnicast),
-				Transport: onvifxsd.Transport{
-					Protocol: onvifxsd.TransportProtocol(transportProtocolRTSP),
-				},
 			},
 			ProfileToken: profile.Token,
 		}
