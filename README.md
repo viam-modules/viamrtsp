@@ -67,6 +67,31 @@ The following attributes are available for all models of `viamrtsp` cameras:
 
 To test your camera, go to the [**CONTROL** tab](https://docs.viam.com/fleet/control/) of your machine in the [Viam app](https://app.viam.com) and expand the camera's panel.
 
+## RTSP stream discovery
+### Use `DiscoverComponents`
+In addition to being able to manually specify RTSP addresses to stream from, `viamrtsp` also offers a discovery utility to search for IP cameras connected to your LAN and return their respective RTSP addresses.
+
+Each model in `viamrtsp` registers a `Discover` method that can be invoked via a `DiscoverComponents` robot API call. See [examples/discovery-client](examples/discovery-client/client.go) for an example usage of discovery and [`DiscoverComponents`](https://docs.viam.com/appendix/apis/robot/#discovercomponents) for documentation.
+
+### Common RTSP discovery pitfalls
+#### DHCP
+IP camera does not support DHCP, and does not have an assigned IP after connecting to your LAN. In this case, you'll have to assign the camera's IP manually. This can be done through your router's web-based management interface.
+To find the IP address of your router's management interface, you can use the following command on Darwin systems:
+```
+netstat -nr | grep default
+```
+And the following command on Linux systems:
+```
+ip route | grep default
+```
+This will display the IP address of your default gateway, which is usually the IP address of your router. You can then access the router's management interface by typing this IP address in a web browser. Some router interfaces also allow you to find a camera using its MAC address or the specific Ethernet port it's connected to, and manually assign an IP address from there.
+
+#### ONVIF adherence
+Discovery relies on the IP camera adhering to the ONVIF Profile S standard, which includes methods such as getting device metadata, media profiles, and stream URIs. It will not work with non-existent or incompatible ONVIF camera integrations that do not meet this profile level.
+
+#### ONVIF authentication
+For some IP cameras, ONVIF authentication may be flaky or broken. A workaround is to disable the camera's ONVIF authentication temporarily to discover the RTSP address, then (optionally) re-enable the setting.
+
 ## Build for local development
 
 The binary is statically linked with [FFmpeg v6.1](https://github.com/FFmpeg/FFmpeg/tree/release/6.1), eliminating the need to install FFmpeg separately on target machines.
