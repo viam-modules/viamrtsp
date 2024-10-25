@@ -76,9 +76,13 @@ Each model in `viamrtsp` registers a `Discover` method that can be invoked via a
 ### Common RTSP discovery pitfalls
 #### DHCP
 IP camera does not support DHCP, and does not have an assigned IP after connecting to your LAN. In this case, you'll have to assign the camera's IP manually. This can be done through your router's web-based management interface.
-To find the IP address of your router's management interface, you can use the following command on Linux or Darwin systems:
+To find the IP address of your router's management interface, you can use the following command on Darwin systems:
 ```
 netstat -nr | grep default
+```
+And the following command on Linux systems:
+```
+ip route | grep default
 ```
 This will display the IP address of your default gateway, which is usually the IP address of your router. You can then access the router's management interface by typing this IP address in a web browser. Some router interfaces also allow you to find a camera using its MAC address or the specific Ethernet port it's connected to, and manually assign an IP address from there.
 
