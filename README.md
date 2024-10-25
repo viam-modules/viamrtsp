@@ -70,7 +70,6 @@ To test your camera, go to the [**CONTROL** tab](https://docs.viam.com/fleet/con
 ## RTSP stream discovery
 ### Using `DiscoverComponents`
 In addition to being able to manually specify RTSP addresses to stream from, `viamrtsp` also offers a discovery utility to search for IP cameras connected to your LAN
-and return their respective RTSP addresses.
 
 Each model in `viamrtsp` registers a `Discover` method that can be invoked via a `DiscoverComponents` robot API call. See [examples/discovery-client](examples/discovery-client/client.go) for an example usage of discovery and [`DiscoverComponents`](https://docs.viam.com/appendix/apis/robot/#discovercomponents) for documentation.
 
