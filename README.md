@@ -73,15 +73,17 @@ In addition to being able to manually specify RTSP addresses to stream from, `vi
 
 Each model in `viamrtsp` registers a `Discover` method that can be invoked via a `DiscoverComponents` robot API call. See [examples/discovery-client](examples/discovery-client/client.go) for an example usage of discovery and [`DiscoverComponents`](https://docs.viam.com/appendix/apis/robot/#discovercomponents) for documentation.
 
-As of time of writing, Viam supports `DiscoverComponents` in Flutter and Golang.
-
 ### Common RTSP discovery pitfalls
 #### DHCP
-IP camera does not support DHCP, and does not have an assigned IP after connecting to your LAN. In this case, you'll have to assign the camera's IP manually. This can be done over your network provider's UI.
-Some network provider UIs also allow you to find a camera using its MAC address or the specific Ethernet port it's connected to, and manually assign an IP address from there.
+IP camera does not support DHCP, and does not have an assigned IP after connecting to your LAN. In this case, you'll have to assign the camera's IP manually. This can be done through your router's web-based management interface.
+To find the IP address of your router's management interface, you can use the following command on Linux or Darwin systems:
+```
+netstat -nr | grep default
+```
+This will display the IP address of your default gateway, which is usually the IP address of your router. You can then access the router's management interface by typing this IP address in a web browser. Some router interfaces also allow you to find a camera using its MAC address or the specific Ethernet port it's connected to, and manually assign an IP address from there.
 
 #### ONVIF adherence
-Discovery relies on the IP camera adhering to standard ONVIF methods such as getting device metadata, media profiles, and stream URIs. It will not work with non-existent or incompatible ONVIF camera integrations.
+Discovery relies on the IP camera adhering to the ONVIF Profile S standard, which includes methods such as getting device metadata, media profiles, and stream URIs. It will not work with non-existent or incompatible ONVIF camera integrations that do not meet this profile level.
 
 #### ONVIF authentication
 For some IP cameras, ONVIF authentication may be flaky or broken. A workaround is to disable the camera's ONVIF authentication temporarily to discover the RTSP address, then (optionally) re-enable the setting.
