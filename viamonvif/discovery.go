@@ -99,7 +99,9 @@ type CameraInfoList struct {
 	Cameras []CameraInfo `json:"cameras"`
 }
 
-func discoveryCameraFromInterface(ctx context.Context, logger logging.Logger, iface net.Interface, username, password string) ([]CameraInfo, error) {
+func discoveryCameraFromInterface(
+	ctx context.Context, logger logging.Logger, iface net.Interface, username, password string,
+) ([]CameraInfo, error) {
 	logger.Debugf("sending WS-Discovery probe using interface: %s", iface.Name)
 	var discoveryResps []string
 	iterations := 3 // run ws-discovery probe 3 times due to sync flakiness between announcer and requester
@@ -115,7 +117,7 @@ func discoveryCameraFromInterface(ctx context.Context, logger logging.Logger, if
 		namespaces := map[string]string{}
 		resp, err := wsdiscovery.SendProbe(iface.Name, scopes, types, namespaces)
 		if err != nil {
-			return nil, fmt.Errorf("attempt %d: failed to send WS-Discovery probe on interface %s: %v", i+1, iface.Name, err)
+			return nil, fmt.Errorf("attempt %d: failed to send WS-Discovery probe on interface %s: %w", i+1, iface.Name, err)
 		}
 
 		discoveryResps = append(discoveryResps, resp...)
@@ -139,7 +141,7 @@ func discoveryCameraFromInterface(ctx context.Context, logger logging.Logger, if
 			return nil, fmt.Errorf("context canceled while connecting to ONVIF device: %s", xaddr)
 		}
 
-		logger.Debugf("Connecting to ONVIF device with URL: %s from interace: %s", xaddr, iface.Name)
+		logger.Debugf("Connecting to ONVIF device with URL: %s from interacted: %s", xaddr, iface.Name)
 
 		params := onvif.DeviceParams{
 			Xaddr: xaddr,
@@ -168,7 +170,7 @@ func discoveryCameraFromInterface(ctx context.Context, logger logging.Logger, if
 	return cameraInfos, nil
 }
 
-// if ifaceNames is nil or empty, we do all
+// if ifaceNames is nil or empty, we do all.
 func filterGoodInterface(all []net.Interface, ifaceNames []string, logger logging.Logger) []net.Interface {
 	var validInterfaces []net.Interface
 	for _, iface := range all {
@@ -188,7 +190,7 @@ func filterGoodInterface(all []net.Interface, ifaceNames []string, logger loggin
 
 // DiscoverCameras performs WS-Discovery using the use-go/onvif discovery utility,
 // then uses ONVIF queries to get available RTSP addresses and supplementary info.
-// if ifaceNames is nil or empty, we do all
+// if ifaceNames is nil or empty, we do all.
 func DiscoverCameras(username, password string, logger logging.Logger, ifaceNames []string) (*CameraInfoList, error) {
 	var discoveredCameras []CameraInfo
 	ctx, cancelFunc := context.WithCancel(context.Background())

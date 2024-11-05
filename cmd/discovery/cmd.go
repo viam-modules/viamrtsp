@@ -1,12 +1,11 @@
+// This package is a binary for trying out onvif discovery
 package main
 
 import (
 	"flag"
-	"fmt"
-
-	"go.viam.com/rdk/logging"
 
 	"github.com/viam-modules/viamrtsp/viamonvif"
+	"go.viam.com/rdk/logging"
 )
 
 func main() {
@@ -39,12 +38,11 @@ func realMain() error {
 	}
 
 	for _, l := range list.Cameras {
-		fmt.Printf("%s %s %s\n", l.Manufacturer, l.Model, l.SerialNumber)
+		logger.Infof("%s %s %s", l.Manufacturer, l.Model, l.SerialNumber)
 		for _, u := range l.RTSPURLs {
-			fmt.Printf("\t%s\n", u)
+			logger.Infof("\t%s", u)
 		}
 	}
 
 	return nil
-
 }
