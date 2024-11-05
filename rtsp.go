@@ -88,7 +88,7 @@ func init() {
 				if err != nil {
 					return nil, err
 				}
-				camInfoList, err := viamonvif.DiscoverCameras(username, password, logger)
+				camInfoList, err := viamonvif.DiscoverCameras(username, password, logger, nil)
 				if err != nil {
 					return nil, err
 				}
