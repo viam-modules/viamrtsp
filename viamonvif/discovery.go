@@ -34,7 +34,7 @@ type OnvifDevice interface {
 	CallMethod(request interface{}) (*http.Response, error)
 }
 
-func callAndParse(logger logging.Logger, deviceInstance OnvifDevice, request interface{}, response interface{}) error {
+func callAndParse(logger logging.Logger, deviceInstance OnvifDevice, request interface{}, response any) error {
 	resp, err := deviceInstance.CallMethod(request)
 	if err != nil {
 		return err
@@ -51,7 +51,7 @@ func callAndParse(logger logging.Logger, deviceInstance OnvifDevice, request int
 	// Reset the response body reader after logging
 	resp.Body = io.NopCloser(bytes.NewReader(body))
 
-	return xml.NewDecoder(resp.Body).Decode(&response)
+	return xml.NewDecoder(resp.Body).Decode(response)
 }
 
 // getProfilesResponse is the schema the GetProfiles response is formatted in.
@@ -360,7 +360,7 @@ func getRTSPStreamURLs(deviceInstance OnvifDevice, username, password string, lo
 		}
 
 		var streamURI getStreamURIResponse
-		err := callAndParse(logger, deviceInstance, getStreamURI, streamURI)
+		err := callAndParse(logger, deviceInstance, getStreamURI, &streamURI)
 		if err != nil {
 			logger.Warnf("Failed to get RTSP URL for profile %s: %v", profile.Token, err)
 			continue
