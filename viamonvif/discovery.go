@@ -34,6 +34,8 @@ type OnvifDevice interface {
 	CallMethod(request interface{}) (*http.Response, error)
 }
 
+// callAndParse sends a request to an ONVIF device, decoding and mutating the
+// provided response struct with the result. Returns an error on failure.
 func callAndParse(logger logging.Logger, deviceInstance OnvifDevice, request interface{}, response any) error {
 	resp, err := deviceInstance.CallMethod(request)
 	if err != nil {
@@ -99,7 +101,7 @@ type CameraInfoList struct {
 	Cameras []CameraInfo `json:"cameras"`
 }
 
-func discoveryCameraFromInterface(
+func discoverCameraFromInterface(
 	ctx context.Context, logger logging.Logger, iface net.Interface, username, password string,
 ) ([]CameraInfo, error) {
 	logger.Debugf("sending WS-Discovery probe using interface: %s", iface.Name)
@@ -190,7 +192,7 @@ func filterGoodInterface(all []net.Interface, ifaceNames []string, logger loggin
 
 // DiscoverCameras performs WS-Discovery using the use-go/onvif discovery utility,
 // then uses ONVIF queries to get available RTSP addresses and supplementary info.
-// if ifaceNames is nil or empty, we do all.
+// If ifaceNames is nil or empty, we try to discover over all available net interfaces on the machine.
 func DiscoverCameras(username, password string, logger logging.Logger, ifaceNames []string) (*CameraInfoList, error) {
 	var discoveredCameras []CameraInfo
 	ctx, cancelFunc := context.WithCancel(context.Background())
@@ -208,7 +210,7 @@ func DiscoverCameras(username, password string, logger logging.Logger, ifaceName
 	for _, iface := range interfaces {
 		activeWorkers.Add(1)
 		utils.ManagedGo(func() {
-			cameraInfos, err := discoveryCameraFromInterface(ctx, logger, iface, username, password)
+			cameraInfos, err := discoverCameraFromInterface(ctx, logger, iface, username, password)
 			if err != nil {
 				logger.Warnf("failed to connect to ONVIF device (%v): %v", iface.Name, err)
 			}
@@ -349,7 +351,7 @@ func getRTSPStreamURLs(deviceInstance OnvifDevice, username, password string, lo
 	var rtspUris []string
 	// Iterate over all profiles and get the RTSP stream URI for each one
 	for _, profile := range envelope.Body.GetProfilesResponse.Profiles {
-		logger.Debugf("Using profile token: %s %#v", profile.Token, profile)
+		logger.Debugf("Using profile token and profile: %s %#v", profile.Token, profile)
 
 		getStreamURI := media.GetStreamUri{
 			StreamSetup: onvifxsd.StreamSetup{
