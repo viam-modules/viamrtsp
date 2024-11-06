@@ -77,7 +77,7 @@ func getStringFromExtra(extra map[string]interface{}, key string) (string, error
 func init() {
 	for _, model := range Models {
 		resource.RegisterComponent(camera.API, model, resource.Registration[camera.Camera, *Config]{
-			Constructor: newRTSPCamera,
+			Constructor: NewRTSPCamera,
 			Discover: func(_ context.Context, logger logging.Logger, extra map[string]interface{}) (interface{}, error) {
 				logger.Debugf("viamrtsp discovery received extra credentials: %v", extra)
 				username, err := getStringFromExtra(extra, "username")
@@ -88,7 +88,7 @@ func init() {
 				if err != nil {
 					return nil, err
 				}
-				camInfoList, err := viamonvif.DiscoverCameras(username, password, logger)
+				camInfoList, err := viamonvif.DiscoverCameras(username, password, logger, nil)
 				if err != nil {
 					return nil, err
 				}
@@ -678,7 +678,8 @@ func (rc *rtspCamera) Unsubscribe(_ context.Context, id rtppassthrough.Subscript
 	return nil
 }
 
-func newRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.Config, logger logging.Logger) (camera.Camera, error) {
+// NewRTSPCamera creates a new rtsp camera from the config, that has to have a viamrtsp.Config.
+func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.Config, logger logging.Logger) (camera.Camera, error) {
 	newConf, err := resource.NativeConfig[*Config](conf)
 	if err != nil {
 		logger.Error(err.Error())
