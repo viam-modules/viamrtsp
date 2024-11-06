@@ -50,7 +50,7 @@ func TestRTSPCamera(t *testing.T) {
 			defer timeoutCancel()
 			config := resource.NewEmptyConfig(camera.Named("foo"), ModelAgnostic)
 			config.ConvertedAttributes = &Config{Address: "rtsp://" + h.s.RTSPAddress}
-			rtspCam, err := newRTSPCamera(timeoutCtx, nil, config, logger)
+			rtspCam, err := NewRTSPCamera(timeoutCtx, nil, config, logger)
 			test.That(t, err, test.ShouldBeNil)
 			defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
 			test.That(t, rtspCam.Name().Name, test.ShouldEqual, "foo")
@@ -65,7 +65,7 @@ func TestRTSPCamera(t *testing.T) {
 			defer timeoutCancel()
 			config := resource.NewEmptyConfig(camera.Named("foo"), ModelAgnostic)
 			config.ConvertedAttributes = &Config{Address: "rtsp://" + h.s.RTSPAddress}
-			rtspCam, err := newRTSPCamera(timeoutCtx, nil, config, logger)
+			rtspCam, err := NewRTSPCamera(timeoutCtx, nil, config, logger)
 			test.That(t, err, test.ShouldBeNil)
 			defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
 			imageTimeoutCtx, imageTimeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
@@ -95,7 +95,7 @@ func TestRTSPCamera(t *testing.T) {
 				defer timeoutCancel()
 				config := resource.NewEmptyConfig(camera.Named("foo"), ModelAgnostic)
 				config.ConvertedAttributes = &Config{Address: "rtsp://" + h.s.RTSPAddress, RTPPassthrough: true}
-				rtspCam, err := newRTSPCamera(timeoutCtx, nil, config, logger)
+				rtspCam, err := NewRTSPCamera(timeoutCtx, nil, config, logger)
 				test.That(t, err, test.ShouldBeNil)
 				defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
 				vcs, ok := rtspCam.(rtppassthrough.Source)
@@ -130,7 +130,7 @@ func TestRTSPCamera(t *testing.T) {
 				defer timeoutCancel()
 				config := resource.NewEmptyConfig(camera.Named("foo"), ModelAgnostic)
 				config.ConvertedAttributes = &Config{Address: "rtsp://" + h.s.RTSPAddress}
-				rtspCam, err := newRTSPCamera(timeoutCtx, nil, config, logger)
+				rtspCam, err := NewRTSPCamera(timeoutCtx, nil, config, logger)
 				test.That(t, err, test.ShouldBeNil)
 				defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
 				vcs, ok := rtspCam.(rtppassthrough.Source)
@@ -210,7 +210,7 @@ func TestRTSPCameraPerformance(t *testing.T) {
 		defer timeoutCancel()
 		config := resource.NewEmptyConfig(camera.Named("foo"), ModelAgnostic)
 		config.ConvertedAttributes = &Config{Address: "rtsp://" + h.s.RTSPAddress}
-		rtspCam, err := newRTSPCamera(timeoutCtx, nil, config, logger)
+		rtspCam, err := NewRTSPCamera(timeoutCtx, nil, config, logger)
 		test.That(t, err, test.ShouldBeNil)
 		defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
 
