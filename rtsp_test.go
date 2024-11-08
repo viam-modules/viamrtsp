@@ -94,7 +94,8 @@ func TestRTSPCamera(t *testing.T) {
 				timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
 				defer timeoutCancel()
 				config := resource.NewEmptyConfig(camera.Named("foo"), ModelAgnostic)
-				config.ConvertedAttributes = &Config{Address: "rtsp://" + h.s.RTSPAddress, RTPPassthrough: true}
+				shouldPassthrough := true
+				config.ConvertedAttributes = &Config{Address: "rtsp://" + h.s.RTSPAddress, RTPPassthrough: &shouldPassthrough}
 				rtspCam, err := NewRTSPCamera(timeoutCtx, nil, config, logger)
 				test.That(t, err, test.ShouldBeNil)
 				defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
@@ -122,14 +123,15 @@ func TestRTSPCamera(t *testing.T) {
 				}
 			})
 
-			t.Run("otherwise", func(t *testing.T) {
+			t.Run("when RTPPassthrough = false", func(t *testing.T) {
 				h, closeFunc := newH264ServerHandler(t, forma, bURL, logger)
 				defer closeFunc()
 				test.That(t, h.s.Start(), test.ShouldBeNil)
 				timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
 				defer timeoutCancel()
 				config := resource.NewEmptyConfig(camera.Named("foo"), ModelAgnostic)
-				config.ConvertedAttributes = &Config{Address: "rtsp://" + h.s.RTSPAddress}
+				shouldPassthrough := false
+				config.ConvertedAttributes = &Config{Address: "rtsp://" + h.s.RTSPAddress, RTPPassthrough: &shouldPassthrough}
 				rtspCam, err := NewRTSPCamera(timeoutCtx, nil, config, logger)
 				test.That(t, err, test.ShouldBeNil)
 				defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
