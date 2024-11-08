@@ -38,7 +38,7 @@ jobs:
     - name: Pull Docker image
       run: docker pull ${{ matrix.docker_image }}
 
-    - name: Build and package using Docker
+    - name: Build and package inside container
       run: |
         docker run --rm \
           -e TARGET_OS=${{ matrix.target_os }} \
