@@ -11,14 +11,17 @@ jobs:
             runner: ubuntu-latest
             target_os: linux
             target_arch: amd64
+            docker_image: ghcr.io/viamrobotics/antique2:amd64-cache
           - platform: linux/arm64
             runner: buildjet-8vcpu-ubuntu-2204-arm
             target_os: linux
             target_arch: arm64
+            docker_image: ghcr.io/viamrobotics/antique2:arm64-cache
           - platform: android/arm64
             runner: ubuntu-latest
             target_os: android
             target_arch: arm64
+            docker_image: ghcr.io/viamrobotics/antique2:amd64-cache
 
     runs-on: ${{ matrix.runner }}
 
@@ -30,19 +33,18 @@ jobs:
       with:
         go-version: 1.21.13
 
-    - name: Install canon (only for non-Android platforms)
-      if: ${{ matrix.target_os != 'android' }}
-      run: |
-        export PATH="$(go env GOPATH)/bin:$PATH"
-        go install github.com/viamrobotics/canon@v1.0.0
+    - name: Pull Docker image
+      run: docker pull ${{ matrix.docker_image }}
 
-    - name: Build and package
+    - name: Build and package using Docker
       run: |
-        if [ "${{ matrix.target_os }}" != "android" ]; then
-          canon --profile viam-rtsp-antique sh -c "(TARGET_OS=${{ matrix.target_os }} TARGET_ARCH=${{ matrix.target_arch }} make module)"
-        else
-          TARGET_OS=${{ matrix.target_os }} TARGET_ARCH=${{ matrix.target_arch }} make module
-        fi
+        docker run --rm \
+          -e TARGET_OS=${{ matrix.target_os }} \
+          -e TARGET_ARCH=${{ matrix.target_arch }} \
+          -v "$(pwd):/workspace" \
+          -w /workspace \
+          ${{ matrix.docker_image }} \
+          sh -c "make module"
 
     - name: Check if module.tar.gz exists recursively
       run: |
@@ -53,12 +55,12 @@ jobs:
           exit 1
         fi
 
-    # - name: Upload viamrtsp module to registry
-    #   uses: viamrobotics/upload-module@v1
-    #   with:
-    #     meta-path: meta.json
-    #     module-path: module.tar.gz
-    #     platform: ${{ matrix.platform }}
-    #     version: 0.1.8-rc0
-    #     key-id: ${{ secrets.VIAM_DEV_API_KEY_ID }}
-    #     key-value: ${{ secrets.VIAM_DEV_API_KEY }}
+    - name: Upload viamrtsp module to registry
+      uses: viamrobotics/upload-module@v1
+      with:
+        meta-path: meta.json
+        module-path: module.tar.gz
+        platform: ${{ matrix.platform }}
+        version: 0.1.8-rc0
+        key-id: ${{ secrets.VIAM_DEV_API_KEY_ID }}
+        key-value: ${{ secrets.VIAM_DEV_API_KEY }}
