@@ -1,8 +1,6 @@
 name: Build & publish module to registry
 
-on:
-  release:
-    types: [published]
+on: [push, pull_request]
 
 jobs:
   publish:
@@ -41,16 +39,26 @@ jobs:
     - name: Build and package
       run: |
         if [ "${{ matrix.target_os }}" != "android" ]; then
-          canon --profile viam-rtsp-antique
+          canon --profile viam-rtsp-antique TARGET_OS=${{ matrix.target_os }} TARGET_ARCH=${{ matrix.target_arch }} make module
+        else
+          TARGET_OS=${{ matrix.target_os }} TARGET_ARCH=${{ matrix.target_arch }} make module
         fi
-        TARGET_OS=${{ matrix.target_os }} TARGET_ARCH=${{ matrix.target_arch }} make module
 
-    - name: Upload viamrtsp module to registry
-      uses: viamrobotics/upload-module@main
-      with:
-        meta-path: meta.json
-        module-path: module.tar.gz
-        platform: ${{ matrix.platform }}
-        version: ${{ github.ref_name }}
-        key-id: ${{ secrets.VIAM_DEV_API_KEY_ID }}
-        key-value: ${{ secrets.VIAM_DEV_API_KEY }}
+    - name: Check if module.tar.gz exists recursively
+      run: |
+        if find . -name module.tar.gz | grep -q .; then
+          echo "module.tar.gz exists"
+        else
+          echo "module.tar.gz does not exist"
+          exit 1
+        fi
+
+    # - name: Upload viamrtsp module to registry
+    #   uses: viamrobotics/upload-module@v1
+    #   with:
+    #     meta-path: meta.json
+    #     module-path: module.tar.gz
+    #     platform: ${{ matrix.platform }}
+    #     version: 0.1.8-rc0
+    #     key-id: ${{ secrets.VIAM_DEV_API_KEY_ID }}
+    #     key-value: ${{ secrets.VIAM_DEV_API_KEY }}
