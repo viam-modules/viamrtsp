@@ -101,7 +101,7 @@ func init() {
 // Config are the config attributes for an RTSP camera model.
 type Config struct {
 	Address          string                             `json:"rtsp_address"`
-	RTPPassthrough   bool                               `json:"rtp_passthrough"`
+	RTPPassthrough   *bool                              `json:"rtp_passthrough"`
 	IntrinsicParams  *transform.PinholeCameraIntrinsics `json:"intrinsic_parameters,omitempty"`
 	DistortionParams *transform.BrownConrady            `json:"distortion_parameters,omitempty"`
 }
@@ -693,11 +693,16 @@ func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 
 	framePool := newFramePool(initialFramePoolSize, logger)
 
+	rtpPassthrough := true
+	if newConf.RTPPassthrough != nil {
+		rtpPassthrough = *newConf.RTPPassthrough
+	}
+
 	rtpPassthroughCtx, rtpPassthroughCancelCauseFn := context.WithCancelCause(context.Background())
 	rc := &rtspCamera{
 		model:                       conf.Model,
 		u:                           u,
-		rtpPassthrough:              newConf.RTPPassthrough,
+		rtpPassthrough:              rtpPassthrough,
 		bufAndCBByID:                make(map[rtppassthrough.SubscriptionID]bufAndCB),
 		rtpPassthroughCtx:           rtpPassthroughCtx,
 		rtpPassthroughCancelCauseFn: rtpPassthroughCancelCauseFn,

@@ -30,7 +30,7 @@ The following attributes are available for all models of `viamrtsp` cameras:
 | Name    | Type   | Inclusion    | Description |
 | ------- | ------ | ------------ | ----------- |
 | `rtsp_address` | string | **Required** | The RTSP address where the camera streams. |
-| `rtp_passthrough` | bool | Optional | RTP passthrough mode (which improves video streaming efficiency) is supported with the H264 codec if this attribute is set to `true`. <br> Default: `false` |
+| `rtp_passthrough` | bool | Optional | RTP passthrough mode (which improves video streaming efficiency) is supported with the H264 codec. It will be on by default. Set to false to bypass H264 RTP passthrough. <br> Default: `true` |
 
 ### Example configuration
 
