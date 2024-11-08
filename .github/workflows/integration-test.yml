@@ -1,12 +1,6 @@
 name: Integration test using mediamtx
 
-on:
-  push:
-    paths-ignore:
-      - 'README.md'
-  pull_request:
-    paths-ignore:
-      - 'README.md'
+on: [push, pull_request]
 
 jobs:
   build-and-test:

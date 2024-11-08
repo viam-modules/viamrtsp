@@ -1,12 +1,6 @@
 name: Test build viamrtsp for Android
 
-on:
-  push:
-    paths-ignore:
-      - 'README.md'
-  pull_request:
-    paths-ignore:
-      - 'README.md'
+on: [push, pull_request]
 
 jobs:
   build-android:
@@ -14,4 +8,4 @@ jobs:
     with:
       target_os: android
       target_arch: arm64
-      docker_image: ghcr.io/viamrobotics/antique2:arm64-cache
+      docker_image: ghcr.io/viamrobotics/antique2:amd64-cache
