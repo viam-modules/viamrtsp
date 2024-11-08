@@ -1,6 +1,12 @@
 name: Integration test using mediamtx
 
-on: [push, pull_request]
+on:
+  push:
+    paths-ignore:
+      - 'README.md'
+  pull_request:
+    paths-ignore:
+      - 'README.md' 
 
 jobs:
   build-and-test:
@@ -31,8 +37,8 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Call build module workflow
-      uses: ./.github/workflows/build-module.yml
+    - name: Build module
+      uses: ./.github/actions/build-module
       with:
         target_os: linux
         target_arch: ${{ matrix.platform.arch }}
@@ -54,10 +60,6 @@ jobs:
       
     - name: Run fake RTSP camera
       run: ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec ${{ matrix.config.codec }} ${{ matrix.config.extra_ffmpeg_args }} -pix_fmt yuv420p -f rtsp -rtsp_transport tcp rtsp://0.0.0.0:8554/live.stream &
-      
-    - name: Build viamrtsp binary
-      run: |
-        TARGET_OS=linux TARGET_ARCH=${{ matrix.platform.arch }} make module
       
     - name: Install viam-server
       run: |

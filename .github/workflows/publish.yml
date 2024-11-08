@@ -1,6 +1,8 @@
 name: Build & publish module to registry
 
-on: [push, pull_request]
+on:
+  release:
+    types: [published]
 
 jobs:
   publish:
@@ -26,8 +28,10 @@ jobs:
     runs-on: ${{ matrix.runner }}
 
     steps:
-    - name: Call build module workflow
-      uses: ./.github/workflows/build-module.yml
+    - uses: actions/checkout@v3
+
+    - name: Build module
+      uses: ./.github/actions/build-module
       with:
         target_os: ${{ matrix.target_os }}
         target_arch: ${{ matrix.target_arch }}
