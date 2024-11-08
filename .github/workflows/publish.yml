@@ -1,6 +1,8 @@
 name: Build & publish module to registry
 
-on: [push, pull_request]
+on:
+  release:
+    types: [published]
 
 jobs:
   publish:
@@ -46,7 +48,7 @@ jobs:
           ${{ matrix.docker_image }} \
           sh -c "make module"
 
-    - name: Check if module.tar.gz exists recursively
+    - name: Check if module.tar.gz exists in the workdir recursively
       run: |
         if find . -name module.tar.gz | grep -q .; then
           echo "module.tar.gz exists"
@@ -61,6 +63,6 @@ jobs:
         meta-path: meta.json
         module-path: module.tar.gz
         platform: ${{ matrix.platform }}
-        version: 0.1.8-rc0
+        version: ${{ github.ref_name }}
         key-id: ${{ secrets.VIAM_DEV_API_KEY_ID }}
         key-value: ${{ secrets.VIAM_DEV_API_KEY }}
