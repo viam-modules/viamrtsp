@@ -38,7 +38,7 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: Call build module workflow
-      uses: ./.github/workflows/build-module.yml
+      uses: hexbabe/sean-viamrtsp/.github/workflows/build-module.yml@fix-ci-publish
       with:
         target_os: linux
         target_arch: ${{ matrix.platform.arch }}
