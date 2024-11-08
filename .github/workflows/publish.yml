@@ -27,7 +27,7 @@ jobs:
 
     steps:
     - name: Call build module workflow
-      uses: hexbabe/sean-viamrtsp/.github/workflows/build-module.yml@fix-ci-publish
+      uses: ./.github/workflows/build-module.yml
       with:
         target_os: ${{ matrix.target_os }}
         target_arch: ${{ matrix.target_arch }}
