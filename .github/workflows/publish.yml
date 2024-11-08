@@ -35,7 +35,7 @@ jobs:
       with:
         go-version: 1.21.13
 
-    - name: Pull Docker image
+    - name: Pull build Docker image
       run: docker pull ${{ matrix.docker_image }}
 
     - name: Build and package inside container
@@ -48,7 +48,7 @@ jobs:
           ${{ matrix.docker_image }} \
           sh -c "make module"
 
-    - name: Check if module.tar.gz exists in the workdir recursively
+    - name: Verify module.tar.gz exists in the workdir recursively
       run: |
         if find . -name module.tar.gz | grep -q .; then
           echo "module.tar.gz exists"
