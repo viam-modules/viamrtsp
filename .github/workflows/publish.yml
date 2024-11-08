@@ -39,7 +39,7 @@ jobs:
     - name: Build and package
       run: |
         if [ "${{ matrix.target_os }}" != "android" ]; then
-          canon --profile viam-rtsp-antique TARGET_OS=${{ matrix.target_os }} TARGET_ARCH=${{ matrix.target_arch }} make module
+          canon --profile viam-rtsp-antique sh -c "(TARGET_OS=${{ matrix.target_os }} TARGET_ARCH=${{ matrix.target_arch }} make module)"
         else
           TARGET_OS=${{ matrix.target_os }} TARGET_ARCH=${{ matrix.target_arch }} make module
         fi
