@@ -14,11 +14,9 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Set up Go
-      uses: actions/setup-go@v2
+    - name: Build module
+      uses: ./.github/actions/build-module
       with:
-        go-version: 1.21
-    
-    - name: Build viamrtsp binary
-      run: |
-        TARGET_OS=android TARGET_ARCH=arm64 make
+        target_os: android
+        target_arch: arm64
+        docker_image: ghcr.io/viamrobotics/antique2:amd64-cache

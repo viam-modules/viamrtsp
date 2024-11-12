@@ -1,6 +1,12 @@
 name: Integration test using mediamtx
 
-on: [push, pull_request]
+on:
+  push:
+    paths-ignore:
+      - 'README.md'
+  pull_request:
+    paths-ignore:
+      - 'README.md' 
 
 jobs:
   build-and-test:
@@ -11,10 +17,12 @@ jobs:
             arch: amd64
             mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_linux_amd64.tar.gz
             viam_server_url: https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-x86_64.AppImage
+            docker_image: ghcr.io/viamrobotics/antique2:amd64-cache
           - runner: buildjet-8vcpu-ubuntu-2204-arm
             arch: arm64
             mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_linux_arm64v8.tar.gz
             viam_server_url: https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-aarch64.AppImage
+            docker_image: ghcr.io/viamrobotics/antique2:arm64-cache
         config:
           - name: "h264"
             codec: "libx264"
@@ -29,11 +37,13 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Set up Go
-      uses: actions/setup-go@v2
+    - name: Build module
+      uses: ./.github/actions/build-module
       with:
-        go-version: 1.21.13
-    
+        target_os: linux
+        target_arch: ${{ matrix.platform.arch }}
+        docker_image: ${{ matrix.platform.docker_image }}
+
     - name: Install dependencies
       run: |
         sudo apt-get update
@@ -50,10 +60,6 @@ jobs:
       
     - name: Run fake RTSP camera
       run: ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec ${{ matrix.config.codec }} ${{ matrix.config.extra_ffmpeg_args }} -pix_fmt yuv420p -f rtsp -rtsp_transport tcp rtsp://0.0.0.0:8554/live.stream &
-      
-    - name: Build viamrtsp binary
-      run: |
-        TARGET_OS=linux TARGET_ARCH=${{ matrix.platform.arch }} make module
       
     - name: Install viam-server
       run: |
