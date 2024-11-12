@@ -87,61 +87,71 @@ func TestRTSPCamera(t *testing.T) {
 		})
 
 		t.Run("SubscribeRTP", func(t *testing.T) {
-			t.Run("when RTPPassthrough = true", func(t *testing.T) {
-				h, closeFunc := newH264ServerHandler(t, forma, bURL, logger)
-				defer closeFunc()
-				test.That(t, h.s.Start(), test.ShouldBeNil)
-				timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
-				defer timeoutCancel()
-				config := resource.NewEmptyConfig(camera.Named("foo"), ModelAgnostic)
-				shouldPassthrough := true
-				config.ConvertedAttributes = &Config{Address: "rtsp://" + h.s.RTSPAddress, RTPPassthrough: &shouldPassthrough}
-				rtspCam, err := NewRTSPCamera(timeoutCtx, nil, config, logger)
-				test.That(t, err, test.ShouldBeNil)
-				defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
-				vcs, ok := rtspCam.(rtppassthrough.Source)
-				test.That(t, ok, test.ShouldBeTrue)
-				cancelCtx, cancel := context.WithCancel(context.Background())
-				sub, err := vcs.SubscribeRTP(timeoutCtx, 512, func(pkts []*rtp.Packet) {
-					if len(pkts) > 0 {
-						logger.Info("got packets")
-						cancel()
-					}
-				})
-				test.That(t, err, test.ShouldBeNil)
-				defer func() {
-					err := vcs.Unsubscribe(context.Background(), sub.ID)
-					test.That(t, err, test.ShouldBeNil)
-				}()
-
-				select {
-				case <-timeoutCtx.Done():
-					t.Log("timed out waiting for packets")
-					t.FailNow()
-				case <-cancelCtx.Done():
-					// We got packets and are happy
+			t.Run("RTPPassthrough config variations", func(t *testing.T) {
+				cases := []struct {
+					name                 string
+					rtpPassthrough       *bool
+					expectSubscribeError error
+				}{
+					{"when RTPPassthrough = true", func() *bool { b := true; return &b }(), nil},
+					{"when RTPPassthrough = false", func() *bool { b := false; return &b }(), ErrH264PassthroughNotEnabled},
+					{"when RTPPassthrough is not specified", nil, nil},
 				}
-			})
 
-			t.Run("when RTPPassthrough = false", func(t *testing.T) {
-				h, closeFunc := newH264ServerHandler(t, forma, bURL, logger)
-				defer closeFunc()
-				test.That(t, h.s.Start(), test.ShouldBeNil)
-				timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
-				defer timeoutCancel()
-				config := resource.NewEmptyConfig(camera.Named("foo"), ModelAgnostic)
-				shouldPassthrough := false
-				config.ConvertedAttributes = &Config{Address: "rtsp://" + h.s.RTSPAddress, RTPPassthrough: &shouldPassthrough}
-				rtspCam, err := NewRTSPCamera(timeoutCtx, nil, config, logger)
-				test.That(t, err, test.ShouldBeNil)
-				defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
-				vcs, ok := rtspCam.(rtppassthrough.Source)
-				test.That(t, ok, test.ShouldBeTrue)
-				_, err = vcs.SubscribeRTP(timeoutCtx, 512, func(_ []*rtp.Packet) {
-					t.Log("should not happen")
-					t.FailNow()
-				})
-				test.That(t, err, test.ShouldBeError, ErrH264PassthroughNotEnabled)
+				for _, tc := range cases {
+					t.Run(tc.name, func(t *testing.T) {
+						// Server and camera setup
+						h, closeFunc := newH264ServerHandler(t, forma, bURL, logger)
+						defer closeFunc()
+						test.That(t, h.s.Start(), test.ShouldBeNil)
+
+						timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), 10*time.Second)
+						defer timeoutCancel()
+
+						config := resource.NewEmptyConfig(camera.Named("foo"), ModelAgnostic)
+						config.ConvertedAttributes = &Config{
+							Address:        "rtsp://" + h.s.RTSPAddress,
+							RTPPassthrough: tc.rtpPassthrough,
+						}
+
+						rtspCam, err := NewRTSPCamera(timeoutCtx, nil, config, logger)
+						test.That(t, err, test.ShouldBeNil)
+						defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
+
+						vcs, ok := rtspCam.(rtppassthrough.Source)
+						test.That(t, ok, test.ShouldBeTrue)
+
+						// Subscription and packet tests
+						if tc.expectSubscribeError == nil {
+							cancelCtx, cancel := context.WithCancel(context.Background())
+							sub, err := vcs.SubscribeRTP(timeoutCtx, 512, func(pkts []*rtp.Packet) {
+								if len(pkts) > 0 {
+									logger.Info("got packets")
+									cancel()
+								}
+							})
+							test.That(t, err, test.ShouldBeNil)
+							defer func() {
+								err := vcs.Unsubscribe(context.Background(), sub.ID)
+								test.That(t, err, test.ShouldBeNil)
+							}()
+
+							select {
+							case <-timeoutCtx.Done():
+								t.Log("timed out waiting for packets")
+								t.FailNow()
+							case <-cancelCtx.Done():
+								// We got packets and are happy
+							}
+						} else {
+							_, err := vcs.SubscribeRTP(timeoutCtx, 512, func(_ []*rtp.Packet) {
+								t.Log("should not happen")
+								t.FailNow()
+							})
+							test.That(t, err, test.ShouldBeError, tc.expectSubscribeError)
+						}
+					})
+				}
 			})
 		})
 	})
