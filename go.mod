@@ -9,6 +9,7 @@ require (
 	github.com/bluenviron/mediacommon v1.9.2
 	github.com/edaniels/golinters v0.0.5-0.20220906153528-641155550742
 	github.com/golangci/golangci-lint v1.61.0
+	github.com/koron/go-ssdp v0.0.4
 	github.com/pion/rtp v1.8.7
 	github.com/rhysd/actionlint v1.6.27
 	github.com/stretchr/testify v1.9.0

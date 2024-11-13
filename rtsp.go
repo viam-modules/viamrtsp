@@ -23,6 +23,7 @@ import (
 	"github.com/pion/rtp"
 	"github.com/viam-modules/viamrtsp/formatprocessor"
 	"github.com/viam-modules/viamrtsp/viamonvif"
+	"github.com/viam-modules/viamrtsp/viamupnp"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/components/camera/rtppassthrough"
 	"go.viam.com/rdk/gostream"
@@ -104,6 +105,7 @@ type Config struct {
 	RTPPassthrough   *bool                              `json:"rtp_passthrough"`
 	IntrinsicParams  *transform.PinholeCameraIntrinsics `json:"intrinsic_parameters,omitempty"`
 	DistortionParams *transform.BrownConrady            `json:"distortion_parameters,omitempty"`
+	Query            viamupnp.DeviceQuery               `json:"query"`
 }
 
 // CodecFormat contains a pointer to a format and the corresponding FFmpeg codec.
@@ -130,6 +132,29 @@ func (conf *Config) Validate(path string) ([]string, error) {
 	}
 
 	return nil, nil
+}
+
+func (conf *Config) parseAndFixAddress(ctx context.Context, logger logging.Logger) (*base.URL, error) {
+	u, err := base.ParseURL(conf.Address)
+	if err != nil {
+		return nil, err
+	}
+
+	if u.Hostname() == "UPNP_DISCOVER" {
+		host, err := viamupnp.FindHost(ctx, logger, conf.Query)
+		if err != nil {
+			return nil, err
+		}
+
+		p := u.Port()
+		if p == "" {
+			u.Host = host
+		} else {
+			u.Host = fmt.Sprintf("%s:%s", host, u.Port())
+		}
+	}
+
+	return u, nil
 }
 
 type (
@@ -685,7 +710,7 @@ func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		logger.Error(err.Error())
 		return nil, err
 	}
-	u, err := base.ParseURL(newConf.Address)
+	u, err := newConf.parseAndFixAddress(ctx, logger)
 	if err != nil {
 		logger.Error(err.Error())
 		return nil, err

@@ -92,6 +92,10 @@ Discovery relies on the IP camera adhering to the ONVIF Profile S standard, whic
 #### ONVIF authentication
 For some IP cameras, ONVIF authentication may be flaky or broken. A workaround is to disable the camera's ONVIF authentication temporarily to discover the RTSP address, then (optionally) re-enable the setting.
 
+## UPnP Host Discovery
+If in your rtsp_address your hostname is UPNP_DISCOVER then we will try to find a UPnP host that matches.
+You can filter the results by fillong out the `query` field in the configuration. See `viamupnp.DeviceQuery` for supported filters.
+
 ## Build for local development
 
 The binary is statically linked with [FFmpeg v6.1](https://github.com/FFmpeg/FFmpeg/tree/release/6.1), eliminating the need to install FFmpeg separately on target machines.

@@ -15,7 +15,9 @@ import (
 	"github.com/bluenviron/gortsplib/v4/pkg/format"
 	"github.com/bluenviron/gortsplib/v4/pkg/rtptime"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
+	"github.com/koron/go-ssdp"
 	"github.com/pion/rtp"
+	"github.com/viam-modules/viamrtsp/viamupnp"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/components/camera/rtppassthrough"
 	"go.viam.com/rdk/logging"
@@ -466,4 +468,37 @@ func newH264ServerHandler(
 		test.That(t, h.s.Wait(), test.ShouldBeError, errors.New("terminated"))
 		h.wg.Wait()
 	}
+}
+
+func TestUPNPStuff(t *testing.T) {
+	ctx := context.Background()
+	logger := logging.NewTestLogger(t)
+
+	ctx = context.WithValue(ctx,
+		viamupnp.FindAllTestKey,
+		[]viamupnp.UPNPDevice{
+			{ssdp.Service{Location: "http://eliot:12312/asd.xml"}, nil},
+		},
+	)
+
+	u, err := base.ParseURL("rtsp://a:b@UPNP_DISCOVER/abc")
+	test.That(t, err, test.ShouldBeNil)
+	test.That(t, u.Host, test.ShouldEqual, "UPNP_DISCOVER")
+
+	c := Config{
+		Address: "rtsp://a:b@foo/abc",
+	}
+	u, err = c.parseAndFixAddress(ctx, logger)
+	test.That(t, err, test.ShouldBeNil)
+	test.That(t, u.Host, test.ShouldEqual, "foo")
+
+	c.Address = "rtsp://a:b@UPNP_DISCOVER/abc"
+	u, err = c.parseAndFixAddress(ctx, logger)
+	test.That(t, err, test.ShouldBeNil)
+	test.That(t, u.Host, test.ShouldEqual, "eliot")
+
+	c.Address = "rtsp://a:b@UPNP_DISCOVER:1234/abc"
+	u, err = c.parseAndFixAddress(ctx, logger)
+	test.That(t, err, test.ShouldBeNil)
+	test.That(t, u.Host, test.ShouldEqual, "eliot:1234")
 }
