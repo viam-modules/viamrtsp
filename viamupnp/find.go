@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/koron/go-ssdp"
 	"go.viam.com/rdk/logging"
@@ -43,7 +44,7 @@ func FindHost(ctx context.Context, logger logging.Logger, query DeviceQuery) (st
 				logger.Warnf("invalid location %s", a.Service.Location)
 				continue
 			}
-			return strings.Split(u.Host, ":")[0], nil
+			return u.Hostname(), nil
 		}
 	}
 
@@ -130,7 +131,9 @@ type deviceDesc struct {
 }
 
 func readDeviceDesc(ctx context.Context, url string) (*deviceDesc, error) {
-	cli := &http.Client{}
+	cli := &http.Client{
+		Timeout: time.Second * 10, //nolint: mnd
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -143,18 +146,18 @@ func readDeviceDesc(ctx context.Context, url string) (*deviceDesc, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("http fetch (%s) not ok: %w", url, err)
+		return nil, fmt.Errorf("http fetch (%s) not ok: %v", url, resp.StatusCode)
 	}
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("can't ready body from (%s): %w", url, err)
+		return nil, fmt.Errorf("can't read body from (%s): %v", url, resp.StatusCode)
 	}
 
-	return parseDeciceDesc(url, data)
+	return parseDeviceDesc(url, data)
 }
 
-func parseDeciceDesc(url string, data []byte) (*deviceDesc, error) {
+func parseDeviceDesc(url string, data []byte) (*deviceDesc, error) {
 	var desc deviceDesc
 	err := xml.Unmarshal(data, &desc)
 	if err != nil {

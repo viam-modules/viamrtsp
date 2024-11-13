@@ -1,8 +1,11 @@
 package viamupnp
 
 import (
+	"context"
 	"testing"
 
+	"github.com/koron/go-ssdp"
+	"go.viam.com/rdk/logging"
 	"go.viam.com/test"
 )
 
@@ -39,7 +42,7 @@ var exampleXML = `<?xml version="1.0"?>
 </root>`
 
 func TestParse1(t *testing.T) {
-	dd, err := parseDeciceDesc("", []byte(exampleXML))
+	dd, err := parseDeviceDesc("", []byte(exampleXML))
 	test.That(t, err, test.ShouldBeNil)
 	test.That(t, dd.SpecVersion.Major, test.ShouldEqual, 1)
 	test.That(t, dd.Device.ModelName, test.ShouldEqual, "M364C")
@@ -78,4 +81,20 @@ func TestQuery1(t *testing.T) {
 	test.That(t, pc.Matches(DeviceQuery{SerialNumber: "c.*"}), test.ShouldBeTrue)
 	test.That(t, pc.Matches(DeviceQuery{SerialNumber: "cz.*"}), test.ShouldBeTrue)
 	test.That(t, pc.Matches(DeviceQuery{SerialNumber: "d"}), test.ShouldBeFalse)
+}
+
+func TestFindHost(t *testing.T) {
+	ctx := context.Background()
+	logger := logging.NewTestLogger(t)
+
+	ctx = context.WithValue(ctx,
+		FindAllTestKey,
+		[]UPNPDevice{
+			{ssdp.Service{Location: "http://eliot:12312/asd.xml"}, nil},
+		},
+	)
+
+	host, err := FindHost(ctx, logger, DeviceQuery{})
+	test.That(t, err, test.ShouldBeNil)
+	test.That(t, host, test.ShouldEqual, "eliot")
 }

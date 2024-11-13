@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"image"
 	"image/jpeg"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -141,21 +140,17 @@ func (conf *Config) parseAndFixAddress(ctx context.Context, logger logging.Logge
 		return nil, err
 	}
 
-	pcs := strings.Split(u.Host, ":")
-	if len(pcs) > 2 { //nolint:mnd
-		return nil, fmt.Errorf("invalid url [%s]", conf.Address)
-	}
-
-	if pcs[0] == "UPNP_DISCOVER" {
+	if u.Hostname() == "UPNP_DISCOVER" {
 		host, err := viamupnp.FindHost(ctx, logger, conf.Query)
 		if err != nil {
 			return nil, err
 		}
 
-		if len(pcs) == 1 {
+		p := u.Port()
+		if p == "" {
 			u.Host = host
 		} else {
-			u.Host = fmt.Sprintf("%s:%s", host, pcs[1])
+			u.Host = fmt.Sprintf("%s:%s", host, u.Port())
 		}
 	}
 
