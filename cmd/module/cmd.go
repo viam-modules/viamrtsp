@@ -3,6 +3,11 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"log"
+	"net/http"
+
+	_ "net/http/pprof"
 
 	"github.com/viam-modules/viamrtsp"
 	"go.uber.org/zap/zapcore"
@@ -13,11 +18,15 @@ import (
 )
 
 func main() {
+	go func() {
+		fmt.Println("sanity checking...")
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 	utils.ContextualMain(mainWithArgs, module.NewLoggerFromArgs("viamrtsp"))
 }
 
 func mainWithArgs(ctx context.Context, _ []string, logger logging.Logger) error {
-	myMod, err := module.NewModuleFromArgs(ctx, logger)
+	myMod, err := module.NewModuleFromArgs(ctx)
 	if err != nil {
 		return err
 	}
