@@ -20,7 +20,7 @@ import (
 func main() {
 	go func() {
 		fmt.Println("sanity checking...")
-		log.Println(http.ListenAndServe("localhost:6060", nil))
+		log.Println(http.ListenAndServe("0.0.0.0:6060", nil))
 	}()
 	utils.ContextualMain(mainWithArgs, module.NewLoggerFromArgs("viamrtsp"))
 }
