@@ -751,6 +751,8 @@ func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		return nil, err
 	}
 
+	rc.clientReconnectBackgroundWorker(codecInfo)
+
 	return rc, nil
 }
 
