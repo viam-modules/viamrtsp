@@ -28,6 +28,7 @@ import (
 	"go.viam.com/rdk/components/camera/rtppassthrough"
 	"go.viam.com/rdk/gostream"
 	"go.viam.com/rdk/logging"
+	"go.viam.com/rdk/pointcloud"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/rimage/transform"
 	rutils "go.viam.com/rdk/utils"
@@ -167,6 +168,7 @@ type (
 
 // rtspCamera contains the rtsp client, and the reader function that fulfills the camera interface.
 type rtspCamera struct {
+	resource.AlwaysRebuild
 	model resource.Model
 	gostream.VideoReader
 	u *base.URL
@@ -199,6 +201,8 @@ type rtspCamera struct {
 
 	subsMu       sync.RWMutex
 	bufAndCBByID map[rtppassthrough.SubscriptionID]bufAndCB
+
+	name resource.Name
 }
 
 // Close closes the camera. It always returns nil, but because of Close() interface, it needs to return an error.
@@ -727,6 +731,7 @@ func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 	rc := &rtspCamera{
 		model:                       conf.Model,
 		u:                           u,
+		name:                        conf.ResourceName(),
 		rtpPassthrough:              rtpPassthrough,
 		bufAndCBByID:                make(map[rtppassthrough.SubscriptionID]bufAndCB),
 		rtpPassthroughCtx:           rtpPassthroughCtx,
@@ -745,48 +750,8 @@ func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		logger.Error(err.Error())
 		return nil, err
 	}
-	cancelCtx, cancel := context.WithCancel(context.Background())
-	reader := gostream.VideoReaderFunc(func(_ context.Context) (image.Image, func(), error) {
-		if videoCodec(rc.currentCodec.Load()) == MJPEG {
-			img := rc.latestMJPEGImage.Load()
-			if img == nil {
-				return nil, func() {}, errors.New("no mjpeg frame yet")
-			}
-			return *img, func() {}, nil
-		}
 
-		rc.frameSwapMu.Lock()
-		defer rc.frameSwapMu.Unlock()
-
-		if rc.latestFrame == nil {
-			return nil, func() {}, errors.New("no frame yet")
-		}
-		// Makes sure we use the same frame pointer in release as we do in this VideoReaderFunc.
-		frame := rc.latestFrame
-		frame.incrementRefs()
-
-		release := func() {
-			// When the caller is done with the image, we return the AVFrame to the pool such
-			// that we can re-use its allocated byte buffer.
-			if refCount := frame.decrementRefs(); refCount == 0 {
-				rc.avFramePool.put(frame)
-			}
-		}
-
-		return frame.toImage(), release, nil
-	})
-	rc.VideoReader = reader
-	rc.cancelCtx = cancelCtx
-	rc.cancelFunc = cancel
-	cameraModel := camera.NewPinholeModelWithBrownConradyDistortion(newConf.IntrinsicParams, newConf.DistortionParams)
-	rc.clientReconnectBackgroundWorker(codecInfo)
-	src, err := camera.NewVideoSourceFromReader(ctx, rc, &cameraModel, camera.ColorStream)
-	if err != nil {
-		logger.Error(err.Error())
-		return nil, err
-	}
-
-	return camera.FromVideoSource(conf.ResourceName(), src, logger), nil
+	return rc, nil
 }
 
 func (rc *rtspCamera) unsubscribeAll() {
@@ -947,4 +912,57 @@ func naluType(nalu []byte) h264.NALUType {
 func isCompactableH264(nalu []byte) bool {
 	typ := naluType(nalu)
 	return typ == h264.NALUTypeSPS || typ == h264.NALUTypePPS || typ == h264.NALUTypeIDR
+}
+
+// Define unimplemented methods for camera
+func (rc *rtspCamera) Stream(_ context.Context, _ ...gostream.ErrorHandler) (gostream.VideoStream, error) {
+	return nil, errors.New("stream not implemented")
+}
+
+func (rc *rtspCamera) Image(_ context.Context, _ string, _ map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
+	rc.frameSwapMu.Lock()
+	defer rc.frameSwapMu.Unlock()
+
+	if rc.latestFrame == nil {
+		return nil, camera.ImageMetadata{}, errors.New("no frame yet")
+	}
+	// Makes sure we use the same frame pointer in release as we do in this VideoReaderFunc.
+	frame := rc.latestFrame
+	frame.incrementRefs()
+
+	rc.logger.Infof("about to jpeg encode")
+
+	// encode to jpeg
+	buf := new(bytes.Buffer)
+	if err := jpeg.Encode(buf, frame.toImage(), nil); err != nil {
+		return nil, camera.ImageMetadata{}, err
+	}
+
+	rc.logger.Infof("jpeg encoded")
+
+	if refCount := frame.decrementRefs(); refCount == 0 {
+		rc.avFramePool.put(frame)
+	}
+
+	return buf.Bytes(), camera.ImageMetadata{}, nil
+}
+
+func (rc *rtspCamera) Images(_ context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
+	return nil, resource.ResponseMetadata{}, errors.New("not implemented")
+}
+
+func (rc *rtspCamera) NextPointCloud(_ context.Context) (pointcloud.PointCloud, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (rc *rtspCamera) DoCommand(_ context.Context, _ map[string]interface{}) (map[string]interface{}, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (rc *rtspCamera) Properties(_ context.Context) (camera.Properties, error) {
+	return camera.Properties{}, nil
+}
+
+func (rc *rtspCamera) Name() resource.Name {
+	return rc.name
 }
