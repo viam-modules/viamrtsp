@@ -922,19 +922,29 @@ func isCompactableH264(nalu []byte) bool {
 // Image returns the latest frame as a JPEG image.
 // (TODO): Add support for mimetype handling.
 func (rc *rtspCamera) Image(_ context.Context, _ string, _ map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
-	rc.frameSwapMu.Lock()
-	defer rc.frameSwapMu.Unlock()
-	if rc.latestFrame == nil {
-		return nil, camera.ImageMetadata{}, errors.New("no frame yet")
+	var img image.Image
+	if videoCodec(rc.currentCodec.Load()) == MJPEG {
+		latestImg := rc.latestMJPEGImage.Load()
+		if latestImg == nil {
+			return nil, camera.ImageMetadata{}, errors.New("no mjpeg frame yet")
+		}
+		img = *latestImg
+	} else {
+		rc.frameSwapMu.Lock()
+		defer rc.frameSwapMu.Unlock()
+		if rc.latestFrame == nil {
+			return nil, camera.ImageMetadata{}, errors.New("no frame yet")
+		}
+		frame := rc.latestFrame
+		frame.incrementRefs()
+		img = frame.toImage()
+		if refCount := frame.decrementRefs(); refCount == 0 {
+			rc.avFramePool.put(frame)
+		}
 	}
-	frame := rc.latestFrame
-	frame.incrementRefs()
 	buf := new(bytes.Buffer)
-	if err := jpeg.Encode(buf, frame.toImage(), nil); err != nil {
+	if err := jpeg.Encode(buf, img, nil); err != nil {
 		return nil, camera.ImageMetadata{}, err
-	}
-	if refCount := frame.decrementRefs(); refCount == 0 {
-		rc.avFramePool.put(frame)
 	}
 	return buf.Bytes(), camera.ImageMetadata{
 		MimeType: rutils.MimeTypeJPEG,
