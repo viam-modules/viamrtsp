@@ -257,9 +257,8 @@ func TestRTSPCameraPerformance(t *testing.T) {
 
 		// Performance testing: Loop over multiple GetImage calls
 		for range make([]int, iterations) {
-			img, f, err := camera.ReadImage(timeoutCtx, rtspCam)
+			img, err := camera.DecodeImageFromCamera(timeoutCtx, "image/jpeg", nil, rtspCam)
 			test.That(t, err, test.ShouldBeNil)
-			f()
 			test.That(t, img.Bounds(), test.ShouldResemble, image.Rect(0, 0, 480, 270))
 			time.Sleep(50 * time.Millisecond)
 		}
