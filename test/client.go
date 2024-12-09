@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -13,7 +14,11 @@ import (
 	"go.viam.com/rdk/robot/client"
 )
 
-const ctxTimeoutDuration = 30 * time.Second
+const (
+	ctxTimeoutDuration = 30 * time.Second
+	maxRetries         = 5
+	retryDelay         = 50 * time.Millisecond
+)
 
 func main() {
 	if err := run(); err != nil {
@@ -53,10 +58,13 @@ func run() error {
 		return err
 	}
 
-	_, err = camera.DecodeImageFromCamera(ctx, "image/jpeg", nil, ipCam)
-	if err != nil {
-		return err
+	for i := 0; i < maxRetries; i++ {
+		_, err = camera.DecodeImageFromCamera(ctx, "image/jpeg", nil, ipCam)
+		if err == nil {
+			return nil
+		}
+		time.Sleep(retryDelay)
 	}
 
-	return nil
+	return errors.New("failed to get image after 5 attempts")
 }
