@@ -919,11 +919,6 @@ func isCompactableH264(nalu []byte) bool {
 	return typ == h264.NALUTypeSPS || typ == h264.NALUTypePPS || typ == h264.NALUTypeIDR
 }
 
-// Define unimplemented methods for camera.
-func (rc *rtspCamera) Stream(_ context.Context, _ ...gostream.ErrorHandler) (gostream.VideoStream, error) {
-	return nil, errors.New("stream not implemented")
-}
-
 // Image returns the latest frame as a JPEG image.
 // (TODO): Add support for mimetype handling.
 func (rc *rtspCamera) Image(_ context.Context, _ string, _ map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
@@ -944,6 +939,11 @@ func (rc *rtspCamera) Image(_ context.Context, _ string, _ map[string]interface{
 	return buf.Bytes(), camera.ImageMetadata{
 		MimeType: rutils.MimeTypeJPEG,
 	}, nil
+}
+
+// Unimplemented camera interface methods.
+func (rc *rtspCamera) Stream(_ context.Context, _ ...gostream.ErrorHandler) (gostream.VideoStream, error) {
+	return nil, errors.New("stream not implemented")
 }
 
 func (rc *rtspCamera) Images(_ context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {

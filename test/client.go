@@ -17,7 +17,7 @@ import (
 const (
 	ctxTimeoutDuration = 30 * time.Second
 	maxRetries         = 5
-	retryDelay         = 50 * time.Millisecond
+	retryDelay         = 1 * time.Second
 )
 
 func main() {
