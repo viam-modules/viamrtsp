@@ -921,31 +921,23 @@ func (rc *rtspCamera) Stream(_ context.Context, _ ...gostream.ErrorHandler) (gos
 	return nil, errors.New("stream not implemented")
 }
 
+// Image returns the latest frame as a JPEG image.
+// (TODO): Add support for mimetype handling.
 func (rc *rtspCamera) Image(_ context.Context, _ string, _ map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
 	rc.frameSwapMu.Lock()
 	defer rc.frameSwapMu.Unlock()
-
 	if rc.latestFrame == nil {
 		return nil, camera.ImageMetadata{}, errors.New("no frame yet")
 	}
-	// Makes sure we use the same frame pointer in release as we do in this VideoReaderFunc.
 	frame := rc.latestFrame
 	frame.incrementRefs()
-
-	rc.logger.Infof("about to jpeg encode")
-
-	// encode to jpeg
 	buf := new(bytes.Buffer)
 	if err := jpeg.Encode(buf, frame.toImage(), nil); err != nil {
 		return nil, camera.ImageMetadata{}, err
 	}
-
-	rc.logger.Infof("jpeg encoded")
-
 	if refCount := frame.decrementRefs(); refCount == 0 {
 		rc.avFramePool.put(frame)
 	}
-
 	return buf.Bytes(), camera.ImageMetadata{}, nil
 }
 
