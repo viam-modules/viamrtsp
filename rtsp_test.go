@@ -236,9 +236,8 @@ func TestRTSPCameraPerformance(t *testing.T) {
 
 		// A loop to keep trying to get the first image until a frame is available.
 		for {
-			img, f, err := camera.ReadImage(timeoutCtx, rtspCam)
+			img, err := camera.DecodeImageFromCamera(imageTimeoutCtx, "image/jpeg", nil, rtspCam)
 			if err == nil && img != nil {
-				f()
 				im = img
 				frameAvailable = true
 				break

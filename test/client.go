@@ -52,11 +52,8 @@ func run() error {
 		}
 		return err
 	}
-	stream, err := ipCam.Stream(ctx)
-	if err != nil {
-		return err
-	}
-	_, _, err = stream.Next(ctx)
+
+	_, err = camera.DecodeImageFromCamera(ctx, "image/jpeg", nil, ipCam)
 	if err != nil {
 		return err
 	}
