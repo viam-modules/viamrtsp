@@ -58,7 +58,7 @@ func run() error {
 		return err
 	}
 
-	for i := 0; i < maxRetries; i++ {
+	for range maxRetries {
 		_, err = camera.DecodeImageFromCamera(ctx, "image/jpeg", nil, ipCam)
 		if err == nil {
 			return nil
