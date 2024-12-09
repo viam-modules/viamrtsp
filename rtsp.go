@@ -751,6 +751,9 @@ func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		return nil, err
 	}
 
+	cancelCtx, cancel := context.WithCancel(context.Background())
+	rc.cancelCtx = cancelCtx
+	rc.cancelFunc = cancel
 	rc.clientReconnectBackgroundWorker(codecInfo)
 
 	return rc, nil
@@ -916,7 +919,7 @@ func isCompactableH264(nalu []byte) bool {
 	return typ == h264.NALUTypeSPS || typ == h264.NALUTypePPS || typ == h264.NALUTypeIDR
 }
 
-// Define unimplemented methods for camera
+// Define unimplemented methods for camera.
 func (rc *rtspCamera) Stream(_ context.Context, _ ...gostream.ErrorHandler) (gostream.VideoStream, error) {
 	return nil, errors.New("stream not implemented")
 }
@@ -938,7 +941,9 @@ func (rc *rtspCamera) Image(_ context.Context, _ string, _ map[string]interface{
 	if refCount := frame.decrementRefs(); refCount == 0 {
 		rc.avFramePool.put(frame)
 	}
-	return buf.Bytes(), camera.ImageMetadata{}, nil
+	return buf.Bytes(), camera.ImageMetadata{
+		MimeType: rutils.MimeTypeJPEG,
+	}, nil
 }
 
 func (rc *rtspCamera) Images(_ context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
