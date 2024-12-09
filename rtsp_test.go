@@ -74,11 +74,10 @@ func TestRTSPCamera(t *testing.T) {
 			defer imageTimeoutCancel()
 			var im image.Image
 			for imageTimeoutCtx.Err() == nil {
-				img, f, err := camera.ReadImage(imageTimeoutCtx, rtspCam)
+				img, err := camera.DecodeImageFromCamera(imageTimeoutCtx, "image/jpeg", nil, rtspCam)
 				if err != nil {
 					continue
 				}
-				f()
 				if img != nil {
 					im = img
 					break
