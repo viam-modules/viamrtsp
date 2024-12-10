@@ -958,7 +958,10 @@ func (rc *rtspCamera) getFrameAsImage() ([]byte, camera.ImageMetadata, error) {
 }
 
 func (rc *rtspCamera) Properties(_ context.Context) (camera.Properties, error) {
-	return camera.Properties{}, nil
+	return camera.Properties{
+		SupportsPCD: false,
+		MimeTypes:   []string{rutils.MimeTypeJPEG},
+	}, nil
 }
 
 func (rc *rtspCamera) Name() resource.Name {
