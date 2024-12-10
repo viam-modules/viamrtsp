@@ -920,7 +920,7 @@ func isCompactableH264(nalu []byte) bool {
 }
 
 // Image returns the latest frame as JPEG bytes.
-func (rc *rtspCamera) Image(ctx context.Context, format string, options map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
+func (rc *rtspCamera) Image(_ context.Context, _ string, _ map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
 	if videoCodec(rc.currentCodec.Load()) == MJPEG {
 		return rc.getMJPEGImage()
 	}
