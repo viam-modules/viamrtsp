@@ -919,8 +919,7 @@ func isCompactableH264(nalu []byte) bool {
 	return typ == h264.NALUTypeSPS || typ == h264.NALUTypePPS || typ == h264.NALUTypeIDR
 }
 
-// Image returns the latest frame as a JPEG image.
-// (TODO): Add support for mimetype handling.
+// Image returns the latest frame as JPEG bytes.
 func (rc *rtspCamera) Image(_ context.Context, _ string, _ map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
 	var img image.Image
 	if videoCodec(rc.currentCodec.Load()) == MJPEG {
@@ -939,6 +938,7 @@ func (rc *rtspCamera) Image(_ context.Context, _ string, _ map[string]interface{
 		frame.incrementRefs()
 		img = frame.toImage()
 		if refCount := frame.decrementRefs(); refCount == 0 {
+			// Release the frame back to the pool if nothing else is using it.
 			rc.avFramePool.put(frame)
 		}
 	}
