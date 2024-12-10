@@ -920,35 +920,41 @@ func isCompactableH264(nalu []byte) bool {
 }
 
 // Image returns the latest frame as JPEG bytes.
-func (rc *rtspCamera) Image(_ context.Context, _ string, _ map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
-	var img image.Image
+func (rc *rtspCamera) Image(ctx context.Context, format string, options map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
 	if videoCodec(rc.currentCodec.Load()) == MJPEG {
-		latestImg := rc.latestMJPEGImage.Load()
-		if latestImg == nil {
-			return nil, camera.ImageMetadata{}, errors.New("no mjpeg frame yet")
-		}
-		img = *latestImg
-	} else {
-		rc.frameSwapMu.Lock()
-		defer rc.frameSwapMu.Unlock()
-		if rc.latestFrame == nil {
-			return nil, camera.ImageMetadata{}, errors.New("no frame yet")
-		}
-		frame := rc.latestFrame
-		frame.incrementRefs()
-		img = frame.toImage()
-		if refCount := frame.decrementRefs(); refCount == 0 {
-			// Release the frame back to the pool if nothing else is using it.
-			rc.avFramePool.put(frame)
-		}
+		return rc.getMJPEGImage()
 	}
-	buf := new(bytes.Buffer)
-	if err := jpeg.Encode(buf, img, nil); err != nil {
-		return nil, camera.ImageMetadata{}, err
+	return rc.getFrameAsImage()
+}
+
+// getMJPEGImage retrieves the latest MJPEG image.
+func (rc *rtspCamera) getMJPEGImage() ([]byte, camera.ImageMetadata, error) {
+	latestImg := rc.latestMJPEGImage.Load()
+	if latestImg == nil {
+		return nil, camera.ImageMetadata{}, errors.New("no mjpeg frame yet")
 	}
-	return buf.Bytes(), camera.ImageMetadata{
-		MimeType: rutils.MimeTypeJPEG,
-	}, nil
+	return encodeToJPEG(*latestImg)
+}
+
+// getFrameAsImage retrieves the latest frame and converts it to an image.
+func (rc *rtspCamera) getFrameAsImage() ([]byte, camera.ImageMetadata, error) {
+	rc.frameSwapMu.Lock()
+	defer rc.frameSwapMu.Unlock()
+
+	if rc.latestFrame == nil {
+		return nil, camera.ImageMetadata{}, errors.New("no frame yet")
+	}
+
+	currentFrame := rc.latestFrame
+	currentFrame.incrementRefs()
+	img := currentFrame.toImage()
+
+	// Release frame if no references are left
+	if refCount := currentFrame.decrementRefs(); refCount == 0 {
+		rc.avFramePool.put(currentFrame)
+	}
+
+	return encodeToJPEG(img)
 }
 
 func (rc *rtspCamera) Properties(_ context.Context) (camera.Properties, error) {
