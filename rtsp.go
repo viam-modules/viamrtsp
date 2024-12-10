@@ -951,6 +951,14 @@ func (rc *rtspCamera) Image(_ context.Context, _ string, _ map[string]interface{
 	}, nil
 }
 
+func (rc *rtspCamera) Properties(_ context.Context) (camera.Properties, error) {
+	return camera.Properties{}, nil
+}
+
+func (rc *rtspCamera) Name() resource.Name {
+	return rc.name
+}
+
 // Unimplemented camera interface methods.
 func (rc *rtspCamera) Stream(_ context.Context, _ ...gostream.ErrorHandler) (gostream.VideoStream, error) {
 	return nil, errors.New("stream not implemented")
@@ -966,12 +974,4 @@ func (rc *rtspCamera) NextPointCloud(_ context.Context) (pointcloud.PointCloud, 
 
 func (rc *rtspCamera) DoCommand(_ context.Context, _ map[string]interface{}) (map[string]interface{}, error) {
 	return nil, errors.New("not implemented")
-}
-
-func (rc *rtspCamera) Properties(_ context.Context) (camera.Properties, error) {
-	return camera.Properties{}, nil
-}
-
-func (rc *rtspCamera) Name() resource.Name {
-	return rc.name
 }
