@@ -23,6 +23,7 @@ import (
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/rimage/transform"
+	rutils "go.viam.com/rdk/utils"
 	"go.viam.com/test"
 	"go.viam.com/utils"
 )
@@ -74,7 +75,7 @@ func TestRTSPCamera(t *testing.T) {
 			defer imageTimeoutCancel()
 			var im image.Image
 			for imageTimeoutCtx.Err() == nil {
-				img, err := camera.DecodeImageFromCamera(imageTimeoutCtx, "image/jpeg", nil, rtspCam)
+				img, err := camera.DecodeImageFromCamera(imageTimeoutCtx, rutils.MimeTypeJPEG, nil, rtspCam)
 				if err != nil {
 					continue
 				}
@@ -236,7 +237,7 @@ func TestRTSPCameraPerformance(t *testing.T) {
 
 		// A loop to keep trying to get the first image until a frame is available.
 		for {
-			img, err := camera.DecodeImageFromCamera(imageTimeoutCtx, "image/jpeg", nil, rtspCam)
+			img, err := camera.DecodeImageFromCamera(imageTimeoutCtx, rutils.MimeTypeJPEG, nil, rtspCam)
 			if err == nil && img != nil {
 				im = img
 				frameAvailable = true
@@ -257,7 +258,7 @@ func TestRTSPCameraPerformance(t *testing.T) {
 
 		// Performance testing: Loop over multiple GetImage calls
 		for range make([]int, iterations) {
-			img, err := camera.DecodeImageFromCamera(timeoutCtx, "image/jpeg", nil, rtspCam)
+			img, err := camera.DecodeImageFromCamera(timeoutCtx, rutils.MimeTypeJPEG, nil, rtspCam)
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, img.Bounds(), test.ShouldResemble, image.Rect(0, 0, 480, 270))
 			time.Sleep(50 * time.Millisecond)
