@@ -30,7 +30,6 @@ import (
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/pointcloud"
 	"go.viam.com/rdk/resource"
-	"go.viam.com/rdk/rimage/transform"
 	rutils "go.viam.com/rdk/utils"
 	"go.viam.com/utils"
 )
@@ -102,11 +101,9 @@ func init() {
 
 // Config are the config attributes for an RTSP camera model.
 type Config struct {
-	Address          string                             `json:"rtsp_address"`
-	RTPPassthrough   *bool                              `json:"rtp_passthrough"`
-	IntrinsicParams  *transform.PinholeCameraIntrinsics `json:"intrinsic_parameters,omitempty"`
-	DistortionParams *transform.BrownConrady            `json:"distortion_parameters,omitempty"`
-	Query            viamupnp.DeviceQuery               `json:"query"`
+	Address        string               `json:"rtsp_address"`
+	RTPPassthrough *bool                `json:"rtp_passthrough"`
+	Query          viamupnp.DeviceQuery `json:"query"`
 }
 
 // CodecFormat contains a pointer to a format and the corresponding FFmpeg codec.
@@ -120,16 +117,6 @@ func (conf *Config) Validate(path string) ([]string, error) {
 	_, err := base.ParseURL(conf.Address)
 	if err != nil {
 		return nil, fmt.Errorf("invalid address '%s' for component at path '%s': %w", conf.Address, path, err)
-	}
-	if conf.IntrinsicParams != nil {
-		if err := conf.IntrinsicParams.CheckValid(); err != nil {
-			return nil, fmt.Errorf("invalid intrinsic parameters for component at path '%s': %w", path, err)
-		}
-	}
-	if conf.DistortionParams != nil {
-		if err := conf.DistortionParams.CheckValid(); err != nil {
-			return nil, fmt.Errorf("invalid distortion parameters for component at path '%s': %w", path, err)
-		}
 	}
 
 	return nil, nil
