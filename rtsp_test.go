@@ -171,8 +171,7 @@ func TestRTSPConfig(t *testing.T) {
 	test.That(t, err.Error(), test.ShouldContainSubstring, "unsupported scheme")
 	// bad intrinsic parameters
 	rtspConf = &Config{
-		Address:         "rtsp://example.com:5000",
-		IntrinsicParams: &transform.PinholeCameraIntrinsics{},
+		Address: "rtsp://example.com:5000",
 	}
 	_, err = rtspConf.Validate("path")
 	test.That(t, err, test.ShouldNotBeNil)
@@ -180,19 +179,8 @@ func TestRTSPConfig(t *testing.T) {
 	// good intrinsic parameters
 	rtspConf = &Config{
 		Address: "rtsp://example.com:5000",
-		IntrinsicParams: &transform.PinholeCameraIntrinsics{
-			Width:  1,
-			Height: 2,
-			Fx:     3,
-			Fy:     4,
-			Ppx:    5,
-			Ppy:    6,
-		},
 	}
 	_, err = rtspConf.Validate("path")
-	test.That(t, err, test.ShouldBeNil)
-	// no distortion parameters is OK
-	rtspConf.DistortionParams = &transform.BrownConrady{}
 	test.That(t, err, test.ShouldBeNil)
 }
 
