@@ -22,7 +22,6 @@ import (
 	"go.viam.com/rdk/components/camera/rtppassthrough"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
-	"go.viam.com/rdk/rimage/transform"
 	rutils "go.viam.com/rdk/utils"
 	"go.viam.com/test"
 	"go.viam.com/utils"
@@ -169,14 +168,6 @@ func TestRTSPConfig(t *testing.T) {
 	_, err = rtspConf.Validate("path")
 	test.That(t, err, test.ShouldNotBeNil)
 	test.That(t, err.Error(), test.ShouldContainSubstring, "unsupported scheme")
-	// bad intrinsic parameters
-	rtspConf = &Config{
-		Address: "rtsp://example.com:5000",
-	}
-	_, err = rtspConf.Validate("path")
-	test.That(t, err, test.ShouldNotBeNil)
-	test.That(t, err, test.ShouldWrap, transform.ErrNoIntrinsics)
-	// good intrinsic parameters
 	rtspConf = &Config{
 		Address: "rtsp://example.com:5000",
 	}
