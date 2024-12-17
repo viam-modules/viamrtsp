@@ -5,26 +5,21 @@ import (
 	"context"
 
 	"github.com/viam-modules/viamrtsp"
-	"go.uber.org/zap/zapcore"
 	"go.viam.com/rdk/components/camera"
-	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/module"
-	"go.viam.com/utils"
 )
 
 func main() {
-	utils.ContextualMain(mainWithArgs, module.NewLoggerFromArgs("viamrtsp"))
+	err := realMain(context.Background())
+	if err != nil {
+		panic(err)
+	}
 }
 
-func mainWithArgs(ctx context.Context, _ []string, logger logging.Logger) error {
+func realMain(ctx context.Context) error {
 	myMod, err := module.NewModuleFromArgs(ctx)
 	if err != nil {
 		return err
-	}
-
-	if logger.Level() != zapcore.DebugLevel {
-		logger.Info("suppressing non fatal libav errors / warnings due to false positives. to unsuppress, set module log_level to 'debug'")
-		viamrtsp.SetLibAVLogLevelFatal()
 	}
 
 	for _, model := range viamrtsp.Models {

@@ -8,6 +8,7 @@ require (
 	github.com/bluenviron/gortsplib/v4 v4.8.0
 	github.com/bluenviron/mediacommon v1.9.2
 	github.com/edaniels/golinters v0.0.5-0.20220906153528-641155550742
+	github.com/erh/viamupnp v0.0.0-20241217142932-2fecf833407c
 	github.com/golangci/golangci-lint v1.61.0
 	github.com/koron/go-ssdp v0.0.4
 	github.com/pion/rtp v1.8.7
@@ -15,7 +16,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/use-go/onvif v0.0.9
 	go.uber.org/zap v1.27.0
-	go.viam.com/rdk v0.53.0
+	go.viam.com/rdk v0.54.0
 	go.viam.com/test v1.2.4
 	go.viam.com/utils v0.1.116
 )
@@ -63,7 +64,7 @@ require (
 	github.com/bufbuild/protocompile v0.9.0 // indirect
 	github.com/butuzov/ireturn v0.3.0 // indirect
 	github.com/butuzov/mirror v1.2.0 // indirect
-	github.com/bytedance/sonic v1.12.2 // indirect
+	github.com/bytedance/sonic/loader v0.2.0 // indirect
 	github.com/campoy/embedmd v1.0.0 // indirect
 	github.com/catenacyber/perfsprint v0.7.1 // indirect
 	github.com/ccojocar/zxcvbn-go v1.0.2 // indirect
@@ -73,6 +74,7 @@ require (
 	github.com/charithe/durationcheck v0.0.10 // indirect
 	github.com/chavacava/garif v0.1.0 // indirect
 	github.com/ckaznocha/intrange v0.2.0 // indirect
+	github.com/cloudwego/base64x v0.1.4 // indirect
 	github.com/curioswitch/go-reassign v0.2.0 // indirect
 	github.com/daixiang0/gci v0.13.5 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -274,6 +276,7 @@ require (
 	github.com/timonwong/loggercheck v0.9.4 // indirect
 	github.com/tomarrell/wrapcheck/v2 v2.9.0 // indirect
 	github.com/tommy-muehle/go-mnd/v2 v2.5.1 // indirect
+	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ultraware/funlen v0.1.0 // indirect
 	github.com/ultraware/whitespace v0.1.1 // indirect
 	github.com/uudashr/gocognit v1.1.3 // indirect
@@ -306,6 +309,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.viam.com/api v0.1.366 // indirect
 	goji.io v2.0.2+incompatible // indirect
+	golang.org/x/arch v0.0.0-20210923205945-b76863e36670 // indirect
 	golang.org/x/crypto v0.28.0 // indirect
 	golang.org/x/exp v0.0.0-20240904232852-e7e105dedf7e // indirect
 	golang.org/x/exp/typeparams v0.0.0-20240314144324-c7f7c6466f7f // indirect
