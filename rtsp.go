@@ -20,10 +20,10 @@ import (
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtph265"
 	"github.com/bluenviron/gortsplib/v4/pkg/liberrors"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
+	"github.com/erh/viamupnp"
 	"github.com/pion/rtp"
 	"github.com/viam-modules/viamrtsp/formatprocessor"
 	"github.com/viam-modules/viamrtsp/viamonvif"
-	"github.com/erh/viamupnp"
 	"go.uber.org/zap/zapcore"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/components/camera/rtppassthrough"
@@ -33,7 +33,6 @@ import (
 	"go.viam.com/rdk/rimage/transform"
 	rutils "go.viam.com/rdk/utils"
 	"go.viam.com/utils"
-
 )
 
 const (
@@ -707,12 +706,11 @@ func (rc *rtspCamera) Unsubscribe(_ context.Context, id rtppassthrough.Subscript
 
 // NewRTSPCamera creates a new rtsp camera from the config, that has to have a viamrtsp.Config.
 func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.Config, logger logging.Logger) (camera.Camera, error) {
-
 	if logger.Level() != zapcore.DebugLevel {
 		logger.Info("suppressing non fatal libav errors / warnings due to false positives. to unsuppress, set module log_level to 'debug'")
 		SetLibAVLogLevelFatal()
 	}
-	
+
 	newConf, err := resource.NativeConfig[*Config](conf)
 	if err != nil {
 		logger.Error(err.Error())
