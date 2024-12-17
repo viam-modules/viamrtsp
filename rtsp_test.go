@@ -17,7 +17,7 @@ import (
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
 	"github.com/koron/go-ssdp"
 	"github.com/pion/rtp"
-	"github.com/viam-modules/viamrtsp/viamupnp"
+	"github.com/erh/viamupnp"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/components/camera/rtppassthrough"
 	"go.viam.com/rdk/logging"
