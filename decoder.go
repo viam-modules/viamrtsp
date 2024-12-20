@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"image"
 	"sync/atomic"
-	"time"
 	"unsafe"
 
 	"go.viam.com/rdk/logging"
@@ -29,8 +28,6 @@ type decoder struct {
 	src         *C.AVFrame
 	swsCtx      *C.struct_SwsContext
 	avFramePool *framePool
-
-	lastCaptureTime time.Time
 }
 
 type videoCodec int
@@ -248,19 +245,6 @@ func (d *decoder) close() {
 }
 
 func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
-	elapsed := time.Since(d.lastCaptureTime).Seconds()
-	if !d.lastCaptureTime.IsZero() {
-		if elapsed > 0 {
-			frequency := 1.0 / elapsed
-			d.logger.Infow("capture metrics", 
-				"frequency_hz", frequency,
-			)
-		} else {
-			panic("oh no")
-		}
-	}
-	d.lastCaptureTime = time.Now()
-
 	nalu = append(H2645StartCode(), nalu...)
 
 	// send frame to decoder

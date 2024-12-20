@@ -4,8 +4,6 @@ package main
 import (
 	"context"
 
-	_ "net/http/pprof"
-
 	"github.com/viam-modules/viamrtsp"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/module"
