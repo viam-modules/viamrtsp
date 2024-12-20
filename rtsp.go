@@ -83,11 +83,11 @@ func init() {
 				logger.Debugf("viamrtsp discovery received extra credentials: %v", extra)
 				username, err := getStringFromExtra(extra, "username")
 				if err != nil {
-					return nil, err
+					logger.Infof("error getting username from extra: %v. Defaulting to empty string", err)
 				}
 				password, err := getStringFromExtra(extra, "password")
 				if err != nil {
-					return nil, err
+					logger.Infof("error getting password from extra: %v. Defaulting to empty string", err)
 				}
 				camInfoList, err := viamonvif.DiscoverCameras(username, password, logger, nil)
 				if err != nil {
