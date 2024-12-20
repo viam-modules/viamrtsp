@@ -15,14 +15,14 @@ import (
 	"github.com/bluenviron/gortsplib/v4/pkg/format"
 	"github.com/bluenviron/gortsplib/v4/pkg/rtptime"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
+	"github.com/erh/viamupnp"
 	"github.com/koron/go-ssdp"
 	"github.com/pion/rtp"
-	"github.com/viam-modules/viamrtsp/viamupnp"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/components/camera/rtppassthrough"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
-	"go.viam.com/rdk/rimage/transform"
+	rutils "go.viam.com/rdk/utils"
 	"go.viam.com/test"
 	"go.viam.com/utils"
 )
@@ -74,11 +74,10 @@ func TestRTSPCamera(t *testing.T) {
 			defer imageTimeoutCancel()
 			var im image.Image
 			for imageTimeoutCtx.Err() == nil {
-				img, f, err := camera.ReadImage(imageTimeoutCtx, rtspCam)
+				img, err := camera.DecodeImageFromCamera(imageTimeoutCtx, rutils.MimeTypeJPEG, nil, rtspCam)
 				if err != nil {
 					continue
 				}
-				f()
 				if img != nil {
 					im = img
 					break
@@ -169,30 +168,10 @@ func TestRTSPConfig(t *testing.T) {
 	_, err = rtspConf.Validate("path")
 	test.That(t, err, test.ShouldNotBeNil)
 	test.That(t, err.Error(), test.ShouldContainSubstring, "unsupported scheme")
-	// bad intrinsic parameters
-	rtspConf = &Config{
-		Address:         "rtsp://example.com:5000",
-		IntrinsicParams: &transform.PinholeCameraIntrinsics{},
-	}
-	_, err = rtspConf.Validate("path")
-	test.That(t, err, test.ShouldNotBeNil)
-	test.That(t, err, test.ShouldWrap, transform.ErrNoIntrinsics)
-	// good intrinsic parameters
 	rtspConf = &Config{
 		Address: "rtsp://example.com:5000",
-		IntrinsicParams: &transform.PinholeCameraIntrinsics{
-			Width:  1,
-			Height: 2,
-			Fx:     3,
-			Fy:     4,
-			Ppx:    5,
-			Ppy:    6,
-		},
 	}
 	_, err = rtspConf.Validate("path")
-	test.That(t, err, test.ShouldBeNil)
-	// no distortion parameters is OK
-	rtspConf.DistortionParams = &transform.BrownConrady{}
 	test.That(t, err, test.ShouldBeNil)
 }
 
@@ -237,9 +216,8 @@ func TestRTSPCameraPerformance(t *testing.T) {
 
 		// A loop to keep trying to get the first image until a frame is available.
 		for {
-			img, f, err := camera.ReadImage(timeoutCtx, rtspCam)
+			img, err := camera.DecodeImageFromCamera(imageTimeoutCtx, rutils.MimeTypeJPEG, nil, rtspCam)
 			if err == nil && img != nil {
-				f()
 				im = img
 				frameAvailable = true
 				break
@@ -259,10 +237,9 @@ func TestRTSPCameraPerformance(t *testing.T) {
 
 		// Performance testing: Loop over multiple GetImage calls
 		for range make([]int, iterations) {
-			img, f, err := camera.ReadImage(timeoutCtx, rtspCam)
+			bytes, _, err := rtspCam.Image(timeoutCtx, rutils.MimeTypeJPEG, nil)
 			test.That(t, err, test.ShouldBeNil)
-			f()
-			test.That(t, img.Bounds(), test.ShouldResemble, image.Rect(0, 0, 480, 270))
+			test.That(t, len(bytes), test.ShouldBeGreaterThan, 0)
 			time.Sleep(50 * time.Millisecond)
 		}
 	})

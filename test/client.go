@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -11,9 +12,14 @@ import (
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/robot/client"
+	rutils "go.viam.com/rdk/utils"
 )
 
-const ctxTimeoutDuration = 30 * time.Second
+const (
+	ctxTimeoutDuration = 30 * time.Second
+	maxRetries         = 5
+	retryDelay         = 1 * time.Second
+)
 
 func main() {
 	if err := run(); err != nil {
@@ -52,14 +58,14 @@ func run() error {
 		}
 		return err
 	}
-	stream, err := ipCam.Stream(ctx)
-	if err != nil {
-		return err
-	}
-	_, _, err = stream.Next(ctx)
-	if err != nil {
-		return err
+
+	for range maxRetries {
+		_, err = camera.DecodeImageFromCamera(ctx, rutils.MimeTypeJPEG, nil, ipCam)
+		if err == nil {
+			return nil
+		}
+		time.Sleep(retryDelay)
 	}
 
-	return nil
+	return errors.New("failed to get image after 5 attempts")
 }

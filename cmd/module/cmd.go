@@ -3,37 +3,25 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"log"
-	"net/http"
 
 	_ "net/http/pprof"
 
 	"github.com/viam-modules/viamrtsp"
-	"go.uber.org/zap/zapcore"
 	"go.viam.com/rdk/components/camera"
-	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/module"
-	"go.viam.com/utils"
 )
 
 func main() {
-	go func() {
-		fmt.Println("sanity checking...")
-		log.Println(http.ListenAndServe("0.0.0.0:6060", nil))
-	}()
-	utils.ContextualMain(mainWithArgs, module.NewLoggerFromArgs("viamrtsp"))
+	err := realMain(context.Background())
+	if err != nil {
+		panic(err)
+	}
 }
 
-func mainWithArgs(ctx context.Context, _ []string, logger logging.Logger) error {
-	myMod, err := module.NewModuleFromArgs(ctx, logger)
+func realMain(ctx context.Context) error {
+	myMod, err := module.NewModuleFromArgs(ctx)
 	if err != nil {
 		return err
-	}
-
-	if logger.Level() != zapcore.DebugLevel {
-		logger.Info("suppressing non fatal libav errors / warnings due to false positives. to unsuppress, set module log_level to 'debug'")
-		viamrtsp.SetLibAVLogLevelFatal()
 	}
 
 	for _, model := range viamrtsp.Models {
