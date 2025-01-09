@@ -17,9 +17,6 @@ import (
 // Model is the model for a rtsp discovery service.
 var Model = viamrtsp.Family.WithModel("discovery")
 
-// defining the family in here to avoid circular dependencies while we setup the new discovery method
-// var Model = resource.NewModel("viam", "viamrtsp", "discovery")
-
 var emptyCred = Creds{Username: "", Password: ""}
 
 func init() {
@@ -78,6 +75,8 @@ func newDiscovery(ctx context.Context,
 		Credentials: cfg.Credentials,
 		logger:      logger,
 	}
+
+	// we always want to serve insecure cameras
 	dis.Credentials = append(dis.Credentials, emptyCred)
 	return dis, nil
 }
@@ -109,6 +108,7 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 	return potentialCams, nil
 }
 
+// set the camera name based on the Username and camera number
 func (cred *Creds) createName(index int) string {
 	if cred.Username == "" {
 		return fmt.Sprintf("Camera_Insecure_%v", index)
