@@ -49,15 +49,15 @@ const (
 )
 
 var (
-	family = resource.ModelNamespace("viam").WithFamily("viamrtsp")
+	Family = resource.ModelNamespace("viam").WithFamily("viamrtsp")
 	// ModelAgnostic selects the best available codec.
-	ModelAgnostic = family.WithModel("rtsp")
+	ModelAgnostic = Family.WithModel("rtsp")
 	// ModelH264 uses the h264 codec.
-	ModelH264 = family.WithModel("rtsp-h264")
+	ModelH264 = Family.WithModel("rtsp-h264")
 	// ModelH265 uses the h265 codec.
-	ModelH265 = family.WithModel("rtsp-h265")
+	ModelH265 = Family.WithModel("rtsp-h265")
 	// ModelMJPEG uses the mjpeg codec.
-	ModelMJPEG = family.WithModel("rtsp-mjpeg")
+	ModelMJPEG = Family.WithModel("rtsp-mjpeg")
 	// Models is a slice containing the above available models.
 	Models = []resource.Model{ModelAgnostic, ModelH264, ModelH265, ModelMJPEG}
 	// ErrH264PassthroughNotEnabled is an error indicating H264 passthrough is not enabled.

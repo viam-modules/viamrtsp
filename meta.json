@@ -19,6 +19,10 @@
     {
       "api": "rdk:component:camera",
       "model": "viam:viamrtsp:rtsp-mjpeg"
+    },
+    {
+      "api": "rdk:service:discovery",
+      "model": "viam:viamrtsp:discovery"
     }
   ],
   "entrypoint": "bin/viamrtsp"
