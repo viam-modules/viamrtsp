@@ -35,15 +35,19 @@ func init() {
 		})
 }
 
+// Creds are the login credentials that a user can input.
 type Creds struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
+
+// Config is the config for the discovery service.
 type Config struct {
 	Credentials []Creds `json:"credentials"`
 }
 
-func (cfg *Config) Validate(deps string) ([]string, error) {
+// Validate validates the discovery service.
+func (cfg *Config) Validate(_ string) ([]string, error) {
 	// check that all creds have both usernames and passwords set. Note a credential can have both fields empty
 	for _, cred := range cfg.Credentials {
 		if cred.Username != "" && cred.Password == "" {
@@ -63,9 +67,10 @@ type rtspDiscovery struct {
 	logger      logging.Logger
 }
 
-func newDiscovery(ctx context.Context,
+func newDiscovery(_ context.Context,
 	conf resource.Config,
-	logger logging.Logger) (discovery.Service, error) {
+	logger logging.Logger,
+) (discovery.Service, error) {
 	cfg, err := resource.NativeConfig[*Config](conf)
 	if err != nil {
 		return nil, err
@@ -81,11 +86,13 @@ func newDiscovery(ctx context.Context,
 	return dis, nil
 }
 
-func (dis *rtspDiscovery) Close(context.Context) error {
+// Close closes the discovery service.
+func (dis *rtspDiscovery) Close(_ context.Context) error {
 	return nil
 }
 
-func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[string]any) ([]resource.Config, error) {
+// DiscoverResources discovers different rtsp cameras that use onvif.
+func (dis *rtspDiscovery) DiscoverResources(_ context.Context, _ map[string]any) ([]resource.Config, error) {
 	potentialCams := []resource.Config{}
 	for _, cred := range dis.Credentials {
 		list, err := viamonvif.DiscoverCameras(cred.Username, cred.Password, dis.logger, nil)
@@ -108,7 +115,7 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 	return potentialCams, nil
 }
 
-// set the camera name based on the Username and camera number
+// set the camera name based on the Username and camera number.
 func (cred *Creds) createName(index int) string {
 	if cred.Username == "" {
 		return fmt.Sprintf("Camera_Insecure_%v", index)

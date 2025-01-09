@@ -49,6 +49,7 @@ const (
 )
 
 var (
+	// Family is the namespace family for the module.
 	Family = resource.ModelNamespace("viam").WithFamily("viamrtsp")
 	// ModelAgnostic selects the best available codec.
 	ModelAgnostic = Family.WithModel("rtsp")
