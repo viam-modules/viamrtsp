@@ -34,8 +34,8 @@ func realMain() error {
 	flag.StringVar(&password, "pass", password, "password")
 	flag.StringVar(&upnpmodel, "upnpmodel", upnpmodel, "")
 	flag.StringVar(&upnpmfg, "upnpmfg", upnpmfg, "")
-	flag.StringVar(&upnpmfg, "upnpmfg", upnpmfg, "")
-	flag.StringVar(&upnpnetwor, "upnpnet", upnpnetwork, "239.255.255.250:1900"
+	flag.StringVar(&upnpser, "upnpmfg", upnpser, "")
+	flag.StringVar(&upnpnetwork, "upnpnet", upnpnetwork, "239.255.255.250:1900")
 
 	flag.Parse()
 
