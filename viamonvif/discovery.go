@@ -356,7 +356,7 @@ func getRTSPStreamURLs(deviceInstance OnvifDevice, username, password string, lo
 		getStreamURI := media.GetStreamUri{
 			StreamSetup: onvifxsd.StreamSetup{
 				Stream:    onvifxsd.StreamType(streamTypeRTPUnicast),
-				Transport: onvifxsd.Transport{Protocol: "rtsp"},
+				Transport: onvifxsd.Transport{Protocol: "RTSP"},
 			},
 			ProfileToken: profile.Token,
 		}
