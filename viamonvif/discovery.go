@@ -13,7 +13,6 @@ import (
 	"net/url"
 	"slices"
 	"strings"
-	"sync"
 
 	"github.com/use-go/onvif"
 	"github.com/use-go/onvif/device"
@@ -21,7 +20,6 @@ import (
 	wsdiscovery "github.com/use-go/onvif/ws-discovery"
 	onvifxsd "github.com/use-go/onvif/xsd/onvif"
 	"go.viam.com/rdk/logging"
-	"go.viam.com/utils"
 )
 
 const (
@@ -148,12 +146,8 @@ func discoverCameraFromInterface(
 		params := onvif.DeviceParams{
 			Xaddr: xaddr,
 		}
-		if username != "" {
-			params.Username = username
-		}
-		if password != "" {
-			params.Password = password
-		}
+		params.Username = username
+		params.Password = password
 
 		deviceInstance, err := onvif.NewDevice(params)
 		if err != nil {
@@ -205,30 +199,14 @@ func DiscoverCameras(username, password string, logger logging.Logger, ifaceName
 
 	interfaces = filterGoodInterface(interfaces, ifaceNames, logger)
 
-	resultsChan := make(chan []CameraInfo, len(interfaces))
-	activeWorkers := sync.WaitGroup{}
 	for _, iface := range interfaces {
-		activeWorkers.Add(1)
-		utils.ManagedGo(func() {
-			cameraInfos, err := discoverCameraFromInterface(ctx, logger, iface, username, password)
-			if err != nil {
-				logger.Warnf("failed to connect to ONVIF device (%v): %v", iface.Name, err)
-			}
-			if len(cameraInfos) > 0 {
-				resultsChan <- cameraInfos
-			}
-		}, func() {
-			defer activeWorkers.Done()
-		})
-	}
-
-	go func() {
-		activeWorkers.Wait()
-		close(resultsChan)
-	}()
-
-	for cameraInfos := range resultsChan {
-		discoveredCameras = append(discoveredCameras, cameraInfos...)
+		cameraInfos, err := discoverCameraFromInterface(ctx, logger, iface, username, password)
+		if err != nil {
+			logger.Warnf("failed to connect to ONVIF device (%v): %v", iface.Name, err)
+		}
+		if len(cameraInfos) > 0 {
+			discoveredCameras = append(discoveredCameras, cameraInfos...)
+		}
 	}
 
 	return &CameraInfoList{Cameras: discoveredCameras}, nil
