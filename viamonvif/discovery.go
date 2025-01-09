@@ -13,7 +13,6 @@ import (
 	"net/url"
 	"slices"
 	"strings"
-	"sync"
 
 	"github.com/use-go/onvif"
 	"github.com/use-go/onvif/device"
@@ -21,7 +20,6 @@ import (
 	wsdiscovery "github.com/use-go/onvif/ws-discovery"
 	onvifxsd "github.com/use-go/onvif/xsd/onvif"
 	"go.viam.com/rdk/logging"
-	"go.viam.com/utils"
 )
 
 const (
@@ -205,30 +203,15 @@ func DiscoverCameras(username, password string, logger logging.Logger, ifaceName
 
 	interfaces = filterGoodInterface(interfaces, ifaceNames, logger)
 
-	resultsChan := make(chan []CameraInfo, len(interfaces))
-	activeWorkers := sync.WaitGroup{}
 	for _, iface := range interfaces {
-		activeWorkers.Add(1)
-		utils.ManagedGo(func() {
-			cameraInfos, err := discoverCameraFromInterface(ctx, logger, iface, username, password)
-			if err != nil {
-				logger.Warnf("failed to connect to ONVIF device (%v): %v", iface.Name, err)
-			}
-			if len(cameraInfos) > 0 {
-				resultsChan <- cameraInfos
-			}
-		}, func() {
-			defer activeWorkers.Done()
-		})
-	}
 
-	go func() {
-		activeWorkers.Wait()
-		close(resultsChan)
-	}()
-
-	for cameraInfos := range resultsChan {
-		discoveredCameras = append(discoveredCameras, cameraInfos...)
+		cameraInfos, err := discoverCameraFromInterface(ctx, logger, iface, username, password)
+		if err != nil {
+			logger.Warnf("failed to connect to ONVIF device (%v): %v", iface.Name, err)
+		}
+		if len(cameraInfos) > 0 {
+			discoveredCameras = append(discoveredCameras, cameraInfos...)
+		}
 	}
 
 	return &CameraInfoList{Cameras: discoveredCameras}, nil
@@ -356,10 +339,11 @@ func getRTSPStreamURLs(deviceInstance OnvifDevice, username, password string, lo
 		getStreamURI := media.GetStreamUri{
 			StreamSetup: onvifxsd.StreamSetup{
 				Stream:    onvifxsd.StreamType(streamTypeRTPUnicast),
-				Transport: onvifxsd.Transport{Protocol: "rtsp"},
+				Transport: onvifxsd.Transport{Protocol: "rtsp", Tunnel: &onvifxsd.Transport{}},
 			},
 			ProfileToken: profile.Token,
 		}
+		logger.Infof("trying to send a getStreamURI of %#v", getStreamURI)
 
 		var streamURI getStreamURIResponse
 		err := callAndParse(logger, deviceInstance, getStreamURI, &streamURI)

@@ -2,8 +2,10 @@
 package main
 
 import (
+	"context"
 	"flag"
 
+	"github.com/erh/viamupnp"
 	"github.com/viam-modules/viamrtsp/viamonvif"
 	"go.viam.com/rdk/logging"
 )
@@ -21,10 +23,19 @@ func realMain() error {
 	debug := false
 	username := ""
 	password := ""
+	upnpmodel := ""
+	upnpmfg := ""
+	upnpnetwork := ""
+	upnpser := ""
+
 
 	flag.BoolVar(&debug, "debug", debug, "debug")
 	flag.StringVar(&username, "user", username, "username")
 	flag.StringVar(&password, "pass", password, "password")
+	flag.StringVar(&upnpmodel, "upnpmodel", upnpmodel, "")
+	flag.StringVar(&upnpmfg, "upnpmfg", upnpmfg, "")
+	flag.StringVar(&upnpmfg, "upnpmfg", upnpmfg, "")
+	flag.StringVar(&upnpnetwor, "upnpnet", upnpnetwork, "239.255.255.250:1900"
 
 	flag.Parse()
 
@@ -43,6 +54,42 @@ func realMain() error {
 			logger.Infof("\t%s", u)
 		}
 	}
+
+	upnpq := viamupnp.DeviceQuery{
+		ModelName:    "CAM200",
+		Manufacturer: "VisionHitech",
+		SerialNumber: "00:26:e6:01:01:51",
+		Network:      "239.255.255.250:1900",
+	}
+	upnp, err := viamupnp.FindHost(context.Background(), logger, upnpq)
+	if err != nil {
+		logger.Error(err)
+	}
+	logger.Infof("upnp host %v", upnp)
+
+	upnpq = viamupnp.DeviceQuery{
+		ModelName:    "CAM220IP",
+		Manufacturer: "VisionHitech",
+		SerialNumber: "00:26:E6:10:6A:D9",
+		Network:      "239.255.255.250:1900",
+	}
+	upnp, err = viamupnp.FindHost(context.Background(), logger, upnpq)
+	if err != nil {
+		logger.Error(err)
+	}
+	logger.Infof("upnp host %v", upnp)
+
+	upnpq = viamupnp.DeviceQuery{
+		ModelName:    "MCF26C_IR",
+		Manufacturer: "ONVIF_ICAMERA",
+		SerialNumber: "EF00000005083E92",
+		Network:      "239.255.255.250:1900",
+	}
+	upnp, err = viamupnp.FindHost(context.Background(), logger, upnpq)
+	if err != nil {
+		logger.Error(err)
+	}
+	logger.Infof("upnp host %v", upnp)
 
 	return nil
 }
