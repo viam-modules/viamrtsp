@@ -87,6 +87,10 @@ $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
 	CGO_LDFLAGS=$(CGO_LDFLAGS) \
 	GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) $(GO_LDFLAGS) -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
 
+$(BIN_OUTPUT_PATH)/discovery: build-ffmpeg *.go cmd/discovery/*.go
+	CGO_LDFLAGS=$(CGO_LDFLAGS) \
+	GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) $(GO_LDFLAGS) -o $(BIN_OUTPUT_PATH)/discovery cmd/discovery/cmd.go
+
 tool-install:
 	GOBIN=`pwd`/$(TOOL_BIN) go install \
 		github.com/edaniels/golinters/cmd/combined \

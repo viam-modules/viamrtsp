@@ -2,7 +2,9 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
+	"os"
 
 	"github.com/viam-modules/viamrtsp/viamonvif"
 	"go.viam.com/rdk/logging"
@@ -21,10 +23,12 @@ func realMain() error {
 	debug := false
 	username := ""
 	password := ""
+	output := ""
 
 	flag.BoolVar(&debug, "debug", debug, "debug")
 	flag.StringVar(&username, "user", username, "username")
 	flag.StringVar(&password, "pass", password, "password")
+	flag.StringVar(&output, "o", output, "output file")
 
 	flag.Parse()
 
@@ -41,6 +45,17 @@ func realMain() error {
 		logger.Infof("%s %s %s", l.Manufacturer, l.Model, l.SerialNumber)
 		for _, u := range l.RTSPURLs {
 			logger.Infof("\t%s", u)
+		}
+	}
+
+	if output != "" {
+		j, err := json.Marshal(list.Cameras)
+		if err != nil {
+			return err
+		}
+
+		if err := os.WriteFile(output, j, 0644); err != nil {
+			return err
 		}
 	}
 
