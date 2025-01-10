@@ -54,7 +54,8 @@ func realMain() error {
 			return err
 		}
 
-		if err := os.WriteFile(output, j, 0600); err != nil {
+		//nolint:mnd
+		if err := os.WriteFile(output, j, 0o600); err != nil {
 			return err
 		}
 	}
