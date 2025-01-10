@@ -94,6 +94,7 @@ type CameraInfo struct {
 	Manufacturer string   `json:"manufacturer"`
 	Model        string   `json:"model"`
 	SerialNumber string   `json:"serial_number"`
+	NoLoginURLs  []string `json:"no_login_urls"`
 }
 
 // CameraInfoList is a struct containing a list of CameraInfo structs.
@@ -299,7 +300,7 @@ func getCameraInfo(deviceInstance OnvifDevice, username, password string, logger
 	}
 
 	// Call the ONVIF Media service to get the available media profiles using the same device instance
-	rtspURLs, err := getRTSPStreamURLs(deviceInstance, username, password, logger)
+	rtspURLs, noLoginURLs, err := getRTSPStreamURLs(deviceInstance, username, password, logger)
 	if err != nil {
 		return CameraInfo{}, fmt.Errorf("failed to get RTSP URLs: %w", err)
 	}
@@ -309,23 +310,24 @@ func getCameraInfo(deviceInstance OnvifDevice, username, password string, logger
 		Manufacturer: deviceInfoEnvelope.Body.GetDeviceInformationResponse.Manufacturer,
 		Model:        deviceInfoEnvelope.Body.GetDeviceInformationResponse.Model,
 		SerialNumber: deviceInfoEnvelope.Body.GetDeviceInformationResponse.SerialNumber,
+		NoLoginURLs:  noLoginURLs,
 	}
 
 	return cameraInfo, nil
 }
 
 // getRTSPStreamURLs uses the ONVIF Media service to get the RTSP stream URLs for all available profiles.
-func getRTSPStreamURLs(deviceInstance OnvifDevice, username, password string, logger logging.Logger) ([]string, error) {
+func getRTSPStreamURLs(deviceInstance OnvifDevice, username, password string, logger logging.Logger) ([]string, []string, error) {
 	getProfiles := media.GetProfiles{}
 	profilesResponse, err := deviceInstance.CallMethod(getProfiles)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get media profiles: %w", err)
+		return nil, nil, fmt.Errorf("failed to get media profiles: %w", err)
 	}
 	defer profilesResponse.Body.Close()
 
 	profilesBody, err := io.ReadAll(profilesResponse.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read profiles response body: %w", err)
+		return nil, nil, fmt.Errorf("failed to read profiles response body: %w", err)
 	}
 	logger.Debugf("GetProfiles response body: %s", profilesBody)
 	// Reset the response body reader after logging
@@ -334,12 +336,12 @@ func getRTSPStreamURLs(deviceInstance OnvifDevice, username, password string, lo
 	var envelope getProfilesResponse
 	err = xml.NewDecoder(profilesResponse.Body).Decode(&envelope)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode media profiles response: %w", err)
+		return nil, nil, fmt.Errorf("failed to decode media profiles response: %w", err)
 	}
 
 	if len(envelope.Body.GetProfilesResponse.Profiles) == 0 {
 		logger.Warn("No media profiles found in the response")
-		return nil, errors.New("no media profiles found")
+		return nil, nil, errors.New("no media profiles found")
 	}
 
 	logger.Debugf("Found %d media profiles", len(envelope.Body.GetProfilesResponse.Profiles))
@@ -349,6 +351,9 @@ func getRTSPStreamURLs(deviceInstance OnvifDevice, username, password string, lo
 
 	// Resultant slice of RTSP URIs
 	var rtspUris []string
+
+	// RTSP URIs without the credentials portion. Needed determining if a camera can be used without credentials.
+	var urisNoLogin []string
 	// Iterate over all profiles and get the RTSP stream URI for each one
 	for _, profile := range envelope.Body.GetProfilesResponse.Profiles {
 		logger.Debugf("Using profile token and profile: %s %#v", profile.Token, profile)
@@ -382,6 +387,10 @@ func getRTSPStreamURLs(deviceInstance OnvifDevice, username, password string, lo
 			continue
 		}
 
+		// record the uri without login credentials. This way we can tell if the same camera showed up for multiple queries.
+		noLoginUri := fmt.Sprintf("%s%s?%s", parsedURI.Host, parsedURI.EscapedPath(), parsedURI.RawQuery)
+		urisNoLogin = append(urisNoLogin, noLoginUri)
+
 		if username != "" && password != "" {
 			parsedURI.User = url.UserPassword(username, password)
 			uri = parsedURI.String()
@@ -390,5 +399,5 @@ func getRTSPStreamURLs(deviceInstance OnvifDevice, username, password string, lo
 		rtspUris = append(rtspUris, uri)
 	}
 
-	return rtspUris, nil
+	return rtspUris, urisNoLogin, nil
 }
