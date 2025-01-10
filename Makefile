@@ -80,10 +80,6 @@ ifeq ($(TARGET_ARCH),arm64)
 endif
 endif
 
-ifeq ($(TARGET_OS),linux)
-	CGO_LDFLAGS := "$(CGO_LDFLAGS) -l:libjpeg.a"
-endif
-
 .PHONY: build-ffmpeg tool-install gofmt lint test profile-cpu profile-memory update-rdk module clean clean-all
 
 # We set GOOS, GOARCH, GO_TAGS, and GO_LDFLAGS to support cross-compilation for android targets.
