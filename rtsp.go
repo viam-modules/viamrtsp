@@ -44,6 +44,7 @@ const (
 	defaultPayloadType = 96
 	// h264NALUTypeMask is the mask to extract the NALU type from the first byte of an H264 NALU.
 	h264NALUTypeMask = 0x1F
+
 	// initialFramePoolSize is the initial size of the frame pool.
 	initialFramePoolSize = 5
 )
