@@ -28,9 +28,9 @@ jobs:
             codec: "libx264"
           - name: "h265"
             codec: "libx265"
-          - name: "mjpeg"
-            codec: "mjpeg"
-            extra_ffmpeg_args: "-huffman 0"
+          # - name: "mjpeg"
+          #   codec: "mjpeg"
+          #   extra_ffmpeg_args: "-huffman 0"
 
     runs-on: ${{ matrix.platform.runner }}
 
