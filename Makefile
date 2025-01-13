@@ -80,16 +80,16 @@ ifeq ($(TARGET_ARCH),arm64)
 endif
 endif
 
-ifeq ($(TARGET_OS),linux)
-	CGO_LDFLAGS := "$(CGO_LDFLAGS) -l:libjpeg.a"
-endif
-
 .PHONY: build-ffmpeg tool-install gofmt lint test profile-cpu profile-memory update-rdk module clean clean-all
 
 # We set GOOS, GOARCH, GO_TAGS, and GO_LDFLAGS to support cross-compilation for android targets.
 $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
 	CGO_LDFLAGS=$(CGO_LDFLAGS) \
 	GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) $(GO_LDFLAGS) -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
+
+$(BIN_OUTPUT_PATH)/discovery: build-ffmpeg *.go cmd/discovery/*.go
+	CGO_LDFLAGS=$(CGO_LDFLAGS) \
+	GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) $(GO_LDFLAGS) -o $(BIN_OUTPUT_PATH)/discovery cmd/discovery/cmd.go
 
 tool-install:
 	GOBIN=`pwd`/$(TOOL_BIN) go install \
