@@ -177,7 +177,7 @@ type rtspCamera struct {
 	// is responsible for the underlying frame contents and further initializing it and/or throwing it away.
 	avFramePool *framePool
 
-	mimeHandler *MimeHandler
+	mimeHandler *mimeHandler
 
 	logger logging.Logger
 

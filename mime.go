@@ -16,21 +16,21 @@ import (
 	rutils "go.viam.com/rdk/utils"
 )
 
-type MimeHandler struct {
+type mimeHandler struct {
 	logger     logging.Logger
 	jpegSwsCtx *C.struct_SwsContext
 	jpegEnc    *C.AVCodecContext
 	currentPTS int
 }
 
-func newMimeHandler(logger logging.Logger) *MimeHandler {
-	return &MimeHandler{
+func newMimeHandler(logger logging.Logger) *mimeHandler {
+	return &mimeHandler{
 		logger:     logger,
 		currentPTS: 0,
 	}
 }
 
-func (mh *MimeHandler) convertJPEG(frame *avFrameWrapper) ([]byte, camera.ImageMetadata, error) {
+func (mh *mimeHandler) convertJPEG(frame *avFrameWrapper) ([]byte, camera.ImageMetadata, error) {
 	if mh.jpegEnc == nil || frame.frame.width != mh.jpegEnc.width || frame.frame.height != mh.jpegEnc.height {
 		mh.logger.Info("creating MJPEG encoder with frame size: ", frame.frame.width, "x", frame.frame.height)
 		// Tear down jpeg encoder if we're changing frame size
@@ -76,7 +76,7 @@ func (mh *MimeHandler) convertJPEG(frame *avFrameWrapper) ([]byte, camera.ImageM
 	}, nil
 }
 
-func (mh *MimeHandler) close() {
+func (mh *mimeHandler) close() {
 	if mh.jpegEnc != nil {
 		C.avcodec_free_context(&mh.jpegEnc)
 	}

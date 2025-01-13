@@ -19,6 +19,10 @@ import (
 	"go.viam.com/rdk/logging"
 )
 
+const (
+	yuv420SubsampleRatio = 2
+)
+
 // decoder is a generic FFmpeg decoder.
 type decoder struct {
 	logger   logging.Logger
@@ -102,8 +106,7 @@ func (w *avFrameWrapper) free() {
 
 // toImageYCbCr maps the underlying AVFrame (in YUV420P format) to a Go image.YCbCr.
 // Returns nil if frame is not AV_PIX_FMT_YUV420P or if something goes wrong.
-func (w *avFrameWrapper) toImageYCbCr() image.Image {
-	// Ensure the frame format is YUV420P.
+func (w *avFrameWrapper) toImage() image.Image {
 	if w.frame.format != C.AV_PIX_FMT_YUV420P {
 		return nil
 	}
@@ -111,7 +114,6 @@ func (w *avFrameWrapper) toImageYCbCr() image.Image {
 	width := int(w.frame.width)
 	height := int(w.frame.height)
 
-	// Strides (a.k.a. linesize in FFmpeg).
 	// For YUV420P:
 	//   - data[0] = Y plane, linesize[0] = stride for Y
 	//   - data[1] = U plane, linesize[1] = stride for U
@@ -123,21 +125,17 @@ func (w *avFrameWrapper) toImageYCbCr() image.Image {
 	// Y plane is full resolution: height * yStride
 	// U and V planes are half resolution in both dimensions: (height/2) * cStride
 	yPlaneSize := yStride * height
-	cPlaneSize := cStride * (height / 2)
+	cPlaneSize := cStride * (height / yuv420SubsampleRatio)
 
-	// Map the Y plane into a Go slice.
 	yDataPtr := unsafe.Pointer(w.frame.data[0])
 	ySlice := (*[1 << 30]byte)(yDataPtr)[:yPlaneSize:yPlaneSize]
 
-	// Map the U (Cb) plane into a Go slice.
 	cbDataPtr := unsafe.Pointer(w.frame.data[1])
 	cbSlice := (*[1 << 30]byte)(cbDataPtr)[:cPlaneSize:cPlaneSize]
 
-	// Map the V (Cr) plane into a Go slice.
 	crDataPtr := unsafe.Pointer(w.frame.data[2])
 	crSlice := (*[1 << 30]byte)(crDataPtr)[:cPlaneSize:cPlaneSize]
 
-	// Construct the Go image.YCbCr. For YUV420p, the subsample ratio is 4:2:0.
 	ycbcr := &image.YCbCr{
 		Y:              ySlice,
 		Cb:             cbSlice,
