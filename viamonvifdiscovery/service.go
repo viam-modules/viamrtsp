@@ -25,14 +25,7 @@ func init() {
 		discovery.API,
 		Model,
 		resource.Registration[discovery.Service, *Config]{
-			Constructor: func(
-				ctx context.Context,
-				_ resource.Dependencies,
-				conf resource.Config,
-				logger logging.Logger,
-			) (discovery.Service, error) {
-				return newDiscovery(ctx, conf, logger)
-			},
+			Constructor: newDiscovery,
 		})
 }
 
@@ -69,7 +62,7 @@ type rtspDiscovery struct {
 	logger      logging.Logger
 }
 
-func newDiscovery(_ context.Context,
+func newDiscovery(_ context.Context, _ resource.Dependencies,
 	conf resource.Config,
 	logger logging.Logger,
 ) (discovery.Service, error) {
@@ -199,5 +192,6 @@ func createCameraConfig(name, address string) (resource.Config, error) {
 	if err != nil {
 		return resource.Config{}, err
 	}
+
 	return resource.Config{Name: name, API: camera.API, Model: viamrtsp.ModelAgnostic, Attributes: result}, nil
 }
