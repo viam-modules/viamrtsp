@@ -78,18 +78,18 @@ func newDiscovery(_ context.Context,
 		return nil, err
 	}
 	dis := &rtspDiscovery{
-		Named:       conf.ResourceName().AsNamed(),
-		Credentials: cfg.Credentials,
+		Named: conf.ResourceName().AsNamed(),
+		// place the empty credentials first, so we find the insecure cameras before other cameras.
+		Credentials: append([]Creds{emptyCred}, cfg.Credentials...),
 		logger:      logger,
 	}
 
 	dis.setCredNumbers()
-
-	// we always want to serve insecure cameras
-	// dis.Credentials = append(dis.Credentials, emptyCred)
 	return dis, nil
 }
 
+// since camera logins can have the same username,
+// check how many repeated usernames we have and index them, to ensure cameras have unique names.
 func (dis *rtspDiscovery) setCredNumbers() {
 	// usernames do not have to be unique, so we want to add an additional label to ensure cameras have unique names.
 	for index, cred := range dis.Credentials {
@@ -102,7 +102,6 @@ func (dis *rtspDiscovery) setCredNumbers() {
 				dis.Credentials[counter].credNumber += 1
 			}
 		}
-		dis.logger.Info("yo cred numbers: ", dis.Credentials[index].credNumber)
 	}
 }
 
@@ -114,47 +113,56 @@ func (dis *rtspDiscovery) Close(_ context.Context) error {
 // DiscoverResources discovers different rtsp cameras that use onvif.
 func (dis *rtspDiscovery) DiscoverResources(_ context.Context, _ map[string]any) ([]resource.Config, error) {
 	potentialCams := []resource.Config{}
-	// test insecure creds first
-	list, err := viamonvif.DiscoverCameras(emptyCred.Username, emptyCred.Password, dis.logger, nil)
-	if err != nil {
-		return nil, err
-	}
 	insecureURLs := []string{}
-	for cameraNumber, l := range list.Cameras {
-		dis.logger.Debugf("%s %s %s", l.Manufacturer, l.Model, l.SerialNumber)
-		insecureURLs = append(insecureURLs, l.NoLoginURLs...)
-
-		for _, u := range l.RTSPURLs {
-			dis.logger.Debugf("\t%s", u)
-			cfg, err := createCameraConfig(emptyCred.createName(cameraNumber), u)
-			if err != nil {
-				return nil, err
-			}
-			potentialCams = append(potentialCams, cfg)
-		}
-	}
 
 	for _, cred := range dis.Credentials {
+		// if we have multiple empty/insecure credentials configured for some reason, skip to the next credential.
+		// only skip if we have not processed insecure credentials yet.
+		if cred.isInsecure() && len(insecureURLs) > 0 {
+			continue
+		}
+
 		list, err := viamonvif.DiscoverCameras(cred.Username, cred.Password, dis.logger, nil)
 		if err != nil {
 			return nil, err
 		}
-
-		for camera_number, l := range list.Cameras {
+		cameraNumber := 0
+		for _, l := range list.Cameras {
 			dis.logger.Debugf("%s %s %s", l.Manufacturer, l.Model, l.SerialNumber)
-			for index, u := range l.RTSPURLs {
-				// // skip over cameras that were already discovered with insecure creds
-				if slices.Contains(insecureURLs, l.NoLoginURLs[index]) {
-					continue
-				}
-				dis.logger.Debugf("\t%s", u)
-				cfg, err := createCameraConfig(cred.createName(camera_number), u)
-				if err != nil {
-					return nil, err
-				}
-				potentialCams = append(potentialCams, cfg)
+			// some cameras return with no urls. explicitly skipping those so the behavior is clear in the service.
+			if len(l.RTSPURLs) == 0 {
+				dis.logger.Debugf("No urls found for camera, skipping. %s %s %s", l.Manufacturer, l.Model, l.SerialNumber)
+				continue
+			}
+			cameraNumber += 1
+			camConfigs, err := createCamerasFromURLs(cred.createName(cameraNumber), l, insecureURLs, dis.logger)
+			if err != nil {
+				return nil, err
+			}
+			potentialCams = append(potentialCams, camConfigs...)
+
+			// if we are processing insecure creds, record the urls so we do not duplicate the cameras when processing cameras with creds.
+			if cred.isInsecure() {
+				insecureURLs = append(insecureURLs, l.NoLoginURLs...)
 			}
 		}
+	}
+	return potentialCams, nil
+}
+
+func createCamerasFromURLs(cameraName string, l viamonvif.CameraInfo, insecureCams []string, logger logging.Logger) ([]resource.Config, error) {
+	potentialCams := []resource.Config{}
+	for index, u := range l.RTSPURLs {
+		// skip over cameras that were already discovered with insecure creds
+		if slices.Contains(insecureCams, l.NoLoginURLs[index]) {
+			continue
+		}
+		logger.Debugf("\t%s", u)
+		cfg, err := createCameraConfig(cameraName, u)
+		if err != nil {
+			return nil, err
+		}
+		potentialCams = append(potentialCams, cfg)
 	}
 	return potentialCams, nil
 }
@@ -165,10 +173,13 @@ func (cred *Creds) createName(index int) string {
 		return fmt.Sprintf("Camera_Insecure_%v", index)
 	}
 	if cred.credNumber > 0 {
-		fmt.Println("yo credNumber")
 		return fmt.Sprintf("Camera_%s-%v_%v", cred.Username, cred.credNumber, index)
 	}
 	return fmt.Sprintf("Camera_%s_%v", cred.Username, index)
+}
+
+func (cred *Creds) isInsecure() bool {
+	return cred.Username == "" && cred.Password == ""
 }
 
 func createCameraConfig(name, address string) (resource.Config, error) {
