@@ -29,8 +29,14 @@ func TestDiscoveryService(t *testing.T) {
 }
 
 func TestCredentials(t *testing.T) {
-	creds := []Creds{{Username: "", Password: ""}, {Username: "user1", Password: "pass1"}, {Username: "user2", Password: "pass2"},
-		{Username: "user1", Password: "pass3"}, {Username: "user1", Password: "pass4"}, {Username: "user2", Password: "pass5"}}
+	creds := []Creds{
+		{Username: "", Password: ""},
+		{Username: "user1", Password: "pass1"},
+		{Username: "user2", Password: "pass2"},
+		{Username: "user1", Password: "pass3"},
+		{Username: "user1", Password: "pass4"},
+		{Username: "user2", Password: "pass5"},
+	}
 	dis := rtspDiscovery{Credentials: creds}
 	dis.setCredNumbers()
 	test.That(t, dis.Credentials[0].credNumber, test.ShouldEqual, 0)
@@ -65,11 +71,14 @@ func TestDiscoveryConfig(t *testing.T) {
 		deps, err := cfg.Validate("")
 		test.That(t, err, test.ShouldBeNil)
 		test.That(t, deps, test.ShouldBeEmpty)
-
 	})
 	t.Run("Test Valid config", func(t *testing.T) {
-		cfg := Config{Credentials: []Creds{{Username: "user1", Password: "pass1"}, {Username: "user2", Password: "pass2"},
-			{Username: "user3", Password: "pass3"}, {Username: "", Password: ""}}}
+		cfg := Config{Credentials: []Creds{
+			{Username: "user1", Password: "pass1"},
+			{Username: "user2", Password: "pass2"},
+			{Username: "user3", Password: "pass3"},
+			{Username: "", Password: ""},
+		}}
 		deps, err := cfg.Validate("")
 		test.That(t, err, test.ShouldBeNil)
 		test.That(t, deps, test.ShouldBeEmpty)

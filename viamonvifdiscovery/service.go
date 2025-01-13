@@ -127,7 +127,7 @@ func (dis *rtspDiscovery) DiscoverResources(_ context.Context, _ map[string]any)
 				dis.logger.Debugf("No urls found for camera, skipping. %s %s %s", l.Manufacturer, l.Model, l.SerialNumber)
 				continue
 			}
-			cameraNumber += 1
+			cameraNumber++
 			camConfigs, err := createCamerasFromURLs(cred.createName(cameraNumber), l, insecureURLs, dis.logger)
 			if err != nil {
 				return nil, err
@@ -144,7 +144,8 @@ func (dis *rtspDiscovery) DiscoverResources(_ context.Context, _ map[string]any)
 }
 
 func createCamerasFromURLs(cameraName string, l viamonvif.CameraInfo, insecureCams []string,
-	logger logging.Logger) ([]resource.Config, error) {
+	logger logging.Logger,
+) ([]resource.Config, error) {
 	potentialCams := []resource.Config{}
 	for index, u := range l.RTSPURLs {
 		// skip over cameras that were already discovered with insecure creds
