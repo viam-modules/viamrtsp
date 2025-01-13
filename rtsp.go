@@ -2,12 +2,9 @@
 package viamrtsp
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"image"
-	"image/jpeg"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -169,7 +166,7 @@ type rtspCamera struct {
 
 	activeBackgroundWorkers sync.WaitGroup
 
-	latestMJPEGImage atomic.Pointer[image.Image]
+	latestMJPEGBytes atomic.Pointer[[]byte]
 	latestFrame      *avFrameWrapper
 	// frameSwapMu protects critical sections where frame state changes (e.g. ref counting) need to be atomic
 	// with swapping out the latest frame.
@@ -563,13 +560,7 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 			return
 		}
 
-		img, err := jpeg.Decode(bytes.NewReader(frame))
-		if err != nil {
-			rc.logger.Debugf("error converting MJPEG frame to image err: %s", err.Error())
-			return
-		}
-
-		rc.latestMJPEGImage.Store(&img)
+		rc.latestMJPEGBytes.Store(&frame)
 	})
 
 	return nil
@@ -923,6 +914,15 @@ func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]int
 	// For now, we only support JPEG
 	if mimeType != rutils.MimeTypeJPEG && mimeType != rutils.WithLazyMIMEType(rutils.MimeTypeJPEG) {
 		rc.logger.Warn("unsupported mime type request %s, returning JPEG", mimeType)
+	}
+	if videoCodec(rc.currentCodec.Load()) == MJPEG {
+		mjpegBytes := rc.latestMJPEGBytes.Load()
+		if mjpegBytes == nil {
+			return nil, camera.ImageMetadata{}, errors.New("no frame yet")
+		}
+		return *mjpegBytes, camera.ImageMetadata{
+			MimeType: rutils.MimeTypeJPEG,
+		}, nil
 	}
 	return rc.getAndConvertFrame()
 }
