@@ -194,5 +194,8 @@ func createCameraConfig(name, address string) (resource.Config, error) {
 		return resource.Config{}, err
 	}
 
-	return resource.Config{Name: name, API: camera.API, Model: viamrtsp.ModelAgnostic, Attributes: result, ConvertedAttributes: &attributes}, nil
+	return resource.Config{
+		Name: name, API: camera.API, Model: viamrtsp.ModelAgnostic,
+		Attributes: result, ConvertedAttributes: &attributes,
+	}, nil
 }
