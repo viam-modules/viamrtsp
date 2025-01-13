@@ -100,18 +100,55 @@ func (w *avFrameWrapper) free() {
 	}
 }
 
-// toImage takes the underlying av frame and embeds it into a RGBA image struct.
-func (w *avFrameWrapper) toImage() image.Image {
-	dstFrameSize := C.av_image_get_buffer_size((int32)(w.frame.format), w.frame.width, w.frame.height, 1)
-	dstFramePtr := (*[1 << 30]uint8)(unsafe.Pointer(w.frame.data[0]))[:dstFrameSize:dstFrameSize]
-
-	return &image.RGBA{
-		Pix:    dstFramePtr,
-		Stride: bytesPerPixel * (int)(w.frame.width),
-		Rect: image.Rectangle{
-			Max: image.Point{(int)(w.frame.width), (int)(w.frame.height)},
-		},
+// toImageYCbCr maps the underlying AVFrame (in YUV420P format) to a Go image.YCbCr.
+// Returns nil if frame is not AV_PIX_FMT_YUV420P or if something goes wrong.
+func (w *avFrameWrapper) toImageYCbCr() image.Image {
+	// Ensure the frame format is YUV420P.
+	if w.frame.format != C.AV_PIX_FMT_YUV420P {
+		return nil
 	}
+
+	width := int(w.frame.width)
+	height := int(w.frame.height)
+
+	// Strides (a.k.a. linesize in FFmpeg).
+	// For YUV420P:
+	//   - data[0] = Y plane, linesize[0] = stride for Y
+	//   - data[1] = U plane, linesize[1] = stride for U
+	//   - data[2] = V plane, linesize[2] = stride for V
+	yStride := int(w.frame.linesize[0])
+	cStride := int(w.frame.linesize[1])
+
+	// Number of bytes in each plane.
+	// Y plane is full resolution: height * yStride
+	// U and V planes are half resolution in both dimensions: (height/2) * cStride
+	yPlaneSize := yStride * height
+	cPlaneSize := cStride * (height / 2)
+
+	// Map the Y plane into a Go slice.
+	yDataPtr := unsafe.Pointer(w.frame.data[0])
+	ySlice := (*[1 << 30]byte)(yDataPtr)[:yPlaneSize:yPlaneSize]
+
+	// Map the U (Cb) plane into a Go slice.
+	cbDataPtr := unsafe.Pointer(w.frame.data[1])
+	cbSlice := (*[1 << 30]byte)(cbDataPtr)[:cPlaneSize:cPlaneSize]
+
+	// Map the V (Cr) plane into a Go slice.
+	crDataPtr := unsafe.Pointer(w.frame.data[2])
+	crSlice := (*[1 << 30]byte)(crDataPtr)[:cPlaneSize:cPlaneSize]
+
+	// Construct the Go image.YCbCr. For YUV420p, the subsample ratio is 4:2:0.
+	ycbcr := &image.YCbCr{
+		Y:              ySlice,
+		Cb:             cbSlice,
+		Cr:             crSlice,
+		YStride:        yStride,
+		CStride:        cStride,
+		SubsampleRatio: image.YCbCrSubsampleRatio420,
+		Rect:           image.Rect(0, 0, width, height),
+	}
+
+	return ycbcr
 }
 
 // newAVFrameWrapper allocates a new AVFrame using C code with safety checks and returns the Go wrapper of it.
