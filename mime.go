@@ -9,7 +9,6 @@ import "C"
 
 import (
 	"errors"
-	"fmt"
 	"unsafe"
 
 	"go.viam.com/rdk/components/camera"
@@ -48,7 +47,7 @@ func (mh *MimeHandler) convertJPEG(frame *avFrameWrapper) ([]byte, camera.ImageM
 		mh.jpegEnc.pix_fmt = C.AV_PIX_FMT_YUVJ420P
 		mh.jpegEnc.time_base = C.AVRational{num: 1, den: 1} // We don't care about time base for still images
 		if res := C.avcodec_open2(mh.jpegEnc, codec, nil); res < 0 {
-			return nil, camera.ImageMetadata{}, fmt.Errorf("failed to open codec: %d", res)
+			return nil, camera.ImageMetadata{}, newAvError(res, "failed to open MJPEG encoder")
 		}
 	}
 	if mh.jpegEnc == nil {
@@ -64,11 +63,11 @@ func (mh *MimeHandler) convertJPEG(frame *avFrameWrapper) ([]byte, camera.ImageM
 	defer C.av_packet_free(&pkt)
 	res := C.avcodec_send_frame(mh.jpegEnc, frame.frame)
 	if res < 0 {
-		return nil, camera.ImageMetadata{}, fmt.Errorf("failed to send frame: %d", res)
+		return nil, camera.ImageMetadata{}, newAvError(res, "failed to send frame to MJPEG encoder")
 	}
 	res = C.avcodec_receive_packet(mh.jpegEnc, pkt)
 	if res < 0 {
-		return nil, camera.ImageMetadata{}, fmt.Errorf("failed to receive packet: %d", res)
+		return nil, camera.ImageMetadata{}, newAvError(res, "failed to receive packet from MJPEG encoder")
 	}
 	dataGo := C.GoBytes(unsafe.Pointer(pkt.data), pkt.size)
 
