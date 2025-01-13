@@ -180,6 +180,8 @@ type rtspCamera struct {
 	// is responsible for the underlying frame contents and further initializing it and/or throwing it away.
 	avFramePool *framePool
 
+	mimeHandler *MimeHandler
+
 	logger logging.Logger
 
 	rtpPassthrough              bool
@@ -200,6 +202,7 @@ func (rc *rtspCamera) Close(_ context.Context) error {
 	rc.activeBackgroundWorkers.Wait()
 	rc.closeConnection()
 	rc.avFramePool.close()
+	rc.mimeHandler.close()
 	return nil
 }
 
@@ -715,6 +718,8 @@ func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 
 	framePool := newFramePool(initialFramePoolSize, logger)
 
+	mimeHandler := newMimeHandler(logger)
+
 	rtpPassthrough := true
 	if newConf.RTPPassthrough != nil {
 		rtpPassthrough = *newConf.RTPPassthrough
@@ -730,6 +735,7 @@ func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		rtpPassthroughCtx:           rtpPassthroughCtx,
 		rtpPassthroughCancelCauseFn: rtpPassthroughCancelCauseFn,
 		avFramePool:                 framePool,
+		mimeHandler:                 mimeHandler,
 		logger:                      logger,
 	}
 	codecInfo, err := modelToCodec(conf.Model)
@@ -913,41 +919,31 @@ func isCompactableH264(nalu []byte) bool {
 }
 
 // Image returns the latest frame as JPEG bytes.
-func (rc *rtspCamera) Image(_ context.Context, _ string, _ map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
-	if videoCodec(rc.currentCodec.Load()) == MJPEG {
-		return rc.getMJPEGImage()
+func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
+	// For now, we only support JPEG
+	if mimeType != rutils.MimeTypeJPEG && mimeType != rutils.WithLazyMIMEType(rutils.MimeTypeJPEG) {
+		rc.logger.Warn("unsupported mime type request %s, returning JPEG", mimeType)
 	}
-	return rc.getFrameAsImage()
+	return rc.getAndConvertFrame()
 }
 
-// getMJPEGImage retrieves the latest MJPEG image.
-func (rc *rtspCamera) getMJPEGImage() ([]byte, camera.ImageMetadata, error) {
-	latestImg := rc.latestMJPEGImage.Load()
-	if latestImg == nil {
-		return nil, camera.ImageMetadata{}, errors.New("no mjpeg frame yet")
-	}
-	return encodeToJPEG(*latestImg)
-}
-
-// getFrameAsImage retrieves the latest frame and converts it to an image.
-func (rc *rtspCamera) getFrameAsImage() ([]byte, camera.ImageMetadata, error) {
+func (rc *rtspCamera) getAndConvertFrame() ([]byte, camera.ImageMetadata, error) {
 	rc.frameSwapMu.Lock()
 	defer rc.frameSwapMu.Unlock()
-
 	if rc.latestFrame == nil {
 		return nil, camera.ImageMetadata{}, errors.New("no frame yet")
 	}
-
 	currentFrame := rc.latestFrame
 	currentFrame.incrementRefs()
-	img := currentFrame.toImage()
-
-	// Release frame if no references are left
+	bytes, metdata, err := rc.mimeHandler.convertJPEG(currentFrame)
+	// TODO(seanp): Can I defer this?
 	if refCount := currentFrame.decrementRefs(); refCount == 0 {
 		rc.avFramePool.put(currentFrame)
 	}
-
-	return encodeToJPEG(img)
+	if err != nil {
+		return nil, camera.ImageMetadata{}, err
+	}
+	return bytes, metdata, err
 }
 
 func (rc *rtspCamera) Properties(_ context.Context) (camera.Properties, error) {

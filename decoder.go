@@ -5,7 +5,6 @@ package viamrtsp
 #include <libavcodec/avcodec.h>
 #include <libavutil/imgutils.h>
 #include <libavutil/error.h>
-#include <libswscale/swscale.h>
 #include <stdlib.h>
 */
 import "C"
@@ -26,7 +25,6 @@ type decoder struct {
 	codecCtx *C.AVCodecContext
 	// The source yuv420 frame buffer we are decoding from
 	src         *C.AVFrame
-	swsCtx      *C.struct_SwsContext
 	avFramePool *framePool
 }
 
@@ -231,10 +229,6 @@ func newH265Decoder(avFramePool *framePool, logger logging.Logger) (*decoder, er
 
 // close closes the decoder.
 func (d *decoder) close() {
-	if d.swsCtx != nil {
-		C.sws_freeContext(d.swsCtx)
-	}
-
 	if d.src != nil {
 		C.av_frame_free(&d.src)
 	}
@@ -296,37 +290,27 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 			}
 			dst = newDst
 		}
-		if d.swsCtx != nil {
-			// When the resolution changes, we must also free+reallocate the `swsCtx`.
-			C.sws_freeContext(d.swsCtx)
-		}
-
 		// Prepare the fresh frame
-		dst.frame.format = C.AV_PIX_FMT_RGBA
+		dst.frame.format = C.AV_PIX_FMT_YUV420P
 		dst.frame.width = d.src.width
 		dst.frame.height = d.src.height
-		dst.frame.color_range = C.AVCOL_RANGE_JPEG
 
 		// This allocates the underlying byte array to contain the image data.
-		res = C.av_frame_get_buffer(dst.frame, 1)
+		res = C.av_frame_get_buffer(dst.frame, 32)
 		if res < 0 {
 			return nil, newAvError(res, "av_frame_get_buffer() err")
 		}
-
-		// Create a scratch space for converting YUV420 to RGB. In our use-case, the yuv source + dst
-		// resolutions always match.
-		d.swsCtx = C.sws_getContext(d.src.width, d.src.height, C.AV_PIX_FMT_YUV420P,
-			dst.frame.width, dst.frame.height, (int32)(dst.frame.format), C.SWS_BILINEAR, nil, nil, nil)
-		if d.swsCtx == nil {
-			return nil, errors.New("sws_getContext() err")
-		}
 	}
 
-	// convert frame from YUV420 to RGB
-	res = C.sws_scale(d.swsCtx, frameData(d.src), frameLineSize(d.src),
-		0, d.src.height, frameData(dst.frame), frameLineSize(dst.frame))
-	if res < 0 {
-		return nil, newAvError(res, "sws_scale() err")
+	// We need to copy the frame data from the source frame to the destination frame
+	// because the source frame will be overwritten by the next frame that is decoded.
+	if res := C.av_frame_copy(dst.frame, d.src); res < 0 {
+		return nil, newAvError(res, "av_frame_copy() failed")
+	}
+
+	// Copy the frame properties from the source frame to the destination frame
+	if res := C.av_frame_copy_props(dst.frame, d.src); res < 0 {
+		return nil, newAvError(res, "av_frame_copy_props() failed")
 	}
 
 	return dst, nil
