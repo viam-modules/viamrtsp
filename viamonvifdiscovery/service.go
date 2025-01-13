@@ -99,7 +99,7 @@ func (dis *rtspDiscovery) setCredNumbers() {
 			}
 			// increase the credNumber for later cameras.
 			if cred.Username == otherCreds.Username {
-				dis.Credentials[counter].credNumber += 1
+				dis.Credentials[counter].credNumber++
 			}
 		}
 	}
@@ -150,7 +150,8 @@ func (dis *rtspDiscovery) DiscoverResources(_ context.Context, _ map[string]any)
 	return potentialCams, nil
 }
 
-func createCamerasFromURLs(cameraName string, l viamonvif.CameraInfo, insecureCams []string, logger logging.Logger) ([]resource.Config, error) {
+func createCamerasFromURLs(cameraName string, l viamonvif.CameraInfo, insecureCams []string,
+	logger logging.Logger) ([]resource.Config, error) {
 	potentialCams := []resource.Config{}
 	for index, u := range l.RTSPURLs {
 		// skip over cameras that were already discovered with insecure creds

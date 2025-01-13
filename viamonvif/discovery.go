@@ -388,8 +388,8 @@ func getRTSPStreamURLs(deviceInstance OnvifDevice, username, password string, lo
 		}
 
 		// record the uri without login credentials. This way we can tell if the same camera showed up for multiple queries.
-		noLoginUri := fmt.Sprintf("%s%s?%s", parsedURI.Host, parsedURI.EscapedPath(), parsedURI.RawQuery)
-		urisNoLogin = append(urisNoLogin, noLoginUri)
+		noLoginURI := fmt.Sprintf("%s%s?%s", parsedURI.Host, parsedURI.EscapedPath(), parsedURI.RawQuery)
+		urisNoLogin = append(urisNoLogin, noLoginURI)
 
 		if username != "" && password != "" {
 			parsedURI.User = url.UserPassword(username, password)
