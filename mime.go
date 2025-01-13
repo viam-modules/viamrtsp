@@ -8,6 +8,7 @@ package viamrtsp
 import "C"
 
 import (
+	"errors"
 	"fmt"
 	"unsafe"
 
@@ -39,7 +40,7 @@ func (mh *MimeHandler) convertJPEG(frame *avFrameWrapper) ([]byte, camera.ImageM
 		}
 		codec := C.avcodec_find_encoder(C.AV_CODEC_ID_MJPEG)
 		if codec == nil {
-			return nil, camera.ImageMetadata{}, fmt.Errorf("failed to find MJPEG encoder")
+			return nil, camera.ImageMetadata{}, errors.New("failed to find MJPEG encoder")
 		}
 		mh.jpegEnc = C.avcodec_alloc_context3(codec)
 		mh.jpegEnc.width = frame.frame.width
@@ -51,13 +52,14 @@ func (mh *MimeHandler) convertJPEG(frame *avFrameWrapper) ([]byte, camera.ImageM
 		}
 	}
 	if mh.jpegEnc == nil {
-		return nil, camera.ImageMetadata{}, fmt.Errorf("failed to create encoder or destination frame")
+		return nil, camera.ImageMetadata{}, errors.New("failed to create encoder or destination frame")
 	}
 	pkt := C.av_packet_alloc()
 	if pkt == nil {
-		return nil, camera.ImageMetadata{}, fmt.Errorf("failed to allocate packet")
+		return nil, camera.ImageMetadata{}, errors.New("failed to allocate packet")
 	}
 	frame.frame.pts = C.int64_t(mh.currentPTS)
+	// If this reaches max int, it will wrap around to 0
 	mh.currentPTS++
 	defer C.av_packet_free(&pkt)
 	res := C.avcodec_send_frame(mh.jpegEnc, frame.frame)
