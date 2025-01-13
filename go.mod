@@ -340,7 +340,3 @@ require (
 	mvdan.cc/unparam v0.0.0-20240528143540-8a5130ca722f // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 )
-
-// replace go.viam.com/rdk => /Users/johnnicholson/viam-slam/rdk
-
-// replace go.viam.com/api => /Users/johnnicholson/viam-slam/api
