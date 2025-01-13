@@ -17,26 +17,53 @@ func main() {
 	}
 }
 
-func realMain() error {
-	logger := logging.NewLogger("discovery")
-
+func ParseOpts() (Options, error) {
 	debug := false
-	username := ""
-	password := ""
+	configFile := "config.json"
 	output := ""
+	var zero Options
 
 	flag.BoolVar(&debug, "debug", debug, "debug")
-	flag.StringVar(&username, "user", username, "username")
-	flag.StringVar(&password, "pass", password, "password")
+	flag.StringVar(&configFile, "c", configFile, "path to json config file with structure [{'user': '...', 'pass': '...'}]")
 	flag.StringVar(&output, "o", output, "output file")
-
 	flag.Parse()
 
-	if debug {
-		logger.SetLevel(logging.DEBUG)
+	config, err := os.ReadFile(configFile)
+	var creds []viamonvif.Credentials
+	if err != nil {
+		return zero, err
+	}
+	if err := json.Unmarshal(config, &creds); err != nil {
+		return zero, err
 	}
 
-	list, err := viamonvif.DiscoverCameras(username, password, logger, flag.Args())
+	return Options{
+		Debug:  debug,
+		Output: output,
+		Creds:  creds,
+	}, nil
+}
+
+type Options struct {
+	Creds  []viamonvif.Credentials
+	Debug  bool
+	Output string
+}
+
+func realMain() error {
+	opts, err := ParseOpts()
+	if err != nil {
+		return err
+	}
+
+	var logger logging.Logger
+	if opts.Debug {
+		logger = logging.NewDebugLogger("discovery")
+	} else {
+		logger = logging.NewLogger("discovery")
+	}
+
+	list, err := viamonvif.DiscoverCameras(opts.Creds, logger)
 	if err != nil {
 		return err
 	}
@@ -48,14 +75,14 @@ func realMain() error {
 		}
 	}
 
-	if output != "" {
+	if opts.Output != "" {
 		j, err := json.Marshal(list.Cameras)
 		if err != nil {
 			return err
 		}
 
 		//nolint:mnd
-		if err := os.WriteFile(output, j, 0o600); err != nil {
+		if err := os.WriteFile(opts.Output, j, 0o600); err != nil {
 			return err
 		}
 	}

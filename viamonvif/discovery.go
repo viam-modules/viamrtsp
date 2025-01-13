@@ -8,25 +8,57 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
-	"slices"
 	"strings"
-	"sync"
 
 	"github.com/use-go/onvif"
 	"github.com/use-go/onvif/device"
 	"github.com/use-go/onvif/media"
-	wsdiscovery "github.com/use-go/onvif/ws-discovery"
 	onvifxsd "github.com/use-go/onvif/xsd/onvif"
 	"go.viam.com/rdk/logging"
-	"go.viam.com/utils"
 )
 
 const (
 	streamTypeRTPUnicast = "RTP-Unicast"
 )
+
+type Credentials struct {
+	User string `json:"user"`
+	Pass string `json:"pass"`
+}
+
+// DiscoverCameras performs WS-Discovery using the use-go/onvif discovery utility,
+// then uses ONVIF queries to get available RTSP addresses and supplementary info.
+func DiscoverCameras(creds []Credentials, logger logging.Logger) (*CameraInfoList, error) {
+	var discoveredCameras []CameraInfo
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
+
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve network interfaces: %w", err)
+	}
+
+	for _, iface := range interfaces {
+		if !ValidWSDiscoveryInterface(iface) {
+			logger.Debugf("skipping interface %s: does not meet WS-Discovery requirements", iface.Name)
+			continue
+		}
+
+		cameraInfos, err := discoverCamerasOnInterface(ctx, logger, iface, creds)
+		if err != nil {
+			logger.Warnf("failed to connect to ONVIF device (%v): %v", iface.Name, err)
+		}
+		if len(cameraInfos) > 0 {
+			discoveredCameras = append(discoveredCameras, cameraInfos...)
+		}
+	}
+
+	return &CameraInfoList{Cameras: discoveredCameras}, nil
+}
 
 // OnvifDevice is an interface to abstract device methods used in the code.
 // Used instead of onvif.Device to allow for mocking in tests.
@@ -101,8 +133,11 @@ type CameraInfoList struct {
 	Cameras []CameraInfo `json:"cameras"`
 }
 
-func discoverCameraFromInterface(
-	ctx context.Context, logger logging.Logger, iface net.Interface, username, password string,
+func discoverCamerasOnInterface(
+	ctx context.Context,
+	logger logging.Logger,
+	iface net.Interface,
+	creds []Credentials,
 ) ([]CameraInfo, error) {
 	logger.Debugf("sending WS-Discovery probe using interface: %s", iface.Name)
 	var discoveryResps []string
@@ -113,11 +148,7 @@ func discoverCameraFromInterface(
 			return nil, fmt.Errorf("context canceled for interface: %s", iface.Name)
 		}
 
-		// other ws-discovery args
-		scopes := []string{}
-		types := []string{"dn:NetworkVideoTransmitter"}
-		namespaces := map[string]string{}
-		resp, err := wsdiscovery.SendProbe(iface.Name, scopes, types, namespaces)
+		resp, err := SendProbe(iface.Name)
 		if err != nil {
 			return nil, fmt.Errorf("attempt %d: failed to send WS-Discovery probe on interface %s: %w", i+1, iface.Name, err)
 		}
@@ -139,99 +170,64 @@ func discoverCameraFromInterface(
 
 	var cameraInfos []CameraInfo
 	for xaddr := range xaddrsSet {
-		if ctx.Err() != nil {
-			return nil, fmt.Errorf("context canceled while connecting to ONVIF device: %s", xaddr)
-		}
+		for _, cred := range creds {
+			if ctx.Err() != nil {
+				return nil, fmt.Errorf("context canceled while connecting to ONVIF device: %s", xaddr)
+			}
 
-		logger.Debugf("Connecting to ONVIF device with URL: %s from interacted: %s", xaddr, iface.Name)
+			logger.Debugf("Connecting to ONVIF device with URL: %s from interacted: %s", xaddr, iface.Name)
 
-		params := onvif.DeviceParams{
-			Xaddr: xaddr,
-		}
-		if username != "" {
-			params.Username = username
-		}
-		if password != "" {
-			params.Password = password
-		}
+			params := onvif.DeviceParams{
+				Xaddr:    xaddr,
+				Username: cred.User,
+				Password: cred.Pass,
+			}
 
-		deviceInstance, err := onvif.NewDevice(params)
-		if err != nil {
-			logger.Warnf("failed to connect to ONVIF device: %v", err)
-			continue
-		}
+			deviceInstance, err := onvif.NewDevice(params)
+			if err != nil {
+				logger.Warnf("failed to connect to ONVIF device: %v", err)
+				continue
+			}
 
-		cameraInfo, err := getCameraInfo(deviceInstance, username, password, logger)
-		if err != nil {
-			logger.Warnf("Failed to get camera info from %s: %v", xaddr, err)
-			continue
+			cameraInfo, err := getCameraInfo(deviceInstance, cred, logger)
+			if err != nil {
+				logger.Warnf("Failed to get camera info from %s: %v", xaddr, err)
+				continue
+			}
+			cameraInfos = append(cameraInfos, cameraInfo)
 		}
-		cameraInfos = append(cameraInfos, cameraInfo)
 	}
 
 	return cameraInfos, nil
 }
 
-// if ifaceNames is nil or empty, we do all.
-func filterGoodInterface(all []net.Interface, ifaceNames []string, logger logging.Logger) []net.Interface {
-	var validInterfaces []net.Interface
-	for _, iface := range all {
-		if len(ifaceNames) > 0 && !slices.Contains(ifaceNames, iface.Name) {
-			logger.Debugf("skipping interface %s: not in list: %v", iface.Name, ifaceNames)
-			continue
-		}
-
-		if iface.Flags&net.FlagUp != 0 && iface.Flags&net.FlagMulticast != 0 && iface.Flags&net.FlagLoopback == 0 {
-			validInterfaces = append(validInterfaces, iface)
-		} else {
-			logger.Debugf("skipping interface %s: does not meet WS-Discovery requirements", iface.Name)
-		}
-	}
-	return validInterfaces
-}
-
-// DiscoverCameras performs WS-Discovery using the use-go/onvif discovery utility,
-// then uses ONVIF queries to get available RTSP addresses and supplementary info.
-// If ifaceNames is nil or empty, we try to discover over all available net interfaces on the machine.
-func DiscoverCameras(username, password string, logger logging.Logger, ifaceNames []string) (*CameraInfoList, error) {
-	var discoveredCameras []CameraInfo
-	ctx, cancelFunc := context.WithCancel(context.Background())
-	defer cancelFunc()
-
-	interfaces, err := net.Interfaces()
+// TODO(Nick S): What happens if we don't do this?
+func ValidWSDiscoveryInterface(iface net.Interface) bool {
+	addrs, err := iface.Addrs()
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve network interfaces: %w", err)
+		panic(err)
+	}
+	addrsNetworksStr := []string{}
+	addrsStr := []string{}
+	for _, a := range addrs {
+		addrsNetworksStr = append(addrsNetworksStr, a.Network())
+		addrsStr = append(addrsStr, a.String())
 	}
 
-	interfaces = filterGoodInterface(interfaces, ifaceNames, logger)
-
-	resultsChan := make(chan []CameraInfo, len(interfaces))
-	activeWorkers := sync.WaitGroup{}
-	for _, iface := range interfaces {
-		activeWorkers.Add(1)
-		utils.ManagedGo(func() {
-			cameraInfos, err := discoverCameraFromInterface(ctx, logger, iface, username, password)
-			if err != nil {
-				logger.Warnf("failed to connect to ONVIF device (%v): %v", iface.Name, err)
-			}
-			if len(cameraInfos) > 0 {
-				resultsChan <- cameraInfos
-			}
-		}, func() {
-			defer activeWorkers.Done()
-		})
+	multiAddrs, err := iface.MulticastAddrs()
+	if err != nil {
+		panic(err)
 	}
-
-	go func() {
-		activeWorkers.Wait()
-		close(resultsChan)
-	}()
-
-	for cameraInfos := range resultsChan {
-		discoveredCameras = append(discoveredCameras, cameraInfos...)
+	multiAddrsNetworkStr := []string{}
+	multiAddrsStr := []string{}
+	for _, a := range multiAddrs {
+		addrsNetworksStr = append(multiAddrsNetworkStr, a.Network())
+		multiAddrsStr = append(multiAddrsStr, a.String())
 	}
-
-	return &CameraInfoList{Cameras: discoveredCameras}, nil
+	log.Printf("iface: %s, FlagUp: %d, FlagBroadcast: %d, FlagLoopback: %d, FlagPointToPoint: %d, FlagMulticast: %d, FlagRunning: %d, flags: %s, "+
+		"addrs: %#v, addrsNetworks: %#v, multicastaddrs: %#v, multicastaddrsNetworks: %#v\n", iface.Name, iface.Flags&net.FlagUp, iface.Flags&net.FlagBroadcast, iface.Flags&net.FlagLoopback, iface.Flags&net.FlagPointToPoint, iface.Flags&net.FlagMulticast, iface.Flags&net.FlagRunning, iface.Flags.String(),
+		addrsStr, addrsNetworksStr, multiAddrsStr, multiAddrsNetworkStr)
+	return iface.Flags&net.FlagUp != 0 && iface.Flags&net.FlagMulticast != 0 && iface.Flags&net.FlagLoopback == 0
 }
 
 // extractXAddrsFromProbeMatch extracts XAddrs from the WS-Discovery ProbeMatch response.
@@ -276,7 +272,7 @@ func extractXAddrsFromProbeMatch(response []byte, logger logging.Logger) []strin
 }
 
 // getCameraInfo uses the ONVIF Media service to get the RTSP stream URLs and camera details.
-func getCameraInfo(deviceInstance OnvifDevice, username, password string, logger logging.Logger) (CameraInfo, error) {
+func getCameraInfo(deviceInstance OnvifDevice, creds Credentials, logger logging.Logger) (CameraInfo, error) {
 	// Fetch device information (manufacturer, serial number, etc.)
 	getDeviceInfo := device.GetDeviceInformation{}
 	deviceInfoResponse, err := deviceInstance.CallMethod(getDeviceInfo)
@@ -299,7 +295,7 @@ func getCameraInfo(deviceInstance OnvifDevice, username, password string, logger
 	}
 
 	// Call the ONVIF Media service to get the available media profiles using the same device instance
-	rtspURLs, err := getRTSPStreamURLs(deviceInstance, username, password, logger)
+	rtspURLs, err := getRTSPStreamURLs(deviceInstance, creds, logger)
 	if err != nil {
 		return CameraInfo{}, fmt.Errorf("failed to get RTSP URLs: %w", err)
 	}
@@ -315,7 +311,7 @@ func getCameraInfo(deviceInstance OnvifDevice, username, password string, logger
 }
 
 // getRTSPStreamURLs uses the ONVIF Media service to get the RTSP stream URLs for all available profiles.
-func getRTSPStreamURLs(deviceInstance OnvifDevice, username, password string, logger logging.Logger) ([]string, error) {
+func getRTSPStreamURLs(deviceInstance OnvifDevice, creds Credentials, logger logging.Logger) ([]string, error) {
 	getProfiles := media.GetProfiles{}
 	profilesResponse, err := deviceInstance.CallMethod(getProfiles)
 	if err != nil {
@@ -382,8 +378,8 @@ func getRTSPStreamURLs(deviceInstance OnvifDevice, username, password string, lo
 			continue
 		}
 
-		if username != "" && password != "" {
-			parsedURI.User = url.UserPassword(username, password)
+		if creds.User != "" || creds.Pass != "" {
+			parsedURI.User = url.UserPassword(creds.User, creds.Pass)
 			uri = parsedURI.String()
 		}
 
