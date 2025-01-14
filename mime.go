@@ -4,11 +4,15 @@ package viamrtsp
 #cgo pkg-config: libavutil libavcodec
 #include <libavcodec/avcodec.h>
 #include <libavutil/error.h>
+#include <libavutil/opt.h>
+#include <libavutil/dict.h>
+#include <stdlib.h>
 */
 import "C"
 
 import (
 	"errors"
+	"sync"
 	"unsafe"
 
 	"go.viam.com/rdk/components/camera"
@@ -18,9 +22,9 @@ import (
 
 type mimeHandler struct {
 	logger     logging.Logger
-	jpegSwsCtx *C.struct_SwsContext
 	jpegEnc    *C.AVCodecContext
 	currentPTS int
+	mu         sync.Mutex
 }
 
 func newMimeHandler(logger logging.Logger) *mimeHandler {
@@ -32,12 +36,16 @@ func newMimeHandler(logger logging.Logger) *mimeHandler {
 
 func (mh *mimeHandler) convertJPEG(frame *avFrameWrapper) ([]byte, camera.ImageMetadata, error) {
 	if mh.jpegEnc == nil || frame.frame.width != mh.jpegEnc.width || frame.frame.height != mh.jpegEnc.height {
+		// Lock to prevent modifying encoder while it is being used concurrently.
+		// Frame param changes are rare, so we can afford to block here.
+		mh.mu.Lock()
 		mh.logger.Info("creating MJPEG encoder with frame size: ", frame.frame.width, "x", frame.frame.height)
 		if mh.jpegEnc != nil {
 			C.avcodec_free_context(&mh.jpegEnc)
 		}
 		codec := C.avcodec_find_encoder(C.AV_CODEC_ID_MJPEG)
 		if codec == nil {
+			mh.mu.Unlock()
 			return nil, camera.ImageMetadata{}, errors.New("failed to find MJPEG encoder")
 		}
 		mh.jpegEnc = C.avcodec_alloc_context3(codec)
@@ -57,11 +65,14 @@ func (mh *mimeHandler) convertJPEG(frame *avFrameWrapper) ([]byte, camera.ImageM
 		}()
 		res := C.av_dict_set(&opts, qscaleKey, qscaleValue, 0)
 		if res < 0 {
+			mh.mu.Unlock()
 			return nil, camera.ImageMetadata{}, newAvError(res, "failed to set qscale option")
 		}
 		if res := C.avcodec_open2(mh.jpegEnc, codec, nil); res < 0 {
+			mh.mu.Unlock()
 			return nil, camera.ImageMetadata{}, newAvError(res, "failed to open MJPEG encoder")
 		}
+		mh.mu.Unlock()
 	}
 	if mh.jpegEnc == nil {
 		return nil, camera.ImageMetadata{}, errors.New("failed to create encoder or destination frame")
