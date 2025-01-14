@@ -318,7 +318,6 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 		// Handle size changes while having previously initialized frames to avoid https://github.com/erh/viamrtsp/pull/41#discussion_r1719998891
 		frameWasPreviouslyInitialized := dst.frame.width > 0 && dst.frame.height > 0
 		if frameWasPreviouslyInitialized {
-			d.logger.Info("Frame was previously initialized. Reinitializing frame due to size change.")
 			// Release previously initialized frames, and block old prev gen frames from returning to pool
 			dst.free()
 			generation := d.avFramePool.clearAndStartNewGeneration()
