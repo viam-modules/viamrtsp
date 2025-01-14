@@ -107,7 +107,7 @@ func (w *avFrameWrapper) free() {
 // toImageYCbCr maps the underlying AVFrame (in YUV420P format) to a Go image.YCbCr.
 // Returns nil if frame is not AV_PIX_FMT_YUV420P or if something goes wrong.
 func (w *avFrameWrapper) toImage() image.Image {
-	if w.frame.format != C.AV_PIX_FMT_YUV420P {
+	if w.frame.format != C.AV_PIX_FMT_YUV420P && w.frame.format != C.AV_PIX_FMT_YUVJ420P {
 		return nil
 	}
 
@@ -231,6 +231,9 @@ func newDecoder(codecID C.enum_AVCodecID, avFramePool *framePool, logger logging
 	if codecCtx == nil {
 		return nil, errors.New("avcodec_alloc_context3() failed")
 	}
+	// Set the codec context to decode YUV420P frames. The decoder can still
+	// output JPEG color range frames YUVJ420P.
+	codecCtx.pix_fmt = C.AV_PIX_FMT_YUV420P
 
 	res := C.avcodec_open2(codecCtx, codec, nil)
 	if res < 0 {
@@ -308,13 +311,14 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 	}
 
 	// If the frame from the pool has the wrong size, (re-)initialize it.
-	if dst.frame.width != d.src.width || dst.frame.height != d.src.height {
-		d.logger.Debugf("(re)making frame due to AVFrame dimension discrepancy: Dst (width: %d, height: %d) vs Src (width: %d, height: %d)",
-			dst.frame.width, dst.frame.height, d.src.width, d.src.height)
+	if dst.frame.width != d.src.width || dst.frame.height != d.src.height || dst.frame.format != d.src.format {
+		d.logger.Debugf("(re)making frame due to AVFrame discrepancy: Dst (width: %d, height: %d, format: %d) vs Src (width: %d, height: %d, format: %d)",
+			dst.frame.width, dst.frame.height, dst.frame.format, d.src.width, d.src.height, d.src.format)
 
 		// Handle size changes while having previously initialized frames to avoid https://github.com/erh/viamrtsp/pull/41#discussion_r1719998891
 		frameWasPreviouslyInitialized := dst.frame.width > 0 && dst.frame.height > 0
 		if frameWasPreviouslyInitialized {
+			d.logger.Info("Frame was previously initialized. Reinitializing frame due to size change.")
 			// Release previously initialized frames, and block old prev gen frames from returning to pool
 			dst.free()
 			generation := d.avFramePool.clearAndStartNewGeneration()
@@ -326,11 +330,10 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 			dst = newDst
 		}
 		// Prepare the fresh frame
-		dst.frame.format = C.AV_PIX_FMT_YUV420P
+		dst.frame.format = d.src.format
 		dst.frame.width = d.src.width
 		dst.frame.height = d.src.height
 
-		// This allocates the underlying byte array to contain the image data.
 		res = C.av_frame_get_buffer(dst.frame, 32)
 		if res < 0 {
 			return nil, newAvError(res, "av_frame_get_buffer() err")
@@ -343,7 +346,8 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 		return nil, newAvError(res, "av_frame_copy() failed")
 	}
 
-	// Copy the frame properties from the source frame to the destination frame
+	// Copy the frame properties from the source frame to the destination frame.
+	// This will fill fields not explicitly set in the initial dst frame allocation.
 	if res := C.av_frame_copy_props(dst.frame, d.src); res < 0 {
 		return nil, newAvError(res, "av_frame_copy_props() failed")
 	}

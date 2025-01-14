@@ -33,7 +33,6 @@ func newMimeHandler(logger logging.Logger) *mimeHandler {
 func (mh *mimeHandler) convertJPEG(frame *avFrameWrapper) ([]byte, camera.ImageMetadata, error) {
 	if mh.jpegEnc == nil || frame.frame.width != mh.jpegEnc.width || frame.frame.height != mh.jpegEnc.height {
 		mh.logger.Info("creating MJPEG encoder with frame size: ", frame.frame.width, "x", frame.frame.height)
-		// Tear down jpeg encoder if we're changing frame size
 		if mh.jpegEnc != nil {
 			C.avcodec_free_context(&mh.jpegEnc)
 		}
@@ -45,7 +44,8 @@ func (mh *mimeHandler) convertJPEG(frame *avFrameWrapper) ([]byte, camera.ImageM
 		mh.jpegEnc.width = frame.frame.width
 		mh.jpegEnc.height = frame.frame.height
 		mh.jpegEnc.pix_fmt = C.AV_PIX_FMT_YUVJ420P
-		mh.jpegEnc.time_base = C.AVRational{num: 1, den: 1} // We don't care about time base for still images
+		// We don't care about accurate timestamps still frames
+		mh.jpegEnc.time_base = C.AVRational{num: 1, den: 1}
 		if res := C.avcodec_open2(mh.jpegEnc, codec, nil); res < 0 {
 			return nil, camera.ImageMetadata{}, newAvError(res, "failed to open MJPEG encoder")
 		}
@@ -69,6 +69,7 @@ func (mh *mimeHandler) convertJPEG(frame *avFrameWrapper) ([]byte, camera.ImageM
 	if res < 0 {
 		return nil, camera.ImageMetadata{}, newAvError(res, "failed to receive packet from MJPEG encoder")
 	}
+	// There is no need to create a frame for the packet, as the packet already contains the data
 	dataGo := C.GoBytes(unsafe.Pointer(pkt.data), pkt.size)
 
 	return dataGo, camera.ImageMetadata{
