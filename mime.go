@@ -4,6 +4,9 @@ package viamrtsp
 #cgo pkg-config: libavutil libavcodec
 #include <libavcodec/avcodec.h>
 #include <libavutil/error.h>
+#include <libavutil/opt.h>
+#include <libavutil/dict.h>
+#include <stdlib.h>
 */
 import "C"
 
@@ -20,6 +23,7 @@ type mimeHandler struct {
 	logger     logging.Logger
 	jpegSwsCtx *C.struct_SwsContext
 	jpegEnc    *C.AVCodecContext
+	jpegPkt    *C.AVPacket
 	currentPTS int
 }
 
@@ -43,34 +47,43 @@ func (mh *mimeHandler) convertJPEG(frame *avFrameWrapper) ([]byte, camera.ImageM
 		mh.jpegEnc = C.avcodec_alloc_context3(codec)
 		mh.jpegEnc.width = frame.frame.width
 		mh.jpegEnc.height = frame.frame.height
-		mh.jpegEnc.pix_fmt = C.AV_PIX_FMT_YUVJ420P
+		mh.jpegEnc.pix_fmt = (C.enum_AVPixelFormat)(frame.frame.format)
 		// We don't care about accurate timestamps still frames
 		mh.jpegEnc.time_base = C.AVRational{num: 1, den: 1}
+		var opts *C.AVDictionary
+		defer C.av_dict_free(&opts)
+		// Equivalent to 75% quality
+		res := C.av_dict_set(&opts, C.CString("qscale"), C.CString("8"), 0)
+		if res < 0 {
+			return nil, camera.ImageMetadata{}, newAvError(res, "failed to set qscale option")
+		}
 		if res := C.avcodec_open2(mh.jpegEnc, codec, nil); res < 0 {
 			return nil, camera.ImageMetadata{}, newAvError(res, "failed to open MJPEG encoder")
+		}
+		mh.jpegPkt = C.av_packet_alloc()
+		if mh.jpegPkt == nil {
+			return nil, camera.ImageMetadata{}, errors.New("failed to allocate packet")
 		}
 	}
 	if mh.jpegEnc == nil {
 		return nil, camera.ImageMetadata{}, errors.New("failed to create encoder or destination frame")
 	}
-	pkt := C.av_packet_alloc()
-	if pkt == nil {
-		return nil, camera.ImageMetadata{}, errors.New("failed to allocate packet")
-	}
+
 	frame.frame.pts = C.int64_t(mh.currentPTS)
 	// If this reaches max int, it will wrap around to 0
 	mh.currentPTS++
-	defer C.av_packet_free(&pkt)
 	res := C.avcodec_send_frame(mh.jpegEnc, frame.frame)
 	if res < 0 {
 		return nil, camera.ImageMetadata{}, newAvError(res, "failed to send frame to MJPEG encoder")
 	}
-	res = C.avcodec_receive_packet(mh.jpegEnc, pkt)
+	res = C.avcodec_receive_packet(mh.jpegEnc, mh.jpegPkt)
 	if res < 0 {
 		return nil, camera.ImageMetadata{}, newAvError(res, "failed to receive packet from MJPEG encoder")
 	}
 	// There is no need to create a frame for the packet, as the packet already contains the data
-	dataGo := C.GoBytes(unsafe.Pointer(pkt.data), pkt.size)
+	dataGo := C.GoBytes(unsafe.Pointer(mh.jpegPkt.data), mh.jpegPkt.size)
+
+	C.av_packet_unref(mh.jpegPkt)
 
 	return dataGo, camera.ImageMetadata{
 		MimeType: rutils.MimeTypeJPEG,
