@@ -47,7 +47,7 @@ func (mh *mimeHandler) convertJPEG(frame *avFrameWrapper) ([]byte, camera.ImageM
 		mh.jpegEnc = C.avcodec_alloc_context3(codec)
 		mh.jpegEnc.width = frame.frame.width
 		mh.jpegEnc.height = frame.frame.height
-		mh.jpegEnc.pix_fmt = (C.enum_AVPixelFormat)(frame.frame.format)
+		mh.jpegEnc.pix_fmt = C.AV_PIX_FMT_YUV420P
 		// We don't care about accurate timestamps still frames
 		mh.jpegEnc.time_base = C.AVRational{num: 1, den: 1}
 		var opts *C.AVDictionary
