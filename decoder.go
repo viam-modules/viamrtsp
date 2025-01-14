@@ -312,9 +312,10 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 
 	// If the frame from the pool has the wrong size, (re-)initialize it.
 	if dst.frame.width != d.src.width || dst.frame.height != d.src.height || dst.frame.format != d.src.format {
-		d.logger.Debugf("(re)making frame due to AVFrame discrepancy: Dst (width: %d, height: %d, format: %d) vs Src (width: %d, height: %d, format: %d)",
-			dst.frame.width, dst.frame.height, dst.frame.format, d.src.width, d.src.height, d.src.format)
-
+		d.logger.Debugf("(re)making frame due to AVFrame discrepancy: "+
+			"Dst (width: %d, height: %d, format: %d) vs Src (width: %d, height: %d, format: %d)",
+			dst.frame.width, dst.frame.height, dst.frame.format,
+			d.src.width, d.src.height, d.src.format)
 		// Handle size changes while having previously initialized frames to avoid https://github.com/erh/viamrtsp/pull/41#discussion_r1719998891
 		frameWasPreviouslyInitialized := dst.frame.width > 0 && dst.frame.height > 0
 		if frameWasPreviouslyInitialized {
