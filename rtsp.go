@@ -935,7 +935,7 @@ func (rc *rtspCamera) getAndConvertFrame() ([]byte, camera.ImageMetadata, error)
 	}
 	currentFrame := rc.latestFrame
 	currentFrame.incrementRefs()
-	bytes, metdata, err := rc.mimeHandler.convertJPEG(currentFrame)
+	bytes, metdata, err := rc.mimeHandler.convertJPEG(currentFrame.frame)
 	if refCount := currentFrame.decrementRefs(); refCount == 0 {
 		rc.avFramePool.put(currentFrame)
 	}

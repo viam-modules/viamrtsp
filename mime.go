@@ -34,8 +34,8 @@ func newMimeHandler(logger logging.Logger) *mimeHandler {
 	}
 }
 
-func (mh *mimeHandler) convertJPEG(frame *avFrameWrapper) ([]byte, camera.ImageMetadata, error) {
-	if mh.jpegEnc == nil || frame.frame.width != mh.jpegEnc.width || frame.frame.height != mh.jpegEnc.height {
+func (mh *mimeHandler) convertJPEG(frame *C.AVFrame) ([]byte, camera.ImageMetadata, error) {
+	if mh.jpegEnc == nil || frame.width != mh.jpegEnc.width || frame.height != mh.jpegEnc.height {
 		if err := mh.initJPEGEncoder(frame); err != nil {
 			return nil, camera.ImageMetadata{}, err
 		}
@@ -49,10 +49,10 @@ func (mh *mimeHandler) convertJPEG(frame *avFrameWrapper) ([]byte, camera.ImageM
 		return nil, camera.ImageMetadata{}, errors.New("failed to allocate packet")
 	}
 	defer C.av_packet_free(&pkt)
-	frame.frame.pts = C.int64_t(mh.currentPTS)
+	frame.pts = C.int64_t(mh.currentPTS)
 	// If this reaches max int, it will wrap around to 0
 	mh.currentPTS++
-	res := C.avcodec_send_frame(mh.jpegEnc, frame.frame)
+	res := C.avcodec_send_frame(mh.jpegEnc, frame)
 	if res < 0 {
 		return nil, camera.ImageMetadata{}, newAvError(res, "failed to send frame to MJPEG encoder")
 	}
@@ -68,12 +68,12 @@ func (mh *mimeHandler) convertJPEG(frame *avFrameWrapper) ([]byte, camera.ImageM
 	}, nil
 }
 
-func (mh *mimeHandler) initJPEGEncoder(frame *avFrameWrapper) error {
+func (mh *mimeHandler) initJPEGEncoder(frame *C.AVFrame) error {
 	// Lock to prevent modifying encoder while it is being used concurrently.
 	// Frame param changes are rare, so we can afford to block here.
 	mh.mu.Lock()
 	defer mh.mu.Unlock()
-	mh.logger.Info("creating MJPEG encoder with frame size: ", frame.frame.width, "x", frame.frame.height)
+	mh.logger.Info("creating MJPEG encoder with frame size: ", frame.width, "x", frame.height)
 	if mh.jpegEnc != nil {
 		C.avcodec_free_context(&mh.jpegEnc)
 	}
@@ -82,8 +82,8 @@ func (mh *mimeHandler) initJPEGEncoder(frame *avFrameWrapper) error {
 		return errors.New("failed to find MJPEG encoder")
 	}
 	mh.jpegEnc = C.avcodec_alloc_context3(codec)
-	mh.jpegEnc.width = frame.frame.width
-	mh.jpegEnc.height = frame.frame.height
+	mh.jpegEnc.width = frame.width
+	mh.jpegEnc.height = frame.height
 	mh.jpegEnc.pix_fmt = C.AV_PIX_FMT_YUVJ420P
 	// We don't care about accurate timestamps still frames
 	mh.jpegEnc.time_base = C.AVRational{num: 1, den: 1}
