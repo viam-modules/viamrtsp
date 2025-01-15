@@ -11,9 +11,7 @@ func TestJPEGConvert(t *testing.T) {
 	t.Run("valid YUV420P frame succeeds", func(t *testing.T) {
 		width, height := 640, 480
 		frame := createTestYUV420PFrame(width, height)
-		if frame == nil {
-			t.Fatalf("failed to allocate YUV420P frame")
-		}
+		test.That(t, frame, test.ShouldNotBeNil)
 		defer freeFrame(frame)
 		fillDummyYUV420PData(frame)
 		logger := logging.NewDebugLogger("mime_test")
@@ -28,9 +26,7 @@ func TestJPEGConvert(t *testing.T) {
 	t.Run("valid YUVJ420P frame succeeds", func(t *testing.T) {
 		width, height := 640, 480
 		frame := createTestYUVJ420PFrame(width, height)
-		if frame == nil {
-			t.Fatalf("failed to allocate YUV420P frame")
-		}
+		test.That(t, frame, test.ShouldNotBeNil)
 		defer freeFrame(frame)
 		fillDummyYUV420PData(frame)
 		logger := logging.NewDebugLogger("mime_test")
@@ -44,9 +40,7 @@ func TestJPEGConvert(t *testing.T) {
 
 	t.Run("invalid frame fails", func(t *testing.T) {
 		frame := createBadFrame()
-		if frame == nil {
-			t.Fatalf("failed to allocate bad frame")
-		}
+		test.That(t, frame, test.ShouldNotBeNil)
 		defer freeFrame(frame)
 		logger := logging.NewDebugLogger("mime_test")
 		mh := newMimeHandler(logger)

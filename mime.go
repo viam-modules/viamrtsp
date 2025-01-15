@@ -85,7 +85,7 @@ func (mh *mimeHandler) initJPEGEncoder(frame *C.AVFrame) error {
 	mh.jpegEnc.width = frame.width
 	mh.jpegEnc.height = frame.height
 	mh.jpegEnc.pix_fmt = C.AV_PIX_FMT_YUVJ420P
-	// We don't care about accurate timestamps still frames
+	// We don't care about accurate timestamps for still frames
 	mh.jpegEnc.time_base = C.AVRational{num: 1, den: 1}
 	var opts *C.AVDictionary
 	// Equivalent to 75% quality

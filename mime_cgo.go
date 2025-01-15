@@ -51,6 +51,7 @@ func createBadFrame() *C.AVFrame {
 	frame.format = C.AV_PIX_FMT_NONE
 	frame.width = 0
 	frame.height = 0
+
 	return frame
 }
 
@@ -63,23 +64,21 @@ func fillDummyYUV420PData(frame *C.AVFrame) {
 	vPlane := (*[1 << 30]uint8)(unsafe.Pointer(frame.data[2]))[: width*height/4 : width*height/4]
 
 	// Fill Y plane
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			yPlane[y*int(frame.linesize[0])+x] = 128 // Dummy value for Y
+	for y := range height {
+		for x := range width {
+			yPlane[y*int(frame.linesize[0])+x] = 128
 		}
 	}
-
 	// Fill U plane
-	for y := 0; y < height/2; y++ {
-		for x := 0; x < width/2; x++ {
-			uPlane[y*int(frame.linesize[1])+x] = 64 // Dummy value for U
+	for y := range height / 2 {
+		for x := range width / 2 {
+			uPlane[y*int(frame.linesize[1])+x] = 64
 		}
 	}
-
 	// Fill V plane
-	for y := 0; y < height/2; y++ {
-		for x := 0; x < width/2; x++ {
-			vPlane[y*int(frame.linesize[2])+x] = 64 // Dummy value for V
+	for y := range height / 2 {
+		for x := range width / 2 {
+			vPlane[y*int(frame.linesize[2])+x] = 64
 		}
 	}
 }
