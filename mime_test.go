@@ -46,6 +46,7 @@ func TestJPEGConvert(t *testing.T) {
 		mh := newMimeHandler(logger)
 		bytes, metadata, err := mh.convertJPEG(frame)
 		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "failed to open MJPEG encoder")
 		test.That(t, bytes, test.ShouldBeNil)
 		test.That(t, metadata.MimeType, test.ShouldBeEmpty)
 	})
