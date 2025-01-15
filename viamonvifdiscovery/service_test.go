@@ -38,7 +38,7 @@ func TestCredentials(t *testing.T) {
 		{Username: "user2", Password: "pass5"},
 	}
 	dis := rtspDiscovery{Credentials: creds}
-	dis.setCredNumbers()
+	dis.countUniqueUsernames()
 	test.That(t, dis.Credentials[0].credNumber, test.ShouldEqual, 0)
 	test.That(t, dis.Credentials[1].credNumber, test.ShouldEqual, 0)
 	test.That(t, dis.Credentials[2].credNumber, test.ShouldEqual, 0)
@@ -84,12 +84,8 @@ func TestDiscoveryConfig(t *testing.T) {
 		test.That(t, deps, test.ShouldBeEmpty)
 	})
 	t.Run("Test Invalid Config", func(t *testing.T) {
-		cfg := Config{Credentials: []Creds{{Username: "user1", Password: ""}}}
+		cfg := Config{Credentials: []Creds{{Username: "", Password: "pass1"}}}
 		deps, err := cfg.Validate("")
-		test.That(t, err.Error(), test.ShouldContainSubstring, "credential user1 missing password")
-		test.That(t, deps, test.ShouldBeEmpty)
-		cfg2 := Config{Credentials: []Creds{{Username: "", Password: "pass1"}}}
-		deps, err = cfg2.Validate("")
 		test.That(t, err.Error(), test.ShouldContainSubstring, "credential missing username, has password pass1")
 		test.That(t, deps, test.ShouldBeEmpty)
 	})

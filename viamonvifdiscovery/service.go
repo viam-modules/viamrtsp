@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"slices"
 
 	"github.com/viam-modules/viamrtsp"
 	"github.com/viam-modules/viamrtsp/viamonvif"
@@ -45,9 +44,6 @@ type Config struct {
 func (cfg *Config) Validate(_ string) ([]string, error) {
 	// check that all creds have both usernames and passwords set. Note a credential can have both fields empty
 	for _, cred := range cfg.Credentials {
-		if cred.Username != "" && cred.Password == "" {
-			return nil, fmt.Errorf("credential %v missing password", cred.Username)
-		}
 		if cred.Password != "" && cred.Username == "" {
 			return nil, fmt.Errorf("credential missing username, has password %v", cred.Password)
 		}
@@ -77,13 +73,13 @@ func newDiscovery(_ context.Context, _ resource.Dependencies,
 		logger:      logger,
 	}
 
-	dis.setCredNumbers()
+	dis.countUniqueUsernames()
 	return dis, nil
 }
 
 // since camera logins can have the same username,
 // check how many repeated usernames we have and index them, to ensure cameras have unique names.
-func (dis *rtspDiscovery) setCredNumbers() {
+func (dis *rtspDiscovery) countUniqueUsernames() {
 	// usernames do not have to be unique, so we want to add an additional label to ensure cameras have unique names.
 	for index, cred := range dis.Credentials {
 		for counter, otherCreds := range dis.Credentials {
@@ -106,53 +102,46 @@ func (dis *rtspDiscovery) Close(_ context.Context) error {
 // DiscoverResources discovers different rtsp cameras that use onvif.
 func (dis *rtspDiscovery) DiscoverResources(_ context.Context, _ map[string]any) ([]resource.Config, error) {
 	potentialCams := []resource.Config{}
-	insecureURLs := []string{}
-
+	insecureFound := false
 	for _, cred := range dis.Credentials {
 		// if we have multiple empty/insecure credentials configured for some reason, skip to the next credential.
 		// only skip if we have not processed insecure credentials yet.
-		if cred.isInsecure() && len(insecureURLs) > 0 {
-			continue
+		if cred.isInsecure() {
+			if insecureFound {
+				continue
+			}
+			insecureFound = true
 		}
 
 		list, err := viamonvif.DiscoverCameras(cred.Username, cred.Password, dis.logger, nil)
 		if err != nil {
 			return nil, err
 		}
+
+		// count camera number separately, since some cameras may not return urls.
 		cameraNumber := 0
 		for _, l := range list.Cameras {
 			dis.logger.Debugf("%s %s %s", l.Manufacturer, l.Model, l.SerialNumber)
 			// some cameras return with no urls. explicitly skipping those so the behavior is clear in the service.
 			if len(l.RTSPURLs) == 0 {
-				dis.logger.Debugf("No urls found for camera, skipping. %s %s %s", l.Manufacturer, l.Model, l.SerialNumber)
+				dis.logger.Errorf("No urls found for camera, skipping. %s %s %s", l.Manufacturer, l.Model, l.SerialNumber)
 				continue
 			}
 			cameraNumber++
-			camConfigs, err := createCamerasFromURLs(cred.createName(cameraNumber), l, insecureURLs, dis.logger)
+			camConfigs, err := createCamerasFromURLs(cred.createName(cameraNumber), l, dis.logger)
 			if err != nil {
 				return nil, err
 			}
 			potentialCams = append(potentialCams, camConfigs...)
-
-			// if we are processing insecure creds, record the urls so we do not duplicate the cameras when processing cameras with creds.
-			if cred.isInsecure() {
-				insecureURLs = append(insecureURLs, l.NoLoginURLs...)
-			}
 		}
 	}
 	return potentialCams, nil
 }
 
-func createCamerasFromURLs(cameraName string, l viamonvif.CameraInfo, insecureCams []string,
-	logger logging.Logger,
-) ([]resource.Config, error) {
+func createCamerasFromURLs(cameraName string, l viamonvif.CameraInfo, logger logging.Logger) ([]resource.Config, error) {
 	potentialCams := []resource.Config{}
-	for index, u := range l.RTSPURLs {
-		// skip over cameras that were already discovered with insecure creds
-		if slices.Contains(insecureCams, l.NoLoginURLs[index]) {
-			continue
-		}
-		logger.Debugf("\t%s", u)
+	for _, u := range l.RTSPURLs {
+		logger.Debugf("camera URL:\t%s", u)
 		cfg, err := createCameraConfig(cameraName, u)
 		if err != nil {
 			return nil, err
@@ -164,7 +153,7 @@ func createCamerasFromURLs(cameraName string, l viamonvif.CameraInfo, insecureCa
 
 // set the camera name based on the Username and camera number.
 func (cred *Creds) createName(index int) string {
-	if cred.Username == "" {
+	if cred.isInsecure() {
 		return fmt.Sprintf("Camera_Insecure_%v", index)
 	}
 	if cred.credNumber > 0 {
@@ -189,8 +178,7 @@ func createCameraConfig(name, address string) (resource.Config, error) {
 	}
 
 	// convert to map to be used as attributes in resource.Config
-	err = json.Unmarshal(jsonBytes, &result)
-	if err != nil {
+	if err = json.Unmarshal(jsonBytes, &result); err != nil {
 		return resource.Config{}, err
 	}
 
