@@ -4,6 +4,8 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
+	"log"
 	"maps"
 	"net/url"
 	"os"
@@ -16,20 +18,39 @@ import (
 func main() {
 	err := realMain()
 	if err != nil {
-		panic(err)
+		log.Print(err.Error())
+		os.Exit(1)
 	}
 }
 
 func ParseOpts() (Options, error) {
 	debug := false
-	configFile := "config.json"
-	output := ""
+	genConfig := false
+	configFile := "./config.json"
+	output := "./output.json"
 	var zero Options
 
 	flag.BoolVar(&debug, "debug", debug, "debug")
-	flag.StringVar(&configFile, "c", configFile, "path to json config file with structure [{'user': '...', 'pass': '...'}]")
-	flag.StringVar(&output, "o", output, "output file")
+	flag.BoolVar(&genConfig, "gen_config", genConfig, "generate config file template")
+	flag.StringVar(&configFile, "config", configFile, "path to json config file.")
+	flag.StringVar(&output, "output", output, "output file")
 	flag.Parse()
+
+	if genConfig {
+		b, err := json.Marshal(Config{XAddrs: []string{"192.168.1.1"}, Creds: []viamonvif.Credentials{{User: "username", Pass: "password"}}})
+		if err != nil {
+			return zero, err
+		}
+		if _, err := os.Stat(configFile); err == nil {
+			return zero, fmt.Errorf("can't create config file template as %s file or directory already exists", configFile)
+		}
+
+		//nolint:mnd
+		if err := os.WriteFile(configFile, b, 0o600); err != nil {
+			return zero, err
+		}
+		os.Exit(0)
+	}
 
 	configBytes, err := os.ReadFile(configFile)
 	var config Config
@@ -85,13 +106,6 @@ func realMain() error {
 	list, err := viamonvif.DiscoverCameras(opts.Config.Creds, urls, logger)
 	if err != nil {
 		return err
-	}
-
-	for _, l := range list.Cameras {
-		logger.Infof("%s %s %s", l.Manufacturer, l.Model, l.SerialNumber)
-		for _, u := range l.RTSPURLs {
-			logger.Infof("\t%s", u)
-		}
 	}
 
 	if opts.Output != "" {
