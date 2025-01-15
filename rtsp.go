@@ -91,7 +91,7 @@ func init() {
 					logger.Infof("error getting password from extra: %v", err)
 				}
 				creds := []viamonvif.Credentials{{User: username, Pass: password}}
-				camInfoList, err := viamonvif.DiscoverCameras(creds, logger)
+				camInfoList, err := viamonvif.DiscoverCameras(creds, nil, logger)
 				if err != nil {
 					return nil, err
 				}

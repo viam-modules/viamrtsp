@@ -4,7 +4,10 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"maps"
+	"net/url"
 	"os"
+	"slices"
 
 	"github.com/viam-modules/viamrtsp/viamonvif"
 	"go.viam.com/rdk/logging"
@@ -28,24 +31,29 @@ func ParseOpts() (Options, error) {
 	flag.StringVar(&output, "o", output, "output file")
 	flag.Parse()
 
-	config, err := os.ReadFile(configFile)
-	var creds []viamonvif.Credentials
+	configBytes, err := os.ReadFile(configFile)
+	var config Config
 	if err != nil {
 		return zero, err
 	}
-	if err := json.Unmarshal(config, &creds); err != nil {
+	if err := json.Unmarshal(configBytes, &config); err != nil {
 		return zero, err
 	}
 
 	return Options{
 		Debug:  debug,
 		Output: output,
-		Creds:  creds,
+		Config: config,
 	}, nil
 }
 
+type Config struct {
+	Creds  []viamonvif.Credentials `json:"creds"`
+	XAddrs []string                `json:"xaddrs"`
+}
+
 type Options struct {
-	Creds  []viamonvif.Credentials
+	Config Config
 	Debug  bool
 	Output string
 }
@@ -63,7 +71,18 @@ func realMain() error {
 		logger = logging.NewLogger("discovery")
 	}
 
-	list, err := viamonvif.DiscoverCameras(opts.Creds, logger)
+	xaddrs := map[string]*url.URL{}
+	for _, xaddr := range opts.Config.XAddrs {
+		u, err := url.Parse(xaddr)
+		if err != nil {
+			logger.Warnf("invalid config xaddr: %s", xaddr)
+			continue
+		}
+		xaddrs[u.Host] = u
+	}
+
+	urls := slices.Collect(maps.Values(xaddrs))
+	list, err := viamonvif.DiscoverCameras(opts.Config.Creds, urls, logger)
 	if err != nil {
 		return err
 	}
