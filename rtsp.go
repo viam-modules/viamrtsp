@@ -911,7 +911,6 @@ func isCompactableH264(nalu []byte) bool {
 
 // Image returns the latest frame as JPEG bytes.
 func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
-	// For now, we only support JPEG
 	if mimeType != rutils.MimeTypeJPEG && mimeType != rutils.WithLazyMIMEType(rutils.MimeTypeJPEG) {
 		rc.logger.Warn("unsupported mime type request %s, returning JPEG", mimeType)
 	}
@@ -924,10 +923,11 @@ func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]int
 			MimeType: rutils.MimeTypeJPEG,
 		}, nil
 	}
-	return rc.getAndConvertFrame()
+	// For now, we only support JPEG
+	return rc.getAndConvertFrame(rutils.MimeTypeJPEG)
 }
 
-func (rc *rtspCamera) getAndConvertFrame() ([]byte, camera.ImageMetadata, error) {
+func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, camera.ImageMetadata, error) {
 	rc.frameSwapMu.Lock()
 	defer rc.frameSwapMu.Unlock()
 	if rc.latestFrame == nil {
@@ -935,14 +935,22 @@ func (rc *rtspCamera) getAndConvertFrame() ([]byte, camera.ImageMetadata, error)
 	}
 	currentFrame := rc.latestFrame
 	currentFrame.incrementRefs()
-	bytes, metdata, err := rc.mimeHandler.convertJPEG(currentFrame.frame)
+	var bytes []byte
+	var metadata camera.ImageMetadata
+	var err error
+	switch mimeType {
+	case rutils.MimeTypeJPEG:
+		bytes, metadata, err = rc.mimeHandler.convertJPEG(currentFrame.frame)
+	default:
+		err = fmt.Errorf("unsupported mime type: %s", mimeType)
+	}
 	if refCount := currentFrame.decrementRefs(); refCount == 0 {
 		rc.avFramePool.put(currentFrame)
 	}
 	if err != nil {
 		return nil, camera.ImageMetadata{}, err
 	}
-	return bytes, metdata, err
+	return bytes, metadata, err
 }
 
 func (rc *rtspCamera) Properties(_ context.Context) (camera.Properties, error) {
