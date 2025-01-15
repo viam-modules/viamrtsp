@@ -138,7 +138,7 @@ func (w *avFrameWrapper) toImage() image.Image {
 	crDataPtr := unsafe.Pointer(w.frame.data[2])
 	crSlice := (*[1 << 30]byte)(crDataPtr)[:cPlaneSize:cPlaneSize]
 
-	ycbcr := &image.YCbCr{
+	return &image.YCbCr{
 		Y:              ySlice,
 		Cb:             cbSlice,
 		Cr:             crSlice,
@@ -147,8 +147,6 @@ func (w *avFrameWrapper) toImage() image.Image {
 		SubsampleRatio: image.YCbCrSubsampleRatio420,
 		Rect:           image.Rect(0, 0, width, height),
 	}
-
-	return ycbcr
 }
 
 // newAVFrameWrapper allocates a new AVFrame using C code with safety checks and returns the Go wrapper of it.
