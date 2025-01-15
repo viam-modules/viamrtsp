@@ -17,7 +17,7 @@ import (
 // Model is the model for a rtsp discovery service.
 var Model = viamrtsp.Family.WithModel("discovery")
 
-var emptyCred = Creds{Username: "", Password: ""}
+var emptyCred = creds{Username: "", Password: ""}
 
 func init() {
 	resource.RegisterService(
@@ -29,15 +29,30 @@ func init() {
 }
 
 // Creds are the login credentials that a user can input.
-type Creds struct {
+type creds struct {
 	Username   string `json:"username"`
 	Password   string `json:"password"`
 	credNumber int
 }
 
+// set the camera name based on the Username and camera number.
+func (cred *creds) createName(index int) string {
+	if cred.isInsecure() {
+		return fmt.Sprintf("Camera_Insecure_%v", index)
+	}
+	if cred.credNumber > 0 {
+		return fmt.Sprintf("Camera_%s-%v_%v", cred.Username, cred.credNumber, index)
+	}
+	return fmt.Sprintf("Camera_%s_%v", cred.Username, index)
+}
+
+func (cred *creds) isInsecure() bool {
+	return cred.Username == "" && cred.Password == ""
+}
+
 // Config is the config for the discovery service.
 type Config struct {
-	Credentials []Creds `json:"credentials"`
+	Credentials []creds `json:"credentials"`
 }
 
 // Validate validates the discovery service.
@@ -54,7 +69,7 @@ func (cfg *Config) Validate(_ string) ([]string, error) {
 type rtspDiscovery struct {
 	resource.Named
 	resource.AlwaysRebuild
-	Credentials []Creds
+	Credentials []creds
 	logger      logging.Logger
 }
 
@@ -69,7 +84,7 @@ func newDiscovery(_ context.Context, _ resource.Dependencies,
 	dis := &rtspDiscovery{
 		Named: conf.ResourceName().AsNamed(),
 		// place the empty credentials first, so we find the insecure cameras before other cameras.
-		Credentials: append([]Creds{emptyCred}, cfg.Credentials...),
+		Credentials: append([]creds{emptyCred}, cfg.Credentials...),
 		logger:      logger,
 	}
 
@@ -149,21 +164,6 @@ func createCamerasFromURLs(cameraName string, l viamonvif.CameraInfo, logger log
 		potentialCams = append(potentialCams, cfg)
 	}
 	return potentialCams, nil
-}
-
-// set the camera name based on the Username and camera number.
-func (cred *Creds) createName(index int) string {
-	if cred.isInsecure() {
-		return fmt.Sprintf("Camera_Insecure_%v", index)
-	}
-	if cred.credNumber > 0 {
-		return fmt.Sprintf("Camera_%s-%v_%v", cred.Username, cred.credNumber, index)
-	}
-	return fmt.Sprintf("Camera_%s_%v", cred.Username, index)
-}
-
-func (cred *Creds) isInsecure() bool {
-	return cred.Username == "" && cred.Password == ""
 }
 
 func createCameraConfig(name, address string) (resource.Config, error) {

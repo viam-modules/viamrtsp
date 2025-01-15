@@ -29,7 +29,7 @@ func TestDiscoveryService(t *testing.T) {
 }
 
 func TestCredentials(t *testing.T) {
-	creds := []Creds{
+	creds := []creds{
 		{Username: "", Password: ""},
 		{Username: "user1", Password: "pass1"},
 		{Username: "user2", Password: "pass2"},
@@ -73,7 +73,7 @@ func TestDiscoveryConfig(t *testing.T) {
 		test.That(t, deps, test.ShouldBeEmpty)
 	})
 	t.Run("Test Valid config", func(t *testing.T) {
-		cfg := Config{Credentials: []Creds{
+		cfg := Config{Credentials: []creds{
 			{Username: "user1", Password: "pass1"},
 			{Username: "user2", Password: "pass2"},
 			{Username: "user3", Password: "pass3"},
@@ -84,7 +84,7 @@ func TestDiscoveryConfig(t *testing.T) {
 		test.That(t, deps, test.ShouldBeEmpty)
 	})
 	t.Run("Test Invalid Config", func(t *testing.T) {
-		cfg := Config{Credentials: []Creds{{Username: "", Password: "pass1"}}}
+		cfg := Config{Credentials: []creds{{Username: "", Password: "pass1"}}}
 		deps, err := cfg.Validate("")
 		test.That(t, err.Error(), test.ShouldContainSubstring, "credential missing username, has password pass1")
 		test.That(t, deps, test.ShouldBeEmpty)
