@@ -104,8 +104,7 @@ func (w *avFrameWrapper) free() {
 	}
 }
 
-// toImageYCbCr maps the underlying AVFrame (in YUV420P format) to a Go image.YCbCr.
-// Returns nil if frame is not AV_PIX_FMT_YUV420P or if something goes wrong.
+// toImage maps the underlying AVFrame (in YUV420P format) to a Go image.YCbCr.
 func (w *avFrameWrapper) toImage() image.Image {
 	if w.frame.format != C.AV_PIX_FMT_YUV420P && w.frame.format != C.AV_PIX_FMT_YUVJ420P {
 		return nil
@@ -113,6 +112,9 @@ func (w *avFrameWrapper) toImage() image.Image {
 
 	width := int(w.frame.width)
 	height := int(w.frame.height)
+	if width <= 0 || height <= 0 {
+		return nil
+	}
 
 	// For YUV420P:
 	//   - data[0] = Y plane, linesize[0] = stride for Y
