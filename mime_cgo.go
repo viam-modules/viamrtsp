@@ -43,7 +43,7 @@ func createTestYUVJ420PFrame(width, height int) *C.AVFrame {
 	return createTestFrame(width, height, C.AV_PIX_FMT_YUVJ420P)
 }
 
-func createBadFrame() *C.AVFrame {
+func createInvalidFrame() *C.AVFrame {
 	frame := C.av_frame_alloc()
 	if frame == nil {
 		return nil

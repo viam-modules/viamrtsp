@@ -39,7 +39,7 @@ func TestJPEGConvert(t *testing.T) {
 	})
 
 	t.Run("invalid frame fails", func(t *testing.T) {
-		frame := createBadFrame()
+		frame := createInvalidFrame()
 		test.That(t, frame, test.ShouldNotBeNil)
 		defer freeFrame(frame)
 		logger := logging.NewDebugLogger("mime_test")

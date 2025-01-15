@@ -349,6 +349,7 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 	// Copy the frame properties from the source frame to the destination frame.
 	// This will fill fields not explicitly set in the initial dst frame allocation.
 	if res := C.av_frame_copy_props(dst.frame, d.src); res < 0 {
+		// We should never reach this point if av_frame_copy() succeeded.
 		return nil, newAvError(res, "av_frame_copy_props() failed")
 	}
 
