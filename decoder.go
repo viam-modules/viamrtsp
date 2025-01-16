@@ -5,7 +5,6 @@ package viamrtsp
 #include <libavcodec/avcodec.h>
 #include <libavutil/imgutils.h>
 #include <libavutil/error.h>
-#include <libswscale/swscale.h>
 #include <stdlib.h>
 */
 import "C"
@@ -20,13 +19,16 @@ import (
 	"go.viam.com/rdk/logging"
 )
 
+const (
+	yuv420SubsampleRatio = 2
+)
+
 // decoder is a generic FFmpeg decoder.
 type decoder struct {
 	logger   logging.Logger
 	codecCtx *C.AVCodecContext
 	// The source yuv420 frame buffer we are decoding from
 	src         *C.AVFrame
-	swsCtx      *C.struct_SwsContext
 	avFramePool *framePool
 }
 
@@ -102,17 +104,48 @@ func (w *avFrameWrapper) free() {
 	}
 }
 
-// toImage takes the underlying av frame and embeds it into a RGBA image struct.
+// toImage maps the underlying AVFrame (in YUV420P format) to a Go image.YCbCr.
 func (w *avFrameWrapper) toImage() image.Image {
-	dstFrameSize := C.av_image_get_buffer_size((int32)(w.frame.format), w.frame.width, w.frame.height, 1)
-	dstFramePtr := (*[1 << 30]uint8)(unsafe.Pointer(w.frame.data[0]))[:dstFrameSize:dstFrameSize]
+	if w.frame.format != C.AV_PIX_FMT_YUV420P && w.frame.format != C.AV_PIX_FMT_YUVJ420P {
+		return nil
+	}
 
-	return &image.RGBA{
-		Pix:    dstFramePtr,
-		Stride: bytesPerPixel * (int)(w.frame.width),
-		Rect: image.Rectangle{
-			Max: image.Point{(int)(w.frame.width), (int)(w.frame.height)},
-		},
+	width := int(w.frame.width)
+	height := int(w.frame.height)
+	if width <= 0 || height <= 0 {
+		return nil
+	}
+
+	// For YUV420P:
+	//   - data[0] = Y plane, linesize[0] = stride for Y
+	//   - data[1] = U plane, linesize[1] = stride for U
+	//   - data[2] = V plane, linesize[2] = stride for V
+	yStride := int(w.frame.linesize[0])
+	cStride := int(w.frame.linesize[1])
+
+	// Number of bytes in each plane.
+	// Y plane is full resolution: height * yStride
+	// U and V planes are half resolution in both dimensions: (height/2) * cStride
+	yPlaneSize := yStride * height
+	cPlaneSize := cStride * (height / yuv420SubsampleRatio)
+
+	yDataPtr := unsafe.Pointer(w.frame.data[0])
+	ySlice := (*[1 << 30]byte)(yDataPtr)[:yPlaneSize:yPlaneSize]
+
+	cbDataPtr := unsafe.Pointer(w.frame.data[1])
+	cbSlice := (*[1 << 30]byte)(cbDataPtr)[:cPlaneSize:cPlaneSize]
+
+	crDataPtr := unsafe.Pointer(w.frame.data[2])
+	crSlice := (*[1 << 30]byte)(crDataPtr)[:cPlaneSize:cPlaneSize]
+
+	return &image.YCbCr{
+		Y:              ySlice,
+		Cb:             cbSlice,
+		Cr:             crSlice,
+		YStride:        yStride,
+		CStride:        cStride,
+		SubsampleRatio: image.YCbCrSubsampleRatio420,
+		Rect:           image.Rect(0, 0, width, height),
 	}
 }
 
@@ -198,6 +231,9 @@ func newDecoder(codecID C.enum_AVCodecID, avFramePool *framePool, logger logging
 	if codecCtx == nil {
 		return nil, errors.New("avcodec_alloc_context3() failed")
 	}
+	// Set the codec context to decode YUV420P frames. The decoder can still
+	// output JPEG color range frames YUVJ420P.
+	codecCtx.pix_fmt = C.AV_PIX_FMT_YUV420P
 
 	res := C.avcodec_open2(codecCtx, codec, nil)
 	if res < 0 {
@@ -231,10 +267,6 @@ func newH265Decoder(avFramePool *framePool, logger logging.Logger) (*decoder, er
 
 // close closes the decoder.
 func (d *decoder) close() {
-	if d.swsCtx != nil {
-		C.sws_freeContext(d.swsCtx)
-	}
-
 	if d.src != nil {
 		C.av_frame_free(&d.src)
 	}
@@ -279,10 +311,11 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 	}
 
 	// If the frame from the pool has the wrong size, (re-)initialize it.
-	if dst.frame.width != d.src.width || dst.frame.height != d.src.height {
-		d.logger.Debugf("(re)making frame due to AVFrame dimension discrepancy: Dst (width: %d, height: %d) vs Src (width: %d, height: %d)",
-			dst.frame.width, dst.frame.height, d.src.width, d.src.height)
-
+	if dst.frame.width != d.src.width || dst.frame.height != d.src.height || dst.frame.format != d.src.format {
+		d.logger.Debugf("(re)making frame due to AVFrame discrepancy: "+
+			"Dst (width: %d, height: %d, format: %d) vs Src (width: %d, height: %d, format: %d)",
+			dst.frame.width, dst.frame.height, dst.frame.format,
+			d.src.width, d.src.height, d.src.format)
 		// Handle size changes while having previously initialized frames to avoid https://github.com/erh/viamrtsp/pull/41#discussion_r1719998891
 		frameWasPreviouslyInitialized := dst.frame.width > 0 && dst.frame.height > 0
 		if frameWasPreviouslyInitialized {
@@ -296,37 +329,28 @@ func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
 			}
 			dst = newDst
 		}
-		if d.swsCtx != nil {
-			// When the resolution changes, we must also free+reallocate the `swsCtx`.
-			C.sws_freeContext(d.swsCtx)
-		}
-
 		// Prepare the fresh frame
-		dst.frame.format = C.AV_PIX_FMT_RGBA
+		dst.frame.format = d.src.format
 		dst.frame.width = d.src.width
 		dst.frame.height = d.src.height
-		dst.frame.color_range = C.AVCOL_RANGE_JPEG
 
-		// This allocates the underlying byte array to contain the image data.
-		res = C.av_frame_get_buffer(dst.frame, 1)
+		res = C.av_frame_get_buffer(dst.frame, 32)
 		if res < 0 {
 			return nil, newAvError(res, "av_frame_get_buffer() err")
 		}
-
-		// Create a scratch space for converting YUV420 to RGB. In our use-case, the yuv source + dst
-		// resolutions always match.
-		d.swsCtx = C.sws_getContext(d.src.width, d.src.height, C.AV_PIX_FMT_YUV420P,
-			dst.frame.width, dst.frame.height, (int32)(dst.frame.format), C.SWS_BILINEAR, nil, nil, nil)
-		if d.swsCtx == nil {
-			return nil, errors.New("sws_getContext() err")
-		}
 	}
 
-	// convert frame from YUV420 to RGB
-	res = C.sws_scale(d.swsCtx, frameData(d.src), frameLineSize(d.src),
-		0, d.src.height, frameData(dst.frame), frameLineSize(dst.frame))
-	if res < 0 {
-		return nil, newAvError(res, "sws_scale() err")
+	// We need to copy the frame data from the source frame to the destination frame
+	// because the source frame will be overwritten by the next frame that is decoded.
+	if res := C.av_frame_copy(dst.frame, d.src); res < 0 {
+		return nil, newAvError(res, "av_frame_copy() failed")
+	}
+
+	// Copy the frame properties from the source frame to the destination frame.
+	// This will fill fields not explicitly set in the initial dst frame allocation.
+	if res := C.av_frame_copy_props(dst.frame, d.src); res < 0 {
+		// We should never reach this point if av_frame_copy() succeeded.
+		return nil, newAvError(res, "av_frame_copy_props() failed")
 	}
 
 	return dst, nil

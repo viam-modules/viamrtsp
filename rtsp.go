@@ -2,12 +2,9 @@
 package viamrtsp
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"image"
-	"image/jpeg"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -169,7 +166,7 @@ type rtspCamera struct {
 
 	activeBackgroundWorkers sync.WaitGroup
 
-	latestMJPEGImage atomic.Pointer[image.Image]
+	latestMJPEGBytes atomic.Pointer[[]byte]
 	latestFrame      *avFrameWrapper
 	// frameSwapMu protects critical sections where frame state changes (e.g. ref counting) need to be atomic
 	// with swapping out the latest frame.
@@ -179,6 +176,8 @@ type rtspCamera struct {
 	// from the pool may be for a resolution that does not match the current image. The user of the pool
 	// is responsible for the underlying frame contents and further initializing it and/or throwing it away.
 	avFramePool *framePool
+
+	mimeHandler *mimeHandler
 
 	logger logging.Logger
 
@@ -200,6 +199,7 @@ func (rc *rtspCamera) Close(_ context.Context) error {
 	rc.activeBackgroundWorkers.Wait()
 	rc.closeConnection()
 	rc.avFramePool.close()
+	rc.mimeHandler.close()
 	return nil
 }
 
@@ -560,13 +560,7 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 			return
 		}
 
-		img, err := jpeg.Decode(bytes.NewReader(frame))
-		if err != nil {
-			rc.logger.Debugf("error converting MJPEG frame to image err: %s", err.Error())
-			return
-		}
-
-		rc.latestMJPEGImage.Store(&img)
+		rc.latestMJPEGBytes.Store(&frame)
 	})
 
 	return nil
@@ -715,6 +709,8 @@ func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 
 	framePool := newFramePool(initialFramePoolSize, logger)
 
+	mimeHandler := newMimeHandler(logger)
+
 	rtpPassthrough := true
 	if newConf.RTPPassthrough != nil {
 		rtpPassthrough = *newConf.RTPPassthrough
@@ -730,6 +726,7 @@ func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		rtpPassthroughCtx:           rtpPassthroughCtx,
 		rtpPassthroughCancelCauseFn: rtpPassthroughCancelCauseFn,
 		avFramePool:                 framePool,
+		mimeHandler:                 mimeHandler,
 		logger:                      logger,
 	}
 	codecInfo, err := modelToCodec(conf.Model)
@@ -913,41 +910,47 @@ func isCompactableH264(nalu []byte) bool {
 }
 
 // Image returns the latest frame as JPEG bytes.
-func (rc *rtspCamera) Image(_ context.Context, _ string, _ map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
+func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
+	if mimeType != rutils.MimeTypeJPEG && mimeType != rutils.WithLazyMIMEType(rutils.MimeTypeJPEG) {
+		rc.logger.Warn("unsupported mime type request %s, returning JPEG", mimeType)
+	}
 	if videoCodec(rc.currentCodec.Load()) == MJPEG {
-		return rc.getMJPEGImage()
+		mjpegBytes := rc.latestMJPEGBytes.Load()
+		if mjpegBytes == nil {
+			return nil, camera.ImageMetadata{}, errors.New("no frame yet")
+		}
+		return *mjpegBytes, camera.ImageMetadata{
+			MimeType: rutils.MimeTypeJPEG,
+		}, nil
 	}
-	return rc.getFrameAsImage()
+	// For now, we only support JPEG
+	return rc.getAndConvertFrame(rutils.MimeTypeJPEG)
 }
 
-// getMJPEGImage retrieves the latest MJPEG image.
-func (rc *rtspCamera) getMJPEGImage() ([]byte, camera.ImageMetadata, error) {
-	latestImg := rc.latestMJPEGImage.Load()
-	if latestImg == nil {
-		return nil, camera.ImageMetadata{}, errors.New("no mjpeg frame yet")
-	}
-	return encodeToJPEG(*latestImg)
-}
-
-// getFrameAsImage retrieves the latest frame and converts it to an image.
-func (rc *rtspCamera) getFrameAsImage() ([]byte, camera.ImageMetadata, error) {
+func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, camera.ImageMetadata, error) {
 	rc.frameSwapMu.Lock()
 	defer rc.frameSwapMu.Unlock()
-
 	if rc.latestFrame == nil {
 		return nil, camera.ImageMetadata{}, errors.New("no frame yet")
 	}
-
 	currentFrame := rc.latestFrame
 	currentFrame.incrementRefs()
-	img := currentFrame.toImage()
-
-	// Release frame if no references are left
+	var bytes []byte
+	var metadata camera.ImageMetadata
+	var err error
+	switch mimeType {
+	case rutils.MimeTypeJPEG:
+		bytes, metadata, err = rc.mimeHandler.convertJPEG(currentFrame.frame)
+	default:
+		err = fmt.Errorf("unsupported mime type: %s", mimeType)
+	}
 	if refCount := currentFrame.decrementRefs(); refCount == 0 {
 		rc.avFramePool.put(currentFrame)
 	}
-
-	return encodeToJPEG(img)
+	if err != nil {
+		return nil, camera.ImageMetadata{}, err
+	}
+	return bytes, metadata, err
 }
 
 func (rc *rtspCamera) Properties(_ context.Context) (camera.Properties, error) {
