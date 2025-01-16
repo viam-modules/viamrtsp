@@ -349,6 +349,7 @@ func getRTSPStreamURLs(deviceInstance OnvifDevice, username, password string, lo
 
 	// Resultant slice of RTSP URIs
 	var rtspUris []string
+
 	// Iterate over all profiles and get the RTSP stream URI for each one
 	for _, profile := range envelope.Body.GetProfilesResponse.Profiles {
 		logger.Debugf("Using profile token and profile: %s %#v", profile.Token, profile)

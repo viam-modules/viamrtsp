@@ -5,8 +5,10 @@ import (
 	"context"
 
 	"github.com/viam-modules/viamrtsp"
+	"github.com/viam-modules/viamrtsp/viamonvifdiscovery"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/module"
+	"go.viam.com/rdk/services/discovery"
 )
 
 func main() {
@@ -27,6 +29,10 @@ func realMain(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+	}
+	err = myMod.AddModelFromRegistry(ctx, discovery.API, viamonvifdiscovery.Model)
+	if err != nil {
+		return err
 	}
 
 	err = myMod.Start(ctx)
