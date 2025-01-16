@@ -12,6 +12,7 @@ import (
 	"slices"
 
 	"github.com/viam-modules/viamrtsp/viamonvif"
+	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"go.viam.com/rdk/logging"
 )
 
@@ -37,7 +38,7 @@ func ParseOpts() (Options, error) {
 	flag.Parse()
 
 	if genConfig {
-		b, err := json.Marshal(Config{XAddrs: []string{"192.168.1.1"}, Creds: []viamonvif.Credentials{{User: "username", Pass: "password"}}})
+		b, err := json.Marshal(Config{XAddrs: []string{"192.168.1.1"}, Creds: []device.Credentials{{User: "username", Pass: "password"}}})
 		if err != nil {
 			return zero, err
 		}
@@ -69,8 +70,8 @@ func ParseOpts() (Options, error) {
 }
 
 type Config struct {
-	Creds  []viamonvif.Credentials `json:"creds"`
-	XAddrs []string                `json:"xaddrs"`
+	Creds  []device.Credentials `json:"creds"`
+	XAddrs []string             `json:"xaddrs"`
 }
 
 type Options struct {

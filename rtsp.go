@@ -24,6 +24,7 @@ import (
 	"github.com/pion/rtp"
 	"github.com/viam-modules/viamrtsp/formatprocessor"
 	"github.com/viam-modules/viamrtsp/viamonvif"
+	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"go.uber.org/zap/zapcore"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/components/camera/rtppassthrough"
@@ -90,7 +91,7 @@ func init() {
 				if err != nil {
 					logger.Infof("error getting password from extra: %v", err)
 				}
-				creds := []viamonvif.Credentials{{User: username, Pass: password}}
+				creds := []device.Credentials{{User: username, Pass: password}}
 				camInfoList, err := viamonvif.DiscoverCameras(creds, nil, logger)
 				if err != nil {
 					return nil, err
