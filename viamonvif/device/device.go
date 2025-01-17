@@ -251,26 +251,6 @@ func (dev *Device) GetEndpoint(name string) string {
 	return dev.endpoints[name]
 }
 
-// getEndpoint functions get the target service endpoint in a better way.
-// func (dev Device) getEndpoint(endpoint string) (string, error) {
-// 	// common condition, endpointMark in map we use this.
-// 	if endpointURL, ok := dev.endpoints[endpoint]; ok {
-// 		return endpointURL, nil
-// 	}
-
-// 	// but ,if we have endpoint like event、analytic
-// 	// and sametime the Targetkey like : events、analytics
-// 	// we use fuzzy way to find the best match url
-// 	var endpointURL string
-// 	for targetKey := range dev.endpoints {
-// 		if strings.Contains(targetKey, endpoint) {
-// 			endpointURL = dev.endpoints[targetKey]
-// 			return endpointURL, nil
-// 		}
-// 	}
-// 	return endpointURL, errors.New("target endpoint service not found")
-// }
-
 // CallMethod functions call an method, defined <method> struct with authentication data.
 func (dev Device) callMedia(method interface{}) ([]byte, error) {
 	return dev.callMethodDo(dev.endpoints["media"], method)
@@ -320,6 +300,8 @@ func (dev Device) callMethodDo(endpoint string, method interface{}) ([]byte, err
 func (dev *Device) sendSoap(endpoint, message string) ([]byte, error) {
 	contentType := "application/soap+xml; charset=utf-8"
 	//nolint: noctx
+	// TODO(Nick S): This is pretty bad as it can cause the goroutine calling this to hang forever
+	// this should be converted to the http interface that takes a context
 	resp, err := dev.params.HTTPClient.Post(endpoint, contentType, bytes.NewBufferString(message))
 	if err != nil {
 		return nil, err
