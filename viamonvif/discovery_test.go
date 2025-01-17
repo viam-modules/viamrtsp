@@ -37,15 +37,15 @@ func (m *MockDevice) GetProfiles() (device.GetProfilesResponse, error) {
 }
 
 func (m *MockDevice) GetStreamURI(profile onvif.Profile, creds device.Credentials) (*url.URL, error) {
-	if creds.User != "username" || creds.Pass != "password" {
-		return nil, errors.New("invalid mock credentials")
-	}
 	if profile.Token != "profile1" || profile.Name != "Main Profile" {
 		return nil, errors.New("invalid mock profile")
 	}
 	u, err := url.Parse("rtsp://192.168.1.100/stream")
 	if err != nil {
 		return nil, err
+	}
+	if creds.User != "" || creds.Pass != "" {
+		u.User = url.UserPassword(creds.User, creds.Pass)
 	}
 	return u, nil
 }
