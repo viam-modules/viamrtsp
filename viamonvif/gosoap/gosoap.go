@@ -38,63 +38,6 @@ func (msg SoapMessage) String() string {
 	return string(msg)
 }
 
-// StringIndent handle indent.
-// func (msg SoapMessage) StringIndent() (string, error) {
-// 	doc := etree.NewDocument()
-
-// 	if err := doc.ReadFromString(msg.String()); err != nil {
-// 		return "", err
-// 	}
-
-// 	doc.IndentTabs()
-// 	res, err := doc.WriteToString()
-// 	if err != nil {
-// 		return "", err
-// 	}
-
-// 	return res, nil
-// }
-
-// Body return body from Envelope.
-// func (msg SoapMessage) Body() string {
-// 	doc := etree.NewDocument()
-
-// 	if err := doc.ReadFromString(msg.String()); err != nil {
-// 		log.Println(err.Error())
-// 	}
-// 	bodyTag := doc.Root().SelectElement("Body").ChildElements()[0]
-// 	doc.SetRoot(bodyTag)
-// 	doc.IndentTabs()
-
-// 	res, _ := doc.WriteToString()
-
-// 	return res
-// }
-
-// AddStringBodyContent for Envelope.
-// func (msg *SoapMessage) AddStringBodyContent(data string) {
-// 	doc := etree.NewDocument()
-
-// 	if err := doc.ReadFromString(data); err != nil {
-// 		log.Println(err.Error())
-// 	}
-
-// 	element := doc.Root()
-
-// 	doc = etree.NewDocument()
-// 	if err := doc.ReadFromString(msg.String()); err != nil {
-// 		log.Println(err.Error())
-// 	}
-// 	// doc.FindElement("./Envelope/Body").AddChild(element)
-// 	bodyTag := doc.Root().SelectElement("Body")
-// 	bodyTag.AddChild(element)
-
-// 	// doc.IndentTabs()
-// 	res, _ := doc.WriteToString()
-
-// 	*msg = SoapMessage(res)
-// }
-
 // AddBodyContent for Envelope.
 func (msg *SoapMessage) AddBodyContent(element *etree.Element) error {
 	doc := etree.NewDocument()
@@ -112,30 +55,6 @@ func (msg *SoapMessage) AddBodyContent(element *etree.Element) error {
 	*msg = SoapMessage(res)
 	return nil
 }
-
-// AddBodyContents for Envelope body.
-// func (msg *SoapMessage) AddBodyContents(elements []*etree.Element) error {
-// 	doc := etree.NewDocument()
-// 	if err := doc.ReadFromString(msg.String()); err != nil {
-// 		return err
-// 	}
-
-// 	bodyTag := doc.Root().SelectElement("Body")
-
-// 	if len(elements) != 0 {
-// 		for _, j := range elements {
-// 			bodyTag.AddChild(j)
-// 		}
-// 	}
-
-// 	res, err := doc.WriteToString()
-// 	if err != nil {
-// 		return nil
-// 	}
-
-// 	*msg = SoapMessage(res)
-// 	return nil
-// }
 
 // AddStringHeaderContent for Envelope body.
 func (msg *SoapMessage) AddStringHeaderContent(data string) error {
@@ -163,43 +82,6 @@ func (msg *SoapMessage) AddStringHeaderContent(data string) error {
 	return nil
 }
 
-// AddHeaderContent for Envelope body.
-// func (msg *SoapMessage) AddHeaderContent(element *etree.Element) {
-// 	doc := etree.NewDocument()
-// 	if err := doc.ReadFromString(msg.String()); err != nil {
-// 		log.Println(err.Error())
-// 	}
-
-// 	bodyTag := doc.Root().SelectElement("Header")
-// 	bodyTag.AddChild(element)
-
-// 	// doc.IndentTabs()
-// 	res, _ := doc.WriteToString()
-
-// 	*msg = SoapMessage(res)
-// }
-
-// AddHeaderContents for Envelope body.
-// func (msg *SoapMessage) AddHeaderContents(elements []*etree.Element) {
-// 	doc := etree.NewDocument()
-// 	if err := doc.ReadFromString(msg.String()); err != nil {
-// 		log.Println(err.Error())
-// 	}
-
-// 	headerTag := doc.Root().SelectElement("Header")
-
-// 	if len(elements) != 0 {
-// 		for _, j := range elements {
-// 			headerTag.AddChild(j)
-// 		}
-// 	}
-
-// 	// doc.IndentTabs()
-// 	res, _ := doc.WriteToString()
-
-// 	*msg = SoapMessage(res)
-// }
-
 // AddRootNamespace for Envelope body.
 func (msg *SoapMessage) AddRootNamespace(key, value string) error {
 	doc := etree.NewDocument()
@@ -215,11 +97,6 @@ func (msg *SoapMessage) AddRootNamespace(key, value string) error {
 	*msg = SoapMessage(res)
 	return nil
 }
-
-// func buildSoapRoot() *etree.Document {
-
-// 	return doc
-// }
 
 // AddWSSecurity Header for soapMessage.
 func (msg *SoapMessage) AddWSSecurity(username, password string) error {

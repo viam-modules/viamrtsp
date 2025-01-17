@@ -65,13 +65,13 @@ func DiscoverCameras(creds []device.Credentials, manualXAddrs []*url.URL, logger
 
 // CameraInfo holds both the RTSP URLs and supplementary camera details.
 type CameraInfo struct {
-	WSDiscoveryXAddr string   `json:"ws_discovery_x_addr"`
-	RTSPURLs         []string `json:"rtsp_urls"`
-	Manufacturer     string   `json:"manufacturer"`
-	Model            string   `json:"model"`
-	SerialNumber     string   `json:"serial_number"`
-	FirmwareVersion  string   `json:"firmware_version"`
-	HardwareID       string   `json:"hardware_id"`
+	Host            string   `json:"host"`
+	RTSPURLs        []string `json:"rtsp_urls"`
+	Manufacturer    string   `json:"manufacturer"`
+	Model           string   `json:"model"`
+	SerialNumber    string   `json:"serial_number"`
+	FirmwareVersion string   `json:"firmware_version"`
+	HardwareID      string   `json:"hardware_id"`
 }
 
 // CameraInfoList is a struct containing a list of CameraInfo structs.
@@ -165,13 +165,13 @@ func GetCameraInfo(dev OnvifDevice, xaddr *url.URL, creds device.Credentials, lo
 	}
 
 	cameraInfo := CameraInfo{
-		WSDiscoveryXAddr: xaddr.Host,
-		RTSPURLs:         rtspURLs,
-		Manufacturer:     resp.Manufacturer,
-		Model:            resp.Model,
-		SerialNumber:     resp.SerialNumber,
-		FirmwareVersion:  resp.FirmwareVersion,
-		HardwareID:       resp.HardwareID,
+		Host:            xaddr.Host,
+		RTSPURLs:        rtspURLs,
+		Manufacturer:    resp.Manufacturer,
+		Model:           resp.Model,
+		SerialNumber:    resp.SerialNumber,
+		FirmwareVersion: resp.FirmwareVersion,
+		HardwareID:      resp.HardwareID,
 	}
 
 	return cameraInfo, nil
