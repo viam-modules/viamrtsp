@@ -14,6 +14,8 @@ package viamrtsp
 import "C"
 
 import (
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"sync"
 	"unsafe"
@@ -134,8 +136,11 @@ func (mh *mimeHandler) convertYUYV(frame *C.AVFrame) ([]byte, camera.ImageMetada
 	}
 
 	yuyvBytes := C.GoBytes(unsafe.Pointer(mh.yuyvFrame.data[0]), C.int(mh.yuyvFrame.width*mh.yuyvFrame.height*2))
+	header := packYUYVHeader(int(mh.yuyvFrame.width), int(mh.yuyvFrame.height))
+	// TODO(seanp): Figure out if this is memory efficient
+	yuyvPacket := append(header, yuyvBytes...)
 
-	return yuyvBytes, camera.ImageMetadata{
+	return yuyvPacket, camera.ImageMetadata{
 		MimeType: mimeTypeYUYV,
 	}, nil
 }
@@ -178,4 +183,16 @@ func (mh *mimeHandler) close() {
 	if mh.jpegEnc != nil {
 		C.avcodec_free_context(&mh.jpegEnc)
 	}
+}
+
+func packYUYVHeader(width, height int) []byte {
+	var header bytes.Buffer
+	header.Write([]byte("YUYV"))
+	tmp := make([]byte, 4)
+	binary.BigEndian.PutUint32(tmp, uint32(width))
+	header.Write(tmp)
+	binary.BigEndian.PutUint32(tmp, uint32(height))
+	header.Write(tmp)
+
+	return header.Bytes()
 }
