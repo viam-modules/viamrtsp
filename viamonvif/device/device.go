@@ -1,5 +1,8 @@
 // Package device allows communication with an onvif device
 // inspired by https://github.com/use-go/onvif
+// NOTE(Nick S): This code currently isn't cancellable.
+// work needs to be done in order to make it cancellable when
+// viam resource Close or Reconfigure are called.
 package device
 
 import (
@@ -146,7 +149,7 @@ type GetDeviceInformationResponseEnvelope struct {
 // GetDeviceInformation returns device information.
 func (dev *Device) GetDeviceInformation() (GetDeviceInformationResponse, error) {
 	var zero GetDeviceInformationResponse
-	b, err := dev.callMethodDo(dev.endpoints["device"], GetDeviceInformation{})
+	b, err := dev.callOnvifServiceMethod(dev.endpoints["device"], GetDeviceInformation{})
 	if err != nil {
 		return zero, fmt.Errorf("failed to get device information: %w", err)
 	}
@@ -263,14 +266,14 @@ func (dev *Device) GetEndpoint(name string) string {
 }
 
 func (dev Device) callMedia(method interface{}) ([]byte, error) {
-	return dev.callMethodDo(dev.endpoints["media"], method)
+	return dev.callOnvifServiceMethod(dev.endpoints["media"], method)
 }
 
 func (dev Device) callDevice(method interface{}) ([]byte, error) {
-	return dev.callMethodDo(dev.endpoints["device"], method)
+	return dev.callOnvifServiceMethod(dev.endpoints["device"], method)
 }
 
-func (dev Device) callMethodDo(endpoint string, method interface{}) ([]byte, error) {
+func (dev Device) callOnvifServiceMethod(endpoint string, method interface{}) ([]byte, error) {
 	output, err := xml.MarshalIndent(method, "  ", "    ")
 	if err != nil {
 		return nil, err

@@ -100,10 +100,6 @@ func (msg *SoapMessage) AddRootNamespace(key, value string) error {
 
 // AddWSSecurity Header for soapMessage.
 func (msg *SoapMessage) AddWSSecurity(username, password string) error {
-	//doc := etree.NewDocument()
-	//if err := doc.ReadFromString(msg.String()); err != nil {
-	//	log.Println(err.Error())
-	//}
 	/*
 		Getting an WS-Security struct representation
 	*/
