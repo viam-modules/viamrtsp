@@ -25,6 +25,10 @@ import (
 	rutils "go.viam.com/rdk/utils"
 )
 
+const (
+	yuyvHeaderDimBytes = 4
+)
+
 type mimeHandler struct {
 	logger     logging.Logger
 	jpegEnc    *C.AVCodecContext
@@ -135,7 +139,7 @@ func (mh *mimeHandler) convertYUYV(frame *C.AVFrame) ([]byte, camera.ImageMetada
 		return nil, camera.ImageMetadata{}, newAvError(res, "failed to convert frame to YUYV")
 	}
 
-	yuyvBytes := C.GoBytes(unsafe.Pointer(mh.yuyvFrame.data[0]), C.int(mh.yuyvFrame.width*mh.yuyvFrame.height*2))
+	yuyvBytes := C.GoBytes(unsafe.Pointer(mh.yuyvFrame.data[0]), mh.yuyvFrame.width*mh.yuyvFrame.height*2)
 	header := packYUYVHeader(int(mh.yuyvFrame.width), int(mh.yuyvFrame.height))
 	// TODO(seanp): Figure out if this is memory efficient
 	yuyvPacket := append(header, yuyvBytes...)
@@ -188,7 +192,7 @@ func (mh *mimeHandler) close() {
 func packYUYVHeader(width, height int) []byte {
 	var header bytes.Buffer
 	header.Write([]byte("YUYV"))
-	tmp := make([]byte, 4)
+	tmp := make([]byte, yuyvHeaderDimBytes)
 	binary.BigEndian.PutUint32(tmp, uint32(width))
 	header.Write(tmp)
 	binary.BigEndian.PutUint32(tmp, uint32(height))
