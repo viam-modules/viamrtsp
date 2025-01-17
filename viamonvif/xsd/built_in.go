@@ -1,4 +1,7 @@
+// Package xsd provides base onvif types
 // inspired by https://github.com/use-go/onvif
+//
+//nolint:lll,revive,stylecheck
 package xsd
 
 import (
@@ -19,10 +22,10 @@ import (
 	TODO: XML SOURCE: https://www.w3.org/2001/05/datatypes.xsd
 */
 
-// AnyType alias for string
+// AnyType alias for string.
 type AnyType string
 
-// AnySimpleType alias for string
+// AnySimpleType alias for string.
 type AnySimpleType string
 
 /***********************************************************
@@ -42,12 +45,12 @@ String has the following constraining facets:
 
 More info: https://www.w3.org/TR/xmlschema-2/#string
 
-//TODO: valid/invalid character declaration and process restrictions
+//TODO: valid/invalid character declaration and process restrictions.
 */
 type String string
 
 /*
-Construct an instance of xsd String type
+Construct an instance of xsd String type.
 */
 func (tp String) NewString(data string) String {
 	return String(data)
@@ -61,12 +64,12 @@ Boolean has the following ·constraining facets·:
 
 More info: https://www.w3.org/TR/xmlschema-2/#boolean
 
-//TODO: process restrictions
+//TODO: process restrictions.
 */
 type Boolean bool
 
 /*
-Construct an instance of xsd Boolean type
+Construct an instance of xsd Boolean type.
 */
 func (tp Boolean) NewBool(data bool) Boolean {
 	return Boolean(data)
@@ -85,12 +88,12 @@ Float has the following ·constraining facets·:
 
 More info: https://www.w3.org/TR/xmlschema-2/#float
 
-//TODO: process restrictions
+//TODO: process restrictions.
 */
 type Float float32
 
 /*
-Construct an instance of xsd Float type
+Construct an instance of xsd Float type.
 */
 func (tp Float) NewFloat(data float32) Float {
 	return Float(data)
@@ -109,12 +112,12 @@ Double has the following ·constraining facets·:
 
 More info: https://www.w3.org/TR/xmlschema-2/#double
 
-//TODO: process restrictions
+//TODO: process restrictions.
 */
 type Double float64
 
 /*
-Construct an instance of xsd Double type
+Construct an instance of xsd Double type.
 */
 func (tp Double) NewDouble(data float64) Double {
 	return Double(data)
@@ -145,12 +148,12 @@ Decimal has the following ·constraining facets·:
 
 More info: https://www.w3.org/TR/xmlschema-2/#decimal
 
-//TODO: process restrictions, valid/invalid characters(commas are not permitted; the decimal separator must be a period)
+//TODO: process restrictions, valid/invalid characters(commas are not permitted; the decimal separator must be a period).
 */
 type Decimal string
 
 /*
-Construct an instance of xsd Decimal type
+Construct an instance of xsd Decimal type.
 */
 func (tp Decimal) NewDecimal(data string) Decimal {
 	return Decimal(data)
@@ -180,11 +183,11 @@ func (tp Decimal) NewDecimal(data string) Decimal {
 	TODO: Look at time.Duration go type
 */
 
-// Duration alias for AnySimpleType
+// Duration alias for AnySimpleType.
 type Duration AnySimpleType
 
 /*
-Construct an instance of xsd duration type
+Construct an instance of xsd duration type.
 */
 func (tp Duration) NewDateTime(years, months, days, hours, minutes, seconds string) Duration {
 	i, err := iso8601.NewDuration(
@@ -195,12 +198,11 @@ func (tp Duration) NewDateTime(years, months, days, hours, minutes, seconds stri
 		minutes,
 		seconds,
 	)
-
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	//fmt.Println(i.ISO8601Duration())
+	// fmt.Println(i.ISO8601Duration())
 
 	return Duration(i.ISO8601Duration())
 }
@@ -226,12 +228,12 @@ DateTime has the following ·constraining facets·:
 More info: https://www.w3.org/TR/xmlschema-2/#dateTime
 
 TODO: decide good type for time with proper format
-TODO: process restrictions
+TODO: process restrictions.
 */
 type DateTime AnySimpleType
 
 /*
-Construct an instance of xsd dateTime type
+Construct an instance of xsd dateTime type.
 */
 func (tp DateTime) NewDateTime(time time.Time) DateTime {
 	return DateTime(time.Format("2002-10-10T12:00:00-05:00"))
@@ -255,12 +257,12 @@ Time has the following ·constraining facets·:
 
 More info: https://www.w3.org/TR/xmlschema-2/#time
 
-TODO: process restrictions
+TODO: process restrictions.
 */
 type Time AnySimpleType
 
 /*
-Construct an instance of xsd time type
+Construct an instance of xsd time type.
 */
 func (tp DateTime) NewTime(time time.Time) DateTime {
 	return DateTime(time.Format("15:04:05"))
@@ -279,7 +281,7 @@ values, the intervals begin at every minute and therefore overlap.
 type Date AnySimpleType
 
 /*
-Construct an instance of xsd date type
+Construct an instance of xsd date type.
 */
 func (tp Date) NewDate(time time.Time) Date {
 	return Date(time.Format("2004-04-12-05:00"))
@@ -301,11 +303,11 @@ More info: https://www.w3.org/TR/xmlschema-2/#gYearMonth
 type GYearMonth AnySimpleType
 
 /*
-Construct an instance of xsd GYearMonth type
+Construct an instance of xsd GYearMonth type.
 */
 func (tp GYearMonth) NewGYearMonth(time time.Time) GYearMonth {
 	return GYearMonth(fmt.Sprint("", time.Year(), "-", time.Month()))
-	//return GYearMonth(time.Format("2004-04-05:00"))
+	// return GYearMonth(time.Format("2004-04-05:00"))
 }
 
 /*
@@ -323,11 +325,11 @@ More info: https://www.w3.org/TR/xmlschema-2/#gYear
 type GYear AnySimpleType
 
 /*
-Construct an instance of xsd GYear type
+Construct an instance of xsd GYear type.
 */
 func (tp GYear) NewGYear(time time.Time) GYear {
 	return GYear(fmt.Sprint("", time.Year()))
-	//return GYearMonth(time.Format("2004-04-05:00"))
+	// return GYearMonth(time.Format("2004-04-05:00"))
 }
 
 /*
@@ -343,7 +345,7 @@ More info: https://www.w3.org/TR/xmlschema-2/#gMonthDay
 type GMonthDay AnySimpleType
 
 /*
-Construct an instance of xsd GMonthDay type
+Construct an instance of xsd GMonthDay type.
 */
 func (tp GMonthDay) NewGMonthDay(time time.Time) GMonthDay {
 	return GMonthDay(fmt.Sprint("--", time.Month(), "-", time.Day()))
@@ -363,7 +365,7 @@ More info: https://www.w3.org/TR/xmlschema-2/#gDay
 type GDay AnySimpleType
 
 /*
-Construct an instance of xsd GDay type
+Construct an instance of xsd GDay type.
 */
 func (tp GDay) NewGDay(time time.Time) GDay {
 	return GDay(fmt.Sprint("---", time.Day()))
@@ -476,8 +478,8 @@ func (tp QName) NewQName(prefix, local string) QName {
 	return QName(result)
 }
 
-//TODO: NOTATION datatype
-//type NOTATION AnySimpleType
+// TODO: NOTATION datatype
+// type NOTATION AnySimpleType
 
 /*
    Derived types
@@ -485,10 +487,10 @@ func (tp QName) NewQName(prefix, local string) QName {
 
 type NormalizedString String
 
-// TODO: check normalization
+// TODO: check normalization.
 func (tp NormalizedString) NewNormalizedString(data string) (NormalizedString, error) {
 	if strings.ContainsAny(data, "\r\n\t<>&") {
-		return NormalizedString(""), errors.New("String " + data + "  contains forbidden symbols")
+		return NormalizedString(""), errors.New("string " + data + "  contains forbidden symbols")
 	}
 	return NormalizedString(data), nil
 }
@@ -502,91 +504,10 @@ func (tp Token) NewToken(data NormalizedString) (Token, error) {
 	/*final := re_leadclose_whtsp.ReplaceAllString(data, "")
 	final = re_inside_whtsp.ReplaceAllString(final, " ")*/
 	if strings.ContainsAny(string(data), "\r\n\t<>&") || trailing_leading_whitespaces.MatchString(string(data)) || multiple_whitespaces.MatchString(string(data)) {
-		return Token(""), errors.New("String " + string(data) + "  contains forbidden symbols or whitespaces")
+		return Token(""), errors.New("string " + string(data) + "  contains forbidden symbols or whitespaces")
 	}
 
 	return Token(data), nil
-}
-
-type Language Token
-
-func (tp Language) NewLanguage(data Token) (Language, error) {
-	//Pattern was given from https://www.w3.org/2001/05/datatypes.xsd
-	rgxp := regexp.MustCompile(`([a-zA-Z]{2}|[iI]-[a-zA-Z]+|[xX]-[a-zA-Z]{1,8})(-[a-zA-Z]{1,8})*`)
-	if rgxp.MatchString(string(data)) {
-		return Language(""), errors.New("String does not match pattern ([a-zA-Z]{2}|[iI]-[a-zA-Z]+|[xX]-[a-zA-Z]{1,8})(-[a-zA-Z]{1,8})*")
-	}
-	return Language(data), nil
-}
-
-type NMTOKEN Token
-
-// TODO: check for valid symbols: https://www.w3.org/TR/xml/#NT-Nmtoken
-func (tp NMTOKEN) NewNMTOKEN(data string) NMTOKEN {
-	return NMTOKEN(data)
-}
-
-type NMTOKENS []NMTOKEN
-
-func (tp NMTOKENS) NewNMTOKENS(data []NMTOKEN) NMTOKENS {
-	result := make(NMTOKENS, len(data))
-	for i, j := range data {
-		result[i] = j
-	}
-	return result
-}
-
-type Name Token
-
-// TODO: implements https://www.w3.org/TR/xml/#NT-Name
-func (tp Name) NewName(data Token) Name {
-	return Name(data)
-}
-
-type NCName Name
-
-// TODO: https://www.w3.org/TR/REC-xml/#NT-Name and https://www.w3.org/TR/xml-names/#NT-NCName
-func (tp NCName) NewNCName(data Name) NCName {
-	return NCName(data)
-}
-
-// TODO: improve next types to correspond to XMLSchema
-type ID NCName
-
-func (tp ID) NewID(data NCName) ID {
-	return ID(data)
-}
-
-type IDREF NCName
-
-func (tp IDREF) NewIDREF(data NCName) IDREF {
-	return IDREF(data)
-}
-
-type IDREFS []IDREF
-
-func (tp IDREFS) NewIDREFS(data []IDREF) IDREFS {
-	result := make(IDREFS, len(data))
-	for i, j := range data {
-		result[i] = j
-	}
-	return result
-}
-
-type ENTITY NCName
-
-func (tp ENTITY) NewENTITY(data NCName) ENTITY {
-	return ENTITY(data)
-}
-
-type ENTITIES []ENTITY
-
-func (tp ENTITIES) NewENTITIES(data []ENTITY) ENTITIES {
-	result := make(ENTITIES, len(data))
-	for i, j := range data {
-		result[i] = j
-	}
-	return result
 }
 
 type Integer int64
@@ -595,86 +516,8 @@ func (tp Integer) NewInteger(data int64) Integer {
 	return Integer(data)
 }
 
-type NonPositiveInteger int64
-
-func (tp NonPositiveInteger) NewNonPositiveInteger(data int64) (NonPositiveInteger, error) {
-	if data > 0 {
-		return 0, errors.New("Value must be less or equal to 0")
-	}
-	return NonPositiveInteger(data), nil
-}
-
-type NegativeInteger int64
-
-func (tp NegativeInteger) NewNegativeInteger(data int64) (NegativeInteger, error) {
-	if data >= 0 {
-		return 0, errors.New("Value must be less than 0")
-	}
-	return NegativeInteger(data), nil
-}
-
-type Long int64
-
-func (tp Long) NewLong(data int64) Long {
-	return Long(data)
-}
-
 type Int int32
 
 func (tp Int) NewInt(data int32) Int {
 	return Int(data)
-}
-
-type Short int16
-
-func (tp Short) NewShort(data int16) Short {
-	return Short(data)
-}
-
-type Byte int8
-
-func (tp Byte) NewByte(data int8) Byte {
-	return Byte(data)
-}
-
-type NonNegativeInteger int64
-
-func (tp NonNegativeInteger) NewNonNegativeInteger(data int64) (NonNegativeInteger, error) {
-	if data > 0 {
-		return 0, errors.New("Value must be more or equal to 0")
-	}
-	return NonNegativeInteger(data), nil
-}
-
-type UnsignedLong uint64
-
-func (tp UnsignedLong) NewUnsignedLong(data uint64) UnsignedLong {
-	return UnsignedLong(data)
-}
-
-type UnsignedInt uint32
-
-func (tp UnsignedInt) NewUnsignedInt(data uint32) UnsignedInt {
-	return UnsignedInt(data)
-}
-
-type UnsignedShort uint16
-
-func (tp UnsignedShort) NewUnsignedShort(data uint16) UnsignedShort {
-	return UnsignedShort(data)
-}
-
-type UnsignedByte uint8
-
-func (tp UnsignedByte) NewUnsignedByte(data uint8) UnsignedByte {
-	return UnsignedByte(data)
-}
-
-type PositiveInteger int64
-
-func (tp PositiveInteger) NewPositiveInteger(data int64) (PositiveInteger, error) {
-	if data >= 0 {
-		return 0, errors.New("Value must be more than 0")
-	}
-	return PositiveInteger(data), nil
 }

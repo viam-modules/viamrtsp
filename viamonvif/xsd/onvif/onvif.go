@@ -1,30 +1,17 @@
+// Package onvif provides base onvif types
 // inspired by https://github.com/use-go/onvif
+//
+//nolint:revive,stylecheck
 package onvif
 
 import (
 	"github.com/viam-modules/viamrtsp/viamonvif/xsd"
 )
 
-// BUG(r): Enum types implemented as simple string
-
-//TODO: enumerations
-//TODO: type <typeName> struct {Any string} convert to type <typeName> AnyType
-//TODO: process restrictions
-
-//todo посмотреть все Extensions (Any string)
-//todo что делать с xs:any = Any
-//todo IntList и ему подобные. Проверить нужен ли слайс. Изменить на slice
-//todo посмотреть можно ли заменить StreamType и ему подобные типы на вмтроенные типы
-//todo оттестировать тип VideoSourceMode из-за Description-а
-
-//todo в документации описать, что Capabilities повторяеся у каждого сервиса, поэтому у каждого свой Capabilities (MediaCapabilities)
-//todo AuxiliaryData и другие simpleTypes, как реализовать рестрикшн
-//todo Name и ему подобные необходимо изучить на наличие "List of..." ошибок
-
-//todo Add in buit in
-
-type ContentType string // minLength value="3"
-type DNSName xsd.Token
+type (
+	ContentType string // minLength value="3"
+	DNSName     xsd.Token
+)
 
 type DeviceEntity struct {
 	Token ReferenceToken `xml:"token,attr"`
@@ -469,10 +456,10 @@ type IPAddress struct {
 
 type IPType xsd.String
 
-// IPv4 address
+// IPv4 address.
 type IPv4Address xsd.Token
 
-// IPv6 address
+// IPv6 address.
 type IPv6Address xsd.Token
 
 type AudioEncoderConfiguration struct {
@@ -820,7 +807,7 @@ type Transport struct {
 	Tunnel   *Transport        `xml:"onvif:Tunnel"`
 }
 
-// enum
+// enum.
 type TransportProtocol xsd.String
 
 type MediaUri struct {
@@ -919,8 +906,7 @@ type OSDImgOptionsExtension xsd.AnyType
 
 type OSDConfigurationOptionsExtension xsd.AnyType
 
-//PTZ
-
+// PTZ.
 type PTZNode struct {
 	DeviceEntity
 	FixedHomePosition      xsd.Boolean `xml:"FixedHomePosition,attr"`
@@ -947,7 +933,7 @@ type PTZSpaces struct {
 
 type PTZSpacesExtension xsd.AnyType
 
-// TODO: restriction
+// TODO: restriction.
 type AuxiliaryData xsd.String
 
 type PTZNodeExtension struct {
@@ -961,8 +947,10 @@ type PTZPresetTourSupported struct {
 	Extension                  PTZPresetTourSupportedExtension
 }
 
-type PTZPresetTourOperation xsd.String
-type PTZPresetTourSupportedExtension xsd.AnyType
+type (
+	PTZPresetTourOperation          xsd.String
+	PTZPresetTourSupportedExtension xsd.AnyType
+)
 
 type PTZNodeExtension2 xsd.AnyType
 
@@ -1122,8 +1110,7 @@ type PTZPresetTourPresetDetailOptions struct {
 
 type PTZPresetTourPresetDetailOptionsExtension xsd.AnyType
 
-//Device
-
+// Device.
 type OnvifVersion struct {
 	Major int
 	Minor int
@@ -1214,7 +1201,7 @@ type UserExtension xsd.String
 
 type CapabilityCategory xsd.String
 
-// Capabilities of device
+// Capabilities of device.
 type Capabilities struct {
 	Analytics AnalyticsCapabilities
 	Device    DeviceCapabilities
@@ -1225,14 +1212,14 @@ type Capabilities struct {
 	Extension CapabilitiesExtension
 }
 
-// AnalyticsCapabilities Check
+// AnalyticsCapabilities Check.
 type AnalyticsCapabilities struct {
 	XAddr                  xsd.AnyURI
 	RuleSupport            xsd.Boolean
 	AnalyticsModuleSupport xsd.Boolean
 }
 
-// DeviceCapabilities Check
+// DeviceCapabilities Check.
 type DeviceCapabilities struct {
 	XAddr     xsd.AnyURI
 	Network   NetworkCapabilities
@@ -1242,7 +1229,7 @@ type DeviceCapabilities struct {
 	Extension DeviceCapabilitiesExtension
 }
 
-// NetworkCapabilities Check
+// NetworkCapabilities Check.
 type NetworkCapabilities struct {
 	IPFilter          xsd.Boolean
 	ZeroConfiguration xsd.Boolean
@@ -1251,16 +1238,16 @@ type NetworkCapabilities struct {
 	Extension         NetworkCapabilitiesExtension
 }
 
-// NetworkCapabilitiesExtension Check
+// NetworkCapabilitiesExtension Check.
 type NetworkCapabilitiesExtension struct {
 	Dot11Configuration xsd.Boolean
 	Extension          NetworkCapabilitiesExtension2
 }
 
-// NetworkCapabilitiesExtension2 Extension2
+// NetworkCapabilitiesExtension2 Extension2.
 type NetworkCapabilitiesExtension2 xsd.AnyType
 
-// SystemCapabilities check
+// SystemCapabilities check.
 type SystemCapabilities struct {
 	DiscoveryResolve  xsd.Boolean
 	DiscoveryBye      xsd.Boolean
@@ -1455,7 +1442,7 @@ type DynamicDNSInformation struct {
 	Extension DynamicDNSInformationExtension
 }
 
-// TODO: enumeration
+// TODO: enumeration.
 type DynamicDNSType xsd.String
 
 type DynamicDNSInformationExtension xsd.AnyType
@@ -1492,7 +1479,7 @@ type NetworkInterfaceConnectionSetting struct {
 	Duplex          Duplex      `xml:"onvif:Duplex"`
 }
 
-// TODO: enum
+// TODO: enum.
 type Duplex xsd.String
 
 type NetworkInterfaceExtension struct {
@@ -1534,19 +1521,19 @@ type Dot11PSKPassphrase xsd.String
 
 type Dot11PSK xsd.HexBinary
 
-// TODO: enumeration
+// TODO: enumeration.
 type Dot11Cipher xsd.String
 
-// TODO: enumeration
+// TODO: enumeration.
 type Dot11SecurityMode xsd.String
 
-// TODO: restrictions
+// TODO: restrictions.
 type NetworkInterfaceConfigPriority xsd.Integer
 
-// TODO: enumeration
+// TODO: enumeration.
 type Dot11StationMode xsd.String
 
-// TODO: restrictions
+// TODO: restrictions.
 type Dot11SSIDType xsd.HexBinary
 
 type Dot3Configuration xsd.String
@@ -1573,7 +1560,7 @@ type PrefixedIPv6Address struct {
 	PrefixLength xsd.Int     `xml:"onvif:PrefixLength"`
 }
 
-// TODO: enumeration
+// TODO: enumeration.
 type IPv6DHCPConfiguration xsd.String
 
 type IPv4NetworkInterface struct {
@@ -1588,7 +1575,7 @@ type IPv4Configuration struct {
 	DHCP      xsd.Boolean
 }
 
-// optional, unbounded
+// optional, unbounded.
 type PrefixedIPv4Address struct {
 	Address      IPv4Address `xml:"onvif:Address"`
 	PrefixLength xsd.Int     `xml:"onvif:PrefixLength"`
@@ -1633,7 +1620,7 @@ type NetworkProtocol struct {
 
 type NetworkProtocolExtension xsd.AnyType
 
-// TODO: enumeration
+// TODO: enumeration.
 type NetworkProtocolType xsd.String
 
 type NetworkGateway struct {
@@ -1665,10 +1652,10 @@ type IPAddressFilter struct {
 type IPAddressFilterExtension xsd.AnyType
 
 // enum { 'Allow', 'Deny' }
-// TODO: enumeration
+// TODO: enumeration.
 type IPAddressFilterType xsd.String
 
-// TODO: attribite <xs:attribute ref="xmime:contentType" use="optional"/>
+// TODO: attribite <xs:attribute ref="xmime:contentType" use="optional"/>.
 type BinaryData struct {
 	X    ContentType      `xml:"xmime:contentType,attr"`
 	Data xsd.Base64Binary `xml:"onvif:Data"`
@@ -1695,13 +1682,13 @@ type RelayOutputSettings struct {
 	IdleState RelayIdleState `xml:"onvif:IdleState"`
 }
 
-// TODO:enumeration
+// TODO:enumeration.
 type RelayIdleState xsd.String
 
-// TODO: enumeration
+// TODO: enumeration.
 type RelayMode xsd.String
 
-// TODO: enumeration
+// TODO: enumeration.
 type RelayLogicalState xsd.String
 
 type CertificateWithPrivateKey struct {
@@ -1777,7 +1764,7 @@ type Dot11Status struct {
 	ActiveConfigAlias ReferenceToken
 }
 
-// TODO: enumeration
+// TODO: enumeration.
 type Dot11SignalStrength xsd.String
 
 type Dot11AvailableNetworks struct {
@@ -1792,7 +1779,7 @@ type Dot11AvailableNetworks struct {
 
 type Dot11AvailableNetworksExtension xsd.AnyType
 
-// TODO: enumeration
+// TODO: enumeration.
 type Dot11AuthAndMangementSuite xsd.String
 
 type SystemLogUriList struct {

@@ -16,20 +16,76 @@ import (
 	"go.viam.com/rdk/logging"
 )
 
+// Config for the disovery command.
+type Config struct {
+	// the device credentials to use when attempting to authenticate via onvif
+	Creds []device.Credentials `json:"creds"`
+	// the hosts (ip:port) to attempt to connect to as if they were returned from WS-Discovery
+	XAddrs []string `json:"xaddrs"`
+}
+
+type options struct {
+	config Config
+	debug  bool
+	output string
+}
+
 func main() {
-	err := realMain()
-	if err != nil {
-		log.Print(err.Error())
-		os.Exit(1)
+	if err := realMain(); err != nil {
+		log.Fatal(err.Error())
 	}
 }
 
-func ParseOpts() (Options, error) {
+func realMain() error {
+	opts, err := parseOpts()
+	if err != nil {
+		return err
+	}
+
+	var logger logging.Logger
+	if opts.debug {
+		logger = logging.NewDebugLogger("discovery")
+	} else {
+		logger = logging.NewLogger("discovery")
+	}
+
+	xaddrs := map[string]*url.URL{}
+	for _, xaddr := range opts.config.XAddrs {
+		u, err := url.Parse(xaddr)
+		if err != nil {
+			logger.Warnf("invalid config xaddr: %s", xaddr)
+			continue
+		}
+		xaddrs[u.Host] = u
+	}
+
+	urls := slices.Collect(maps.Values(xaddrs))
+	list, err := viamonvif.DiscoverCameras(opts.config.Creds, urls, logger)
+	if err != nil {
+		return err
+	}
+
+	if opts.output != "" {
+		j, err := json.Marshal(list.Cameras)
+		if err != nil {
+			return err
+		}
+
+		//nolint:mnd
+		if err := os.WriteFile(opts.output, j, 0o600); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func parseOpts() (options, error) {
 	debug := false
 	genConfig := false
 	configFile := "./config.json"
 	output := "./output.json"
-	var zero Options
+	var zero options
 
 	flag.BoolVar(&debug, "debug", debug, "debug")
 	flag.BoolVar(&genConfig, "gen_config", genConfig, "generate config file template")
@@ -62,64 +118,9 @@ func ParseOpts() (Options, error) {
 		return zero, err
 	}
 
-	return Options{
-		Debug:  debug,
-		Output: output,
-		Config: config,
+	return options{
+		debug:  debug,
+		output: output,
+		config: config,
 	}, nil
-}
-
-type Config struct {
-	Creds  []device.Credentials `json:"creds"`
-	XAddrs []string             `json:"xaddrs"`
-}
-
-type Options struct {
-	Config Config
-	Debug  bool
-	Output string
-}
-
-func realMain() error {
-	opts, err := ParseOpts()
-	if err != nil {
-		return err
-	}
-
-	var logger logging.Logger
-	if opts.Debug {
-		logger = logging.NewDebugLogger("discovery")
-	} else {
-		logger = logging.NewLogger("discovery")
-	}
-
-	xaddrs := map[string]*url.URL{}
-	for _, xaddr := range opts.Config.XAddrs {
-		u, err := url.Parse(xaddr)
-		if err != nil {
-			logger.Warnf("invalid config xaddr: %s", xaddr)
-			continue
-		}
-		xaddrs[u.Host] = u
-	}
-
-	urls := slices.Collect(maps.Values(xaddrs))
-	list, err := viamonvif.DiscoverCameras(opts.Config.Creds, urls, logger)
-	if err != nil {
-		return err
-	}
-
-	if opts.Output != "" {
-		j, err := json.Marshal(list.Cameras)
-		if err != nil {
-			return err
-		}
-
-		//nolint:mnd
-		if err := os.WriteFile(opts.Output, j, 0o600); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }

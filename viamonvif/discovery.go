@@ -1,4 +1,5 @@
 // Package viamonvif provides ONVIF integration to the viamrtsp module
+//nolint: revive
 package viamonvif
 
 import (
@@ -11,9 +12,16 @@ import (
 
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"github.com/viam-modules/viamrtsp/viamonvif/xsd/onvif"
-
 	"go.viam.com/rdk/logging"
 )
+
+// OnvifDevice is an interface to abstract device methods used in the code.
+// Used instead of onvif.Device to allow for mocking in tests.
+type OnvifDevice interface {
+	GetDeviceInformation() (device.GetDeviceInformationResponse, error)
+	GetProfiles() (device.GetProfilesResponse, error)
+	GetStreamURI(profile onvif.Profile, creds device.Credentials) (*url.URL, error)
+}
 
 // DiscoverCameras performs WS-Discovery
 // then uses ONVIF queries to get available RTSP addresses and supplementary info.
@@ -22,6 +30,7 @@ func DiscoverCameras(creds []device.Credentials, manualXAddrs []*url.URL, logger
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
 
+	logger.Debug("WS-Discovery start")
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve network interfaces: %w", err)
@@ -41,9 +50,9 @@ func DiscoverCameras(creds []device.Credentials, manualXAddrs []*url.URL, logger
 			discovered[xaddr.Host] = xaddr
 		}
 	}
+	logger.Debug("WS-Discovery complete")
 
 	for _, xaddr := range discovered {
-		logger.Debugf("Connecting to ONVIF device with URL: %s", xaddr.Host)
 		cameraInfo, err := DiscoverCamerasOnXAddr(ctx, xaddr, creds, logger)
 		if err != nil {
 			logger.Warnf("failed to connect to ONVIF device %v", err)
@@ -54,14 +63,6 @@ func DiscoverCameras(creds []device.Credentials, manualXAddrs []*url.URL, logger
 	return &CameraInfoList{Cameras: discoveredCameras}, nil
 }
 
-// OnvifDevice is an interface to abstract device methods used in the code.
-// Used instead of onvif.Device to allow for mocking in tests.
-type OnvifDevice interface {
-	GetDeviceInformation() (device.DeviceInfo, error)
-	GetProfiles() (device.GetProfilesResponse, error)
-	GetStreamUri(profile onvif.Profile, creds device.Credentials) (*url.URL, error)
-}
-
 // CameraInfo holds both the RTSP URLs and supplementary camera details.
 type CameraInfo struct {
 	WSDiscoveryXAddr string   `json:"ws_discovery_x_addr"`
@@ -70,7 +71,7 @@ type CameraInfo struct {
 	Model            string   `json:"model"`
 	SerialNumber     string   `json:"serial_number"`
 	FirmwareVersion  string   `json:"firmware_version"`
-	HardwareId       string   `json:"hardware_id"`
+	HardwareID       string   `json:"hardware_id"`
 }
 
 // CameraInfoList is a struct containing a list of CameraInfo structs.
@@ -84,6 +85,7 @@ func DiscoverCamerasOnXAddr(
 	creds []device.Credentials,
 	logger logging.Logger,
 ) (CameraInfo, error) {
+	logger.Debugf("Connecting to ONVIF device with URL: %s", xaddr)
 	var zero CameraInfo
 	for _, cred := range creds {
 		if ctx.Err() != nil {
@@ -100,7 +102,6 @@ func DiscoverCamerasOnXAddr(
 			continue
 		}
 
-		logger.Debugf("ip: %s GetCapabilities: DeviceInfo: %#v, Endpoints: %#v", xaddr, dev)
 		cameraInfo, err := GetCameraInfo(dev, xaddr, cred, logger)
 		if err != nil {
 			logger.Warnf("Failed to get camera info from %s: %v", xaddr, err)
@@ -151,10 +152,11 @@ func extractXAddrsFromProbeMatch(response string, logger logging.Logger) []*url.
 func GetCameraInfo(dev OnvifDevice, xaddr *url.URL, creds device.Credentials, logger logging.Logger) (CameraInfo, error) {
 	var zero CameraInfo
 	// Fetch device information (manufacturer, serial number, etc.)
-	deviceInfo, err := dev.GetDeviceInformation()
+	resp, err := dev.GetDeviceInformation()
 	if err != nil {
 		return zero, fmt.Errorf("failed to read device information response body: %w", err)
 	}
+	logger.Debugf("ip: %s GetCapabilities: DeviceInfo: %#v", xaddr, dev)
 
 	// Call the ONVIF Media service to get the available media profiles using the same device instance
 	rtspURLs, err := GetRTSPStreamURIsFromProfiles(dev, creds, logger)
@@ -165,11 +167,11 @@ func GetCameraInfo(dev OnvifDevice, xaddr *url.URL, creds device.Credentials, lo
 	cameraInfo := CameraInfo{
 		WSDiscoveryXAddr: xaddr.Host,
 		RTSPURLs:         rtspURLs,
-		Manufacturer:     deviceInfo.Body.GetDeviceInformationResponse.Manufacturer,
-		Model:            deviceInfo.Body.GetDeviceInformationResponse.Model,
-		SerialNumber:     deviceInfo.Body.GetDeviceInformationResponse.SerialNumber,
-		FirmwareVersion:  deviceInfo.Body.GetDeviceInformationResponse.FirmwareVersion,
-		HardwareId:       deviceInfo.Body.GetDeviceInformationResponse.HardwareId,
+		Manufacturer:     resp.Manufacturer,
+		Model:            resp.Model,
+		SerialNumber:     resp.SerialNumber,
+		FirmwareVersion:  resp.FirmwareVersion,
+		HardwareID:       resp.HardwareID,
 	}
 
 	return cameraInfo, nil
@@ -185,10 +187,10 @@ func GetRTSPStreamURIsFromProfiles(dev OnvifDevice, creds device.Credentials, lo
 	// Resultant slice of RTSP URIs
 	var rtspUris []string
 	// Iterate over all profiles and get the RTSP stream URI for each one
-	for _, profile := range resp.Body.GetProfilesResponse.Profiles {
-		uri, err := dev.GetStreamUri(profile, creds)
+	for _, profile := range resp.Profiles {
+		uri, err := dev.GetStreamURI(profile, creds)
 		if err != nil {
-			logger.Warnf(err.Error())
+			logger.Warn(err.Error())
 			continue
 		}
 

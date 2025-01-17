@@ -1,5 +1,6 @@
-// inspired by https://github.com/use-go/onvif
 package viamonvif
+
+// inspired by https://github.com/use-go/onvif
 
 import (
 	"errors"
@@ -8,8 +9,8 @@ import (
 	"os"
 	"time"
 
-	// TODO: change to use the google uuid lib
 	"github.com/gofrs/uuid"
+	"go.viam.com/rdk/logging"
 	"golang.org/x/net/ipv4"
 )
 
@@ -32,41 +33,51 @@ var template = `<?xml version="1.0" encoding="UTF-8"?>
  </e:Body>
 </e:Envelope>`
 
-func SendProbe(interfaceName string) ([]string, error) {
-	msg := fmt.Sprintf(template, uuid.Must(uuid.NewV4()).String())
-	return sendUDPMulticast(msg, interfaceName)
-}
+var (
+	port = 3702
+	//nolint: mnd
+	group        = net.IPv4(239, 255, 255, 250)
+	multicastTTL = 2
+)
 
-func sendUDPMulticast(msg string, interfaceName string) ([]string, error) {
+// SendProbe makes a WS-Discovery Probe call.
+func SendProbe(interfaceName string, logger logging.Logger) ([]string, error) {
+	logger.Debug("Starting SendProbe")
+	msg := fmt.Sprintf(template, uuid.Must(uuid.NewV4()).String())
+	logger.Debug("listening on udp4 0.0.0.0:0")
 	c, err := net.ListenPacket("udp4", "0.0.0.0:0")
 	if err != nil {
 		return nil, err
 	}
 	defer c.Close()
 
+	logger.Debugf("looking up interface %s\n", interfaceName)
 	iface, err := net.InterfaceByName(interfaceName)
 	if err != nil {
 		return nil, err
 	}
 
 	p := ipv4.NewPacketConn(c)
-	group := net.IPv4(239, 255, 255, 250)
+
 	if err := p.JoinGroup(iface, &net.UDPAddr{IP: group}); err != nil {
 		return nil, err
 	}
 
-	dst := &net.UDPAddr{IP: group, Port: 3702}
+	dst := &net.UDPAddr{IP: group, Port: port}
+	logger.Debugf("SendProbe sending message on interface %s, multicast: %s\n", interfaceName, dst.String())
+	logger.Debug(msg)
 	data := []byte(msg)
-	for _, ifi := range []*net.Interface{iface} {
-		if err := p.SetMulticastInterface(ifi); err != nil {
-			return nil, err
-		}
-		p.SetMulticastTTL(2)
-		if _, err := p.WriteTo(data, nil, dst); err != nil {
-			return nil, err
-		}
+	if err := p.SetMulticastInterface(iface); err != nil {
+		return nil, err
+	}
+	if err := p.SetMulticastTTL(multicastTTL); err != nil {
+		return nil, err
+	}
+	if _, err := p.WriteTo(data, nil, dst); err != nil {
+		return nil, err
 	}
 
+	//nolint:mnd
 	if err := p.SetReadDeadline(time.Now().Add(time.Second * 2)); err != nil {
 		return nil, err
 	}

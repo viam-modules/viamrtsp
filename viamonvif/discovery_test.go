@@ -1,15 +1,12 @@
 package viamonvif
 
 import (
-	"bytes"
 	"errors"
-	"io"
-	"net/http"
 	"net/url"
 	"testing"
 
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
-	"github.com/viam-modules/viamrtsp/viamonvif/media"
+	"github.com/viam-modules/viamrtsp/viamonvif/xsd/onvif"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/test"
 )
@@ -20,56 +17,37 @@ func NewMockDevice() *MockDevice {
 	return &MockDevice{}
 }
 
-func (m *MockDevice) CallMethod(request interface{}) (*http.Response, error) {
-	switch request.(type) {
-	case device.GetDeviceInformation:
-		body := `<Envelope>
-				<Body>
-					<GetDeviceInformationResponse>
-						<Manufacturer>Evil Inc.</Manufacturer>
-						<Model>Doom Ray Camera of Certain Annihilation</Model>
-						<SerialNumber>44444444</SerialNumber>
-					</GetDeviceInformationResponse>
-				</Body>
-			</Envelope>`
-		return &http.Response{
-			Body: io.NopCloser(bytes.NewReader([]byte(body))),
-		}, nil
+func (m *MockDevice) GetDeviceInformation() (device.GetDeviceInformationResponse, error) {
+	return device.GetDeviceInformationResponse{
+		Manufacturer: "Evil Inc.",
+		Model:        "Doom Ray Camera of Certain Annihilation",
+		SerialNumber: "44444444",
+	}, nil
+}
 
-	case media.GetProfiles:
-		body := `<Envelope>
-				<Body>
-					<GetProfilesResponse>
-						<Profiles>
-							<Profile>
-								<Token>profile1</Token>
-								<Name>Main Profile</Name>
-							</Profile>
-						</Profiles>
-					</GetProfilesResponse>
-				</Body>
-			</Envelope>`
-		return &http.Response{
-			Body: io.NopCloser(bytes.NewReader([]byte(body))),
-		}, nil
+func (m *MockDevice) GetProfiles() (device.GetProfilesResponse, error) {
+	return device.GetProfilesResponse{
+		Profiles: []onvif.Profile{
+			{
+				Token: "profile1",
+				Name:  "Main Profile",
+			},
+		},
+	}, nil
+}
 
-	case media.GetStreamUri:
-		body := `<Envelope>
-				<Body>
-					<GetStreamUriResponse>
-						<MediaUri>
-							<Uri>rtsp://192.168.1.100/stream</Uri>
-						</MediaUri>
-					</GetStreamUriResponse>
-				</Body>
-			</Envelope>`
-		return &http.Response{
-			Body: io.NopCloser(bytes.NewReader([]byte(body))),
-		}, nil
-
-	default:
-		return nil, errors.New("unsupported request")
+func (m *MockDevice) GetStreamURI(profile onvif.Profile, creds device.Credentials) (*url.URL, error) {
+	if creds.User != "username" || creds.Pass != "password" {
+		return nil, errors.New("invalid mock credentials")
 	}
+	if profile.Token != "profile1" || profile.Name != "Main Profile" {
+		return nil, errors.New("invalid mock profile")
+	}
+	u, err := url.Parse("rtsp://192.168.1.100/stream")
+	if err != nil {
+		return nil, err
+	}
+	return u, nil
 }
 
 func TestGetCameraInfo(t *testing.T) {
@@ -79,7 +57,7 @@ func TestGetCameraInfo(t *testing.T) {
 
 		uri, err := url.Parse("192.168.1.100")
 		test.That(t, err, test.ShouldBeNil)
-		cameraInfo, err := GetCameraInfo(mockDevice, uri, Credentials{User: "username", Pass: "password"}, logger)
+		cameraInfo, err := GetCameraInfo(mockDevice, uri, device.Credentials{User: "username", Pass: "password"}, logger)
 		test.That(t, err, test.ShouldBeNil)
 		test.That(t, cameraInfo.Manufacturer, test.ShouldEqual, "Evil Inc.")
 		test.That(t, cameraInfo.Model, test.ShouldEqual, "Doom Ray Camera of Certain Annihilation")
@@ -90,7 +68,7 @@ func TestGetCameraInfo(t *testing.T) {
 		t.Run("GetRTSPStreamURLs with credentials", func(t *testing.T) {
 			uri, err := url.Parse("192.168.1.100")
 			test.That(t, err, test.ShouldBeNil)
-			cameraInfo, err := GetCameraInfo(mockDevice, uri, Credentials{User: "username", Pass: "password"}, logger)
+			cameraInfo, err := GetCameraInfo(mockDevice, uri, device.Credentials{User: "username", Pass: "password"}, logger)
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, len(cameraInfo.RTSPURLs), test.ShouldEqual, 1)
 			test.That(t, cameraInfo.RTSPURLs[0], test.ShouldEqual, "rtsp://username:password@192.168.1.100/stream")
@@ -98,7 +76,7 @@ func TestGetCameraInfo(t *testing.T) {
 		t.Run("GetRTSPStreamURLs without credentials", func(t *testing.T) {
 			uri, err := url.Parse("192.168.1.100")
 			test.That(t, err, test.ShouldBeNil)
-			cameraInfo, err := GetCameraInfo(mockDevice, uri, Credentials{}, logger)
+			cameraInfo, err := GetCameraInfo(mockDevice, uri, device.Credentials{}, logger)
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, len(cameraInfo.RTSPURLs), test.ShouldEqual, 1)
 			test.That(t, cameraInfo.RTSPURLs[0], test.ShouldEqual, "rtsp://192.168.1.100/stream")

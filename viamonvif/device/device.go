@@ -1,4 +1,6 @@
+// Package device allows communication with an onvif device
 // inspired by https://github.com/use-go/onvif
+//nolint: revive
 package device
 
 import (
@@ -9,12 +11,10 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 
 	"github.com/beevik/etree"
 	"github.com/viam-modules/viamrtsp/viamonvif/gosoap"
-	"github.com/viam-modules/viamrtsp/viamonvif/media"
 	"github.com/viam-modules/viamrtsp/viamonvif/xsd/onvif"
 	"go.viam.com/rdk/logging"
 )
@@ -24,7 +24,7 @@ const (
 	streamSetupProtocol  = "RTSP"
 )
 
-// Xlmns XML Scheam
+// Xlmns XML Scheam.
 var Xlmns = map[string]string{
 	"onvif":   "http://www.onvif.org/ver10/schema",
 	"tds":     "http://www.onvif.org/ver10/device/wsdl",
@@ -43,36 +43,9 @@ var Xlmns = map[string]string{
 	"wsaw":    "http://www.w3.org/2006/05/addressing/wsdl",
 }
 
-// DeviceType alias for int
-type DeviceType int
-
-// Onvif Device Tyoe
-const (
-	NVD DeviceType = iota
-	NVS
-	NVA
-	NVT
-)
-
-func (devType DeviceType) String() string {
-	stringRepresentation := []string{
-		"NetworkVideoDisplay",
-		"NetworkVideoStorage",
-		"NetworkVideoAnalytics",
-		"NetworkVideoTransmitter",
-	}
-	i := uint8(devType)
-	switch {
-	case i <= uint8(NVT):
-		return stringRepresentation[i]
-	default:
-		return strconv.Itoa(int(i))
-	}
-}
-
 // Device for a new device of onvif and DeviceInfo
 // struct represents an abstract ONVIF device.
-// It contains methods, which helps to communicate with ONVIF device
+// It contains methods, which helps to communicate with ONVIF device.
 type Device struct {
 	xaddr     *url.URL
 	logger    logging.Logger
@@ -84,10 +57,29 @@ type DeviceParams struct {
 	Xaddr      *url.URL
 	Username   string
 	Password   string
-	HttpClient *http.Client
+	HTTPClient *http.Client
 }
 
-// NewDevice function construct a ONVIF Device entity
+type GetProfiles struct {
+	XMLName string `xml:"trt:GetProfiles"`
+}
+
+type GetStreamURI struct {
+	XMLName      string               `xml:"trt:GetStreamUri"`
+	StreamSetup  onvif.StreamSetup    `xml:"trt:StreamSetup"`
+	ProfileToken onvif.ReferenceToken `xml:"trt:ProfileToken"`
+}
+
+type GetDeviceInformation struct {
+	XMLName string `xml:"tds:GetDeviceInformation"`
+}
+
+type GetCapabilities struct {
+	XMLName  string                   `xml:"tds:GetCapabilities"`
+	Category onvif.CapabilityCategory `xml:"tds:Category"`
+}
+
+// NewDevice function construct a ONVIF Device entity.
 func NewDevice(params DeviceParams, logger logging.Logger) (*Device, error) {
 	dev := &Device{
 		xaddr:     params.Xaddr,
@@ -96,8 +88,8 @@ func NewDevice(params DeviceParams, logger logging.Logger) (*Device, error) {
 		endpoints: map[string]string{"device": params.Xaddr.String()},
 	}
 
-	if dev.params.HttpClient == nil {
-		dev.params.HttpClient = new(http.Client)
+	if dev.params.HTTPClient == nil {
+		dev.params.HTTPClient = new(http.Client)
 	}
 
 	data, err := dev.callDevice(GetCapabilities{Category: "All"})
@@ -118,8 +110,8 @@ func NewDevice(params DeviceParams, logger logging.Logger) (*Device, error) {
 		dev.logger.Debugf("%s: %s", s.Parent().Tag, s.Text())
 		dev.endpoints[strings.ToLower(s.Parent().Tag)] = s.Text()
 	}
-	extension_services := doc.FindElements("./Envelope/Body/GetCapabilitiesResponse/Capabilities/Extension/*/XAddr")
-	for i, s := range extension_services {
+	extensionServices := doc.FindElements("./Envelope/Body/GetCapabilitiesResponse/Capabilities/Extension/*/XAddr")
+	for i, s := range extensionServices {
 		if i == 0 {
 			dev.logger.Debug("GetCapabilities extension services:")
 		}
@@ -130,56 +122,59 @@ func NewDevice(params DeviceParams, logger logging.Logger) (*Device, error) {
 	return dev, nil
 }
 
-// DeviceInfo is the schema the GetDeviceInformation response is formatted in.
-type DeviceInfo struct {
+type GetDeviceInformationResponse struct {
+	Manufacturer    string `xml:"Manufacturer"`
+	Model           string `xml:"Model"`
+	FirmwareVersion string `xml:"FirmwareVersion"`
+	SerialNumber    string `xml:"SerialNumber"`
+	HardwareID      string `xml:"HardwareId"`
+}
+
+type GetDeviceInformationResponseEnvelope struct {
 	XMLName xml.Name `xml:"Envelope"`
 	Body    struct {
-		GetDeviceInformationResponse struct {
-			Manufacturer    string `xml:"Manufacturer"`
-			Model           string `xml:"Model"`
-			FirmwareVersion string `xml:"FirmwareVersion"`
-			SerialNumber    string `xml:"SerialNumber"`
-			HardwareId      string `xml:"HardwareId"`
-		} `xml:"GetDeviceInformationResponse"`
+		GetDeviceInformationResponse GetDeviceInformationResponse `xml:"GetDeviceInformationResponse"`
 	} `xml:"Body"`
 }
 
-func (dev *Device) GetDeviceInformation() (DeviceInfo, error) {
-	var zero DeviceInfo
+func (dev *Device) GetDeviceInformation() (GetDeviceInformationResponse, error) {
+	var zero GetDeviceInformationResponse
 	b, err := dev.callMethodDo(dev.endpoints["device"], GetDeviceInformation{})
 	if err != nil {
 		return zero, fmt.Errorf("failed to get device information: %w", err)
 	}
 	dev.logger.Debugf("GetDeviceInformation response body: %s", string(b))
 
-	var resp DeviceInfo
+	var resp GetDeviceInformationResponseEnvelope
 	err = xml.NewDecoder(bytes.NewReader(b)).Decode(&resp)
 	if err != nil {
 		return zero, fmt.Errorf("failed to decode device information response: %w", err)
 	}
-	return resp, nil
+	dev.logger.Debugf("GetDeviceInformation decoded: %#v", resp.Body.GetDeviceInformationResponse)
+	return resp.Body.GetDeviceInformationResponse, nil
 }
 
-// GetProfilesResponse is the schema the GetProfiles response is formatted in.
 type GetProfilesResponse struct {
+	Profiles []onvif.Profile `xml:"Profiles"`
+}
+
+type GetProfilesResponseEnvelope struct {
 	XMLName xml.Name `xml:"Envelope"`
 	Body    struct {
-		GetProfilesResponse struct {
-			Profiles []onvif.Profile `xml:"Profiles"`
-		} `xml:"GetProfilesResponse"`
+		GetProfilesResponse GetProfilesResponse `xml:"GetProfilesResponse"`
 	} `xml:"Body"`
 }
 
 func (dev *Device) GetProfiles() (GetProfilesResponse, error) {
 	var zero GetProfilesResponse
-	getProfiles := media.GetProfiles{}
+	getProfiles := GetProfiles{}
 	b, err := dev.callMedia(getProfiles)
 	if err != nil {
 		return zero, fmt.Errorf("failed to get media profiles: %w", err)
 	}
 
 	dev.logger.Debugf("GetProfiles response body: %s", b)
-	var resp GetProfilesResponse
+	var resp GetProfilesResponseEnvelope
 	err = xml.NewDecoder(bytes.NewReader(b)).Decode(&resp)
 	if err != nil {
 		return zero, fmt.Errorf("failed to decode media profiles response: %w", err)
@@ -195,7 +190,8 @@ func (dev *Device) GetProfiles() (GetProfilesResponse, error) {
 		dev.logger.Debugf("Profile %d: Token=%s, Name=%s", i, profile.Token, profile.Name)
 	}
 
-	return resp, nil
+	dev.logger.Debugf("GetProfiles decoded: %#v", resp.Body.GetProfilesResponse)
+	return resp.Body.GetProfilesResponse, nil
 }
 
 // getStreamURIResponse is the schema the GetStreamUri response is formatted in.
@@ -213,16 +209,15 @@ type Credentials struct {
 	Pass string `json:"pass"`
 }
 
-func (dev *Device) GetStreamUri(profile onvif.Profile, creds Credentials) (*url.URL, error) {
-	dev.logger.Debugf("Using profile token and profile: %s %#v", profile.Token, profile)
-	body, err := dev.callMedia(media.GetStreamUri{
+func (dev *Device) GetStreamURI(profile onvif.Profile, creds Credentials) (*url.URL, error) {
+	dev.logger.Debugf("GetStreamUri token: %s, profile: %#v", profile.Token, profile)
+	body, err := dev.callMedia(GetStreamURI{
 		StreamSetup: onvif.StreamSetup{
 			Stream:    onvif.StreamType(streamTypeRTPUnicast),
 			Transport: onvif.Transport{Protocol: streamSetupProtocol},
 		},
 		ProfileToken: profile.Token,
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -230,10 +225,10 @@ func (dev *Device) GetStreamUri(profile onvif.Profile, creds Credentials) (*url.
 
 	var streamURI getStreamURIResponse
 	if err := xml.NewDecoder(bytes.NewReader(body)).Decode(&streamURI); err != nil {
-		return nil, fmt.Errorf("Failed to get RTSP URL for profile %s: %v", profile.Token, err)
+		return nil, fmt.Errorf("failed to get RTSP URL for profile %s: %w", profile.Token, err)
 	}
 
-	dev.logger.Debugf("stream uri response for profile %s: %v: ", profile.Token, streamURI)
+	dev.logger.Debugf("GetStreamUriResponse decoded %v: ", profile.Token, streamURI)
 
 	uriStr := string(streamURI.Body.GetStreamURIResponse.MediaURI.Uri)
 	if uriStr == "" {
@@ -242,7 +237,7 @@ func (dev *Device) GetStreamUri(profile onvif.Profile, creds Credentials) (*url.
 
 	uri, err := url.Parse(uriStr)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to parse URI %s: %v", uriStr, err)
+		return nil, fmt.Errorf("failed to parse URI %s: %w", uriStr, err)
 	}
 
 	if creds.User != "" || creds.Pass != "" {
@@ -251,55 +246,32 @@ func (dev *Device) GetStreamUri(profile onvif.Profile, creds Credentials) (*url.
 	return uri, nil
 }
 
-// func (dev *Device) addEndpoint(Key, Value string) {
-// 	// Replace host with host from device params.
-// 	// if u, err := url.Parse(Value); err == nil {
-// 	// 	u.Host = dev.host
-// 	// 	Value = u.String()
-// 	// }
-
-// 	dev.endpoints[strings.ToLower(Key)] = Value
-// }
-
-// GetEndpoint returns specific ONVIF service endpoint address
+// GetEndpoint returns specific ONVIF service endpoint address.
 func (dev *Device) GetEndpoint(name string) string {
 	return dev.endpoints[name]
 }
 
-// getEndpoint functions get the target service endpoint in a better way
-func (dev Device) getEndpoint(endpoint string) (string, error) {
-	// common condition, endpointMark in map we use this.
-	if endpointURL, ok := dev.endpoints[endpoint]; ok {
-		return endpointURL, nil
-	}
-
-	//but ,if we have endpoint like event、analytic
-	//and sametime the Targetkey like : events、analytics
-	//we use fuzzy way to find the best match url
-	var endpointURL string
-	for targetKey := range dev.endpoints {
-		if strings.Contains(targetKey, endpoint) {
-			endpointURL = dev.endpoints[targetKey]
-			return endpointURL, nil
-		}
-	}
-	return endpointURL, errors.New("target endpoint service not found")
-}
-
-// CallMethod functions call an method, defined <method> struct.
-// You should use Authenticate method to call authorized requests.
-// func (dev Device) CallMethod(method interface{}) ([]byte, error) {
-// 	pkgPath := strings.Split(reflect.TypeOf(method).PkgPath(), "/")
-// 	pkg := strings.ToLower(pkgPath[len(pkgPath)-1])
-
-// 	endpoint, err := dev.getEndpoint(pkg)
-// 	if err != nil {
-// 		return nil, err
+// getEndpoint functions get the target service endpoint in a better way.
+// func (dev Device) getEndpoint(endpoint string) (string, error) {
+// 	// common condition, endpointMark in map we use this.
+// 	if endpointURL, ok := dev.endpoints[endpoint]; ok {
+// 		return endpointURL, nil
 // 	}
-// 	return dev.callMethodDo(endpoint, method)
+
+// 	// but ,if we have endpoint like event、analytic
+// 	// and sametime the Targetkey like : events、analytics
+// 	// we use fuzzy way to find the best match url
+// 	var endpointURL string
+// 	for targetKey := range dev.endpoints {
+// 		if strings.Contains(targetKey, endpoint) {
+// 			endpointURL = dev.endpoints[targetKey]
+// 			return endpointURL, nil
+// 		}
+// 	}
+// 	return endpointURL, errors.New("target endpoint service not found")
 // }
 
-// CallMethod functions call an method, defined <method> struct with authentication data
+// CallMethod functions call an method, defined <method> struct with authentication data.
 func (dev Device) callMedia(method interface{}) ([]byte, error) {
 	return dev.callMethodDo(dev.endpoints["media"], method)
 }
@@ -319,21 +291,36 @@ func (dev Device) callMethodDo(endpoint string, method interface{}) ([]byte, err
 		return nil, err
 	}
 
-	soap := gosoap.NewEmptySOAP()
-	soap.AddBodyContent(doc.Root())
-	soap.AddRootNamespaces(Xlmns)
-	soap.AddAction()
-
-	//Auth Handling
-	if dev.params.Username != "" || dev.params.Password != "" {
-		soap.AddWSSecurity(dev.params.Username, dev.params.Password)
+	soap, err := gosoap.NewEmptySOAP()
+	if err != nil {
+		return nil, err
 	}
 
-	return SendSoap(dev.params.HttpClient, endpoint, soap.String())
+	if err := soap.AddBodyContent(doc.Root()); err != nil {
+		return nil, err
+	}
+	for key, value := range Xlmns {
+		if err := soap.AddRootNamespace(key, value); err != nil {
+			return nil, err
+		}
+	}
+	if err := soap.AddAction(); err != nil {
+		return nil, err
+	}
+
+	if dev.params.Username != "" || dev.params.Password != "" {
+		if err := soap.AddWSSecurity(dev.params.Username, dev.params.Password); err != nil {
+			return nil, err
+		}
+	}
+
+	return dev.sendSoap(endpoint, soap.String())
 }
 
-func SendSoap(httpClient *http.Client, endpoint, message string) ([]byte, error) {
-	resp, err := httpClient.Post(endpoint, "application/soap+xml; charset=utf-8", bytes.NewBufferString(message))
+func (dev *Device) sendSoap(endpoint, message string) ([]byte, error) {
+	contentType := "application/soap+xml; charset=utf-8"
+	//nolint: noctx
+	resp, err := dev.params.HTTPClient.Post(endpoint, contentType, bytes.NewBufferString(message))
 	if err != nil {
 		return nil, err
 	}
