@@ -1,6 +1,6 @@
 // Package device allows communication with an onvif device
 // inspired by https://github.com/use-go/onvif
-//nolint: revive
+// nolint: revive
 package device
 
 import (

@@ -1,5 +1,5 @@
 // Package viamonvif provides ONVIF integration to the viamrtsp module
-//nolint: revive
+// nolint: revive
 package viamonvif
 
 import (
