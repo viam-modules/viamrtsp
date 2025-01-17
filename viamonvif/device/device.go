@@ -1,6 +1,5 @@
 // Package device allows communication with an onvif device
 // inspired by https://github.com/use-go/onvif
-// nolint: revive
 package device
 
 import (
@@ -49,38 +48,43 @@ var Xlmns = map[string]string{
 type Device struct {
 	xaddr     *url.URL
 	logger    logging.Logger
-	params    DeviceParams
+	params    Params
 	endpoints map[string]string
 }
 
-type DeviceParams struct {
+// Params configures the device connection.
+type Params struct {
 	Xaddr      *url.URL
 	Username   string
 	Password   string
 	HTTPClient *http.Client
 }
 
+// GetProfiles is a request to the GetProfiles onvif endpoint.
 type GetProfiles struct {
 	XMLName string `xml:"trt:GetProfiles"`
 }
 
+// GetStreamURI is a request to the GetStreamURI onvif endpoint.
 type GetStreamURI struct {
 	XMLName      string               `xml:"trt:GetStreamUri"`
 	StreamSetup  onvif.StreamSetup    `xml:"trt:StreamSetup"`
 	ProfileToken onvif.ReferenceToken `xml:"trt:ProfileToken"`
 }
 
+// GetDeviceInformation is a request to the GetDeviceInformation onvif endpoint.
 type GetDeviceInformation struct {
 	XMLName string `xml:"tds:GetDeviceInformation"`
 }
 
+// GetCapabilities is a request to the GetCapabilities onvif endpoint.
 type GetCapabilities struct {
 	XMLName  string                   `xml:"tds:GetCapabilities"`
 	Category onvif.CapabilityCategory `xml:"tds:Category"`
 }
 
 // NewDevice function construct a ONVIF Device entity.
-func NewDevice(params DeviceParams, logger logging.Logger) (*Device, error) {
+func NewDevice(params Params, logger logging.Logger) (*Device, error) {
 	dev := &Device{
 		xaddr:     params.Xaddr,
 		logger:    logger,
@@ -122,6 +126,7 @@ func NewDevice(params DeviceParams, logger logging.Logger) (*Device, error) {
 	return dev, nil
 }
 
+// GetDeviceInformationResponse is the response to GetDeviceInformation.
 type GetDeviceInformationResponse struct {
 	Manufacturer    string `xml:"Manufacturer"`
 	Model           string `xml:"Model"`
@@ -130,6 +135,7 @@ type GetDeviceInformationResponse struct {
 	HardwareID      string `xml:"HardwareId"`
 }
 
+// GetDeviceInformationResponseEnvelope is the envelope of the GetDeviceInformationResponse.
 type GetDeviceInformationResponseEnvelope struct {
 	XMLName xml.Name `xml:"Envelope"`
 	Body    struct {
@@ -137,6 +143,7 @@ type GetDeviceInformationResponseEnvelope struct {
 	} `xml:"Body"`
 }
 
+// GetDeviceInformation returns device information.
 func (dev *Device) GetDeviceInformation() (GetDeviceInformationResponse, error) {
 	var zero GetDeviceInformationResponse
 	b, err := dev.callMethodDo(dev.endpoints["device"], GetDeviceInformation{})
@@ -154,10 +161,12 @@ func (dev *Device) GetDeviceInformation() (GetDeviceInformationResponse, error) 
 	return resp.Body.GetDeviceInformationResponse, nil
 }
 
+// GetProfilesResponse is the body of the response to the GetProfiles endpoint.
 type GetProfilesResponse struct {
 	Profiles []onvif.Profile `xml:"Profiles"`
 }
 
+// GetProfilesResponseEnvelope is the envelope of the response to the GetProfiles endpoint.
 type GetProfilesResponseEnvelope struct {
 	XMLName xml.Name `xml:"Envelope"`
 	Body    struct {
@@ -165,6 +174,7 @@ type GetProfilesResponseEnvelope struct {
 	} `xml:"Body"`
 }
 
+// GetProfiles returns the device's profiles.
 func (dev *Device) GetProfiles() (GetProfilesResponse, error) {
 	var zero GetProfilesResponse
 	getProfiles := GetProfiles{}
@@ -194,7 +204,6 @@ func (dev *Device) GetProfiles() (GetProfilesResponse, error) {
 	return resp.Body.GetProfilesResponse, nil
 }
 
-// getStreamURIResponse is the schema the GetStreamUri response is formatted in.
 type getStreamURIResponse struct {
 	XMLName xml.Name `xml:"Envelope"`
 	Body    struct {
@@ -204,11 +213,13 @@ type getStreamURIResponse struct {
 	} `xml:"Body"`
 }
 
+// Credentials contain an onvif device username and password.
 type Credentials struct {
 	User string `json:"user"`
 	Pass string `json:"pass"`
 }
 
+// GetStreamURI returns a device's stream URI for a given profile.
 func (dev *Device) GetStreamURI(profile onvif.Profile, creds Credentials) (*url.URL, error) {
 	dev.logger.Debugf("GetStreamUri token: %s, profile: %#v", profile.Token, profile)
 	body, err := dev.callMedia(GetStreamURI{
@@ -251,7 +262,6 @@ func (dev *Device) GetEndpoint(name string) string {
 	return dev.endpoints[name]
 }
 
-// CallMethod functions call an method, defined <method> struct with authentication data.
 func (dev Device) callMedia(method interface{}) ([]byte, error) {
 	return dev.callMethodDo(dev.endpoints["media"], method)
 }

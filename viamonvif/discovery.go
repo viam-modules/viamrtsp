@@ -1,14 +1,13 @@
 // Package viamonvif provides ONVIF integration to the viamrtsp module
-// nolint: revive
 package viamonvif
 
 import (
 	"context"
-	"encoding/xml"
 	"fmt"
+	"maps"
 	"net"
 	"net/url"
-	"strings"
+	"slices"
 
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"github.com/viam-modules/viamrtsp/viamonvif/xsd/onvif"
@@ -25,11 +24,30 @@ type OnvifDevice interface {
 
 // DiscoverCameras performs WS-Discovery
 // then uses ONVIF queries to get available RTSP addresses and supplementary info.
-func DiscoverCameras(creds []device.Credentials, manualXAddrs []*url.URL, logger logging.Logger) (*CameraInfoList, error) {
-	var discoveredCameras []CameraInfo
-	ctx, cancelFunc := context.WithCancel(context.Background())
-	defer cancelFunc()
+func DiscoverCameras(
+	ctx context.Context,
+	creds []device.Credentials,
+	manualXAddrs []*url.URL,
+	logger logging.Logger,
+) (*CameraInfoList, error) {
+	var ret []CameraInfo
+	discovered, err := discoverOnAllInterfaces(ctx, manualXAddrs, logger)
+	if err != nil {
+		return nil, err
+	}
 
+	for _, xaddr := range discovered {
+		cameraInfo, err := DiscoverCameraInfo(ctx, xaddr, creds, logger)
+		if err != nil {
+			logger.Warnf("failed to connect to ONVIF device %v", err)
+			continue
+		}
+		ret = append(ret, cameraInfo)
+	}
+	return &CameraInfoList{Cameras: ret}, nil
+}
+
+func discoverOnAllInterfaces(ctx context.Context, manualXAddrs []*url.URL, logger logging.Logger) ([]*url.URL, error) {
 	logger.Debug("WS-Discovery start")
 	ifaces, err := net.Interfaces()
 	if err != nil {
@@ -51,16 +69,7 @@ func DiscoverCameras(creds []device.Credentials, manualXAddrs []*url.URL, logger
 		}
 	}
 	logger.Debug("WS-Discovery complete")
-
-	for _, xaddr := range discovered {
-		cameraInfo, err := DiscoverCamerasOnXAddr(ctx, xaddr, creds, logger)
-		if err != nil {
-			logger.Warnf("failed to connect to ONVIF device %v", err)
-			continue
-		}
-		discoveredCameras = append(discoveredCameras, cameraInfo)
-	}
-	return &CameraInfoList{Cameras: discoveredCameras}, nil
+	return slices.Collect(maps.Values(discovered)), nil
 }
 
 // CameraInfo holds both the RTSP URLs and supplementary camera details.
@@ -79,7 +88,10 @@ type CameraInfoList struct {
 	Cameras []CameraInfo `json:"cameras"`
 }
 
-func DiscoverCamerasOnXAddr(
+// DiscoverCameraInfo discovers camera information on a given uri
+// using onvif
+// the xaddr should be the URL of the onvif camera's device service URI.
+func DiscoverCameraInfo(
 	ctx context.Context,
 	xaddr *url.URL,
 	creds []device.Credentials,
@@ -92,7 +104,7 @@ func DiscoverCamerasOnXAddr(
 			return zero, fmt.Errorf("context canceled while connecting to ONVIF device: %s", xaddr)
 		}
 		// This calls GetCapabilities
-		dev, err := device.NewDevice(device.DeviceParams{
+		dev, err := device.NewDevice(device.Params{
 			Xaddr:    xaddr,
 			Username: cred.User,
 			Password: cred.Pass,
@@ -111,41 +123,6 @@ func DiscoverCamerasOnXAddr(
 		return cameraInfo, nil
 	}
 	return zero, fmt.Errorf("no credentials matched IP %s", xaddr)
-}
-
-// extractXAddrsFromProbeMatch extracts XAddrs from the WS-Discovery ProbeMatch response.
-func extractXAddrsFromProbeMatch(response string, logger logging.Logger) []*url.URL {
-	type ProbeMatch struct {
-		XMLName xml.Name `xml:"Envelope"`
-		Body    struct {
-			ProbeMatches struct {
-				ProbeMatch []struct {
-					XAddrs string `xml:"XAddrs"`
-				} `xml:"ProbeMatch"`
-			} `xml:"ProbeMatches"`
-		} `xml:"Body"`
-	}
-
-	var probeMatch ProbeMatch
-	err := xml.NewDecoder(strings.NewReader(response)).Decode(&probeMatch)
-	if err != nil {
-		logger.Warnf("error unmarshalling ONVIF discovery xml response: %w\nFull xml resp: %s", err, response)
-	}
-
-	xaddrs := []*url.URL{}
-	for _, match := range probeMatch.Body.ProbeMatches.ProbeMatch {
-		for _, xaddr := range strings.Split(match.XAddrs, " ") {
-			parsedURL, err := url.Parse(xaddr)
-			if err != nil {
-				logger.Warnf("failed to parse XAddr %s: %w", xaddr, err)
-				continue
-			}
-
-			xaddrs = append(xaddrs, parsedURL)
-		}
-	}
-
-	return xaddrs
 }
 
 // GetCameraInfo uses the ONVIF Media service to get the RTSP stream URLs and camera details.

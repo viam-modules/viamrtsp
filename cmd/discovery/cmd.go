@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -20,7 +21,7 @@ import (
 type Config struct {
 	// the device credentials to use when attempting to authenticate via onvif
 	Creds []device.Credentials `json:"creds"`
-	// the hosts (ip:port) to attempt to connect to as if they were returned from WS-Discovery
+	// the urls to attempt to connect to as if they were returned from WS-Discovery service as XAddrs
 	XAddrs []string `json:"xaddrs"`
 }
 
@@ -37,6 +38,7 @@ func main() {
 }
 
 func realMain() error {
+	ctx := context.Background()
 	opts, err := parseOpts()
 	if err != nil {
 		return err
@@ -60,7 +62,7 @@ func realMain() error {
 	}
 
 	urls := slices.Collect(maps.Values(xaddrs))
-	list, err := viamonvif.DiscoverCameras(opts.config.Creds, urls, logger)
+	list, err := viamonvif.DiscoverCameras(ctx, opts.config.Creds, urls, logger)
 	if err != nil {
 		return err
 	}

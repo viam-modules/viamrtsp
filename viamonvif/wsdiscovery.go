@@ -2,11 +2,13 @@ package viamonvif
 
 import (
 	"context"
+	"encoding/xml"
 	"fmt"
 	"maps"
 	"net"
 	"net/url"
 	"slices"
+	"strings"
 
 	"go.viam.com/rdk/logging"
 )
@@ -19,7 +21,8 @@ func WSDiscovery(ctx context.Context, logger logging.Logger, iface net.Interface
 		return nil, fmt.Errorf("WS-Discovery skipping interface %s: does not meet WS-Discovery requirements", iface.Name)
 	}
 	var discoveryResps []string
-	attempts := 3 // run ws-discovery probe 3 times due to sync flakiness between announcer and requester
+	// run ws-discovery probe 3 times due to sync flakiness between announcer and requester
+	attempts := 3
 	//nolint:intrange
 	for i := 0; i < attempts; i++ {
 		if ctx.Err() != nil {
@@ -54,6 +57,41 @@ func WSDiscovery(ctx context.Context, logger logging.Logger, iface net.Interface
 	}
 
 	return slices.Collect(maps.Values(xaddrsSet)), nil
+}
+
+// extractXAddrsFromProbeMatch extracts XAddrs from the WS-Discovery ProbeMatch response.
+func extractXAddrsFromProbeMatch(response string, logger logging.Logger) []*url.URL {
+	type ProbeMatch struct {
+		XMLName xml.Name `xml:"Envelope"`
+		Body    struct {
+			ProbeMatches struct {
+				ProbeMatch []struct {
+					XAddrs string `xml:"XAddrs"`
+				} `xml:"ProbeMatch"`
+			} `xml:"ProbeMatches"`
+		} `xml:"Body"`
+	}
+
+	var probeMatch ProbeMatch
+	err := xml.NewDecoder(strings.NewReader(response)).Decode(&probeMatch)
+	if err != nil {
+		logger.Warnf("error unmarshalling ONVIF discovery xml response: %w\nFull xml resp: %s", err, response)
+	}
+
+	xaddrs := []*url.URL{}
+	for _, match := range probeMatch.Body.ProbeMatches.ProbeMatch {
+		for _, xaddr := range strings.Split(match.XAddrs, " ") {
+			parsedURL, err := url.Parse(xaddr)
+			if err != nil {
+				logger.Warnf("failed to parse XAddr %s: %w", xaddr, err)
+				continue
+			}
+
+			xaddrs = append(xaddrs, parsedURL)
+		}
+	}
+
+	return xaddrs
 }
 
 // TODO(Nick S): What happens if we don't do this?
