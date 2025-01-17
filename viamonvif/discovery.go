@@ -8,10 +8,12 @@ import (
 	"net"
 	"net/url"
 	"slices"
+	"sync"
 
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"github.com/viam-modules/viamrtsp/viamonvif/xsd/onvif"
 	"go.viam.com/rdk/logging"
+	"go.viam.com/utils"
 )
 
 // OnvifDevice is an interface to abstract device methods used in the code.
@@ -31,17 +33,27 @@ func DiscoverCameras(
 	logger logging.Logger,
 ) (*CameraInfoList, error) {
 	var ret []CameraInfo
-	discovered, err := discoverOnAllInterfaces(ctx, manualXAddrs, logger)
+	discoveredXAddrs, err := discoverOnAllInterfaces(ctx, manualXAddrs, logger)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, xaddr := range discovered {
-		cameraInfo, err := DiscoverCameraInfo(ctx, xaddr, creds, logger)
-		if err != nil {
-			logger.Warnf("failed to connect to ONVIF device %v", err)
-			continue
-		}
+	var wg sync.WaitGroup
+	ch := make(chan CameraInfo, len(discoveredXAddrs))
+	wg.Add(len(discoveredXAddrs))
+	for _, xaddr := range discoveredXAddrs {
+		utils.ManagedGo(func() {
+			cameraInfo, err := DiscoverCameraInfo(ctx, xaddr, creds, logger)
+			if err != nil {
+				logger.Warnf("failed to connect to ONVIF device %w", err)
+				return
+			}
+			ch <- cameraInfo
+		}, wg.Done)
+	}
+	wg.Wait()
+	close(ch)
+	for cameraInfo := range ch {
 		ret = append(ret, cameraInfo)
 	}
 	return &CameraInfoList{Cameras: ret}, nil
@@ -54,16 +66,30 @@ func discoverOnAllInterfaces(ctx context.Context, manualXAddrs []*url.URL, logge
 		return nil, fmt.Errorf("failed to retrieve network interfaces: %w", err)
 	}
 
+	var wg sync.WaitGroup
+	ch := make(chan []*url.URL, len(ifaces))
+	wg.Add(len(ifaces))
+	for _, iface := range ifaces {
+		utils.ManagedGo(func() {
+			xaddrs, err := WSDiscovery(ctx, logger, iface)
+			if err != nil {
+				logger.Debugf("WS-Discovery skipping interface %s: due to error from SendProbe: %w", iface.Name, err)
+				return
+			}
+			ch <- xaddrs
+		}, wg.Done)
+	}
+	logger.Debug("WS-Discovery waiting for all interfaces to return results")
+	wg.Wait()
+
+	close(ch)
+	logger.Debug("WS-Discovery all interfaces have returned results")
+
 	discovered := map[string]*url.URL{}
 	for _, xaddr := range manualXAddrs {
 		discovered[xaddr.Host] = xaddr
 	}
-	for _, iface := range ifaces {
-		xaddrs, err := WSDiscovery(ctx, logger, iface)
-		if err != nil {
-			logger.Debugf("WS-Discovery skipping interface %s: due to error from SendProbe: %w", iface.Name, err)
-			continue
-		}
+	for xaddrs := range ch {
 		for _, xaddr := range xaddrs {
 			discovered[xaddr.Host] = xaddr
 		}
