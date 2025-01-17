@@ -26,7 +26,7 @@ const (
 	streamSetupProtocol  = "RTSP"
 )
 
-// Xlmns XML Scheam.
+// Xlmns XML Schema.
 var Xlmns = map[string]string{
 	"onvif":   "http://www.onvif.org/ver10/schema",
 	"tds":     "http://www.onvif.org/ver10/device/wsdl",
