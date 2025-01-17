@@ -1,11 +1,14 @@
 package viamrtsp
 
 /*
-#cgo pkg-config: libavutil libavcodec
+#cgo pkg-config: libavutil libavcodec libswscale
 #include <libavcodec/avcodec.h>
 #include <libavutil/error.h>
 #include <libavutil/opt.h>
 #include <libavutil/dict.h>
+#include <libavutil/frame.h>
+#include <libavutil/imgutils.h>
+#include <libswscale/swscale.h>
 #include <stdlib.h>
 */
 import "C"
@@ -23,6 +26,8 @@ import (
 type mimeHandler struct {
 	logger     logging.Logger
 	jpegEnc    *C.AVCodecContext
+	yuyvFrame  *C.AVFrame
+	yuyvSwsCtx *C.struct_SwsContext
 	currentPTS int
 	mu         sync.Mutex
 }
@@ -102,6 +107,68 @@ func (mh *mimeHandler) initJPEGEncoder(frame *C.AVFrame) error {
 	}
 	if res := C.avcodec_open2(mh.jpegEnc, codec, nil); res < 0 {
 		return newAvError(res, "failed to open MJPEG encoder")
+	}
+
+	return nil
+}
+
+func (mh *mimeHandler) convertYUYV(frame *C.AVFrame) ([]byte, camera.ImageMetadata, error) {
+	if mh.yuyvSwsCtx == nil || frame.width != mh.yuyvFrame.width || frame.height != mh.yuyvFrame.height {
+		if err := mh.initYUYVContext(frame); err != nil {
+			return nil, camera.ImageMetadata{}, err
+		}
+	}
+
+	// perform the conversion
+	res := C.sws_scale(
+		mh.yuyvSwsCtx,
+		(**C.uint8_t)(unsafe.Pointer(&frame.data[0])),
+		(*C.int)(unsafe.Pointer(&frame.linesize[0])),
+		0,
+		frame.height,
+		(**C.uint8_t)(unsafe.Pointer(&mh.yuyvFrame.data[0])),
+		(*C.int)(unsafe.Pointer(&mh.yuyvFrame.linesize[0])),
+	)
+	if res < 0 {
+		return nil, camera.ImageMetadata{}, newAvError(res, "failed to convert frame to YUYV")
+	}
+
+	yuyvBytes := C.GoBytes(unsafe.Pointer(mh.yuyvFrame.data[0]), C.int(mh.yuyvFrame.width*mh.yuyvFrame.height*2))
+
+	return yuyvBytes, camera.ImageMetadata{
+		MimeType: mimeTypeYUYV,
+	}, nil
+}
+
+func (mh *mimeHandler) initYUYVContext(frame *C.AVFrame) error {
+	mh.mu.Lock()
+	defer mh.mu.Unlock()
+	mh.logger.Info("creating YUYV sws cosntext with frame size: ", frame.width, "x", frame.height)
+	if mh.yuyvSwsCtx != nil {
+		C.sws_freeContext(mh.yuyvSwsCtx)
+	}
+	if mh.yuyvFrame != nil {
+		C.av_frame_free(&mh.yuyvFrame)
+	}
+	mh.yuyvFrame = C.av_frame_alloc()
+	if mh.yuyvFrame == nil {
+		return errors.New("failed to allocate YUYV frame")
+	}
+	mh.yuyvFrame.width = frame.width
+	mh.yuyvFrame.height = frame.height
+	mh.yuyvFrame.format = C.AV_PIX_FMT_YUYV422
+	if res := C.av_frame_get_buffer(mh.yuyvFrame, 32); res < 0 {
+		C.av_frame_free(&mh.yuyvFrame)
+		return newAvError(res, "failed to allocate buffer for YUYV frame")
+	}
+	mh.yuyvSwsCtx = C.sws_getContext(
+		frame.width, frame.height, C.AV_PIX_FMT_YUV420P,
+		frame.width, frame.height, C.AV_PIX_FMT_YUYV422,
+		C.SWS_FAST_BILINEAR, nil, nil, nil,
+	)
+	if mh.yuyvSwsCtx == nil {
+		C.av_frame_free(&mh.yuyvFrame)
+		return errors.New("failed to create YUYV converter")
 	}
 
 	return nil

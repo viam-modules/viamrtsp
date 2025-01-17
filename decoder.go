@@ -21,6 +21,7 @@ import (
 
 const (
 	yuv420SubsampleRatio = 2
+	mimeTypeYUYV         = "image/yuyv422"
 )
 
 // decoder is a generic FFmpeg decoder.
