@@ -2,63 +2,127 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
+	"fmt"
+	"log"
+	"maps"
+	"net/url"
 	"os"
+	"slices"
 
 	"github.com/viam-modules/viamrtsp/viamonvif"
+	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"go.viam.com/rdk/logging"
 )
 
+// Config for the disovery command.
+type Config struct {
+	// the device credentials to use when attempting to authenticate via onvif
+	Creds []device.Credentials `json:"creds"`
+	// the urls to attempt to connect to as if they were returned from WS-Discovery service as XAddrs
+	XAddrs []string `json:"xaddrs"`
+}
+
+type options struct {
+	config Config
+	debug  bool
+	output string
+}
+
 func main() {
-	err := realMain()
-	if err != nil {
-		panic(err)
+	if err := realMain(); err != nil {
+		log.Fatal(err.Error())
 	}
 }
 
 func realMain() error {
-	logger := logging.NewLogger("discovery")
-
-	debug := false
-	username := ""
-	password := ""
-	output := ""
-
-	flag.BoolVar(&debug, "debug", debug, "debug")
-	flag.StringVar(&username, "user", username, "username")
-	flag.StringVar(&password, "pass", password, "password")
-	flag.StringVar(&output, "o", output, "output file")
-
-	flag.Parse()
-
-	if debug {
-		logger.SetLevel(logging.DEBUG)
-	}
-
-	list, err := viamonvif.DiscoverCameras(username, password, logger, flag.Args())
+	ctx := context.Background()
+	opts, err := parseOpts()
 	if err != nil {
 		return err
 	}
 
-	for _, l := range list.Cameras {
-		logger.Infof("%s %s %s", l.Manufacturer, l.Model, l.SerialNumber)
-		for _, u := range l.RTSPURLs {
-			logger.Infof("\t%s", u)
-		}
+	var logger logging.Logger
+	if opts.debug {
+		logger = logging.NewDebugLogger("discovery")
+	} else {
+		logger = logging.NewLogger("discovery")
 	}
 
-	if output != "" {
+	xaddrs := map[string]*url.URL{}
+	for _, xaddr := range opts.config.XAddrs {
+		u, err := url.Parse(xaddr)
+		if err != nil {
+			logger.Warnf("invalid config xaddr: %s", xaddr)
+			continue
+		}
+		xaddrs[u.Host] = u
+	}
+
+	urls := slices.Collect(maps.Values(xaddrs))
+	list, err := viamonvif.DiscoverCameras(ctx, opts.config.Creds, urls, logger)
+	if err != nil {
+		return err
+	}
+
+	if opts.output != "" {
 		j, err := json.Marshal(list.Cameras)
 		if err != nil {
 			return err
 		}
 
 		//nolint:mnd
-		if err := os.WriteFile(output, j, 0o600); err != nil {
+		if err := os.WriteFile(opts.output, j, 0o600); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func parseOpts() (options, error) {
+	debug := false
+	genConfig := false
+	configFile := "./config.json"
+	output := "./output.json"
+	var zero options
+
+	flag.BoolVar(&debug, "debug", debug, "debug")
+	flag.BoolVar(&genConfig, "gen_config", genConfig, "generate config file template")
+	flag.StringVar(&configFile, "config", configFile, "path to json config file.")
+	flag.StringVar(&output, "output", output, "output file")
+	flag.Parse()
+
+	if genConfig {
+		b, err := json.Marshal(Config{XAddrs: []string{"192.168.1.1"}, Creds: []device.Credentials{{User: "username", Pass: "password"}}})
+		if err != nil {
+			return zero, err
+		}
+		if _, err := os.Stat(configFile); err == nil {
+			return zero, fmt.Errorf("can't create config file template as %s file or directory already exists", configFile)
+		}
+
+		//nolint:mnd
+		if err := os.WriteFile(configFile, b, 0o600); err != nil {
+			return zero, err
+		}
+		os.Exit(0)
+	}
+
+	configBytes, err := os.ReadFile(configFile)
+	var config Config
+	if err != nil {
+		return zero, err
+	}
+	if err := json.Unmarshal(configBytes, &config); err != nil {
+		return zero, err
+	}
+
+	return options{
+		debug:  debug,
+		output: output,
+		config: config,
+	}, nil
 }
