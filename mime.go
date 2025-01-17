@@ -26,6 +26,7 @@ import (
 )
 
 const (
+	yuyvMagicString    = "YUYV"
 	yuyvHeaderDimBytes = 4
 )
 
@@ -124,8 +125,12 @@ func (mh *mimeHandler) convertYUYV(frame *C.AVFrame) ([]byte, camera.ImageMetada
 			return nil, camera.ImageMetadata{}, err
 		}
 	}
-
-	// perform the conversion
+	if mh.yuyvSwsCtx == nil {
+		return nil, camera.ImageMetadata{}, errors.New("failed to create YUYV converter")
+	}
+	if mh.yuyvFrame == nil {
+		return nil, camera.ImageMetadata{}, errors.New("failed to create yuyv destination frame")
+	}
 	res := C.sws_scale(
 		mh.yuyvSwsCtx,
 		(**C.uint8_t)(unsafe.Pointer(&frame.data[0])),
@@ -138,7 +143,6 @@ func (mh *mimeHandler) convertYUYV(frame *C.AVFrame) ([]byte, camera.ImageMetada
 	if res < 0 {
 		return nil, camera.ImageMetadata{}, newAvError(res, "failed to convert frame to YUYV")
 	}
-
 	yuyvBytes := C.GoBytes(unsafe.Pointer(mh.yuyvFrame.data[0]), mh.yuyvFrame.width*mh.yuyvFrame.height*2)
 	header := packYUYVHeader(int(mh.yuyvFrame.width), int(mh.yuyvFrame.height))
 	// TODO(seanp): Figure out if this is memory efficient
@@ -189,9 +193,14 @@ func (mh *mimeHandler) close() {
 	}
 }
 
+// packYUYVHeader creates a header for YUYV data with the given width and height.
+// The header structure is as follows:
+// - "YUYV" (4 bytes): A fixed string indicating the format.
+// - Width (4 bytes): The width of the image, stored in big-endian format.
+// - Height (4 bytes): The height of the image, stored in big-endian format.
 func packYUYVHeader(width, height int) []byte {
 	var header bytes.Buffer
-	header.Write([]byte("YUYV"))
+	header.Write([]byte(yuyvMagicString))
 	tmp := make([]byte, yuyvHeaderDimBytes)
 	binary.BigEndian.PutUint32(tmp, uint32(width))
 	header.Write(tmp)
