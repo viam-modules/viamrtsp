@@ -28,6 +28,7 @@ import (
 const (
 	yuyvMagicString    = "YUYV"
 	yuyvHeaderDimBytes = 4
+	yuyvBytesPerPixel  = 2
 )
 
 type mimeHandler struct {
@@ -143,10 +144,13 @@ func (mh *mimeHandler) convertYUYV(frame *C.AVFrame) ([]byte, camera.ImageMetada
 	if res < 0 {
 		return nil, camera.ImageMetadata{}, newAvError(res, "failed to convert frame to YUYV")
 	}
-	yuyvBytes := C.GoBytes(unsafe.Pointer(mh.yuyvFrame.data[0]), mh.yuyvFrame.width*mh.yuyvFrame.height*2)
+	yuyvDataSize := int(mh.yuyvFrame.width) * int(mh.yuyvFrame.height) * yuyvBytesPerPixel
 	header := packYUYVHeader(int(mh.yuyvFrame.width), int(mh.yuyvFrame.height))
-	// TODO(seanp): Figure out if this is memory efficient
-	yuyvPacket := append(header, yuyvBytes...)
+	// Preallocate the final slice with the combined size of the header and the image data
+	yuyvPacket := make([]byte, len(header)+yuyvDataSize)
+	copy(yuyvPacket[0:], header)
+	// Copy the YUYV data directly into the preallocated slice
+	C.memcpy(unsafe.Pointer(&yuyvPacket[len(header)]), unsafe.Pointer(mh.yuyvFrame.data[0]), C.size_t(yuyvDataSize))
 
 	return yuyvPacket, camera.ImageMetadata{
 		MimeType: mimeTypeYUYV,
@@ -200,7 +204,7 @@ func (mh *mimeHandler) close() {
 // - Height (4 bytes): The height of the image, stored in big-endian format.
 func packYUYVHeader(width, height int) []byte {
 	var header bytes.Buffer
-	header.Write([]byte(yuyvMagicString))
+	header.WriteString(yuyvMagicString)
 	tmp := make([]byte, yuyvHeaderDimBytes)
 	binary.BigEndian.PutUint32(tmp, uint32(width))
 	header.Write(tmp)
