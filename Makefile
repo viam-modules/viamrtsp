@@ -83,7 +83,7 @@ endif
 
 .PHONY: build-ffmpeg tool-install gofmt lint test profile-cpu profile-memory update-rdk module clean clean-all
 
-all: $(BIN_OUTPUT_PATH)/viamrtsp $(BIN_OUTPUT_PATH)/discovery
+all: $(BIN_OUTPUT_PATH)/viamrtsp $(BIN_OUTPUT_PATH)/discovery $(BIN_OUTPUT_PATH)/picture
 
 # We set GOOS, GOARCH, GO_TAGS, and GO_LDFLAGS to support cross-compilation for android targets.
 $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
@@ -93,6 +93,11 @@ $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
 $(BIN_OUTPUT_PATH)/discovery: build-ffmpeg *.go cmd/discovery/*.go
 	CGO_LDFLAGS=$(CGO_LDFLAGS) \
 	GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) $(GO_LDFLAGS) -o $(BIN_OUTPUT_PATH)/discovery cmd/discovery/cmd.go
+
+$(BIN_OUTPUT_PATH)/picture: build-ffmpeg *.go cmd/picture/*.go
+	CGO_LDFLAGS=$(CGO_LDFLAGS) \
+	GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) $(GO_LDFLAGS) -o $(BIN_OUTPUT_PATH)/picture cmd/picture/cmd.go
+
 
 tool-install:
 	GOBIN=`pwd`/$(TOOL_BIN) go install \
