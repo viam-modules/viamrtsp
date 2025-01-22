@@ -17,7 +17,7 @@ import (
 type SoapMessage string
 
 // NewEmptySOAP return new SoapMessage.
-// (TODO) migrate to just use XML struct annotations
+// (TODO) migrate to just use XML struct annotations.
 func NewEmptySOAP() (SoapMessage, error) {
 	var zero SoapMessage
 	doc := etree.NewDocument()
