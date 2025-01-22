@@ -61,7 +61,7 @@ func TestDiscoveryConfig(t *testing.T) {
 	t.Run("Test Invalid Config", func(t *testing.T) {
 		cfg := Config{Credentials: []device.Credentials{{User: "", Pass: "pass1"}}}
 		deps, err := cfg.Validate("")
-		test.That(t, err.Error(), test.ShouldContainSubstring, "credential missing User, has password pass1")
+		test.That(t, err.Error(), test.ShouldContainSubstring, "credential missing username, has password pass1")
 		test.That(t, deps, test.ShouldBeEmpty)
 	})
 }
