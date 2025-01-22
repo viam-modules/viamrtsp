@@ -127,6 +127,9 @@ func (mh *mimeHandler) convertYUYV(frame *C.AVFrame) ([]byte, camera.ImageMetada
 	if frame == nil {
 		return nil, camera.ImageMetadata{}, errors.New("frame input is nil, cannot convert to YUYV")
 	}
+	// sws_scale is not thread-safe, so we need to lock here to prevent concurrent access.
+	mh.mu.Lock()
+	defer mh.mu.Unlock()
 	if mh.yuyvSwsCtx == nil || frame.width != mh.yuyvFrame.width || frame.height != mh.yuyvFrame.height {
 		if err := mh.initYUYVContext(frame); err != nil {
 			return nil, camera.ImageMetadata{}, err
@@ -164,9 +167,7 @@ func (mh *mimeHandler) convertYUYV(frame *C.AVFrame) ([]byte, camera.ImageMetada
 }
 
 func (mh *mimeHandler) initYUYVContext(frame *C.AVFrame) error {
-	mh.mu.Lock()
-	defer mh.mu.Unlock()
-	mh.logger.Info("creating YUYV sws cosntext with frame size: ", frame.width, "x", frame.height)
+	mh.logger.Info("creating YUYV sws context with frame size: ", frame.width, "x", frame.height)
 	if mh.yuyvSwsCtx != nil {
 		C.sws_freeContext(mh.yuyvSwsCtx)
 	}
