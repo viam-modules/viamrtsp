@@ -22,7 +22,7 @@
     },
     {
       "api": "rdk:service:discovery",
-      "model": "viam:viamrtsp:discovery"
+      "model": "viam:viamrtsp:onvif"
     }
   ],
   "entrypoint": "bin/viamrtsp"

@@ -109,6 +109,11 @@ type CameraInfo struct {
 	HardwareID      string   `json:"hardware_id"`
 }
 
+// Name creates generates a name for the camera based on discovered information about the camera
+func (cam *CameraInfo) Name() string {
+	return fmt.Sprintf("%s_%s_%s", cam.Manufacturer, cam.Model, cam.SerialNumber)
+}
+
 // CameraInfoList is a struct containing a list of CameraInfo structs.
 type CameraInfoList struct {
 	Cameras []CameraInfo `json:"cameras"`
