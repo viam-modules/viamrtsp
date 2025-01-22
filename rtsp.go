@@ -921,7 +921,6 @@ func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]int
 		}, nil
 	}
 	return rc.getAndConvertFrame(mimeType)
-
 }
 
 func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, camera.ImageMetadata, error) {

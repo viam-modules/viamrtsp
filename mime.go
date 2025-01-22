@@ -48,6 +48,9 @@ func newMimeHandler(logger logging.Logger) *mimeHandler {
 }
 
 func (mh *mimeHandler) convertJPEG(frame *C.AVFrame) ([]byte, camera.ImageMetadata, error) {
+	if frame == nil {
+		return nil, camera.ImageMetadata{}, errors.New("frame input is nil, cannot convert to JPEG")
+	}
 	if mh.jpegEnc == nil || frame.width != mh.jpegEnc.width || frame.height != mh.jpegEnc.height {
 		if err := mh.initJPEGEncoder(frame); err != nil {
 			return nil, camera.ImageMetadata{}, err
@@ -121,6 +124,9 @@ func (mh *mimeHandler) initJPEGEncoder(frame *C.AVFrame) error {
 }
 
 func (mh *mimeHandler) convertYUYV(frame *C.AVFrame) ([]byte, camera.ImageMetadata, error) {
+	if frame == nil {
+		return nil, camera.ImageMetadata{}, errors.New("frame input is nil, cannot convert to YUYV")
+	}
 	if mh.yuyvSwsCtx == nil || frame.width != mh.yuyvFrame.width || frame.height != mh.yuyvFrame.height {
 		if err := mh.initYUYVContext(frame); err != nil {
 			return nil, camera.ImageMetadata{}, err
