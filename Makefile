@@ -44,6 +44,7 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --disable-everything \
                --enable-decoder=h264 \
                --enable-decoder=hevc \
+               --enable-encoder=mjpeg \
                --enable-network \
                --enable-parser=h264 \
                --enable-parser=hevc
@@ -81,6 +82,8 @@ endif
 endif
 
 .PHONY: build-ffmpeg tool-install gofmt lint test profile-cpu profile-memory update-rdk module clean clean-all
+
+all: $(BIN_OUTPUT_PATH)/viamrtsp $(BIN_OUTPUT_PATH)/discovery
 
 # We set GOOS, GOARCH, GO_TAGS, and GO_LDFLAGS to support cross-compilation for android targets.
 $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
