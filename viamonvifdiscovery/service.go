@@ -36,7 +36,7 @@ type Config struct {
 func (cfg *Config) Validate(_ string) ([]string, error) {
 	// check that all creds have both usernames and passwords set. Note a credential can have both fields empty
 	for _, cred := range cfg.Credentials {
-		if cred.Pass != "" && cred.Pass == "" {
+		if cred.Pass != "" && cred.User == "" {
 			return nil, fmt.Errorf("credential missing username, has password %v", cred.Pass)
 		}
 	}

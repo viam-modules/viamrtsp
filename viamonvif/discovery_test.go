@@ -64,6 +64,7 @@ func TestGetCameraInfo(t *testing.T) {
 		test.That(t, cameraInfo.SerialNumber, test.ShouldEqual, "44444444")
 		test.That(t, len(cameraInfo.RTSPURLs), test.ShouldEqual, 1)
 		test.That(t, cameraInfo.RTSPURLs[0], test.ShouldEqual, "rtsp://username:password@192.168.1.100/stream")
+		test.That(t, cameraInfo.Name(), test.ShouldEqual, "Evil Inc._Doom Ray Camera of Certain Annihilation_44444444")
 
 		t.Run("GetRTSPStreamURLs with credentials", func(t *testing.T) {
 			uri, err := url.Parse("192.168.1.100")
