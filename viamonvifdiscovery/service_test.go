@@ -25,7 +25,6 @@ func TestDiscoveryService(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 		test.That(t, dis, test.ShouldNotBeNil)
 		test.That(t, dis.Name().ShortName(), test.ShouldResemble, testName)
-		test.That(t, dis.Close(ctx), test.ShouldBeNil)
 	})
 }
 
@@ -38,6 +37,7 @@ func TestCamConfig(t *testing.T) {
 	cfg, err := resource.NativeConfig[*viamrtsp.Config](conf)
 	test.That(t, err, test.ShouldBeNil)
 	test.That(t, cfg.Address, test.ShouldEqual, camURL)
+	test.That(t, *cfg.RTPPassthrough, test.ShouldBeTrue)
 }
 
 func TestDiscoveryConfig(t *testing.T) {

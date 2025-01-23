@@ -46,7 +46,7 @@ func (cfg *Config) Validate(_ string) ([]string, error) {
 type rtspDiscovery struct {
 	resource.Named
 	resource.AlwaysRebuild
-        resource.TriviallyCloseable
+	resource.TriviallyCloseable
 	Credentials []device.Credentials
 	logger      logging.Logger
 }
@@ -68,7 +68,6 @@ func newDiscovery(_ context.Context, _ resource.Dependencies,
 
 	return dis, nil
 }
-
 
 // DiscoverResources discovers different rtsp cameras that use onvif.
 func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, _ map[string]any) ([]resource.Config, error) {
@@ -110,7 +109,8 @@ func createCamerasFromURLs(l viamonvif.CameraInfo, logger logging.Logger) ([]res
 
 func createCameraConfig(name, address string) (resource.Config, error) {
 	// using the camera's Config struct in case a breaking change occurs
-	attributes := viamrtsp.Config{Address: address}
+	_true := true
+	attributes := viamrtsp.Config{Address: address, RTPPassthrough: &_true}
 	var result map[string]interface{}
 
 	// marshal to bytes

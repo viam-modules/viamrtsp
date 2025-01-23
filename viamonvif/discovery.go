@@ -7,6 +7,7 @@ import (
 	"maps"
 	"net"
 	"net/url"
+	"regexp"
 	"slices"
 	"sync"
 
@@ -109,9 +110,15 @@ type CameraInfo struct {
 	HardwareID      string   `json:"hardware_id"`
 }
 
+// regex to remove non alpha numerics.
+var reg = regexp.MustCompile("[^a-zA-Z0-9 ]+")
+
 // Name creates generates a name for the camera based on discovered information about the camera.
 func (cam *CameraInfo) Name() string {
-	return fmt.Sprintf("%s_%s_%s", cam.Manufacturer, cam.Model, cam.SerialNumber)
+	stripManufacturer := reg.ReplaceAllString(cam.Manufacturer, "")
+	stripModel := reg.ReplaceAllString(cam.Model, "")
+	stripSerial := reg.ReplaceAllString(cam.SerialNumber, "")
+	return fmt.Sprintf("%s-%s-%s", stripManufacturer, stripModel, stripSerial)
 }
 
 // CameraInfoList is a struct containing a list of CameraInfo structs.
