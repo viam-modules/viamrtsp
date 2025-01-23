@@ -1,16 +1,21 @@
 package viamrtsp
 
 /*
-#cgo pkg-config: libavutil libavcodec
+#cgo pkg-config: libavutil libavcodec libswscale
 #include <libavcodec/avcodec.h>
 #include <libavutil/error.h>
 #include <libavutil/opt.h>
 #include <libavutil/dict.h>
+#include <libavutil/frame.h>
+#include <libavutil/imgutils.h>
+#include <libswscale/swscale.h>
 #include <stdlib.h>
 */
 import "C"
 
 import (
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"sync"
 	"unsafe"
@@ -20,9 +25,17 @@ import (
 	rutils "go.viam.com/rdk/utils"
 )
 
+const (
+	yuyvMagicString    = "YUYV"
+	yuyvHeaderDimBytes = 4
+	yuyvBytesPerPixel  = 2
+)
+
 type mimeHandler struct {
 	logger     logging.Logger
 	jpegEnc    *C.AVCodecContext
+	yuyvFrame  *C.AVFrame
+	yuyvSwsCtx *C.struct_SwsContext
 	currentPTS int
 	mu         sync.Mutex
 }
@@ -35,6 +48,9 @@ func newMimeHandler(logger logging.Logger) *mimeHandler {
 }
 
 func (mh *mimeHandler) convertJPEG(frame *C.AVFrame) ([]byte, camera.ImageMetadata, error) {
+	if frame == nil {
+		return nil, camera.ImageMetadata{}, errors.New("frame input is nil, cannot convert to JPEG")
+	}
 	if mh.jpegEnc == nil || frame.width != mh.jpegEnc.width || frame.height != mh.jpegEnc.height {
 		if err := mh.initJPEGEncoder(frame); err != nil {
 			return nil, camera.ImageMetadata{}, err
@@ -107,8 +123,100 @@ func (mh *mimeHandler) initJPEGEncoder(frame *C.AVFrame) error {
 	return nil
 }
 
+func (mh *mimeHandler) convertYUYV(frame *C.AVFrame) ([]byte, camera.ImageMetadata, error) {
+	if frame == nil {
+		return nil, camera.ImageMetadata{}, errors.New("frame input is nil, cannot convert to YUYV")
+	}
+	// sws_scale is not thread-safe, so we need to lock here to prevent concurrent access.
+	mh.mu.Lock()
+	defer mh.mu.Unlock()
+	if mh.yuyvSwsCtx == nil || frame.width != mh.yuyvFrame.width || frame.height != mh.yuyvFrame.height {
+		if err := mh.initYUYVContext(frame); err != nil {
+			return nil, camera.ImageMetadata{}, err
+		}
+	}
+	if mh.yuyvSwsCtx == nil {
+		return nil, camera.ImageMetadata{}, errors.New("failed to create YUYV converter")
+	}
+	if mh.yuyvFrame == nil {
+		return nil, camera.ImageMetadata{}, errors.New("failed to create yuyv destination frame")
+	}
+	res := C.sws_scale(
+		mh.yuyvSwsCtx,
+		(**C.uint8_t)(unsafe.Pointer(&frame.data[0])),
+		(*C.int)(unsafe.Pointer(&frame.linesize[0])),
+		0,
+		frame.height,
+		(**C.uint8_t)(unsafe.Pointer(&mh.yuyvFrame.data[0])),
+		(*C.int)(unsafe.Pointer(&mh.yuyvFrame.linesize[0])),
+	)
+	if res < 0 {
+		return nil, camera.ImageMetadata{}, newAvError(res, "failed to convert frame to YUYV")
+	}
+	yuyvDataSize := int(mh.yuyvFrame.width) * int(mh.yuyvFrame.height) * yuyvBytesPerPixel
+	header := packYUYVHeader(int(mh.yuyvFrame.width), int(mh.yuyvFrame.height))
+	// Preallocate the final slice with the combined size of the header and the image data
+	yuyvPacket := make([]byte, len(header)+yuyvDataSize)
+	copy(yuyvPacket[0:], header)
+	// Copy the YUYV data directly into the preallocated slice
+	C.memcpy(unsafe.Pointer(&yuyvPacket[len(header)]), unsafe.Pointer(mh.yuyvFrame.data[0]), C.size_t(yuyvDataSize))
+
+	return yuyvPacket, camera.ImageMetadata{
+		MimeType: mimeTypeYUYV,
+	}, nil
+}
+
+func (mh *mimeHandler) initYUYVContext(frame *C.AVFrame) error {
+	mh.logger.Info("creating YUYV sws context with frame size: ", frame.width, "x", frame.height)
+	if mh.yuyvSwsCtx != nil {
+		C.sws_freeContext(mh.yuyvSwsCtx)
+	}
+	if mh.yuyvFrame != nil {
+		C.av_frame_free(&mh.yuyvFrame)
+	}
+	mh.yuyvFrame = C.av_frame_alloc()
+	if mh.yuyvFrame == nil {
+		return errors.New("failed to allocate YUYV frame")
+	}
+	mh.yuyvFrame.width = frame.width
+	mh.yuyvFrame.height = frame.height
+	mh.yuyvFrame.format = C.AV_PIX_FMT_YUYV422
+	if res := C.av_frame_get_buffer(mh.yuyvFrame, 32); res < 0 {
+		C.av_frame_free(&mh.yuyvFrame)
+		return newAvError(res, "failed to allocate buffer for YUYV frame")
+	}
+	mh.yuyvSwsCtx = C.sws_getContext(
+		frame.width, frame.height, C.AV_PIX_FMT_YUV420P,
+		frame.width, frame.height, C.AV_PIX_FMT_YUYV422,
+		C.SWS_FAST_BILINEAR, nil, nil, nil,
+	)
+	if mh.yuyvSwsCtx == nil {
+		C.av_frame_free(&mh.yuyvFrame)
+		return errors.New("failed to create YUYV converter")
+	}
+
+	return nil
+}
+
 func (mh *mimeHandler) close() {
 	if mh.jpegEnc != nil {
 		C.avcodec_free_context(&mh.jpegEnc)
 	}
+}
+
+// packYUYVHeader creates a header for YUYV data with the given width and height.
+// The header structure is as follows:
+// - "YUYV" (4 bytes): A fixed string indicating the format.
+// - Width (4 bytes): The width of the image, stored in big-endian format.
+// - Height (4 bytes): The height of the image, stored in big-endian format.
+func packYUYVHeader(width, height int) []byte {
+	var header bytes.Buffer
+	header.WriteString(yuyvMagicString)
+	tmp := make([]byte, yuyvHeaderDimBytes)
+	binary.BigEndian.PutUint32(tmp, uint32(width))
+	header.Write(tmp)
+	binary.BigEndian.PutUint32(tmp, uint32(height))
+	header.Write(tmp)
+
+	return header.Bytes()
 }
