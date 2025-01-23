@@ -40,12 +40,13 @@ func (cfg *Config) Validate(_ string) ([]string, error) {
 			return nil, fmt.Errorf("credential missing username, has password %v", cred.Pass)
 		}
 	}
-	return nil, nil
+	return []string{}, nil
 }
 
 type rtspDiscovery struct {
 	resource.Named
 	resource.AlwaysRebuild
+        resource.TriviallyCloseable
 	Credentials []device.Credentials
 	logger      logging.Logger
 }
@@ -68,10 +69,6 @@ func newDiscovery(_ context.Context, _ resource.Dependencies,
 	return dis, nil
 }
 
-// Close closes the discovery service.
-func (dis *rtspDiscovery) Close(_ context.Context) error {
-	return nil
-}
 
 // DiscoverResources discovers different rtsp cameras that use onvif.
 func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, _ map[string]any) ([]resource.Config, error) {
