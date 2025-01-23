@@ -86,8 +86,8 @@ func TestGetCameraInfo(t *testing.T) {
 }
 
 func TestCameraName(t *testing.T) {
-	cam := CameraInfo{Manufacturer: "M#a$n&u™facturer1", Model: "Mod*el", SerialNumber: "123()456"}
-	test.That(t, cam.Name(), test.ShouldEqual, "Manufacturer1-Model-123456")
+	cam := CameraInfo{Manufacturer: "M#a$n&u™facturer1", Model: "Good Mod*el", SerialNumber: "123()456"}
+	test.That(t, cam.Name(), test.ShouldEqual, "Manufacturer1-Good Model-123456")
 }
 
 func TestExtractXAddrsFromProbeMatch(t *testing.T) {
