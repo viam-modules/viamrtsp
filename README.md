@@ -7,6 +7,10 @@ Four models are provided:
 * `viam:viamrtsp:rtsp-h265` - Only supports the H265 codec.
 * `viam:viamrtsp:rtsp-mjpeg` - Only supports the M-JPEG codec.
 
+This module also implements the `"rdk:service:discovery"` API, to surface rtsp cameras based on their communication protocol. The following models are implemented:
+* `viam:viamrtsp:onvif` - discovers cameras using the [onvif interface](https://www.onvif.org/).
+
+
 ## Configure your `viamrtsp` camera
 
 Navigate to the [**CONFIGURE** tab](https://docs.viam.com/build/configure/) of your [machine](https://docs.viam.com/fleet/machines/) in the [Viam app](https://app.viam.com/).
@@ -62,6 +66,73 @@ The following attributes are available for all models of `viamrtsp` cameras:
 > [!NOTE]
 > The above is a raw JSON configuration for an `rtsp` model.
 > To use another provided model, change the "model" string.
+
+## Configure the `viamrtsp:onvif` discovery service
+
+Navigate to the [**CONFIGURE** tab](https://docs.viam.com/build/configure/) of your [machine](https://docs.viam.com/fleet/machines/) in the [Viam app](https://app.viam.com/).
+[Add the camera component to your machine](https://docs.viam.com/build/configure/#services), searching for `viamrtsp` and selecting the `onvif` discovery service.
+
+Copy and paste the following attributes template into the resulting component's attribute panel:
+
+```
+{
+   "credentials": [
+    {
+      user: <USERNAME1>,
+      pass: <PASSWORD1>
+    },
+    {
+      user: <USERNAME2>,
+      pass: <PASSWORD2>
+    },
+   ]
+}
+```
+
+Edit the attributes to include any credentials for cameras on the network. Cameras that do not require credentials will be discovered automatically.
+
+### Attributes
+
+The following attributes are available for all models of `viamrtsp` discovery services:
+
+| Name    | Type   | Inclusion    | Description |
+| ------- | ------ | ------------ | ----------- |
+| `credentials` | string | Optional | set the username and password for any amount of credentials. |
+
+### Example configuration
+
+```
+{
+  "services": [
+    {
+      "name": "your-rtsp-discovery",
+      "namespace": "rdk",
+      "type": "discovery",
+      "model": "viam:viamrtsp:onvif",
+      "attributes": {
+         "credentials": [
+            {
+              user: <USERNAME1>,
+              pass: <PASSWORD1>
+            },
+            {
+              user: <USERNAME2>,
+              pass: <PASSWORD2>
+            },
+          ]
+      }
+    }
+  ],
+  "modules": [
+    {
+      "type": "registry",
+      "name": "viam_viamrtsp",
+      "module_id": "viam:viamrtsp",
+      "version": "latest"
+    }
+  ]
+}
+```
 
 ### Next steps
 

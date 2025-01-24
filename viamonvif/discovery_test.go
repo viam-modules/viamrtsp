@@ -64,7 +64,7 @@ func TestGetCameraInfo(t *testing.T) {
 		test.That(t, cameraInfo.SerialNumber, test.ShouldEqual, "44444444")
 		test.That(t, len(cameraInfo.RTSPURLs), test.ShouldEqual, 1)
 		test.That(t, cameraInfo.RTSPURLs[0], test.ShouldEqual, "rtsp://username:password@192.168.1.100/stream")
-		test.That(t, cameraInfo.Name(), test.ShouldEqual, "Evil Inc-Doom Ray Camera of Certain Annihilation-44444444")
+		test.That(t, cameraInfo.Name(), test.ShouldEqual, "EvilInc-DoomRayCameraofCertainAnnihilation-44444444")
 
 		t.Run("GetRTSPStreamURLs with credentials", func(t *testing.T) {
 			uri, err := url.Parse("192.168.1.100")
@@ -86,8 +86,8 @@ func TestGetCameraInfo(t *testing.T) {
 }
 
 func TestCameraName(t *testing.T) {
-	cam := CameraInfo{Manufacturer: "M#a$n&u™facturer1", Model: "Good Mod*el", SerialNumber: "123()456"}
-	test.That(t, cam.Name(), test.ShouldEqual, "Manufacturer1-Good Model-123456")
+	cam := CameraInfo{Manufacturer: "M#a$n&u™facturer1", Model: "G o od M o d*e l", SerialNumber: "123()456"}
+	test.That(t, cam.Name(), test.ShouldEqual, "Manufacturer1-GoodModel-123456")
 }
 
 func TestExtractXAddrsFromProbeMatch(t *testing.T) {

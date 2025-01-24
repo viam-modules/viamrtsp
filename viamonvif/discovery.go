@@ -111,7 +111,7 @@ type CameraInfo struct {
 }
 
 // regex to remove non alpha numerics.
-var reg = regexp.MustCompile("[^a-zA-Z0-9 ]+")
+var reg = regexp.MustCompile("[^a-zA-Z0-9]+")
 
 // Name creates generates a name for the camera based on discovered information about the camera.
 func (cam *CameraInfo) Name() string {

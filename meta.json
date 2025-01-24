@@ -6,23 +6,33 @@
   "models": [
     {
       "api": "rdk:component:camera",
-      "model": "viam:viamrtsp:rtsp"
+      "model": "viam:viamrtsp:rtsp",
+      "markdown_link": "README.md#configure-your-viamrtsp-camera",
+      "short_description": "configure a rtsp camera that will autodetect the codec to use."
     },
     {
       "api": "rdk:component:camera",
-      "model": "viam:viamrtsp:rtsp-h264"
+      "model": "viam:viamrtsp:rtsp-h264",
+      "markdown_link": "README.md#configure-your-viamrtsp-camera",
+      "short_description": "configure a rtsp camera that uses the H264 codec."
     },
     {
       "api": "rdk:component:camera",
-      "model": "viam:viamrtsp:rtsp-h265"
+      "model": "viam:viamrtsp:rtsp-h265",
+      "markdown_link": "README.md#configure-your-viamrtsp-camera",
+      "short_description": "configure a rtsp camera that uses the H265 codec."
     },
     {
       "api": "rdk:component:camera",
-      "model": "viam:viamrtsp:rtsp-mjpeg"
+      "model": "viam:viamrtsp:rtsp-mjpeg",
+      "markdown_link": "README.md#configure-your-viamrtsp-camera",
+      "short_description": "configure a rtsp camera that uses the M-JPEG codec."
     },
     {
       "api": "rdk:service:discovery",
-      "model": "viam:viamrtsp:onvif"
+      "model": "viam:viamrtsp:onvif",
+      "markdown_link": "README.md#configure-the-viamrtsponvif-discovery-service",
+      "short_description": "A discovery service to find rtsp cameras that use the onvif interface."
     }
   ],
   "entrypoint": "bin/viamrtsp"
