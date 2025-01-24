@@ -54,7 +54,7 @@ func TestDiscoveryConfig(t *testing.T) {
 		cfg := Config{Credentials: []device.Credentials{
 			{User: "user1", Pass: "pass1"},
 			{User: "user2", Pass: "pass2"},
-			{User: "user3", Pass: "pass3"},
+			{User: "user3", Pass: ""},
 			{User: "", Pass: ""},
 		}}
 		deps, err := cfg.Validate("")

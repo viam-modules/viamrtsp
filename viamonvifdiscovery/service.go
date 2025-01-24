@@ -38,7 +38,7 @@ type Config struct {
 
 // Validate validates the discovery service.
 func (cfg *Config) Validate(_ string) ([]string, error) {
-	// check that all creds have both usernames and passwords set. Note a credential can have both fields empty
+	// check that all creds have usernames set. Note a credential can have both fields empty
 	for _, cred := range cfg.Credentials {
 		if cred.Pass != "" && cred.User == "" {
 			return nil, fmt.Errorf("credential missing username, has password %v", cred.Pass)
@@ -64,8 +64,7 @@ func newDiscovery(_ context.Context, _ resource.Dependencies,
 		return nil, err
 	}
 	dis := &rtspDiscovery{
-		Named: conf.ResourceName().AsNamed(),
-		// place the empty credentials first, so we find the insecure cameras before other cameras.
+		Named:       conf.ResourceName().AsNamed(),
 		Credentials: cfg.Credentials,
 		logger:      logger,
 	}
