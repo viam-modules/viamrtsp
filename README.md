@@ -96,6 +96,10 @@ The following attributes are available for all models of `viamrtsp` discovery se
 }
 ```
 
+### Next steps
+
+Use the `DiscoverResources` API to retrieve a list of cameras discovered by the service and their configuration. Some cameras will output multiple channels, so review the `rtsp_address` of the cameras to determine which camera streams you wish to add.
+
 ## RTSP stream discovery
 ### Use `DiscoverComponents`
 In addition to being able to manually specify RTSP addresses to stream from, `viamrtsp` also offers a discovery utility to search for IP cameras connected to your LAN and return their respective RTSP addresses.
