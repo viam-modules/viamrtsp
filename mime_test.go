@@ -8,7 +8,6 @@ import (
 	"go.viam.com/test"
 )
 
-//nolint:dupl
 func TestJPEGConvert(t *testing.T) {
 	t.Run("valid YUV420P frame succeeds", func(t *testing.T) {
 		width, height := 640, 480
@@ -54,7 +53,6 @@ func TestJPEGConvert(t *testing.T) {
 	})
 }
 
-//nolint:dupl
 func TestYUYVConvert(t *testing.T) {
 	t.Run("valid YUV420P frame succeeds", func(t *testing.T) {
 		width, height := 640, 480

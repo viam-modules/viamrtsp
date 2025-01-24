@@ -74,7 +74,7 @@ func newDiscovery(_ context.Context, _ resource.Dependencies,
 
 // DiscoverResources discovers different rtsp cameras that use onvif.
 func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, _ map[string]any) ([]resource.Config, error) {
-	potentialCams := []resource.Config{}
+	cams := []resource.Config{}
 
 	list, err := viamonvif.DiscoverCameras(ctx, dis.Credentials, nil, dis.logger)
 	if err != nil {
@@ -95,22 +95,22 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, _ map[string]an
 		if err != nil {
 			return nil, err
 		}
-		potentialCams = append(potentialCams, camConfigs...)
+		cams = append(cams, camConfigs...)
 	}
-	return potentialCams, nil
+	return cams, nil
 }
 
 func createCamerasFromURLs(l viamonvif.CameraInfo, logger logging.Logger) ([]resource.Config, error) {
-	potentialCams := []resource.Config{}
+	cams := []resource.Config{}
 	for index, u := range l.RTSPURLs {
 		logger.Debugf("camera URL:\t%s", u)
 		cfg, err := createCameraConfig(l.Name(index), u)
 		if err != nil {
 			return nil, err
 		}
-		potentialCams = append(potentialCams, cfg)
+		cams = append(cams, cfg)
 	}
-	return potentialCams, nil
+	return cams, nil
 }
 
 func createCameraConfig(name, address string) (resource.Config, error) {
