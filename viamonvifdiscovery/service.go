@@ -103,9 +103,9 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, _ map[string]an
 
 func createCamerasFromURLs(l viamonvif.CameraInfo, logger logging.Logger) ([]resource.Config, error) {
 	potentialCams := []resource.Config{}
-	for _, u := range l.RTSPURLs {
+	for index, u := range l.RTSPURLs {
 		logger.Debugf("camera URL:\t%s", u)
-		cfg, err := createCameraConfig(l.Name(), u)
+		cfg, err := createCameraConfig(l.Name(index), u)
 		if err != nil {
 			return nil, err
 		}
