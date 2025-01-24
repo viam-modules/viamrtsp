@@ -4,6 +4,7 @@ package viamonvifdiscovery
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/viam-modules/viamrtsp"
@@ -16,7 +17,10 @@ import (
 )
 
 // Model is the model for a rtsp discovery service.
-var Model = viamrtsp.Family.WithModel("onvif")
+var (
+	Model             = viamrtsp.Family.WithModel("onvif")
+	errNoCamerasFound = errors.New("no cameras found, ensure cameras are working or check credentials")
+)
 
 func init() {
 	resource.RegisterService(
@@ -76,6 +80,9 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, _ map[string]an
 	list, err := viamonvif.DiscoverCameras(ctx, dis.Credentials, nil, dis.logger)
 	if err != nil {
 		return nil, err
+	}
+	if len(list.Cameras) == 0 {
+		return nil, errors.New("no cameras found, ensure cameras are working or check credentials")
 	}
 
 	for _, l := range list.Cameras {

@@ -18,13 +18,16 @@ func TestDiscoveryService(t *testing.T) {
 	ctx := context.Background()
 	logger := logging.NewTestLogger(t)
 
-	t.Run("Test Default Service", func(t *testing.T) {
+	t.Run("Test Default Service with no cameras", func(t *testing.T) {
 		testName := "test"
 		resourceCfg := resource.Config{API: discovery.API, Model: Model, Name: testName, ConvertedAttributes: &cfg}
 		dis, err := newDiscovery(ctx, nil, resourceCfg, logger)
 		test.That(t, err, test.ShouldBeNil)
 		test.That(t, dis, test.ShouldNotBeNil)
 		test.That(t, dis.Name().ShortName(), test.ShouldResemble, testName)
+		cfgs, err := dis.DiscoverResources(ctx, nil)
+		test.That(t, cfgs, test.ShouldNotBeNil)
+		test.That(t, err, test.ShouldBeError, errNoCamerasFound)
 	})
 }
 
