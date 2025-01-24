@@ -914,9 +914,6 @@ func isCompactableH264(nalu []byte) bool {
 
 // Image returns the latest frame as JPEG bytes.
 func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
-	if mimeType != rutils.MimeTypeJPEG && mimeType != rutils.WithLazyMIMEType(rutils.MimeTypeJPEG) {
-		rc.logger.Warn("unsupported mime type request %s, returning JPEG", mimeType)
-	}
 	if videoCodec(rc.currentCodec.Load()) == MJPEG {
 		mjpegBytes := rc.latestMJPEGBytes.Load()
 		if mjpegBytes == nil {
@@ -926,8 +923,7 @@ func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]int
 			MimeType: rutils.MimeTypeJPEG,
 		}, nil
 	}
-	// For now, we only support JPEG
-	return rc.getAndConvertFrame(rutils.MimeTypeJPEG)
+	return rc.getAndConvertFrame(mimeType)
 }
 
 func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, camera.ImageMetadata, error) {
@@ -942,10 +938,13 @@ func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, camera.ImageM
 	var metadata camera.ImageMetadata
 	var err error
 	switch mimeType {
-	case rutils.MimeTypeJPEG:
+	case rutils.MimeTypeJPEG, rutils.MimeTypeJPEG + "+" + rutils.MimeTypeSuffixLazy:
 		bytes, metadata, err = rc.mimeHandler.convertJPEG(currentFrame.frame)
+	case mimeTypeYUYV, mimeTypeYUYV + "+" + rutils.MimeTypeSuffixLazy:
+		bytes, metadata, err = rc.mimeHandler.convertYUYV(currentFrame.frame)
 	default:
-		err = fmt.Errorf("unsupported mime type: %s", mimeType)
+		rc.logger.Debugf("unsupported mime type: %s, defaulting to JPEG", mimeType)
+		bytes, metadata, err = rc.mimeHandler.convertJPEG(currentFrame.frame)
 	}
 	if refCount := currentFrame.decrementRefs(); refCount == 0 {
 		rc.avFramePool.put(currentFrame)
