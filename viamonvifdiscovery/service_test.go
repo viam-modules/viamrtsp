@@ -29,7 +29,6 @@ func TestDiscoveryService(t *testing.T) {
 		test.That(t, cfgs, test.ShouldBeEmpty)
 		test.That(t, err, test.ShouldBeError, errNoCamerasFound)
 	})
-
 }
 
 func TestCamConfig(t *testing.T) {
