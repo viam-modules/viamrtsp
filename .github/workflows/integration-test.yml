@@ -24,10 +24,10 @@ jobs:
             viam_server_url: https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-aarch64.AppImage
             docker_image: ghcr.io/viamrobotics/antique2:arm64-cache
         config:
-          - name: "h264"
-            codec: "libx264"
-          - name: "h265"
-            codec: "libx265"
+          # - name: "h264"
+          #   codec: "libx264"
+          # - name: "h265"
+          #   codec: "libx265"
           - name: "mjpeg"
             codec: "mjpeg"
             extra_ffmpeg_args: "-huffman 0"
