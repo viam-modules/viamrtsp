@@ -69,27 +69,7 @@ The following attributes are available for all models of `viamrtsp` cameras:
 
 ## Configure the `viamrtsp:onvif` discovery service
 
-Navigate to the [**CONFIGURE** tab](https://docs.viam.com/build/configure/) of your [machine](https://docs.viam.com/fleet/machines/) in the [Viam app](https://app.viam.com/).
-[Add the camera component to your machine](https://docs.viam.com/build/configure/#services), searching for `viamrtsp` and selecting the `onvif` discovery service.
-
-Copy and paste the following attributes template into the resulting component's attribute panel:
-
-```
-{
-   "credentials": [
-    {
-      user: <USERNAME1>,
-      pass: <PASSWORD1>
-    },
-    {
-      user: <USERNAME2>,
-      pass: <PASSWORD2>
-    },
-   ]
-}
-```
-
-Edit the attributes to include any credentials for cameras on the network. Cameras that do not require credentials will be discovered automatically.
+This model is used to locate rtsp cameras on a network that utilize the [onvif interface](https://www.onvif.org/) and surface their configuration.
 
 ### Attributes
 
@@ -101,42 +81,20 @@ The following attributes are available for all models of `viamrtsp` discovery se
 
 ### Example configuration
 
-```
+```json
 {
-  "services": [
+   "credentials": [
     {
-      "name": "your-rtsp-discovery",
-      "namespace": "rdk",
-      "type": "discovery",
-      "model": "viam:viamrtsp:onvif",
-      "attributes": {
-         "credentials": [
-            {
-              user: <USERNAME1>,
-              pass: <PASSWORD1>
-            },
-            {
-              user: <USERNAME2>,
-              pass: <PASSWORD2>
-            },
-          ]
-      }
-    }
-  ],
-  "modules": [
+      "user": "<USERNAME1>",
+      "pass": "<PASSWORD1>"
+    },
     {
-      "type": "registry",
-      "name": "viam_viamrtsp",
-      "module_id": "viam:viamrtsp",
-      "version": "latest"
-    }
-  ]
+      "user": "<USERNAME2>",
+      "pass": "<PASSWORD2>"
+    },
+   ]
 }
 ```
-
-### Next steps
-
-To test your camera, go to the [**CONTROL** tab](https://docs.viam.com/fleet/control/) of your machine in the [Viam app](https://app.viam.com) and expand the camera's panel.
 
 ## RTSP stream discovery
 ### Use `DiscoverComponents`
