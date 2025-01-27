@@ -34,6 +34,9 @@ jobs:
             codec: "mjpeg"
             extra_ffmpeg_args: "-huffman 0"
             pix_fmt: "yuvj420p"
+          - name: "mpeg4"
+            codec: "mpeg4"
+            pix_fmt: "yuv420p"
 
     runs-on: ${{ matrix.platform.runner }}
 

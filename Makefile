@@ -44,7 +44,9 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --disable-everything \
                --enable-decoder=h264 \
                --enable-decoder=hevc \
+               --enable-decoder=mpeg4 \
                --enable-encoder=mjpeg \
+               --enable-encoder=mpeg4 \
                --enable-network \
                --enable-parser=h264 \
                --enable-parser=hevc

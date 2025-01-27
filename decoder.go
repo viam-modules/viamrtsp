@@ -49,6 +49,8 @@ const (
 	H265
 	// MJPEG indicates the mjpeg video codec
 	MJPEG
+	// MPEG4 indicates the mpeg4 video codec
+	MPEG4
 )
 
 func (vc videoCodec) String() string {
@@ -61,6 +63,8 @@ func (vc videoCodec) String() string {
 		return "H265"
 	case MJPEG:
 		return "MJPEG"
+	case MPEG4:
+		return "MPEG4"
 	default:
 		return "Unknown"
 	}
@@ -221,8 +225,8 @@ func SetLibAVLogLevelFatal() {
 	C.av_log_set_level(C.AV_LOG_FATAL)
 }
 
-// newDecoder creates a new decoder for the given codec.
-func newDecoder(codecID C.enum_AVCodecID, avFramePool *framePool, logger logging.Logger) (*decoder, error) {
+// newDecoder creates a new decoder for the given codec, including any extra configuration data.
+func newDecoder(codecID C.enum_AVCodecID, avFramePool *framePool, logger logging.Logger, extraData []byte) (*decoder, error) {
 	codec := C.avcodec_find_decoder(codecID)
 	if codec == nil {
 		return nil, errors.New("avcodec_find_decoder() failed")
@@ -236,11 +240,31 @@ func newDecoder(codecID C.enum_AVCodecID, avFramePool *framePool, logger logging
 	// output JPEG color range frames YUVJ420P.
 	codecCtx.pix_fmt = C.AV_PIX_FMT_YUV420P
 
+	// Set extradata if provided
+	if len(extraData) > 0 {
+		codecCtx.extradata_size = C.int(len(extraData))
+		codecCtx.extradata = (*C.uint8_t)(C.av_malloc(C.size_t(codecCtx.extradata_size)))
+		if codecCtx.extradata == nil {
+			C.avcodec_close(codecCtx)
+			return nil, errors.New("av_malloc() failed for extradata")
+		}
+		C.memcpy(unsafe.Pointer(codecCtx.extradata), unsafe.Pointer(&extraData[0]), C.size_t(codecCtx.extradata_size))
+
+		// Log extradata details
+		logger.Debugf("Extradata Size: %d bytes", codecCtx.extradata_size)
+		if codecCtx.extradata_size >= 4 {
+			logger.Debugf("Extradata Start Bytes: %x", extraData[:4])
+		}
+	}
+
 	res := C.avcodec_open2(codecCtx, codec, nil)
 	if res < 0 {
 		C.avcodec_close(codecCtx)
 		return nil, newAvError(res, "avcodec_open2() failed")
 	}
+
+	// Log codec context details
+	logger.Infof("Initialized codec: %s, width: %d, height: %d", C.GoString(codec.name), codecCtx.width, codecCtx.height)
 
 	src := C.av_frame_alloc()
 	if src == nil {
@@ -258,12 +282,17 @@ func newDecoder(codecID C.enum_AVCodecID, avFramePool *framePool, logger logging
 
 // newH264Decoder creates a new H264 decoder.
 func newH264Decoder(avFramePool *framePool, logger logging.Logger) (*decoder, error) {
-	return newDecoder(C.AV_CODEC_ID_H264, avFramePool, logger)
+	return newDecoder(C.AV_CODEC_ID_H264, avFramePool, logger, nil)
 }
 
 // newH265Decoder creates a new H265 decoder.
 func newH265Decoder(avFramePool *framePool, logger logging.Logger) (*decoder, error) {
-	return newDecoder(C.AV_CODEC_ID_H265, avFramePool, logger)
+	return newDecoder(C.AV_CODEC_ID_H265, avFramePool, logger, nil)
+}
+
+// newMPEG4Decoder creates a new MPEG4 decoder with the provided configuration data as extra data.
+func newMPEG4Decoder(avFramePool *framePool, logger logging.Logger, extraData []byte) (*decoder, error) {
+	return newDecoder(C.AV_CODEC_ID_MPEG4, avFramePool, logger, extraData)
 }
 
 // close closes the decoder.
@@ -278,7 +307,9 @@ func (d *decoder) close() {
 }
 
 func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
-	nalu = append(H2645StartCode(), nalu...)
+	if d.codecCtx.codec_id == C.AV_CODEC_ID_H264 || d.codecCtx.codec_id == C.AV_CODEC_ID_H265 {
+		nalu = append(H2645StartCode(), nalu...)
+	}
 
 	// send frame to decoder
 	var avPacket C.AVPacket
