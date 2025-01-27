@@ -249,12 +249,6 @@ func newDecoder(codecID C.enum_AVCodecID, avFramePool *framePool, logger logging
 			return nil, errors.New("av_malloc() failed for extradata")
 		}
 		C.memcpy(unsafe.Pointer(codecCtx.extradata), unsafe.Pointer(&extraData[0]), C.size_t(codecCtx.extradata_size))
-
-		// Log extradata details
-		logger.Debugf("Extradata Size: %d bytes", codecCtx.extradata_size)
-		if codecCtx.extradata_size >= 4 {
-			logger.Debugf("Extradata Start Bytes: %x", extraData[:4])
-		}
 	}
 
 	res := C.avcodec_open2(codecCtx, codec, nil)
