@@ -316,12 +316,10 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec) error {
 		if err := rc.initMPEG4(session); err != nil {
 			return err
 		}
-	case Unknown:
-		return errors.New("codecInfo was Unknown after getting stream info")
-	case Agnostic:
-		return errors.New("codecInfo was Agnostic after getting stream info")
+	case Unknown, Agnostic:
+		return fmt.Errorf("codecInfo was '%s' after getting session info. Codec could not be determined", codecInfo.String())
 	default:
-		return fmt.Errorf("codec not supported: %s", codecInfo.String())
+		return fmt.Errorf("codec not supported: '%s'", codecInfo.String())
 	}
 
 	if _, err := rc.client.Play(nil); err != nil {
