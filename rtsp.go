@@ -47,17 +47,18 @@ const (
 )
 
 var (
-	family = resource.ModelNamespace("viam").WithFamily("viamrtsp")
+	// Family is the namespace family for the viamrtsp module.
+	Family = resource.ModelNamespace("viam").WithFamily("viamrtsp")
 	// ModelAgnostic selects the best available codec.
-	ModelAgnostic = family.WithModel("rtsp")
+	ModelAgnostic = Family.WithModel("rtsp")
 	// ModelH264 uses the h264 codec.
-	ModelH264 = family.WithModel("rtsp-h264")
+	ModelH264 = Family.WithModel("rtsp-h264")
 	// ModelH265 uses the h265 codec.
-	ModelH265 = family.WithModel("rtsp-h265")
+	ModelH265 = Family.WithModel("rtsp-h265")
 	// ModelMJPEG uses the mjpeg codec.
-	ModelMJPEG = family.WithModel("rtsp-mjpeg")
+	ModelMJPEG = Family.WithModel("rtsp-mjpeg")
 	// ModelMPEG4 uses the mpeg4 codec.
-	ModelMPEG4 = family.WithModel("rtsp-mpeg4")
+	ModelMPEG4 = Family.WithModel("rtsp-mpeg4")
 	// Models is a slice containing the above available models.
 	Models = []resource.Model{ModelAgnostic, ModelH264, ModelH265, ModelMJPEG, ModelMPEG4}
 	// ErrH264PassthroughNotEnabled is an error indicating H264 passthrough is not enabled.

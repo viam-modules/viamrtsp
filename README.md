@@ -6,6 +6,10 @@ Four models are provided:
 * `viam:viamrtsp:rtsp-h264` - Only supports the H264 codec.
 * `viam:viamrtsp:rtsp-h265` - Only supports the H265 codec.
 * `viam:viamrtsp:rtsp-mjpeg` - Only supports the M-JPEG codec.
+* `viam:viamrtsp:rtsp-mpeg4` - Only supports the MPEG4 codec.
+This module also implements the `"rdk:service:discovery"` API, to surface rtsp cameras based on their communication protocol. The following models are implemented:
+* `viam:viamrtsp:onvif` - discovers cameras using the [onvif interface](https://www.onvif.org/).
+
 
 ## Configure your `viamrtsp` camera
 
@@ -63,9 +67,38 @@ The following attributes are available for all models of `viamrtsp` cameras:
 > The above is a raw JSON configuration for an `rtsp` model.
 > To use another provided model, change the "model" string.
 
+## Configure the `viamrtsp:onvif` discovery service
+
+This model is used to locate rtsp cameras on a network that utilize the [onvif interface](https://www.onvif.org/) and surface their configuration.
+
+### Attributes
+
+The following attributes are available for all models of `viamrtsp` discovery services:
+
+| Name    | Type   | Inclusion    | Description |
+| ------- | ------ | ------------ | ----------- |
+| `credentials` | string | Optional | set the username and password for any amount of credentials. |
+
+### Example configuration
+
+```json
+{
+   "credentials": [
+    {
+      "user": "<USERNAME1>",
+      "pass": "<PASSWORD1>"
+    },
+    {
+      "user": "<USERNAME2>",
+      "pass": "<PASSWORD2>"
+    },
+   ]
+}
+```
+
 ### Next steps
 
-To test your camera, go to the [**CONTROL** tab](https://docs.viam.com/fleet/control/) of your machine in the [Viam app](https://app.viam.com) and expand the camera's panel.
+Use the `DiscoverResources` API to retrieve a list of cameras discovered by the service and their configuration. Some cameras will output multiple channels, so review the `rtsp_address` of the cameras to determine which camera streams you wish to add.
 
 ## RTSP stream discovery
 ### Use `DiscoverComponents`

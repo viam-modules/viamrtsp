@@ -7,6 +7,7 @@ import (
 	"maps"
 	"net"
 	"net/url"
+	"regexp"
 	"slices"
 	"sync"
 
@@ -109,6 +110,17 @@ type CameraInfo struct {
 	HardwareID      string   `json:"hardware_id"`
 }
 
+// regex to remove non alpha numerics.
+var reg = regexp.MustCompile("[^a-zA-Z0-9]+")
+
+// Name creates generates a name for the camera based on discovered information about the camera.
+func (cam *CameraInfo) Name(urlNum int) string {
+	stripManufacturer := reg.ReplaceAllString(cam.Manufacturer, "")
+	stripModel := reg.ReplaceAllString(cam.Model, "")
+	stripSerial := reg.ReplaceAllString(cam.SerialNumber, "")
+	return fmt.Sprintf("%s-%s-%s-url%v", stripManufacturer, stripModel, stripSerial, urlNum)
+}
+
 // CameraInfoList is a struct containing a list of CameraInfo structs.
 type CameraInfoList struct {
 	Cameras []CameraInfo `json:"cameras"`
@@ -189,6 +201,7 @@ func GetRTSPStreamURIsFromProfiles(dev OnvifDevice, creds device.Credentials, lo
 
 	// Resultant slice of RTSP URIs
 	var rtspUris []string
+
 	// Iterate over all profiles and get the RTSP stream URI for each one
 	for _, profile := range resp.Profiles {
 		uri, err := dev.GetStreamURI(profile, creds)
