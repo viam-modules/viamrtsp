@@ -18,9 +18,9 @@ require (
 	github.com/rhysd/actionlint v1.6.27
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
-	go.viam.com/rdk v0.54.0
+	go.viam.com/rdk v0.57.1-0.20250108163155-2071720cd8d3
 	go.viam.com/test v1.2.4
-	go.viam.com/utils v0.1.116
+	go.viam.com/utils v0.1.118
 	golang.org/x/net v0.30.0
 )
 
@@ -236,7 +236,7 @@ require (
 	github.com/prometheus/client_golang v1.12.2 // indirect
 	github.com/prometheus/client_model v0.6.0 // indirect
 	github.com/prometheus/common v0.37.0 // indirect
-	github.com/prometheus/procfs v0.7.3 // indirect
+	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/quasilyte/go-ruleguard v0.4.3-0.20240823090925-0fe6f58b47b1 // indirect
 	github.com/quasilyte/go-ruleguard/dsl v0.3.22 // indirect
 	github.com/quasilyte/gogrep v0.5.0 // indirect
@@ -307,7 +307,7 @@ require (
 	go.uber.org/automaxprocs v1.5.3 // indirect
 	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.viam.com/api v0.1.366 // indirect
+	go.viam.com/api v0.1.380 // indirect
 	goji.io v2.0.2+incompatible // indirect
 	golang.org/x/arch v0.0.0-20210923205945-b76863e36670 // indirect
 	golang.org/x/crypto v0.28.0 // indirect
