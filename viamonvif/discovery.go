@@ -114,11 +114,11 @@ type CameraInfo struct {
 var reg = regexp.MustCompile("[^a-zA-Z0-9]+")
 
 // Name creates generates a name for the camera based on discovered information about the camera.
-func (cam *CameraInfo) Name(channel int) string {
+func (cam *CameraInfo) Name(urlNum int) string {
 	stripManufacturer := reg.ReplaceAllString(cam.Manufacturer, "")
 	stripModel := reg.ReplaceAllString(cam.Model, "")
 	stripSerial := reg.ReplaceAllString(cam.SerialNumber, "")
-	return fmt.Sprintf("%s-%s-%s-channel%v", stripManufacturer, stripModel, stripSerial, channel)
+	return fmt.Sprintf("%s-%s-%s-url%v", stripManufacturer, stripModel, stripSerial, urlNum)
 }
 
 // CameraInfoList is a struct containing a list of CameraInfo structs.
