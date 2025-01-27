@@ -597,7 +597,7 @@ func (rc *rtspCamera) initMPEG4(session *description.Session) error {
 
 	// Initialize the rawDecoder with MPEG4 config data
 	if f.Config != nil {
-		// Prepend MPEG4 Visual Object Sequence (VOS) and Video Object (VO) start codes if not present
+		// Prepend MPEG4 Visual Object Sequence (VOS) and Video Object (VO) start codes
 		vosStart := []byte{0x00, 0x00, 0x01, 0xB0}
 		voStart := []byte{0x00, 0x00, 0x01, 0xB5}
 		extraData := append(vosStart, voStart...)
