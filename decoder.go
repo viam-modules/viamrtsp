@@ -276,14 +276,12 @@ func newDecoder(codecID C.enum_AVCodecID, avFramePool *framePool, logger logging
 
 // newH264Decoder creates a new H264 decoder.
 func newH264Decoder(avFramePool *framePool, logger logging.Logger) (*decoder, error) {
-	startCode := H2645StartCode()
-	return newDecoder(C.AV_CODEC_ID_H264, avFramePool, logger, startCode)
+	return newDecoder(C.AV_CODEC_ID_H264, avFramePool, logger, nil)
 }
 
 // newH265Decoder creates a new H265 decoder.
 func newH265Decoder(avFramePool *framePool, logger logging.Logger) (*decoder, error) {
-	startCode := H2645StartCode()
-	return newDecoder(C.AV_CODEC_ID_H265, avFramePool, logger, startCode)
+	return newDecoder(C.AV_CODEC_ID_H265, avFramePool, logger, nil)
 }
 
 // newMPEG4Decoder creates a new MPEG4 decoder with the provided configuration data as extra data.
@@ -303,6 +301,10 @@ func (d *decoder) close() {
 }
 
 func (d *decoder) decode(nalu []byte) (*avFrameWrapper, error) {
+	if d.codecCtx.codec_id == C.AV_CODEC_ID_H264 || d.codecCtx.codec_id == C.AV_CODEC_ID_H265 {
+		nalu = append(H2645StartCode(), nalu...)
+	}
+
 	// send frame to decoder
 	var avPacket C.AVPacket
 	avPacket.data = (*C.uint8_t)(C.CBytes(nalu))

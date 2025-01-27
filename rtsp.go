@@ -601,10 +601,10 @@ func (rc *rtspCamera) initMPEG4(session *description.Session) error {
 		// Prepend MPEG4 Visual Object Sequence (VOS) and Video Object (VO) start codes if not present
 		vosStart := []byte{0x00, 0x00, 0x01, 0xB0}
 		voStart := []byte{0x00, 0x00, 0x01, 0xB5}
-		configData := append(vosStart, voStart...)
-		configData = append(configData, f.Config...)
+		extraData := append(vosStart, voStart...)
+		extraData = append(extraData, f.Config...)
 
-		rc.rawDecoder, err = newMPEG4Decoder(rc.avFramePool, rc.logger, configData)
+		rc.rawDecoder, err = newMPEG4Decoder(rc.avFramePool, rc.logger, extraData)
 		if err != nil {
 			return fmt.Errorf("creating MPEG4 raw decoder: %w", err)
 		}
