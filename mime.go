@@ -29,7 +29,6 @@ const (
 	yuyvMagicString    = "YUYV"
 	yuyvHeaderDimBytes = 4
 	yuyvBytesPerPixel  = 2
-	rgbaHeaderDimBytes = 4
 	rgbaBytesPerPixel  = 4
 )
 
@@ -120,7 +119,8 @@ func (mh *mimeHandler) initJPEGEncoder(frame *C.AVFrame) error {
 	if res < 0 {
 		return newAvError(res, "failed to set qscale option")
 	}
-	if res := C.avcodec_open2(mh.jpegEnc, codec, nil); res < 0 {
+	if res := C.avcodec_open2(mh.jpegEnc, codec, &opts); res < 0 {
+		C.avcodec_free_context(&mh.jpegEnc)
 		return newAvError(res, "failed to open MJPEG encoder")
 	}
 
@@ -264,7 +264,7 @@ func (mh *mimeHandler) initRGBAContext(frame *C.AVFrame) error {
 	}
 	mh.rgbaFrame.width = frame.width
 	mh.rgbaFrame.height = frame.height
-	mh.rgbaFrame.format = 26 // AV_PIX_FMT_RGBA in FFmpeg
+	mh.rgbaFrame.format = C.AV_PIX_FMT_RGBA
 	if res := C.av_frame_get_buffer(mh.rgbaFrame, 32); res < 0 {
 		C.av_frame_free(&mh.rgbaFrame)
 		return newAvError(res, "failed to allocate buffer for RGBA frame")
@@ -276,6 +276,7 @@ func (mh *mimeHandler) initRGBAContext(frame *C.AVFrame) error {
 	)
 	if mh.rgbaSwsCtx == nil {
 		C.av_frame_free(&mh.rgbaFrame)
+		mh.rgbaFrame = nil
 		return errors.New("failed to create RGBA converter")
 	}
 
@@ -285,18 +286,23 @@ func (mh *mimeHandler) initRGBAContext(frame *C.AVFrame) error {
 func (mh *mimeHandler) close() {
 	if mh.jpegEnc != nil {
 		C.avcodec_free_context(&mh.jpegEnc)
+		mh.jpegEnc = nil
 	}
 	if mh.yuyvSwsCtx != nil {
 		C.sws_freeContext(mh.yuyvSwsCtx)
+		mh.yuyvSwsCtx = nil
 	}
 	if mh.yuyvFrame != nil {
 		C.av_frame_free(&mh.yuyvFrame)
+		mh.yuyvFrame = nil
 	}
 	if mh.rgbaSwsCtx != nil {
 		C.sws_freeContext(mh.rgbaSwsCtx)
+		mh.rgbaSwsCtx = nil
 	}
 	if mh.rgbaFrame != nil {
 		C.av_frame_free(&mh.rgbaFrame)
+		mh.rgbaFrame = nil
 	}
 }
 
