@@ -6,7 +6,7 @@ Four models are provided:
 * `viam:viamrtsp:rtsp-h264` - Only supports the H264 codec.
 * `viam:viamrtsp:rtsp-h265` - Only supports the H265 codec.
 * `viam:viamrtsp:rtsp-mjpeg` - Only supports the M-JPEG codec.
-
+* `viam:viamrtsp:rtsp-mpeg4` - Only supports the MPEG4 codec.
 This module also implements the `"rdk:service:discovery"` API, to surface rtsp cameras based on their communication protocol. The following models are implemented:
 * `viam:viamrtsp:onvif` - discovers cameras using the [onvif interface](https://www.onvif.org/).
 

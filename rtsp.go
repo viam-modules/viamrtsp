@@ -57,8 +57,10 @@ var (
 	ModelH265 = Family.WithModel("rtsp-h265")
 	// ModelMJPEG uses the mjpeg codec.
 	ModelMJPEG = Family.WithModel("rtsp-mjpeg")
+	// ModelMPEG4 uses the mpeg4 codec.
+	ModelMPEG4 = Family.WithModel("rtsp-mpeg4")
 	// Models is a slice containing the above available models.
-	Models = []resource.Model{ModelAgnostic, ModelH264, ModelH265, ModelMJPEG}
+	Models = []resource.Model{ModelAgnostic, ModelH264, ModelH265, ModelMJPEG, ModelMPEG4}
 	// ErrH264PassthroughNotEnabled is an error indicating H264 passthrough is not enabled.
 	ErrH264PassthroughNotEnabled = errors.New("H264 passthrough is not enabled")
 )
@@ -309,12 +311,15 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec) error {
 		if err := rc.initMJPEG(session); err != nil {
 			return err
 		}
-	case Unknown:
-		return errors.New("codecInfo should not be Unknown after getting stream info")
-	case Agnostic:
-		return errors.New("codecInfo should not be Agnostic after getting stream info")
+	case MPEG4:
+		rc.logger.Info("setting up MPEG4 decoder")
+		if err := rc.initMPEG4(session); err != nil {
+			return err
+		}
+	case Unknown, Agnostic:
+		return fmt.Errorf("codecInfo was '%s' after getting session info. Codec could not be determined", codecInfo.String())
 	default:
-		return fmt.Errorf("codec not supported: %s", codecInfo.String())
+		return fmt.Errorf("codec not supported: '%s'", codecInfo.String())
 	}
 
 	if _, err := rc.client.Play(nil); err != nil {
@@ -569,6 +574,67 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 	return nil
 }
 
+// initMPEG4 initializes the MPEG4 decoder and sets up the client to receive MPEG4 packets.
+func (rc *rtspCamera) initMPEG4(session *description.Session) error {
+	if rc.rtpPassthrough {
+		rc.logger.Warn("rtp_passthrough is only supported for H264 codec. rtp_passthrough features disabled due to MPEG4 RTSP track")
+	}
+
+	var f *format.MPEG4Video
+	media := session.FindFormat(&f)
+	if media == nil {
+		rc.logger.Warn("No MPEG4 track found")
+		for _, x := range session.Medias {
+			rc.logger.Warnf("\t %v", x)
+		}
+		return errors.New("MPEG4 track not found")
+	}
+
+	mpeg4Decoder, err := f.CreateDecoder()
+	if err != nil {
+		return fmt.Errorf("creating MPEG4 RTP decoder: %w", err)
+	}
+
+	// Initialize the rawDecoder with MPEG4 config data
+	if f.Config != nil {
+		// Prepend MPEG4 Visual Object Sequence (VOS) and Video Object (VO) start codes
+		vosStart := []byte{0x00, 0x00, 0x01, 0xB0}
+		voStart := []byte{0x00, 0x00, 0x01, 0xB5}
+		extraData := append(vosStart, voStart...)
+		extraData = append(extraData, f.Config...)
+
+		rc.rawDecoder, err = newMPEG4Decoder(rc.avFramePool, rc.logger, extraData)
+		if err != nil {
+			return fmt.Errorf("creating MPEG4 raw decoder: %w", err)
+		}
+	} else {
+		rc.rawDecoder, err = newMPEG4Decoder(rc.avFramePool, rc.logger, nil)
+		if err != nil {
+			return fmt.Errorf("creating MPEG4 raw decoder: %w", err)
+		}
+	}
+
+	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
+	if err != nil {
+		return fmt.Errorf("when calling RTSP Setup on %s for MPEG4: %w", session.BaseURL, err)
+	}
+
+	rc.client.OnPacketRTP(media, f, func(pkt *rtp.Packet) {
+		frame, err := mpeg4Decoder.Decode(pkt)
+		if err != nil {
+			return
+		}
+
+		if frame != nil {
+			if decodedFrame, err := rc.rawDecoder.decode(frame); err == nil && decodedFrame != nil {
+				rc.handleLatestFrame(decodedFrame)
+			}
+		}
+	})
+
+	return nil
+}
+
 // SubscribeRTP registers the PacketCallback which will be called when there are new packets.
 // NOTE: Packets may be dropped before calling packetsCB if the rate new packets are received by
 // the rtppassthrough.Source is greater than the rate the subscriber consumes them.
@@ -792,6 +858,8 @@ func modelToCodec(model resource.Model) (videoCodec, error) {
 		return H265, nil
 	case ModelMJPEG:
 		return MJPEG, nil
+	case ModelMPEG4:
+		return MPEG4, nil
 	default:
 		return Unknown, fmt.Errorf("model '%s' has unspecified codec handling", model.Name)
 	}
@@ -803,12 +871,14 @@ func getAvailableCodec(session *description.Session) videoCodec {
 	var h264 *format.H264
 	var h265 *format.H265
 	var mjpeg *format.MJPEG
+	var mpeg4 *format.MPEG4Video
 
 	// List of formats/codecs in priority order
 	codecFormats := []codecFormat{
 		{&h264, H264},
 		{&h265, H265},
 		{&mjpeg, MJPEG},
+		{&mpeg4, MPEG4},
 	}
 
 	for _, codecFormat := range codecFormats {
