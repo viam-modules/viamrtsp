@@ -98,7 +98,7 @@ The following attributes are available for all models of `viamrtsp` discovery se
 
 ### Next steps
 
-Use the `viam:viamrtsp:onvif` `discovery` service to retrieve a list of cameras discovered by the service and their configuration. Some cameras will output multiple channels, so review the `rtsp_address` of the cameras to determine which camera streams you wish to add.
+Use the `DiscoverResources` API by adding a `viam:viamrtsp:onvif` `discovery` model to retrieve a list of cameras discovered by the service and their configuration. Some cameras will output multiple channels, so review the `rtsp_address` of the cameras to determine which camera streams you wish to add.
 
 ### Common RTSP discovery pitfalls
 #### DHCP
