@@ -98,13 +98,7 @@ The following attributes are available for all models of `viamrtsp` discovery se
 
 ### Next steps
 
-Use the `DiscoverResources` API to retrieve a list of cameras discovered by the service and their configuration. Some cameras will output multiple channels, so review the `rtsp_address` of the cameras to determine which camera streams you wish to add.
-
-## RTSP stream discovery
-### Use `DiscoverComponents`
-In addition to being able to manually specify RTSP addresses to stream from, `viamrtsp` also offers a discovery utility to search for IP cameras connected to your LAN and return their respective RTSP addresses.
-
-Each model in `viamrtsp` registers a `Discover` method that can be invoked via a `DiscoverComponents` robot API call. See [examples/discovery-client](examples/discovery-client/client.go) for an example usage of discovery and [`DiscoverComponents`](https://docs.viam.com/appendix/apis/robot/#discovercomponents) for documentation.
+Use the `viam:viamrtsp:onvif` `discovery` service to retrieve a list of cameras discovered by the service and their configuration. Some cameras will output multiple channels, so review the `rtsp_address` of the cameras to determine which camera streams you wish to add.
 
 ### Common RTSP discovery pitfalls
 #### DHCP
