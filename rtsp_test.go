@@ -13,7 +13,6 @@ import (
 	"github.com/bluenviron/gortsplib/v4/pkg/base"
 	"github.com/bluenviron/gortsplib/v4/pkg/description"
 	"github.com/bluenviron/gortsplib/v4/pkg/format"
-	"github.com/bluenviron/gortsplib/v4/pkg/rtptime"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
 	"github.com/erh/viamupnp"
 	"github.com/koron/go-ssdp"
@@ -374,12 +373,7 @@ func newH264ServerHandler(
 					t.Log(err.Error())
 					t.FailNow()
 				}
-				rtpTime := &rtptime.Encoder{ClockRate: forma.ClockRate()}
-				err = rtpTime.Initialize()
-				if err != nil {
-					t.Log(err.Error())
-					t.FailNow()
-				}
+
 				start := time.Now()
 
 				// setup a ticker to sleep between frames
@@ -408,12 +402,9 @@ func newH264ServerHandler(
 						t.FailNow()
 					}
 
-					// get current timestamp
-					ts := rtpTime.Encode(time.Since(start))
-
 					// write packets to the server
 					for _, pkt := range pkts {
-						pkt.Timestamp = ts
+						pkt.Timestamp = uint32(multiplyAndDivide(int64(time.Since(start)), int64(forma.ClockRate()), int64(time.Second)))
 
 						sh.mu.Lock()
 						err = sh.stream.WritePacketRTP(sh.media, pkt)
@@ -445,6 +436,12 @@ func newH264ServerHandler(
 		test.That(t, h.s.Wait(), test.ShouldBeError, errors.New("terminated"))
 		h.wg.Wait()
 	}
+}
+
+func multiplyAndDivide(v, m, d int64) int64 {
+	secs := v / d
+	dec := v % d
+	return (secs*m + dec*m/d)
 }
 
 func TestUPNPStuff(t *testing.T) {
