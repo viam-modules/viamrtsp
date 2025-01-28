@@ -29,6 +29,8 @@ const (
 	yuyvMagicString    = "YUYV"
 	yuyvHeaderDimBytes = 4
 	yuyvBytesPerPixel  = 2
+	rgbaHeaderDimBytes = 4
+	rgbaBytesPerPixel  = 4
 )
 
 type mimeHandler struct {
@@ -36,6 +38,8 @@ type mimeHandler struct {
 	jpegEnc    *C.AVCodecContext
 	yuyvFrame  *C.AVFrame
 	yuyvSwsCtx *C.struct_SwsContext
+	rgbaFrame  *C.AVFrame
+	rgbaSwsCtx *C.struct_SwsContext
 	currentPTS int
 	mu         sync.Mutex
 }
@@ -198,9 +202,101 @@ func (mh *mimeHandler) initYUYVContext(frame *C.AVFrame) error {
 	return nil
 }
 
+func (mh *mimeHandler) convertRGBA(frame *C.AVFrame) ([]byte, camera.ImageMetadata, error) {
+	if frame == nil {
+		return nil, camera.ImageMetadata{}, errors.New("frame input is nil, cannot convert to RGBA")
+	}
+	// sws_scale is not thread-safe, so we need to lock here to prevent concurrent access.
+	mh.mu.Lock()
+	defer mh.mu.Unlock()
+	if mh.rgbaSwsCtx == nil || frame.width != mh.rgbaFrame.width || frame.height != mh.rgbaFrame.height {
+		if err := mh.initRGBAContext(frame); err != nil {
+			return nil, camera.ImageMetadata{}, err
+		}
+	}
+	if mh.rgbaSwsCtx == nil {
+		return nil, camera.ImageMetadata{}, errors.New("failed to create RGBA converter")
+	}
+	if mh.rgbaFrame == nil {
+		return nil, camera.ImageMetadata{}, errors.New("failed to create RGBA destination frame")
+	}
+	res := C.sws_scale(
+		mh.rgbaSwsCtx,
+		(**C.uint8_t)(unsafe.Pointer(&frame.data[0])),
+		(*C.int)(unsafe.Pointer(&frame.linesize[0])),
+		0,
+		frame.height,
+		(**C.uint8_t)(unsafe.Pointer(&mh.rgbaFrame.data[0])),
+		(*C.int)(unsafe.Pointer(&mh.rgbaFrame.linesize[0])),
+	)
+	if res < 0 {
+		return nil, camera.ImageMetadata{}, newAvError(res, "failed to convert frame to RGBA")
+	}
+
+	// Pack width and height into header bytes.
+	// Cribbed from rimage/image_file.go in RDK, which is used for image.Image, not bytes as in this case.
+	rgbaDataSize := int(mh.rgbaFrame.width) * int(mh.rgbaFrame.height) * rgbaBytesPerPixel
+	numBytesHeader := 12
+	headerBytes := make([]byte, numBytesHeader)
+	copy(headerBytes[0:4], []byte("RGBA"))
+	binary.BigEndian.PutUint32(headerBytes[4:8], uint32(mh.rgbaFrame.width))
+	binary.BigEndian.PutUint32(headerBytes[8:12], uint32(mh.rgbaFrame.height))
+	rgbaData := make([]byte, len(headerBytes)+rgbaDataSize)
+	copy(rgbaData[0:], headerBytes)
+	C.memcpy(unsafe.Pointer(&rgbaData[12]), unsafe.Pointer(mh.rgbaFrame.data[0]), C.size_t(rgbaDataSize))
+
+	return rgbaData, camera.ImageMetadata{
+		MimeType: rutils.MimeTypeRawRGBA,
+	}, nil
+}
+
+func (mh *mimeHandler) initRGBAContext(frame *C.AVFrame) error {
+	mh.logger.Info("creating RGBA sws context with frame size: ", frame.width, "x", frame.height)
+	if mh.rgbaSwsCtx != nil {
+		C.sws_freeContext(mh.rgbaSwsCtx)
+	}
+	if mh.rgbaFrame != nil {
+		C.av_frame_free(&mh.rgbaFrame)
+	}
+	mh.rgbaFrame = C.av_frame_alloc()
+	if mh.rgbaFrame == nil {
+		return errors.New("failed to allocate RGBA frame")
+	}
+	mh.rgbaFrame.width = frame.width
+	mh.rgbaFrame.height = frame.height
+	mh.rgbaFrame.format = 26 // AV_PIX_FMT_RGBA in FFmpeg
+	if res := C.av_frame_get_buffer(mh.rgbaFrame, 32); res < 0 {
+		C.av_frame_free(&mh.rgbaFrame)
+		return newAvError(res, "failed to allocate buffer for RGBA frame")
+	}
+	mh.rgbaSwsCtx = C.sws_getContext(
+		frame.width, frame.height, C.AV_PIX_FMT_YUV420P,
+		frame.width, frame.height, C.AV_PIX_FMT_RGBA,
+		C.SWS_FAST_BILINEAR, nil, nil, nil,
+	)
+	if mh.rgbaSwsCtx == nil {
+		C.av_frame_free(&mh.rgbaFrame)
+		return errors.New("failed to create RGBA converter")
+	}
+
+	return nil
+}
+
 func (mh *mimeHandler) close() {
 	if mh.jpegEnc != nil {
 		C.avcodec_free_context(&mh.jpegEnc)
+	}
+	if mh.yuyvSwsCtx != nil {
+		C.sws_freeContext(mh.yuyvSwsCtx)
+	}
+	if mh.yuyvFrame != nil {
+		C.av_frame_free(&mh.yuyvFrame)
+	}
+	if mh.rgbaSwsCtx != nil {
+		C.sws_freeContext(mh.rgbaSwsCtx)
+	}
+	if mh.rgbaFrame != nil {
+		C.av_frame_free(&mh.rgbaFrame)
 	}
 }
 
