@@ -127,7 +127,7 @@ func TestRGBAConvert(t *testing.T) {
 		bytes, metadata, err := mh.convertRGBA(frame)
 		test.That(t, err, test.ShouldBeNil)
 		test.That(t, bytes, test.ShouldNotBeNil)
-		test.That(t, len(bytes), test.ShouldEqual, width*height*rgbaBytesPerPixel)
+		test.That(t, len(bytes), test.ShouldEqual, width*height*rgbaBytesPerPixel+12) // header size
 		test.That(t, metadata.MimeType, test.ShouldEqual, rutils.MimeTypeRawRGBA)
 	})
 
@@ -142,7 +142,7 @@ func TestRGBAConvert(t *testing.T) {
 		bytes, metadata, err := mh.convertRGBA(frame)
 		test.That(t, err, test.ShouldBeNil)
 		test.That(t, bytes, test.ShouldNotBeNil)
-		test.That(t, len(bytes), test.ShouldEqual, width*height*rgbaBytesPerPixel)
+		test.That(t, len(bytes), test.ShouldEqual, width*height*rgbaBytesPerPixel+12) // header size
 		test.That(t, metadata.MimeType, test.ShouldEqual, rutils.MimeTypeRawRGBA)
 	})
 
