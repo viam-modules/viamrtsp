@@ -233,7 +233,7 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 			}
 
 			if badState {
-				if err := rc.reconnectClient(codecInfo); err != nil {
+				if err := rc.reconnectClientWithTransportFallback(codecInfo); err != nil {
 					rc.logger.Warnf("cannot reconnect to rtsp server err: %s", err.Error())
 				} else {
 					rc.logger.Infof("reconnected to rtsp server url: %s", rc.u)
@@ -255,14 +255,40 @@ func (rc *rtspCamera) closeConnection() {
 	}
 }
 
+func (rc *rtspCamera) reconnectClientWithTransportFallback(codecInfo videoCodec) error {
+	// Define the transport preferences in order
+	transportTCP := gortsplib.TransportTCP
+	transportUDP := gortsplib.TransportUDP
+	transportUDPMulticast := gortsplib.TransportUDPMulticast
+	transports := []*gortsplib.Transport{
+		&transportTCP,
+		&transportUDP,
+		&transportUDPMulticast,
+	}
+	var lastErr error
+	for _, transport := range transports {
+		rc.logger.Info("attempting to reconnect with transport: ", transport.String())
+		if err := rc.reconnectClient(codecInfo, transport); err != nil {
+			rc.logger.Warnf("cannot reconnect to rtsp server using transport %s, err: %s", transport.String(), err.Error())
+			lastErr = err
+			continue
+		}
+		rc.logger.Infof("reconnected to rtsp server url: %s", rc.u)
+		return nil
+	}
+	return fmt.Errorf("all attempts to reconnect to rtsp server failed: %w", lastErr)
+}
+
 // reconnectClient reconnects the RTSP client to the streaming server by closing the old one and starting a new one.
-func (rc *rtspCamera) reconnectClient(codecInfo videoCodec) error {
+func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib.Transport) error {
 	rc.logger.Warnf("reconnectClient called with codec: %s", codecInfo)
 
 	rc.closeConnection()
 
 	// replace the client with a new one, but close it if setup is not successful
-	rc.client = &gortsplib.Client{}
+	rc.client = &gortsplib.Client{
+		Transport: transport,
+	}
 	rc.client.OnPacketLost = func(err error) {
 		rc.logger.Debugf("OnPacketLost: err: %s", err)
 	}
@@ -492,8 +518,12 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		rc.logger.Warn("no PPS found in H265 format")
 	}
 
-	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
+	res, err := rc.client.Setup(session.BaseURL, media, 0, 0)
+	// err = rc.setupWithFallbackTransports(session.BaseURL, media)
 	if err != nil {
+		if res != nil {
+			return fmt.Errorf("status code when calling RTSP Setup on %s for H265: %w, status_code: %d", session.BaseURL, err, res.StatusCode)
+		}
 		return fmt.Errorf("when calling RTSP Setup on %s for H265: %w", session.BaseURL, err)
 	}
 
@@ -565,6 +595,45 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 
 		rc.latestMJPEGBytes.Store(&frame)
 	})
+
+	return nil
+}
+
+// setupWithFallbackTransports attempts to setup the RTSP client with the given URL and media
+// using the transports in the order of TCP, UDP, and UDP Multicast. This overrides gortsplib's
+// default behavior of trying UDP first.
+func (rc *rtspCamera) setupWithFallbackTransports(url *base.URL, media *description.Media) error {
+	// Define the transport preferences in order
+	transportTCP := gortsplib.TransportTCP
+	transportUDP := gortsplib.TransportUDP
+	transportUDPMulticast := gortsplib.TransportUDPMulticast
+	transports := []*gortsplib.Transport{
+		&transportTCP,
+		&transportUDP,
+		&transportUDPMulticast,
+	}
+	// var transportTCP gortsplib.Transport
+
+	var setupErr error
+	for _, transport := range transports {
+		rc.logger.Debug("attempting to setup with transport: ", transport.String())
+		rc.client.Transport = transport
+
+		_, err := rc.client.Setup(url, media, 0, 0)
+		// Status code is not being returned in response when SETUP fails, so we can't check for
+		// status code here and naively assume that if there is an error, it is due to the transport.
+		if err != nil {
+			rc.logger.Warnf("RTSP server does not support %s transport, trying next transport. Error: %s", transport.String(), err)
+			setupErr = fmt.Errorf("when calling RTSP Setup on %s: %w", url, err)
+			continue
+		}
+		setupErr = nil
+		break
+	}
+
+	if setupErr != nil {
+		return setupErr
+	}
 
 	return nil
 }
@@ -738,7 +807,8 @@ func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		return nil, err
 	}
 
-	err = rc.reconnectClient(codecInfo)
+	// err = rc.reconnectClient(codecInfo)
+	err = rc.reconnectClientWithTransportFallback(codecInfo)
 	if err != nil {
 		logger.Error(err.Error())
 		return nil, err
