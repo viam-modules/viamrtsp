@@ -274,13 +274,12 @@ func (rc *rtspCamera) reconnectClientWithFallbackTransports(codecInfo videoCodec
 	// If all attempts fail, return the last error.
 	var lastErr error
 	for _, transport := range transports {
-		rc.logger.Info("attempting to reconnect with transport: ", transport.String())
 		if err := rc.reconnectClient(codecInfo, transport); err != nil {
 			rc.logger.Warnf("cannot reconnect to rtsp server using transport %s, err: %s", transport.String(), err.Error())
 			lastErr = err
 			continue
 		}
-		rc.logger.Infof("reconnected to rtsp server url: %s", rc.u)
+		rc.logger.Debugf("successfully reconnected to rtsp server url: %s", rc.u)
 		return nil
 	}
 	return fmt.Errorf("all attempts to reconnect to rtsp server failed: %w", lastErr)
@@ -288,7 +287,7 @@ func (rc *rtspCamera) reconnectClientWithFallbackTransports(codecInfo videoCodec
 
 // reconnectClient reconnects the RTSP client to the streaming server by closing the old one and starting a new one.
 func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib.Transport) error {
-	rc.logger.Warnf("reconnectClient called with codec: %s", codecInfo)
+	rc.logger.Warnf("reconnectClient called with codec: %s and transport: %s", codecInfo, transport.String())
 
 	rc.closeConnection()
 
