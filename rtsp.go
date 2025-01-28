@@ -235,7 +235,7 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 			}
 
 			if badState {
-				if err := rc.reconnectClientWithTransportFallback(codecInfo); err != nil {
+				if err := rc.reconnectClientWithFallbackTransports(codecInfo); err != nil {
 					rc.logger.Warnf("cannot reconnect to rtsp server err: %s", err.Error())
 				} else {
 					rc.logger.Infof("reconnected to rtsp server url: %s", rc.u)
@@ -257,8 +257,11 @@ func (rc *rtspCamera) closeConnection() {
 	}
 }
 
-func (rc *rtspCamera) reconnectClientWithTransportFallback(codecInfo videoCodec) error {
-	// Define the transport preferences in order
+// reconnectClientWithFallbackTransports attempts to setup the RTSP client with the given codec
+// using the transports in the order of TCP, UDP, and UDP Multicast. This overrides gortsplib's
+// default behavior of trying UDP first.
+func (rc *rtspCamera) reconnectClientWithFallbackTransports(codecInfo videoCodec) error {
+	// Define the transport preferences in order.
 	transportTCP := gortsplib.TransportTCP
 	transportUDP := gortsplib.TransportUDP
 	transportUDPMulticast := gortsplib.TransportUDPMulticast
@@ -267,6 +270,8 @@ func (rc *rtspCamera) reconnectClientWithTransportFallback(codecInfo videoCodec)
 		&transportUDP,
 		&transportUDPMulticast,
 	}
+	// Try to reconnect with each transport in the order defined above.
+	// If all attempts fail, return the last error.
 	var lastErr error
 	for _, transport := range transports {
 		rc.logger.Info("attempting to reconnect with transport: ", transport.String())
@@ -524,7 +529,6 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 	}
 
 	res, err := rc.client.Setup(session.BaseURL, media, 0, 0)
-	// err = rc.setupWithFallbackTransports(session.BaseURL, media)
 	if err != nil {
 		if res != nil {
 			return fmt.Errorf("status code when calling RTSP Setup on %s for H265: %w, status_code: %d", session.BaseURL, err, res.StatusCode)
@@ -834,8 +838,7 @@ func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		return nil, err
 	}
 
-	// err = rc.reconnectClient(codecInfo)
-	err = rc.reconnectClientWithTransportFallback(codecInfo)
+	err = rc.reconnectClientWithFallbackTransports(codecInfo)
 	if err != nil {
 		logger.Error(err.Error())
 		return nil, err
