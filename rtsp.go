@@ -527,11 +527,8 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		rc.logger.Warn("no PPS found in H265 format")
 	}
 
-	res, err := rc.client.Setup(session.BaseURL, media, 0, 0)
+	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
 	if err != nil {
-		if res != nil {
-			return fmt.Errorf("status code when calling RTSP Setup on %s for H265: %w, status_code: %d", session.BaseURL, err, res.StatusCode)
-		}
 		return fmt.Errorf("when calling RTSP Setup on %s for H265: %w", session.BaseURL, err)
 	}
 
