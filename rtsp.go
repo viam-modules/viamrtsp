@@ -404,12 +404,12 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		}
 
 		publishToWebRTC := func(pkt *rtp.Packet) {
-			pts, ok := rc.client.PacketPTS(media, pkt)
+			pts, ok := rc.client.PacketPTS2(media, pkt)
 			if !ok {
 				return
 			}
 			ntp := time.Now()
-			u, err := fp.ProcessRTPPacket(pkt, ntp, pts, true)
+			u, err := fp.ProcessRTPPacket(pkt, ntp, time.Duration(pts), true)
 			if err != nil {
 				rc.logger.Debug(err.Error())
 				return
