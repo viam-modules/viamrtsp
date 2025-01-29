@@ -510,22 +510,28 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 			return
 		}
 
-		for _, nalu := range au {
-			frame, err := rc.rawDecoder.decode(nalu)
-			recoverableErr := &recoverableError{}
-			if errors.As(err, &recoverableErr) {
-				continue
+		// If the AU has more than one NALU, compact them into a single payload with NALUs seperated
+		// in AnnexB format. This is necessary because the H.265 decoder expects all NALUs for a frame
+		// to be in a single payload rather than chunked across multiple decode calls.
+		var packed []byte
+		for i, nalu := range au {
+			// Add start code prefix to all NALUs except the first one.
+			if i != 0 {
+				packed = append(packed, H2645StartCode()...)
 			}
-			if err != nil {
-				// This error is created with `github.com/pkg/errors`. Explicitly call `Error()` to
-				// avoid logging the stacktrace.
-				rc.logger.Debugw("error decoding(2) h265 rtsp stream", "err", err.Error())
-				return
-			}
+			packed = append(packed, nalu...)
+		}
 
-			if frame != nil {
-				rc.handleLatestFrame(frame)
-			}
+		frame, err := rc.rawDecoder.decode(packed)
+		if err != nil {
+			// This error is created with `github.com/pkg/errors`. Explicitly call `Error()` to
+			// avoid logging the stacktrace.
+			rc.logger.Debugw("error decoding(2) h265 rtsp stream", "err", err.Error())
+			return
+		}
+
+		if frame != nil {
+			rc.handleLatestFrame(frame)
 		}
 	})
 
