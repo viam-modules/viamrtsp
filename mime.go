@@ -8,13 +8,13 @@ package viamrtsp
 #include <libavutil/dict.h>
 #include <libavutil/frame.h>
 #include <libavutil/imgutils.h>
+#include <libavutil/pixfmt.h>
 #include <libswscale/swscale.h>
 #include <stdlib.h>
 */
 import "C"
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"sync"
@@ -26,12 +26,10 @@ import (
 )
 
 const (
-	yuyvMagicString    = "YUYV"
-	yuyvHeaderDimBytes = 4
-	yuyvBytesPerPixel  = 2
-	rgbaMagicString    = "RGBA"
-	rgbaHeaderDimBytes = 8
-	rgbaBytesPerPixel  = 4
+	yuyvMagicString   = "YUYV"
+	yuyvBytesPerPixel = 2
+	rgbaMagicString   = "RGBA"
+	rgbaBytesPerPixel = 4
 )
 
 type mimeHandler struct {
@@ -130,6 +128,32 @@ func (mh *mimeHandler) initJPEGEncoder(frame *C.AVFrame) error {
 	return nil
 }
 
+func (mh *mimeHandler) convertYUYV(frame *C.AVFrame) ([]byte, camera.ImageMetadata, error) {
+	return mh.convertPixelFormat(
+		frame,
+		yuyvMagicString,
+		&mh.yuyvSwsCtx,
+		&mh.yuyvFrame,
+		&mh.yuyvMu,
+		mh.initYUYVContext,
+		yuyvBytesPerPixel,
+		mimeTypeYUYV,
+	)
+}
+
+func (mh *mimeHandler) convertRGBA(frame *C.AVFrame) ([]byte, camera.ImageMetadata, error) {
+	return mh.convertPixelFormat(
+		frame,
+		rgbaMagicString,
+		&mh.rgbaSwsCtx,
+		&mh.rgbaFrame,
+		&mh.rgbaMu,
+		mh.initRGBAContext,
+		rgbaBytesPerPixel,
+		rutils.MimeTypeRawRGBA,
+	)
+}
+
 // convertPixelFormat handles the common logic for converting frames to different pixel formats
 func (mh *mimeHandler) convertPixelFormat(
 	frame *C.AVFrame,
@@ -139,7 +163,6 @@ func (mh *mimeHandler) convertPixelFormat(
 	mu *sync.Mutex,
 	initContext func(*C.AVFrame) error,
 	bytesPerPixel int,
-	headerDimBytes int,
 	mimeType string,
 ) ([]byte, camera.ImageMetadata, error) {
 	if frame == nil {
@@ -176,7 +199,7 @@ func (mh *mimeHandler) convertPixelFormat(
 	}
 
 	dataSize := int((*dstFrame).width) * int((*dstFrame).height) * bytesPerPixel
-	header := packHeader(format, int((*dstFrame).width), int((*dstFrame).height), headerDimBytes)
+	header := packHeader(format, int((*dstFrame).width), int((*dstFrame).height))
 	data := make([]byte, len(header)+dataSize)
 	copy(data[0:], header)
 	C.memcpy(unsafe.Pointer(&data[len(header)]), unsafe.Pointer((*dstFrame).data[0]), C.size_t(dataSize))
@@ -186,32 +209,12 @@ func (mh *mimeHandler) convertPixelFormat(
 	}, nil
 }
 
-func (mh *mimeHandler) convertYUYV(frame *C.AVFrame) ([]byte, camera.ImageMetadata, error) {
-	return mh.convertPixelFormat(
-		frame,
-		yuyvMagicString,
-		&mh.yuyvSwsCtx,
-		&mh.yuyvFrame,
-		&mh.yuyvMu,
-		mh.initYUYVContext,
-		yuyvBytesPerPixel,
-		yuyvHeaderDimBytes,
-		mimeTypeYUYV,
-	)
+func (mh *mimeHandler) initYUYVContext(frame *C.AVFrame) error {
+	return mh.initPixelFormatContext(frame, C.AV_PIX_FMT_YUYV422, &mh.yuyvSwsCtx, &mh.yuyvFrame)
 }
 
-func (mh *mimeHandler) convertRGBA(frame *C.AVFrame) ([]byte, camera.ImageMetadata, error) {
-	return mh.convertPixelFormat(
-		frame,
-		rgbaMagicString,
-		&mh.rgbaSwsCtx,
-		&mh.rgbaFrame,
-		&mh.rgbaMu,
-		mh.initRGBAContext,
-		rgbaBytesPerPixel,
-		rgbaHeaderDimBytes,
-		rutils.MimeTypeRawRGBA,
-	)
+func (mh *mimeHandler) initRGBAContext(frame *C.AVFrame) error {
+	return mh.initPixelFormatContext(frame, C.AV_PIX_FMT_RGBA, &mh.rgbaSwsCtx, &mh.rgbaFrame)
 }
 
 // initPixelFormatContext is a helper function that initializes the conversion context and destination frame
@@ -224,44 +227,51 @@ func (mh *mimeHandler) convertRGBA(frame *C.AVFrame) ([]byte, camera.ImageMetada
 // - dstFrame: Pointer to AVFrame pointer that will be initialized
 //
 // Returns error if any allocation or initialization fails
-func (mh *mimeHandler) initPixelFormatContext(frame *C.AVFrame, pixFmt C.int, swsCtxPtr **C.struct_SwsContext, dstFrame **C.AVFrame) error {
+func (mh *mimeHandler) initPixelFormatContext(
+	frame *C.AVFrame,
+	pixFmt C.enum_AVPixelFormat,
+	swsCtxPtr **C.struct_SwsContext,
+	dstFrame **C.AVFrame,
+) error {
 	mh.logger.Infof("creating sws context with frame size: %dx%d for format %d", frame.width, frame.height, pixFmt)
+
 	if *swsCtxPtr != nil {
 		C.sws_freeContext(*swsCtxPtr)
+		*swsCtxPtr = nil
 	}
 	if *dstFrame != nil {
 		C.av_frame_free(dstFrame)
+		*dstFrame = nil
 	}
-	*dstFrame = C.av_frame_alloc()
-	if *dstFrame == nil {
+
+	newFrame := C.av_frame_alloc()
+	if newFrame == nil {
 		return errors.New("failed to allocate frame")
 	}
-	(*dstFrame).width = frame.width
-	(*dstFrame).height = frame.height
-	(*dstFrame).format = pixFmt
-	if res := C.av_frame_get_buffer(*dstFrame, 32); res < 0 {
-		C.av_frame_free(dstFrame)
+
+	newFrame.width = frame.width
+	newFrame.height = frame.height
+	newFrame.format = C.int(pixFmt)
+
+	if res := C.av_frame_get_buffer(newFrame, 32); res < 0 {
+		C.av_frame_free(&newFrame)
 		return newAvError(res, "failed to allocate buffer for frame")
 	}
-	*swsCtxPtr = C.sws_getContext(
-		frame.width, frame.height, C.AV_PIX_FMT_YUV420P,
+
+	newSwsCtx := C.sws_getContext(
+		frame.width, frame.height, pixFmt,
 		frame.width, frame.height, pixFmt,
 		C.SWS_FAST_BILINEAR, nil, nil, nil,
 	)
-	if *swsCtxPtr == nil {
-		C.av_frame_free(dstFrame)
-		*dstFrame = nil
+
+	if newSwsCtx == nil {
+		C.av_frame_free(&newFrame)
 		return errors.New("failed to create converter")
 	}
+
+	*dstFrame = newFrame
+	*swsCtxPtr = newSwsCtx
 	return nil
-}
-
-func (mh *mimeHandler) initYUYVContext(frame *C.AVFrame) error {
-	return mh.initPixelFormatContext(frame, C.AV_PIX_FMT_YUYV422, &mh.yuyvSwsCtx, &mh.yuyvFrame)
-}
-
-func (mh *mimeHandler) initRGBAContext(frame *C.AVFrame) error {
-	return mh.initPixelFormatContext(frame, C.AV_PIX_FMT_RGBA, &mh.rgbaSwsCtx, &mh.rgbaFrame)
 }
 
 func (mh *mimeHandler) close() {
@@ -292,23 +302,21 @@ func (mh *mimeHandler) close() {
 // - Format string (4 bytes): A fixed string indicating the format (e.g., "YUYV" or "RGBA").
 // - Width (4 bytes): The width of the image, stored in big-endian format.
 // - Height (4 bytes): The height of the image, stored in big-endian format.
-func packHeader(format string, width, height int, dimBytes int) []byte {
-	var header bytes.Buffer
-	header.WriteString(format)
-	tmp := make([]byte, dimBytes)
-	binary.BigEndian.PutUint32(tmp, uint32(width))
-	header.Write(tmp)
-	binary.BigEndian.PutUint32(tmp, uint32(height))
-	header.Write(tmp)
-	return header.Bytes()
+func packHeader(format string, width, height int) []byte {
+	headerSize := 12
+	headerBytes := make([]byte, headerSize)
+	copy(headerBytes[0:4], []byte(format))
+	binary.BigEndian.PutUint32(headerBytes[4:8], uint32(width))
+	binary.BigEndian.PutUint32(headerBytes[8:12], uint32(height))
+	return headerBytes
 }
 
 // packYUYVHeader creates a header for YUYV data with the given width and height.
 func packYUYVHeader(width, height int) []byte {
-	return packHeader(yuyvMagicString, width, height, yuyvHeaderDimBytes)
+	return packHeader(yuyvMagicString, width, height)
 }
 
 // packRGBAHeader creates a header for RGBA data with the given width and height.
 func packRGBAHeader(width, height int) []byte {
-	return packHeader(rgbaMagicString, width, height, rgbaHeaderDimBytes)
+	return packHeader(rgbaMagicString, width, height)
 }
