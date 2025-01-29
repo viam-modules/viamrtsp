@@ -36,6 +36,7 @@ jobs:
             codec: "mjpeg"
             extra_ffmpeg_args: "-huffman 0"
             pix_fmt: "yuvj420p"
+            transport: "tcp"
           - name: "mpeg4"
             codec: "mpeg4"
             pix_fmt: "yuv420p"
@@ -52,6 +53,10 @@ jobs:
             codec: "mjpeg"
             extra_ffmpeg_args: "-huffman 0"
             pix_fmt: "yuvj420p"
+            transport: "udp"
+          - name: "mpeg4"
+            codec: "mpeg4"
+            pix_fmt: "yuv420p"
             transport: "udp"
 
     runs-on: ${{ matrix.platform.runner }}
