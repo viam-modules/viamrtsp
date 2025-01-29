@@ -235,7 +235,7 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 			}
 
 			if badState {
-				if err := rc.reconnectClient(codecInfo); err != nil {
+				if err := rc.reconnectClientWithFallbackTransports(codecInfo); err != nil {
 					rc.logger.Warnf("cannot reconnect to rtsp server err: %s", err.Error())
 				} else {
 					rc.logger.Infof("reconnected to rtsp server url: %s", rc.u)
@@ -257,14 +257,44 @@ func (rc *rtspCamera) closeConnection() {
 	}
 }
 
+// reconnectClientWithFallbackTransports attempts to setup the RTSP client with the given codec
+// using the transports in the order of TCP, UDP, and UDP Multicast. This overrides gortsplib's
+// default behavior of trying UDP first.
+func (rc *rtspCamera) reconnectClientWithFallbackTransports(codecInfo videoCodec) error {
+	// Define the transport preferences in order.
+	transportTCP := gortsplib.TransportTCP
+	transportUDP := gortsplib.TransportUDP
+	transportUDPMulticast := gortsplib.TransportUDPMulticast
+	transports := []*gortsplib.Transport{
+		&transportTCP,
+		&transportUDP,
+		&transportUDPMulticast,
+	}
+	// Try to reconnect with each transport in the order defined above.
+	// If all attempts fail, return the last error.
+	var lastErr error
+	for _, transport := range transports {
+		if err := rc.reconnectClient(codecInfo, transport); err != nil {
+			rc.logger.Warnf("cannot reconnect to rtsp server using transport %s, err: %s", transport.String(), err.Error())
+			lastErr = err
+			continue
+		}
+		rc.logger.Debugf("successfully reconnected to rtsp server url: %s", rc.u)
+		return nil
+	}
+	return fmt.Errorf("all attempts to reconnect to rtsp server failed: %w", lastErr)
+}
+
 // reconnectClient reconnects the RTSP client to the streaming server by closing the old one and starting a new one.
-func (rc *rtspCamera) reconnectClient(codecInfo videoCodec) error {
-	rc.logger.Warnf("reconnectClient called with codec: %s", codecInfo)
+func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib.Transport) error {
+	rc.logger.Warnf("reconnectClient called with codec: %s and transport: %s", codecInfo, transport.String())
 
 	rc.closeConnection()
 
 	// replace the client with a new one, but close it if setup is not successful
-	rc.client = &gortsplib.Client{}
+	rc.client = &gortsplib.Client{
+		Transport: transport,
+	}
 	rc.client.OnPacketLost = func(err error) {
 		rc.logger.Debugf("OnPacketLost: err: %s", err)
 	}
@@ -804,7 +834,7 @@ func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		return nil, err
 	}
 
-	err = rc.reconnectClient(codecInfo)
+	err = rc.reconnectClientWithFallbackTransports(codecInfo)
 	if err != nil {
 		logger.Error(err.Error())
 		return nil, err

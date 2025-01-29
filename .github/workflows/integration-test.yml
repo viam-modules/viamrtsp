@@ -27,16 +27,37 @@ jobs:
           - name: "h264"
             codec: "libx264"
             pix_fmt: "yuv420p"
+            transport: "tcp"
           - name: "h265"
             codec: "libx265"
             pix_fmt: "yuv420p"
+            transport: "tcp"
           - name: "mjpeg"
             codec: "mjpeg"
             extra_ffmpeg_args: "-huffman 0"
             pix_fmt: "yuvj420p"
+            transport: "tcp"
           - name: "mpeg4"
             codec: "mpeg4"
             pix_fmt: "yuv420p"
+            transport: "tcp"
+          - name: "h264"
+            codec: "libx264"
+            pix_fmt: "yuv420p"
+            transport: "udp"
+          - name: "h265"
+            codec: "libx265"
+            pix_fmt: "yuv420p"
+            transport: "udp"
+          - name: "mjpeg"
+            codec: "mjpeg"
+            extra_ffmpeg_args: "-huffman 0"
+            pix_fmt: "yuvj420p"
+            transport: "udp"
+          - name: "mpeg4"
+            codec: "mpeg4"
+            pix_fmt: "yuv420p"
+            transport: "udp"
 
     runs-on: ${{ matrix.platform.runner }}
 
@@ -65,7 +86,7 @@ jobs:
       run: ./mediamtx &
       
     - name: Run fake RTSP camera
-      run: ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec ${{ matrix.config.codec }} ${{ matrix.config.extra_ffmpeg_args }} -pix_fmt ${{ matrix.config.pix_fmt }} -f rtsp -rtsp_transport tcp rtsp://0.0.0.0:8554/live.stream &
+      run: ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec ${{ matrix.config.codec }} ${{ matrix.config.extra_ffmpeg_args }} -pix_fmt ${{ matrix.config.pix_fmt }} -f rtsp -rtsp_transport ${{ matrix.config.transport }} rtsp://0.0.0.0:8554/live.stream &
       
     - name: Install viam-server
       run: |
