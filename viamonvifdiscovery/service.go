@@ -20,6 +20,7 @@ import (
 var (
 	Model             = viamrtsp.Family.WithModel("onvif")
 	errNoCamerasFound = errors.New("no cameras found, ensure cameras are working or check credentials")
+	emptyCred         = device.Credentials{}
 )
 
 func init() {
@@ -65,7 +66,7 @@ func newDiscovery(_ context.Context, _ resource.Dependencies,
 	}
 	dis := &rtspDiscovery{
 		Named:       conf.ResourceName().AsNamed(),
-		Credentials: cfg.Credentials,
+		Credentials: append([]device.Credentials{emptyCred}, cfg.Credentials...),
 		logger:      logger,
 	}
 
