@@ -523,7 +523,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		}
 
 		if len(packed) == 0 {
-			rc.logger.Warn("no NALUs found in H265 AU skipping packet")
+			rc.logger.Warn("no NALUs found in H265 AU, skipping packet")
 			return
 		}
 
