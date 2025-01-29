@@ -17,6 +17,7 @@ import "C"
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"sync"
 	"unsafe"
 
@@ -166,7 +167,7 @@ func (mh *mimeHandler) convertPixelFormat(
 	mimeType string,
 ) ([]byte, camera.ImageMetadata, error) {
 	if frame == nil {
-		return nil, camera.ImageMetadata{}, errors.New("frame input is nil, cannot convert to " + format)
+		return nil, camera.ImageMetadata{}, fmt.Errorf("frame input is nil, cannot convert to %s", format)
 	}
 
 	mu.Lock()
@@ -179,10 +180,10 @@ func (mh *mimeHandler) convertPixelFormat(
 	}
 
 	if *swsCtx == nil {
-		return nil, camera.ImageMetadata{}, errors.New("failed to create " + format + " converter")
+		return nil, camera.ImageMetadata{}, fmt.Errorf("failed to create %s converter", format)
 	}
 	if *dstFrame == nil {
-		return nil, camera.ImageMetadata{}, errors.New("failed to create " + format + " destination frame")
+		return nil, camera.ImageMetadata{}, fmt.Errorf("failed to create %s destination frame", format)
 	}
 
 	res := C.sws_scale(
