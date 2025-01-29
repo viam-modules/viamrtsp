@@ -513,13 +513,18 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		// If the AU has more than one NALU, compact them into a single payload with NALUs seperated
 		// in AnnexB format. This is necessary because the H.265 decoder expects all NALUs for a frame
 		// to be in a single payload rather than chunked across multiple decode calls.
-		var packed []byte
+		packed := []byte{}
 		for i, nalu := range au {
 			// Add start code prefix to all NALUs except the first one.
 			if i != 0 {
 				packed = append(packed, H2645StartCode()...)
 			}
 			packed = append(packed, nalu...)
+		}
+
+		if len(packed) == 0 {
+			rc.logger.Warn("no NALUs found in H265 AU skipping packet")
+			return
 		}
 
 		frame, err := rc.rawDecoder.decode(packed)
