@@ -41,9 +41,7 @@ type mimeHandler struct {
 	rgbaFrame  *C.AVFrame
 	rgbaSwsCtx *C.struct_SwsContext
 	currentPTS int
-	jpegMu     sync.Mutex
-	yuyvMu     sync.Mutex
-	rgbaMu     sync.Mutex
+	mu         sync.Mutex
 }
 
 func newMimeHandler(logger logging.Logger) *mimeHandler {
@@ -92,8 +90,8 @@ func (mh *mimeHandler) convertJPEG(frame *C.AVFrame) ([]byte, camera.ImageMetada
 
 func (mh *mimeHandler) initJPEGEncoder(frame *C.AVFrame) error {
 	// Lock to prevent modifying encoder while it is being used concurrently.
-	mh.jpegMu.Lock()
-	defer mh.jpegMu.Unlock()
+	mh.mu.Lock()
+	defer mh.mu.Unlock()
 	mh.logger.Info("creating MJPEG encoder with frame size: ", frame.width, "x", frame.height)
 	if mh.jpegEnc != nil {
 		C.avcodec_free_context(&mh.jpegEnc)
@@ -135,7 +133,6 @@ func (mh *mimeHandler) convertYUYV(frame *C.AVFrame) ([]byte, camera.ImageMetada
 		yuyvMagicString,
 		&mh.yuyvSwsCtx,
 		&mh.yuyvFrame,
-		&mh.yuyvMu,
 		mh.initYUYVContext,
 		yuyvBytesPerPixel,
 		mimeTypeYUYV,
@@ -148,7 +145,6 @@ func (mh *mimeHandler) convertRGBA(frame *C.AVFrame) ([]byte, camera.ImageMetada
 		rgbaMagicString,
 		&mh.rgbaSwsCtx,
 		&mh.rgbaFrame,
-		&mh.rgbaMu,
 		mh.initRGBAContext,
 		rgbaBytesPerPixel,
 		rutils.MimeTypeRawRGBA,
@@ -161,7 +157,6 @@ func (mh *mimeHandler) convertPixelFormat(
 	format string,
 	swsCtx **C.struct_SwsContext,
 	dstFrame **C.AVFrame,
-	mu *sync.Mutex,
 	initContext func(*C.AVFrame) error,
 	bytesPerPixel int,
 	mimeType string,
@@ -170,8 +165,8 @@ func (mh *mimeHandler) convertPixelFormat(
 		return nil, camera.ImageMetadata{}, fmt.Errorf("frame input is nil, cannot convert to %s", format)
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
+	mh.mu.Lock()
+	defer mh.mu.Unlock()
 
 	if *swsCtx == nil || frame.width != (*dstFrame).width || frame.height != (*dstFrame).height {
 		if err := initContext(frame); err != nil {
@@ -260,7 +255,7 @@ func (mh *mimeHandler) initPixelFormatContext(
 	}
 
 	newSwsCtx := C.sws_getContext(
-		frame.width, frame.height, pixFmt,
+		frame.width, frame.height, C.AV_PIX_FMT_YUV420P,
 		frame.width, frame.height, pixFmt,
 		C.SWS_FAST_BILINEAR, nil, nil, nil,
 	)
