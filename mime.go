@@ -15,6 +15,7 @@ package viamrtsp
 import "C"
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -29,8 +30,11 @@ import (
 const (
 	yuyvMagicString   = "YUYV"
 	yuyvBytesPerPixel = 2
+
 	rgbaMagicString   = "RGBA"
 	rgbaBytesPerPixel = 4
+
+	headerStrDimBytes = 4
 )
 
 type mimeHandler struct {
@@ -164,7 +168,7 @@ func (mh *mimeHandler) convertPixelFormat(
 	if frame == nil {
 		return nil, camera.ImageMetadata{}, fmt.Errorf("frame input is nil, cannot convert to %s", format)
 	}
-
+	// sws_scale is not thread-safe, so we need to lock here to prevent concurrent access.
 	mh.mu.Lock()
 	defer mh.mu.Unlock()
 
@@ -299,12 +303,15 @@ func (mh *mimeHandler) close() {
 // - Width (4 bytes): The width of the image, stored in big-endian format.
 // - Height (4 bytes): The height of the image, stored in big-endian format.
 func packHeader(format string, width, height int) []byte {
-	headerSize := 12
-	headerBytes := make([]byte, headerSize)
-	copy(headerBytes[0:4], []byte(format))
-	binary.BigEndian.PutUint32(headerBytes[4:8], uint32(width))
-	binary.BigEndian.PutUint32(headerBytes[8:12], uint32(height))
-	return headerBytes
+	var header bytes.Buffer
+	header.WriteString(format)
+	tmp := make([]byte, headerStrDimBytes)
+	binary.BigEndian.PutUint32(tmp, uint32(width))
+	header.Write(tmp)
+	binary.BigEndian.PutUint32(tmp, uint32(height))
+	header.Write(tmp)
+
+	return header.Bytes()
 }
 
 // packYUYVHeader creates a header for YUYV data with the given width and height.
