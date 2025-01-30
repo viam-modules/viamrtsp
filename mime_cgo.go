@@ -90,29 +90,3 @@ func freeFrame(frame *C.AVFrame) {
 func createTestRGBAFrame(width, height int) *C.AVFrame {
 	return createTestFrame(width, height, C.AV_PIX_FMT_RGBA)
 }
-
-func fillDummyRGBAData(frame *C.AVFrame) {
-	width := int(frame.width)
-	height := int(frame.height)
-	linesize := int(frame.linesize[0])
-
-	rgbaPlane := (*[1 << 30]uint8)(unsafe.Pointer(frame.data[0]))[: height*linesize : height*linesize]
-
-	// Top half: solid red (255, 0, 0, 255)
-	// Bottom half: solid blue (0, 0, 255, 255)
-	for y := range height {
-		for x := range width {
-			idx := y*linesize + x*rgbaBytesPerPixel
-			if y < height/2 {
-				rgbaPlane[idx+0] = 255 // R
-				rgbaPlane[idx+1] = 0   // G
-				rgbaPlane[idx+2] = 0   // B
-			} else {
-				rgbaPlane[idx+0] = 0   // R
-				rgbaPlane[idx+1] = 0   // G
-				rgbaPlane[idx+2] = 255 // B
-			}
-			rgbaPlane[idx+3] = 255 // A always fully opaque
-		}
-	}
-}

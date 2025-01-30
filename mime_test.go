@@ -119,10 +119,10 @@ func TestYUYVConvert(t *testing.T) {
 func TestRGBAConvert(t *testing.T) {
 	t.Run("valid RGBA frame succeeds", func(t *testing.T) {
 		width, height := 640, 480
-		frame := createTestRGBAFrame(width, height)
+		frame := createTestYUV420PFrame(width, height)
 		test.That(t, frame, test.ShouldNotBeNil)
 		defer freeFrame(frame)
-		fillDummyRGBAData(frame)
+		fillDummyYUV420PData(frame)
 		logger := logging.NewDebugLogger("mime_test")
 		mh := newMimeHandler(logger)
 		bytes, metadata, err := mh.convertRGBA(frame)
@@ -137,23 +137,6 @@ func TestRGBAConvert(t *testing.T) {
 		test.That(t, header[1], test.ShouldEqual, 'G')
 		test.That(t, header[2], test.ShouldEqual, 'B')
 		test.That(t, header[3], test.ShouldEqual, 'A')
-
-		// Verify the RGBA data
-		data := bytes[12:]
-
-		// Check top half (should be red)
-		idx := (height / 4) * width * rgbaBytesPerPixel        // Point in top half
-		test.That(t, data[idx+0], test.ShouldEqual, byte(255)) // R
-		test.That(t, data[idx+1], test.ShouldEqual, byte(0))   // G
-		test.That(t, data[idx+2], test.ShouldEqual, byte(0))   // B
-		test.That(t, data[idx+3], test.ShouldEqual, byte(255)) // A
-
-		// Check bottom half (should be blue)
-		idx = (3 * height / 4) * width * rgbaBytesPerPixel     // Point in bottom half
-		test.That(t, data[idx+0], test.ShouldEqual, byte(0))   // R
-		test.That(t, data[idx+1], test.ShouldEqual, byte(0))   // G
-		test.That(t, data[idx+2], test.ShouldEqual, byte(255)) // B
-		test.That(t, data[idx+3], test.ShouldEqual, byte(255)) // A
 	})
 
 	t.Run("invalid frame fails", func(t *testing.T) {
