@@ -8,6 +8,7 @@ package viamrtsp
 #include <libavutil/dict.h>
 #include <libavutil/frame.h>
 #include <libavutil/imgutils.h>
+#include <libavutil/pixfmt.h>
 #include <libswscale/swscale.h>
 #include <stdlib.h>
 */
@@ -17,6 +18,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"sync"
 	"unsafe"
 
@@ -26,9 +28,13 @@ import (
 )
 
 const (
-	yuyvMagicString    = "YUYV"
-	yuyvHeaderDimBytes = 4
-	yuyvBytesPerPixel  = 2
+	yuyvMagicString   = "YUYV"
+	yuyvBytesPerPixel = 2
+
+	rgbaMagicString   = "RGBA"
+	rgbaBytesPerPixel = 4
+
+	headerStrDimBytes = 4
 )
 
 type mimeHandler struct {
@@ -36,6 +42,8 @@ type mimeHandler struct {
 	jpegEnc    *C.AVCodecContext
 	yuyvFrame  *C.AVFrame
 	yuyvSwsCtx *C.struct_SwsContext
+	rgbaFrame  *C.AVFrame
+	rgbaSwsCtx *C.struct_SwsContext
 	currentPTS int
 	mu         sync.Mutex
 }
@@ -86,7 +94,6 @@ func (mh *mimeHandler) convertJPEG(frame *C.AVFrame) ([]byte, camera.ImageMetada
 
 func (mh *mimeHandler) initJPEGEncoder(frame *C.AVFrame) error {
 	// Lock to prevent modifying encoder while it is being used concurrently.
-	// Frame param changes are rare, so we can afford to block here.
 	mh.mu.Lock()
 	defer mh.mu.Unlock()
 	mh.logger.Info("creating MJPEG encoder with frame size: ", frame.width, "x", frame.height)
@@ -116,7 +123,8 @@ func (mh *mimeHandler) initJPEGEncoder(frame *C.AVFrame) error {
 	if res < 0 {
 		return newAvError(res, "failed to set qscale option")
 	}
-	if res := C.avcodec_open2(mh.jpegEnc, codec, nil); res < 0 {
+	if res := C.avcodec_open2(mh.jpegEnc, codec, &opts); res < 0 {
+		C.avcodec_free_context(&mh.jpegEnc)
 		return newAvError(res, "failed to open MJPEG encoder")
 	}
 
@@ -124,99 +132,194 @@ func (mh *mimeHandler) initJPEGEncoder(frame *C.AVFrame) error {
 }
 
 func (mh *mimeHandler) convertYUYV(frame *C.AVFrame) ([]byte, camera.ImageMetadata, error) {
+	return mh.convertPixelFormat(
+		frame,
+		yuyvMagicString,
+		&mh.yuyvSwsCtx,
+		&mh.yuyvFrame,
+		mh.initYUYVContext,
+		yuyvBytesPerPixel,
+		mimeTypeYUYV,
+	)
+}
+
+func (mh *mimeHandler) convertRGBA(frame *C.AVFrame) ([]byte, camera.ImageMetadata, error) {
+	return mh.convertPixelFormat(
+		frame,
+		rgbaMagicString,
+		&mh.rgbaSwsCtx,
+		&mh.rgbaFrame,
+		mh.initRGBAContext,
+		rgbaBytesPerPixel,
+		rutils.MimeTypeRawRGBA,
+	)
+}
+
+// convertPixelFormat handles the common logic for converting frames to different pixel formats
+func (mh *mimeHandler) convertPixelFormat(
+	frame *C.AVFrame,
+	format string,
+	swsCtx **C.struct_SwsContext,
+	dstFrame **C.AVFrame,
+	initContext func(*C.AVFrame) error,
+	bytesPerPixel int,
+	mimeType string,
+) ([]byte, camera.ImageMetadata, error) {
 	if frame == nil {
-		return nil, camera.ImageMetadata{}, errors.New("frame input is nil, cannot convert to YUYV")
+		return nil, camera.ImageMetadata{}, fmt.Errorf("frame input is nil, cannot convert to %s", format)
 	}
 	// sws_scale is not thread-safe, so we need to lock here to prevent concurrent access.
 	mh.mu.Lock()
 	defer mh.mu.Unlock()
-	if mh.yuyvSwsCtx == nil || frame.width != mh.yuyvFrame.width || frame.height != mh.yuyvFrame.height {
-		if err := mh.initYUYVContext(frame); err != nil {
+
+	if *swsCtx == nil || frame.width != (*dstFrame).width || frame.height != (*dstFrame).height {
+		if err := initContext(frame); err != nil {
 			return nil, camera.ImageMetadata{}, err
 		}
 	}
-	if mh.yuyvSwsCtx == nil {
-		return nil, camera.ImageMetadata{}, errors.New("failed to create YUYV converter")
+
+	if *swsCtx == nil {
+		return nil, camera.ImageMetadata{}, fmt.Errorf("failed to create %s converter", format)
 	}
-	if mh.yuyvFrame == nil {
-		return nil, camera.ImageMetadata{}, errors.New("failed to create yuyv destination frame")
+	if *dstFrame == nil {
+		return nil, camera.ImageMetadata{}, fmt.Errorf("failed to create %s destination frame", format)
 	}
+
 	res := C.sws_scale(
-		mh.yuyvSwsCtx,
+		*swsCtx,
 		(**C.uint8_t)(unsafe.Pointer(&frame.data[0])),
 		(*C.int)(unsafe.Pointer(&frame.linesize[0])),
 		0,
 		frame.height,
-		(**C.uint8_t)(unsafe.Pointer(&mh.yuyvFrame.data[0])),
-		(*C.int)(unsafe.Pointer(&mh.yuyvFrame.linesize[0])),
+		(**C.uint8_t)(unsafe.Pointer(&(*dstFrame).data[0])),
+		(*C.int)(unsafe.Pointer(&(*dstFrame).linesize[0])),
 	)
 	if res < 0 {
-		return nil, camera.ImageMetadata{}, newAvError(res, "failed to convert frame to YUYV")
+		return nil, camera.ImageMetadata{}, newAvError(res, "failed to convert frame to "+format)
 	}
-	yuyvDataSize := int(mh.yuyvFrame.width) * int(mh.yuyvFrame.height) * yuyvBytesPerPixel
-	header := packYUYVHeader(int(mh.yuyvFrame.width), int(mh.yuyvFrame.height))
-	// Preallocate the final slice with the combined size of the header and the image data
-	yuyvPacket := make([]byte, len(header)+yuyvDataSize)
-	copy(yuyvPacket[0:], header)
-	// Copy the YUYV data directly into the preallocated slice
-	C.memcpy(unsafe.Pointer(&yuyvPacket[len(header)]), unsafe.Pointer(mh.yuyvFrame.data[0]), C.size_t(yuyvDataSize))
 
-	return yuyvPacket, camera.ImageMetadata{
-		MimeType: mimeTypeYUYV,
+	dataSize := int((*dstFrame).width) * int((*dstFrame).height) * bytesPerPixel
+	header := packHeader(format, int((*dstFrame).width), int((*dstFrame).height))
+	data := make([]byte, len(header)+dataSize)
+	copy(data[0:], header)
+	C.memcpy(unsafe.Pointer(&data[len(header)]), unsafe.Pointer((*dstFrame).data[0]), C.size_t(dataSize))
+
+	return data, camera.ImageMetadata{
+		MimeType: mimeType,
 	}, nil
 }
 
 func (mh *mimeHandler) initYUYVContext(frame *C.AVFrame) error {
-	mh.logger.Info("creating YUYV sws context with frame size: ", frame.width, "x", frame.height)
-	if mh.yuyvSwsCtx != nil {
-		C.sws_freeContext(mh.yuyvSwsCtx)
+	return mh.initPixelFormatContext(frame, C.AV_PIX_FMT_YUYV422, &mh.yuyvSwsCtx, &mh.yuyvFrame)
+}
+
+func (mh *mimeHandler) initRGBAContext(frame *C.AVFrame) error {
+	return mh.initPixelFormatContext(frame, C.AV_PIX_FMT_RGBA, &mh.rgbaSwsCtx, &mh.rgbaFrame)
+}
+
+// initPixelFormatContext is a helper function that initializes the conversion context and destination frame
+// for pixel format conversions. It handles cleanup of existing contexts/frames and allocation of new ones.
+//
+// Parameters:
+// - frame: Source AVFrame containing the input image
+// - pixFmt: Target pixel format to convert to
+// - swsCtxPtr: Pointer to SwsContext pointer that will be initialized
+// - dstFrame: Pointer to AVFrame pointer that will be initialized
+//
+// Returns error if any allocation or initialization fails
+func (mh *mimeHandler) initPixelFormatContext(
+	frame *C.AVFrame,
+	pixFmt C.enum_AVPixelFormat,
+	swsCtxPtr **C.struct_SwsContext,
+	dstFrame **C.AVFrame,
+) error {
+	mh.logger.Infof("creating sws context with frame size: %dx%d for format %d", frame.width, frame.height, pixFmt)
+
+	if *swsCtxPtr != nil {
+		C.sws_freeContext(*swsCtxPtr)
+		*swsCtxPtr = nil
 	}
-	if mh.yuyvFrame != nil {
-		C.av_frame_free(&mh.yuyvFrame)
-	}
-	mh.yuyvFrame = C.av_frame_alloc()
-	if mh.yuyvFrame == nil {
-		return errors.New("failed to allocate YUYV frame")
-	}
-	mh.yuyvFrame.width = frame.width
-	mh.yuyvFrame.height = frame.height
-	mh.yuyvFrame.format = C.AV_PIX_FMT_YUYV422
-	if res := C.av_frame_get_buffer(mh.yuyvFrame, 32); res < 0 {
-		C.av_frame_free(&mh.yuyvFrame)
-		return newAvError(res, "failed to allocate buffer for YUYV frame")
-	}
-	mh.yuyvSwsCtx = C.sws_getContext(
-		frame.width, frame.height, C.AV_PIX_FMT_YUV420P,
-		frame.width, frame.height, C.AV_PIX_FMT_YUYV422,
-		C.SWS_FAST_BILINEAR, nil, nil, nil,
-	)
-	if mh.yuyvSwsCtx == nil {
-		C.av_frame_free(&mh.yuyvFrame)
-		return errors.New("failed to create YUYV converter")
+	if *dstFrame != nil {
+		C.av_frame_free(dstFrame)
+		*dstFrame = nil
 	}
 
+	newFrame := C.av_frame_alloc()
+	if newFrame == nil {
+		return errors.New("failed to allocate frame")
+	}
+
+	newFrame.width = frame.width
+	newFrame.height = frame.height
+	newFrame.format = C.int(pixFmt)
+
+	if res := C.av_frame_get_buffer(newFrame, 32); res < 0 {
+		C.av_frame_free(&newFrame)
+		return newAvError(res, "failed to allocate buffer for frame")
+	}
+
+	newSwsCtx := C.sws_getContext(
+		frame.width, frame.height, C.AV_PIX_FMT_YUV420P,
+		frame.width, frame.height, pixFmt,
+		C.SWS_FAST_BILINEAR, nil, nil, nil,
+	)
+
+	if newSwsCtx == nil {
+		C.av_frame_free(&newFrame)
+		return errors.New("failed to create converter")
+	}
+
+	*dstFrame = newFrame
+	*swsCtxPtr = newSwsCtx
 	return nil
 }
 
 func (mh *mimeHandler) close() {
 	if mh.jpegEnc != nil {
 		C.avcodec_free_context(&mh.jpegEnc)
+		mh.jpegEnc = nil
+	}
+	if mh.yuyvSwsCtx != nil {
+		C.sws_freeContext(mh.yuyvSwsCtx)
+		mh.yuyvSwsCtx = nil
+	}
+	if mh.yuyvFrame != nil {
+		C.av_frame_free(&mh.yuyvFrame)
+		mh.yuyvFrame = nil
+	}
+	if mh.rgbaSwsCtx != nil {
+		C.sws_freeContext(mh.rgbaSwsCtx)
+		mh.rgbaSwsCtx = nil
+	}
+	if mh.rgbaFrame != nil {
+		C.av_frame_free(&mh.rgbaFrame)
+		mh.rgbaFrame = nil
 	}
 }
 
-// packYUYVHeader creates a header for YUYV data with the given width and height.
+// packHeader creates a header for image data with the given format, width and height.
 // The header structure is as follows:
-// - "YUYV" (4 bytes): A fixed string indicating the format.
+// - Format string (4 bytes): A fixed string indicating the format (e.g., "YUYV" or "RGBA").
 // - Width (4 bytes): The width of the image, stored in big-endian format.
 // - Height (4 bytes): The height of the image, stored in big-endian format.
-func packYUYVHeader(width, height int) []byte {
+func packHeader(format string, width, height int) []byte {
 	var header bytes.Buffer
-	header.WriteString(yuyvMagicString)
-	tmp := make([]byte, yuyvHeaderDimBytes)
+	header.WriteString(format)
+	tmp := make([]byte, headerStrDimBytes)
 	binary.BigEndian.PutUint32(tmp, uint32(width))
 	header.Write(tmp)
 	binary.BigEndian.PutUint32(tmp, uint32(height))
 	header.Write(tmp)
 
 	return header.Bytes()
+}
+
+// packYUYVHeader creates a header for YUYV data with the given width and height.
+func packYUYVHeader(width, height int) []byte {
+	return packHeader(yuyvMagicString, width, height)
+}
+
+// packRGBAHeader creates a header for RGBA data with the given width and height.
+func packRGBAHeader(width, height int) []byte {
+	return packHeader(rgbaMagicString, width, height)
 }

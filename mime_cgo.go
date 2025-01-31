@@ -86,3 +86,7 @@ func fillDummyYUV420PData(frame *C.AVFrame) {
 func freeFrame(frame *C.AVFrame) {
 	C.av_frame_free(&frame)
 }
+
+func createTestRGBAFrame(width, height int) *C.AVFrame {
+	return createTestFrame(width, height, C.AV_PIX_FMT_RGBA)
+}

@@ -1059,6 +1059,8 @@ func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, camera.ImageM
 		bytes, metadata, err = rc.mimeHandler.convertJPEG(currentFrame.frame)
 	case mimeTypeYUYV, mimeTypeYUYV + "+" + rutils.MimeTypeSuffixLazy:
 		bytes, metadata, err = rc.mimeHandler.convertYUYV(currentFrame.frame)
+	case rutils.MimeTypeRawRGBA, rutils.MimeTypeRawRGBA + "+" + rutils.MimeTypeSuffixLazy:
+		bytes, metadata, err = rc.mimeHandler.convertRGBA(currentFrame.frame)
 	default:
 		rc.logger.Debugf("unsupported mime type: %s, defaulting to JPEG", mimeType)
 		bytes, metadata, err = rc.mimeHandler.convertJPEG(currentFrame.frame)
