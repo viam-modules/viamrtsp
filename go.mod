@@ -6,22 +6,22 @@ toolchain go1.23.2
 
 require (
 	github.com/beevik/etree v1.1.0
-	github.com/bluenviron/gortsplib/v4 v4.8.0
-	github.com/bluenviron/mediacommon v1.9.2
+	github.com/bluenviron/gortsplib/v4 v4.12.2
+	github.com/bluenviron/mediacommon v1.13.3
 	github.com/edaniels/golinters v0.0.5-0.20220906153528-641155550742
 	github.com/elgs/gostrgen v0.0.0-20161222160715-9d61ae07eeae
 	github.com/erh/viamupnp v0.0.0-20241217142932-2fecf833407c
 	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/golangci/golangci-lint v1.61.0
 	github.com/koron/go-ssdp v0.0.4
-	github.com/pion/rtp v1.8.7
+	github.com/pion/rtp v1.8.11
 	github.com/rhysd/actionlint v1.6.27
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	go.uber.org/zap v1.27.0
 	go.viam.com/rdk v0.57.1-0.20250108163155-2071720cd8d3
 	go.viam.com/test v1.2.4
 	go.viam.com/utils v0.1.118
-	golang.org/x/net v0.30.0
+	golang.org/x/net v0.34.0
 )
 
 require (
@@ -222,9 +222,9 @@ require (
 	github.com/pion/mdns v0.0.12 // indirect
 	github.com/pion/mediadevices v0.6.4 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
-	github.com/pion/rtcp v1.2.14 // indirect
+	github.com/pion/rtcp v1.2.15 // indirect
 	github.com/pion/sctp v1.8.33 // indirect
-	github.com/pion/sdp/v3 v3.0.9 // indirect
+	github.com/pion/sdp/v3 v3.0.10 // indirect
 	github.com/pion/srtp/v2 v2.0.20 // indirect
 	github.com/pion/stun v0.6.1 // indirect
 	github.com/pion/transport/v2 v2.2.10 // indirect
@@ -310,15 +310,15 @@ require (
 	go.viam.com/api v0.1.380 // indirect
 	goji.io v2.0.2+incompatible // indirect
 	golang.org/x/arch v0.0.0-20210923205945-b76863e36670 // indirect
-	golang.org/x/crypto v0.28.0 // indirect
+	golang.org/x/crypto v0.32.0 // indirect
 	golang.org/x/exp v0.0.0-20240904232852-e7e105dedf7e // indirect
 	golang.org/x/exp/typeparams v0.0.0-20240314144324-c7f7c6466f7f // indirect
 	golang.org/x/image v0.19.0 // indirect
 	golang.org/x/mod v0.21.0 // indirect
 	golang.org/x/oauth2 v0.22.0 // indirect
-	golang.org/x/sync v0.8.0 // indirect
-	golang.org/x/sys v0.27.0 // indirect
-	golang.org/x/text v0.19.0 // indirect
+	golang.org/x/sync v0.10.0 // indirect
+	golang.org/x/sys v0.29.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/time v0.6.0 // indirect
 	golang.org/x/tools v0.24.0 // indirect
 	gonum.org/v1/gonum v0.12.0 // indirect
