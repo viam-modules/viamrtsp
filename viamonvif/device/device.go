@@ -327,6 +327,7 @@ func (dev *Device) sendSoap(endpoint, message string) ([]byte, error) {
 	}
 	req.Header.Set("Content-Type", contentType)
 
+	// Using Do instead of POST to support context cancellation and timeout.
 	resp, err := dev.params.HTTPClient.Do(req)
 	if err != nil {
 		return nil, err
