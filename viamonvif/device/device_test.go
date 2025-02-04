@@ -2,12 +2,14 @@ package device
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"go.viam.com/rdk/logging"
 	"go.viam.com/test"
@@ -51,10 +53,14 @@ func TestSendSoapNoHang(t *testing.T) {
 		serverURL, err := url.Parse(server.URL)
 		test.That(t, err, test.ShouldBeNil)
 
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+
 		// Create device with the context
 		dev, err := NewDevice(Params{
 			Xaddr:      serverURL,
 			HTTPClient: &http.Client{},
+			Context:    ctx,
 		}, logger)
 		test.That(t, err, test.ShouldBeNil)
 

@@ -545,7 +545,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 			return
 		}
 
-		// If the AU has more than one NALU, compact them into a single payload with NALUs seperated
+		// If the AU has more than one NALU, compact them into a single payload with NALUs separated
 		// in AnnexB format. This is necessary because the H.265 decoder expects all NALUs for a frame
 		// to be in a single payload rather than chunked across multiple decode calls.
 		packed := []byte{}

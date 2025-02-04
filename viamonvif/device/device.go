@@ -7,6 +7,7 @@ package device
 
 import (
 	"bytes"
+	"context"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -53,6 +54,7 @@ type Device struct {
 	logger    logging.Logger
 	params    Params
 	endpoints map[string]string
+	ctx       context.Context
 }
 
 // Params configures the device connection.
@@ -61,6 +63,7 @@ type Params struct {
 	Username   string
 	Password   string
 	HTTPClient *http.Client
+	Context    context.Context
 }
 
 // GetProfiles is a request to the GetProfiles onvif endpoint.
@@ -88,11 +91,16 @@ type GetCapabilities struct {
 
 // NewDevice function construct a ONVIF Device entity.
 func NewDevice(params Params, logger logging.Logger) (*Device, error) {
+	if params.Context == nil {
+		params.Context = context.Background()
+	}
+
 	dev := &Device{
 		xaddr:     params.Xaddr,
 		logger:    logger,
 		params:    params,
 		endpoints: map[string]string{"device": params.Xaddr.String()},
+		ctx:       params.Context,
 	}
 
 	if dev.params.HTTPClient == nil {
@@ -312,10 +320,14 @@ func (dev Device) callOnvifServiceMethod(endpoint string, method interface{}) ([
 
 func (dev *Device) sendSoap(endpoint, message string) ([]byte, error) {
 	contentType := "application/soap+xml; charset=utf-8"
-	//nolint: noctx
-	// TODO(Nick S): This is pretty bad as it can cause the goroutine calling this to hang forever
-	// this should be converted to the http interface that takes a context
-	resp, err := dev.params.HTTPClient.Post(endpoint, contentType, bytes.NewBufferString(message))
+
+	req, err := http.NewRequestWithContext(dev.ctx, http.MethodPost, endpoint, bytes.NewBufferString(message))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", contentType)
+
+	resp, err := dev.params.HTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

@@ -46,7 +46,7 @@ func DiscoverCameras(
 		utils.ManagedGo(func() {
 			cameraInfo, err := DiscoverCameraInfo(ctx, xaddr, creds, logger)
 			if err != nil {
-				logger.Warnf("failed to connect to ONVIF device %w", err)
+				logger.Warnf("failed to connect to ONVIF device %s", err)
 				return
 			}
 			ch <- cameraInfo
