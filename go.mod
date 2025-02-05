@@ -22,6 +22,8 @@ require (
 	go.viam.com/test v1.2.4
 	go.viam.com/utils v0.1.118
 	golang.org/x/net v0.30.0
+	github.com/viam-modules/video-store v0.0.3
+
 )
 
 require (
@@ -97,7 +99,7 @@ require (
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/firefart/nonamedreturns v1.0.5 // indirect
 	github.com/fogleman/gg v1.3.0 // indirect
-	github.com/fsnotify/fsnotify v1.6.0 // indirect
+	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/fullstorydev/grpcurl v1.8.6 // indirect
 	github.com/fzipp/gocyclo v0.6.0 // indirect
 	github.com/gen2brain/malgo v0.11.21 // indirect
@@ -339,3 +341,5 @@ require (
 	mvdan.cc/unparam v0.0.0-20240528143540-8a5130ca722f // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 )
+
+replace github.com/viam-modules/video-store => ./video-store/video-store-review
