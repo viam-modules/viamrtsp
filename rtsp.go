@@ -9,7 +9,6 @@ import "C"
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"sync"
@@ -405,24 +404,9 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		return fmt.Errorf("creating H264 raw decoder: %w", err)
 	}
 
-	// Setup segmenter
-	rc.logger.Info("setting up H264 segmenter")
-	// prtint out initial SPS and PPS
-	// if f.SPS != nil {
-	// 	// print out actual bytes
-	// 	rc.logger.Infof("SPS: %v", f.SPS)
-	// } else {
-	err = rc.rawSegmenter.Init(C.AV_CODEC_ID_H264, f.SPS, f.PPS)
-	if err != nil {
-		rc.logger.Errorf("error initializing H264 segmenter: %s", err)
-	}
-	rc.logger.Info("H264 segmenter setup complete")
-
 	// if SPS and PPS are present into the SDP, send them to the decoder
 	initialSPSAndPPS := [][]byte{}
 	if f.SPS != nil {
-		// log out SPS bytes
-		rc.logger.Info("SPS bytes: ", f.SPS)
 		initialSPSAndPPS = append(initialSPSAndPPS, f.SPS)
 	} else {
 		rc.logger.Warn("no initial SPS found in H264 format")
@@ -434,36 +418,42 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		rc.logger.Warn("no initial PPS found in H264 format")
 	}
 
-	var receivedFirstIDR bool
-	storeImage := func(pkt *rtp.Packet) {
-		au, err := rtpDec.Decode(pkt)
-		if err != nil {
-			if !errors.Is(err, rtph264.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph264.ErrMorePacketsNeeded) {
-				rc.logger.Debugf("error decoding(1) h264 rstp stream %w", err)
-			}
-			return
-		}
-
-		if !receivedFirstIDR && h264.IDRPresent(au) {
-			rc.logger.Debug("adding initial SPS & PPS")
-			receivedFirstIDR = true
-			au = append(initialSPSAndPPS, au...)
-		}
-
-		rc.storeH264Frame(au)
+	// Setup segmenter
+	err = rc.rawSegmenter.Init(C.AV_CODEC_ID_H264, f.SPS, f.PPS)
+	if err != nil {
+		rc.logger.Errorf("error initializing H264 segmenter: %s", err)
 	}
 
+	// var receivedFirstIDR bool
+	// storeImage := func(pkt *rtp.Packet) {
+	// 	au, err := rtpDec.Decode(pkt)
+	// 	if err != nil {
+	// 		if !errors.Is(err, rtph264.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph264.ErrMorePacketsNeeded) {
+	// 			rc.logger.Debugf("error decoding(1) h264 rstp stream %w", err)
+	// 		}
+	// 		return
+	// 	}
+
+	// 	if !receivedFirstIDR && h264.IDRPresent(au) {
+	// 		rc.logger.Debug("adding initial SPS & PPS")
+	// 		receivedFirstIDR = true
+	// 		au = append(initialSPSAndPPS, au...)
+	// 	}
+
+	// 	rc.storeH264Frame(au)
+	// }
+
 	var receivedFirstSegmentKeyframe bool
-	// var firstParamsWritten bool
 	segmentPacket := func(pkt *rtp.Packet) {
 		pts, ok := rc.client.PacketPTS(media, pkt)
 		if !ok {
 			rc.logger.Info("no pts found for packet")
 		}
-		// convert pts which is in Time.Duration to int64
+		// Convert pts which is in Time.Duration to ms
 		int64pts := int64(pts / time.Millisecond)
-		// rc.logger.Info("pts found for packet: ", int64pts)
 		au, err := rtpDec.Decode(pkt)
+		//  We need to wait for for the full frame boundary to be received before
+		// we can send the frame to the segmenter.
 		if err != nil {
 			if !errors.Is(err, rtph264.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph264.ErrMorePacketsNeeded) {
 				rc.logger.Debugf("error decoding(1) h264 rstp stream %w", err)
@@ -472,11 +462,11 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		}
 		if !receivedFirstSegmentKeyframe {
 			if h264.IDRPresent(au) {
-				rc.logger.Info("found first segment keyframe")
+				rc.logger.Debug("segmenter found first segment keyframe")
 				receivedFirstSegmentKeyframe = true
-				au = append(initialSPSAndPPS, au...)
+				// au = append(initialSPSAndPPS, au...)
 			} else {
-				rc.logger.Info("skipping non-keyframe")
+				rc.logger.Debug("segmenter is waiting for first keyframe")
 				return
 			}
 		}
@@ -485,40 +475,33 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		packed := []byte{}
 		for _, nalu := range au {
 			if len(nalu) == 0 {
-				rc.logger.Warn("empty NALU found in H264 AU, skipping NALU")
+				rc.logger.Warn("segmenter found empty NALU found in H264 AU, skipping NALU")
 				continue
 			}
-			// Filter out SPS and PPS
+			// Skip in-band parameter sets as they are provided in the codec context.
+			// Some video players may not handle in-band parameter sets correctly.
 			typ := h264.NALUType(nalu[0] & h264NALUTypeMask)
 			if typ == h264.NALUTypeSPS || typ == h264.NALUTypePPS {
-				rc.logger.Infof("skipping NALU of type %s", typ)
+				rc.logger.Debugf("segmenter skipping NALU of type %s", typ)
 				continue
 			}
-			// Add start code prefix to all NALUs except the first non-empty one.
-			// packed = append(packed, H2645StartCode()...)
+			// Convert NALU length to big-endian 4-byte integer.
 			naluLen := uint32(len(nalu))
-			// Convert length to big-endian 4-byte integer
 			lengthBytes := []byte{
 				byte(naluLen >> 24),
 				byte(naluLen >> 16),
 				byte(naluLen >> 8),
 				byte(naluLen),
 			}
-			rc.logger.Infof("Adding nalu of type %s, length: %d", typ, naluLen)
+			// Prepend the AVC header to the NALU.
 			packed = append(packed, lengthBytes...)
-
 			packed = append(packed, nalu...)
 		}
 
-		hexdump := hex.Dump(packed)
-		rc.logger.Infof("hexdump of packed data:\n%s", hexdump)
-
-		// err = rc.rawSegmenter.WritePacket(pkt, int64pts)
 		err = rc.rawSegmenter.WritePacket(packed, int64pts)
 		if err != nil {
 			rc.logger.Errorf("error writing packet to segmenter: %s", err)
 		}
-		rc.logger.Info("packet written to segmenter")
 	}
 
 	onPacketRTP := func(pkt *rtp.Packet) {
@@ -530,7 +513,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		// }
 		// rc.logger.Info("packet written to segmenter")
 		// segmentPacket(pkt)
-		storeImage(pkt)
+		// storeImage(pkt)
 	}
 
 	if rc.rtpPassthrough {
