@@ -106,6 +106,7 @@ func init() {
 type Config struct {
 	Address        string               `json:"rtsp_address"`
 	RTPPassthrough *bool                `json:"rtp_passthrough"`
+	LazyDecode     bool                 `json:"lazy_decode"`
 	Query          viamupnp.DeviceQuery `json:"query"`
 }
 
@@ -161,7 +162,8 @@ type rtspCamera struct {
 	resource.AlwaysRebuild
 	model resource.Model
 	gostream.VideoReader
-	u *base.URL
+	u             *base.URL
+	lazyDecodeRTP bool
 
 	auMu       sync.Mutex
 	au         [][]byte
@@ -448,11 +450,15 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 			return
 		}
 
-		if h264.IDRPresent(au) {
-			rc.resetAU(au)
-			return
+		if rc.lazyDecodeRTP {
+			if h264.IDRPresent(au) {
+				rc.resetAU(au)
+			} else {
+				rc.appendAU(au)
+			}
+		} else {
+			rc.storeH264Frame(au)
 		}
-		rc.appendAU(au)
 	}
 
 	onPacketRTP := func(pkt *rtp.Packet) {
@@ -510,6 +516,10 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 	if rc.rtpPassthrough {
 		rc.logger.Warn("rtp_passthrough is only supported for H264 codec. rtp_passthrough features disabled due to H265 RTSP track")
+	}
+
+	if rc.lazyDecodeRTP {
+		rc.logger.Warn("lazy_decode is currently only supported for H264 codec. lazy_decode features disabled due to H265 RTSP track")
 	}
 	var f *format.H265
 
@@ -572,7 +582,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 			return
 		}
 
-		// If the AU has more than one NALU, compact them into a single payload with NALUs seperated
+		// If the AU has more than one NALU, compact them into a single payload with NALUs separated
 		// in AnnexB format. This is necessary because the H.265 decoder expects all NALUs for a frame
 		// to be in a single payload rather than chunked across multiple decode calls.
 		packed := []byte{}
@@ -616,6 +626,9 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 	if rc.rtpPassthrough {
 		rc.logger.Warn("rtp_passthrough is only supported for H264 codec. rtp_passthrough features disabled due to MJPEG RTSP track")
 	}
+	if rc.lazyDecodeRTP {
+		rc.logger.Warn("lazy_decode is currently only supported for H264 codec. lazy_decode features disabled due to MJPEG RTSP track")
+	}
 	var f *format.MJPEG
 	media := session.FindFormat(&f)
 	if media == nil {
@@ -652,6 +665,10 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 func (rc *rtspCamera) initMPEG4(session *description.Session) error {
 	if rc.rtpPassthrough {
 		rc.logger.Warn("rtp_passthrough is only supported for H264 codec. rtp_passthrough features disabled due to MPEG4 RTSP track")
+	}
+
+	if rc.lazyDecodeRTP {
+		rc.logger.Warn("lazy_decode is currently only supported for H264 codec. lazy_decode features disabled due to MPEG4 RTSP track")
 	}
 
 	var f *format.MPEG4Video
@@ -862,6 +879,7 @@ func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 	rtpPassthroughCtx, rtpPassthroughCancelCauseFn := context.WithCancelCause(context.Background())
 	rc := &rtspCamera{
 		model:                       conf.Model,
+		lazyDecodeRTP:               newConf.LazyDecode,
 		u:                           u,
 		name:                        conf.ResourceName(),
 		rtpPassthrough:              rtpPassthrough,
@@ -973,7 +991,7 @@ func (rc *rtspCamera) storeH264Frame(au [][]byte) {
 			// the NALUs that were compacted.
 			// We do this so that the libav functions the decoder uses under the hood don't log
 			// spam error messages (which happens when it is fed SPS or PPS without an IDR
-			nalu, nalusCompacted := rc.compactH264SPSAndPPSAndIDR(au[naluIndex:])
+			nalu, nalusCompacted := compactH264SPSAndPPSAndIDR(au[naluIndex:])
 			if err := rc.decodeAndStore(nalu); err != nil {
 				rc.logger.Debugf("error decoding(2) h264 rtsp stream  %s", err.Error())
 				return
@@ -991,7 +1009,7 @@ func (rc *rtspCamera) storeH264Frame(au [][]byte) {
 	}
 }
 
-func (rc *rtspCamera) compactH264SPSAndPPSAndIDR(au [][]byte) ([]byte, int) {
+func compactH264SPSAndPPSAndIDR(au [][]byte) ([]byte, int) {
 	compactedNALU, numCompacted := []byte{}, 0
 	for _, nalu := range au {
 		if !isCompactableH264(nalu) {
