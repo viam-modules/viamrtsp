@@ -165,6 +165,8 @@ type rtspCamera struct {
 	u             *base.URL
 	lazyDecodeRTP bool
 
+	closeMu sync.RWMutex
+
 	auMu       sync.Mutex
 	au         [][]byte
 	client     *gortsplib.Client
@@ -204,6 +206,8 @@ type rtspCamera struct {
 // Close closes the camera. It always returns nil, but because of Close() interface, it needs to return an error.
 func (rc *rtspCamera) Close(_ context.Context) error {
 	rc.cancelFunc()
+	rc.closeMu.Lock()
+	defer rc.closeMu.Unlock()
 	rc.unsubscribeAll()
 	rc.activeBackgroundWorkers.Wait()
 	rc.closeConnection()
@@ -254,6 +258,7 @@ func (rc *rtspCamera) closeConnection() {
 		rc.client.Close()
 		rc.client = nil
 	}
+	rc.resetAU(nil)
 	rc.currentCodec.Store(0)
 	if rc.rawDecoder != nil {
 		rc.rawDecoder.close()
@@ -377,8 +382,10 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib
 func (rc *rtspCamera) consumeAU() {
 	rc.auMu.Lock()
 	defer rc.auMu.Unlock()
-	rc.storeH264Frame(rc.au)
-	rc.au = [][]byte{}
+	if len(rc.au) > 0 {
+		rc.storeH264Frame(rc.au)
+		rc.au = [][]byte{}
+	}
 }
 
 func (rc *rtspCamera) resetAU(au [][]byte) {
@@ -1076,6 +1083,11 @@ func isCompactableH264(nalu []byte) bool {
 
 // Image returns the latest frame as JPEG bytes.
 func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
+	rc.closeMu.RLock()
+	defer rc.closeMu.RUnlock()
+	if err := rc.cancelCtx.Err(); err != nil {
+		return nil, camera.ImageMetadata{}, err
+	}
 	if videoCodec(rc.currentCodec.Load()) == MJPEG {
 		mjpegBytes := rc.latestMJPEGBytes.Load()
 		if mjpegBytes == nil {
