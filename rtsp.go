@@ -162,8 +162,8 @@ type rtspCamera struct {
 	resource.AlwaysRebuild
 	model resource.Model
 	gostream.VideoReader
-	u             *base.URL
-	lazyDecodeRTP bool
+	u          *base.URL
+	lazyDecode bool
 
 	closeMu sync.RWMutex
 
@@ -457,7 +457,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 			return
 		}
 
-		if rc.lazyDecodeRTP {
+		if rc.lazyDecode {
 			if h264.IDRPresent(au) {
 				rc.resetAU(au)
 			} else {
@@ -525,7 +525,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		rc.logger.Warn("rtp_passthrough is only supported for H264 codec. rtp_passthrough features disabled due to H265 RTSP track")
 	}
 
-	if rc.lazyDecodeRTP {
+	if rc.lazyDecode {
 		rc.logger.Warn("lazy_decode is currently only supported for H264 codec. lazy_decode features disabled due to H265 RTSP track")
 	}
 	var f *format.H265
@@ -633,7 +633,7 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 	if rc.rtpPassthrough {
 		rc.logger.Warn("rtp_passthrough is only supported for H264 codec. rtp_passthrough features disabled due to MJPEG RTSP track")
 	}
-	if rc.lazyDecodeRTP {
+	if rc.lazyDecode {
 		rc.logger.Warn("lazy_decode is currently only supported for H264 codec. lazy_decode features disabled due to MJPEG RTSP track")
 	}
 	var f *format.MJPEG
@@ -674,7 +674,7 @@ func (rc *rtspCamera) initMPEG4(session *description.Session) error {
 		rc.logger.Warn("rtp_passthrough is only supported for H264 codec. rtp_passthrough features disabled due to MPEG4 RTSP track")
 	}
 
-	if rc.lazyDecodeRTP {
+	if rc.lazyDecode {
 		rc.logger.Warn("lazy_decode is currently only supported for H264 codec. lazy_decode features disabled due to MPEG4 RTSP track")
 	}
 
@@ -886,7 +886,7 @@ func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 	rtpPassthroughCtx, rtpPassthroughCancelCauseFn := context.WithCancelCause(context.Background())
 	rc := &rtspCamera{
 		model:                       conf.Model,
-		lazyDecodeRTP:               newConf.LazyDecode,
+		lazyDecode:                  newConf.LazyDecode,
 		u:                           u,
 		name:                        conf.ResourceName(),
 		rtpPassthrough:              rtpPassthrough,
