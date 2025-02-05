@@ -11,11 +11,14 @@ import (
 	"net/url"
 	"os"
 	"slices"
+	"time"
 
 	"github.com/viam-modules/viamrtsp/viamonvif"
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"go.viam.com/rdk/logging"
 )
+
+const timeoutDuration = 10 * time.Second
 
 // Config for the disovery command.
 type Config struct {
@@ -38,7 +41,9 @@ func main() {
 }
 
 func realMain() error {
-	ctx := context.Background()
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), timeoutDuration)
+	defer cancel()
+
 	opts, err := parseOpts()
 	if err != nil {
 		return err
@@ -62,7 +67,7 @@ func realMain() error {
 	}
 
 	urls := slices.Collect(maps.Values(xaddrs))
-	list, err := viamonvif.DiscoverCameras(ctx, opts.config.Creds, urls, logger)
+	list, err := viamonvif.DiscoverCameras(timeoutCtx, opts.config.Creds, urls, logger)
 	if err != nil {
 		return err
 	}
