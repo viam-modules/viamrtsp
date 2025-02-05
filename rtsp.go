@@ -2,7 +2,6 @@
 package viamrtsp
 
 /*
-#cgo pkg-config: libavutil libavcodec libavformat libswscale
 #include <libavcodec/avcodec.h>
 */
 import "C"

@@ -65,22 +65,13 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-encoder=libx264
 
 # Add linker flag -checklinkname=0 for anet https://github.com/wlynxg/anet?tab=readme-ov-file#how-to-build-with-go-1230-or-later.
-# GO_LDFLAGS := -ldflags="-checklinkname=0 "
-# CGO_LDFLAGS := "-L$(FFMPEG_BUILD)/lib /usr/lib/aarch64-linux-gnu/libx264.a"
-# CGO_LDFLAGS := "-L$(FFMPEG_BUILD)/lib -l:libx264.a"
-# CGO_LDFLAGS := "-L$(FFMPEG_BUILD)/lib libx264.a"
+GO_LDFLAGS := -ldflags="-checklinkname=0 "
 CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib -lavcodec -lavutil -lavformat -lswscale -lz
+# TODO(seanp): Make sure this works on our CI runners.
 ifeq ($(SOURCE_OS),linux)
 	CGO_LDFLAGS += -l:libx264.a
 endif
-# ifeq ($(SOURCE_OS),linux)
-# 	CGO_LDFLAGS += /usr/lib/aarch64-linux-gnu/libx264.a
-# endif
-# CGO_LDFLAGS += -l:libx264.a
-# CGO_LDFLAGS += /usr/lib/aarch64-linux-gnu/libx264.a
-# CGO_LDFLAGS += -L/usr/lib/aarch64-linux-gnu -lx264
 CGO_CFLAGS := -I$(FFMPEG_BUILD)/include
-export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
 # If we are building for android, we need to set the correct flags
 # and toolchain paths for FFMPEG and go binary cross-compilation.
