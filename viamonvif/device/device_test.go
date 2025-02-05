@@ -1,6 +1,7 @@
 package device
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -80,13 +81,13 @@ func TestSendSoapNoHang(t *testing.T) {
 
 // Helper function to read request body.
 func readBody(r *http.Request) (string, error) {
-	body, err := io.ReadAll(r.Body)
+	var buf bytes.Buffer
+	_, err := io.Copy(&buf, r.Body)
 	if err != nil {
 		return "", err
 	}
-	err = r.Body.Close()
-	if err != nil {
+	if err := r.Body.Close(); err != nil {
 		return "", err
 	}
-	return string(body), nil
+	return buf.String(), nil
 }
