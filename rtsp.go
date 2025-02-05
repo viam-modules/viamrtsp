@@ -320,9 +320,19 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib
 	if err != nil {
 		return fmt.Errorf("when calling RTSP DESCRIBE on %s: %w", rc.u, err)
 	}
+	rc.logger.Debugf("Session media info: %+v", session)
+	for _, media := range session.Medias {
+		for i, format := range media.Formats {
+			rc.logger.Debugf("Media %d format: %s", i+1, format.Codec())
+			rc.logger.Debugf("Format clock rate: %d", format.ClockRate())
+			rc.logger.Debugf("Format payload type: %d", format.PayloadType())
+			rc.logger.Debugf("Format RTPMap: %s", format.RTPMap())
+			rc.logger.Debugf("Format FMTP: %+v", format.FMTP())
+		}
+	}
 
 	if codecInfo == Agnostic {
-		codecInfo = getAvailableCodec(session, rc.logger)
+		codecInfo = getAvailableCodec(session)
 	}
 
 	switch codecInfo {
@@ -914,7 +924,7 @@ func modelToCodec(model resource.Model) (videoCodec, error) {
 
 // getAvailableCodec determines the first supported codec from a session's SDP data
 // returning Unknown if none are found.
-func getAvailableCodec(session *description.Session, logger logging.Logger) videoCodec {
+func getAvailableCodec(session *description.Session) videoCodec {
 	var h264 *format.H264
 	var h265 *format.H265
 	var mjpeg *format.MJPEG
@@ -926,17 +936,6 @@ func getAvailableCodec(session *description.Session, logger logging.Logger) vide
 		{&h265, H265},
 		{&mjpeg, MJPEG},
 		{&mpeg4, MPEG4},
-	}
-
-	logger.Debugf("Session media info: %+v", session)
-	for _, media := range session.Medias {
-		for i, format := range media.Formats {
-			logger.Debugf("Media %d format: %s", i+1, format.Codec())
-			logger.Debugf("Format clock rate: %d", format.ClockRate())
-			logger.Debugf("Format payload type: %d", format.PayloadType())
-			logger.Debugf("Format RTPMap: %s", format.RTPMap())
-			logger.Debugf("Format FMTP: %+v", format.FMTP())
-		}
 	}
 
 	for _, codecFormat := range codecFormats {
