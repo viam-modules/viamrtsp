@@ -63,7 +63,6 @@ type Params struct {
 	Username   string
 	Password   string
 	HTTPClient *http.Client
-	Context    context.Context
 }
 
 // GetProfiles is a request to the GetProfiles onvif endpoint.
