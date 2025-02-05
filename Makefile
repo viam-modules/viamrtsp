@@ -49,11 +49,28 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
                --enable-encoder=mpeg4 \
                --enable-network \
                --enable-parser=h264 \
-               --enable-parser=hevc
+               --enable-parser=hevc \
+               --enable-muxer=segment \
+               --enable-muxer=mp4 \
+               --enable-demuxer=segment \
+               --enable-demuxer=concat \
+               --enable-demuxer=mov \
+               --enable-demuxer=mp4 \
+               --enable-protocol=file \
+               --enable-protocol=concat \
+               --enable-protocol=crypto \
+               --enable-bsf=h264_mp4toannexb \
+               --enable-libx264 \
+               --enable-gpl \
+               --enable-encoder=libx264
 
 # Add linker flag -checklinkname=0 for anet https://github.com/wlynxg/anet?tab=readme-ov-file#how-to-build-with-go-1230-or-later.
-GO_LDFLAGS := -ldflags="-checklinkname=0"
-CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib
+GO_LDFLAGS := -ldflags="-checklinkname=0 "
+CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib -lavcodec -lavutil -lavformat -lswscale -lz
+# TODO(seanp): Make sure this works on our CI runners.
+ifeq ($(SOURCE_OS),linux)
+	CGO_LDFLAGS += -l:libx264.a
+endif
 CGO_CFLAGS := -I$(FFMPEG_BUILD)/include
 export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
@@ -89,11 +106,11 @@ all: $(BIN_OUTPUT_PATH)/viamrtsp $(BIN_OUTPUT_PATH)/discovery
 
 # We set GOOS, GOARCH, GO_TAGS, and GO_LDFLAGS to support cross-compilation for android targets.
 $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
-	CGO_LDFLAGS=$(CGO_LDFLAGS) \
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" \
 	GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) $(GO_LDFLAGS) -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
 
 $(BIN_OUTPUT_PATH)/discovery: build-ffmpeg *.go cmd/discovery/*.go
-	CGO_LDFLAGS=$(CGO_LDFLAGS) \
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" \
 	GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) $(GO_LDFLAGS) -o $(BIN_OUTPUT_PATH)/discovery cmd/discovery/cmd.go
 
 tool-install:
