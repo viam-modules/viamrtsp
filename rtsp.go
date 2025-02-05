@@ -384,7 +384,7 @@ func (rc *rtspCamera) consumeAU() {
 	defer rc.auMu.Unlock()
 	if len(rc.au) > 0 {
 		rc.storeH264Frame(rc.au)
-		rc.au = [][]byte{}
+		rc.au = nil
 	}
 }
 
