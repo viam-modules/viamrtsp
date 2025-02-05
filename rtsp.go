@@ -163,6 +163,8 @@ type rtspCamera struct {
 	gostream.VideoReader
 	u *base.URL
 
+	auMu       sync.Mutex
+	au         [][]byte
 	client     *gortsplib.Client
 	rawDecoder *decoder
 
@@ -370,6 +372,25 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib
 	return nil
 }
 
+func (rc *rtspCamera) consumeAU() {
+	rc.auMu.Lock()
+	defer rc.auMu.Unlock()
+	rc.storeH264Frame(rc.au)
+	rc.au = [][]byte{}
+}
+
+func (rc *rtspCamera) resetAU(au [][]byte) {
+	rc.auMu.Lock()
+	defer rc.auMu.Unlock()
+	rc.au = au
+}
+
+func (rc *rtspCamera) appendAU(au [][]byte) {
+	rc.auMu.Lock()
+	defer rc.auMu.Unlock()
+	rc.au = append(rc.au, au...)
+}
+
 // initH264 initializes the H264 decoder and sets up the client to receive H264 packets.
 func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 	// setup RTP/H264 -> H264 decoder
@@ -423,9 +444,15 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 			rc.logger.Debug("adding initial SPS & PPS")
 			receivedFirstIDR = true
 			au = append(initialSPSAndPPS, au...)
+			rc.storeH264Frame(au)
+			return
 		}
 
-		rc.storeH264Frame(au)
+		if h264.IDRPresent(au) {
+			rc.resetAU(au)
+			return
+		}
+		rc.appendAU(au)
 	}
 
 	onPacketRTP := func(pkt *rtp.Packet) {
@@ -1044,6 +1071,7 @@ func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]int
 }
 
 func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, camera.ImageMetadata, error) {
+	rc.consumeAU()
 	rc.frameSwapMu.Lock()
 	defer rc.frameSwapMu.Unlock()
 	if rc.latestFrame == nil {
