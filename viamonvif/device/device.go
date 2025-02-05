@@ -90,17 +90,13 @@ type GetCapabilities struct {
 }
 
 // NewDevice function construct a ONVIF Device entity.
-func NewDevice(params Params, logger logging.Logger) (*Device, error) {
-	if params.Context == nil {
-		params.Context = context.Background()
-	}
-
+func NewDevice(ctx context.Context, params Params, logger logging.Logger) (*Device, error) {
 	dev := &Device{
 		xaddr:     params.Xaddr,
 		logger:    logger,
 		params:    params,
 		endpoints: map[string]string{"device": params.Xaddr.String()},
-		ctx:       params.Context,
+		ctx:       ctx,
 	}
 
 	if dev.params.HTTPClient == nil {

@@ -142,7 +142,7 @@ func DiscoverCameraInfo(
 			return zero, fmt.Errorf("context canceled while connecting to ONVIF device: %s", xaddr)
 		}
 		// This calls GetCapabilities
-		dev, err := device.NewDevice(device.Params{
+		dev, err := device.NewDevice(ctx, device.Params{
 			Xaddr:    xaddr,
 			Username: cred.User,
 			Password: cred.Pass,

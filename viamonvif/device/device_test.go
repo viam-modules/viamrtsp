@@ -1,8 +1,8 @@
 package device
 
 import (
-	"bytes"
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -24,8 +24,12 @@ func TestSendSoapNoHang(t *testing.T) {
 		// A server that will hang forever
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// For GetCapabilities request during initialization, we must return a valid response
+			body, err := readBody(r)
+			if err != nil {
+				t.Fatalf("failed to read body: %v", err)
+			}
 			if strings.Contains(r.Header.Get("Content-Type"), "soap") &&
-				strings.Contains(readBody(r), "GetCapabilities") {
+				strings.Contains(body, "GetCapabilities") {
 				w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
 					<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
 						<SOAP-ENV:Body>
@@ -57,23 +61,32 @@ func TestSendSoapNoHang(t *testing.T) {
 		defer cancel()
 
 		// Create device with the context
-		dev, err := NewDevice(Params{
+		dev, err := NewDevice(ctx, Params{
 			Xaddr:      serverURL,
 			HTTPClient: &http.Client{},
-			Context:    ctx,
 		}, logger)
 		test.That(t, err, test.ShouldBeNil)
 
 		_, err = dev.sendSoap(server.URL, "test message")
-		test.That(t, err, test.ShouldNotBeNil)
-		test.That(t, err.Error(), test.ShouldContainSubstring, "context deadline exceeded")
+		// Cast to url.Error to check if the error is a context deadline exceeded
+		var urlErr *url.Error
+		if errors.As(err, &urlErr) {
+			test.That(t, urlErr.Err, test.ShouldBeError, context.DeadlineExceeded)
+		} else {
+			t.Fatalf("expected a URL error, got: %v", err)
+		}
 	})
 }
 
 // Helper function to read request body.
-func readBody(r *http.Request) string {
-	body, _ := io.ReadAll(r.Body)
-	r.Body.Close()
-	r.Body = io.NopCloser(bytes.NewBuffer(body))
-	return string(body)
+func readBody(r *http.Request) (string, error) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return "", err
+	}
+	err = r.Body.Close()
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
 }
