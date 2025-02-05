@@ -504,7 +504,8 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 			packed = append(packed, lengthBytes...)
 			packed = append(packed, nalu...)
 		}
-		err = rc.rawSegmenter.WritePacket(packed, int64pts)
+		isIDR := h264.IDRPresent(au)
+		err = rc.rawSegmenter.WritePacket(packed, int64pts, isIDR)
 		if err != nil {
 			rc.logger.Errorf("error writing packet to segmenter: %s", err)
 		}
