@@ -259,7 +259,7 @@ func (rc *rtspCamera) closeConnection() {
 		rc.client.Close()
 		rc.client = nil
 	}
-	rc.resetAU(nil)
+	rc.resetLazyAU(nil)
 	rc.currentCodec.Store(0)
 	if rc.rawDecoder != nil {
 		rc.rawDecoder.close()
@@ -390,7 +390,7 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib
 	return nil
 }
 
-func (rc *rtspCamera) consumeAU() {
+func (rc *rtspCamera) consumeLazyAU() {
 	rc.auMu.Lock()
 	defer rc.auMu.Unlock()
 	if len(rc.au) > 0 {
@@ -410,20 +410,20 @@ func (rc *rtspCamera) consumeAU() {
 		case MPEG4:
 			fallthrough
 		default:
-			rc.logger.Infof("consumeAU: called with unexpected codec: %s, int: %d", codec, codec)
+			rc.logger.Infof("consumeLazyAU: called with unexpected codec: %s, int: %d", codec, codec)
 		}
 
 		rc.au = nil
 	}
 }
 
-func (rc *rtspCamera) resetAU(au [][]byte) {
+func (rc *rtspCamera) resetLazyAU(au [][]byte) {
 	rc.auMu.Lock()
 	defer rc.auMu.Unlock()
 	rc.au = au
 }
 
-func (rc *rtspCamera) appendAU(au [][]byte) {
+func (rc *rtspCamera) appendLazyAU(au [][]byte) {
 	rc.auMu.Lock()
 	defer rc.auMu.Unlock()
 	rc.au = append(rc.au, au...)
@@ -488,9 +488,9 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 
 		if rc.lazyDecode {
 			if h264.IDRPresent(au) {
-				rc.resetAU(au)
+				rc.resetLazyAU(au)
 			} else {
-				rc.appendAU(au)
+				rc.appendLazyAU(au)
 			}
 		} else {
 			rc.storeH264Frame(au)
@@ -618,9 +618,9 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		packedAU := packH265AUIntoNALU(au, rc.logger)
 		if rc.lazyDecode {
 			if h265.IsRandomAccess(au) {
-				rc.resetAU([][]byte{packedAU})
+				rc.resetLazyAU([][]byte{packedAU})
 			} else {
-				rc.appendAU([][]byte{packedAU})
+				rc.appendLazyAU([][]byte{packedAU})
 			}
 		} else {
 			rc.storeH265Frame(packedAU)
@@ -1147,7 +1147,7 @@ func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]int
 }
 
 func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, camera.ImageMetadata, error) {
-	rc.consumeAU()
+	rc.consumeLazyAU()
 	rc.frameSwapMu.Lock()
 	defer rc.frameSwapMu.Unlock()
 	if rc.latestFrame == nil {
