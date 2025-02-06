@@ -917,12 +917,10 @@ func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		rtpPassthrough = *newConf.RTPPassthrough
 	}
 
-	logger.Info("about to create raw segmenter")
 	rawSegmenter, err := videostore.NewRawSegmenter(logger, "/tmp/testing-raw-segmenter")
 	if err != nil {
 		logger.Errorf("error creating raw segmenter: %s", err.Error())
 	}
-	logger.Info("created raw segmenter")
 
 	rtpPassthroughCtx, rtpPassthroughCancelCauseFn := context.WithCancelCause(context.Background())
 	rc := &rtspCamera{
