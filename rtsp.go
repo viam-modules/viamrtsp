@@ -17,6 +17,7 @@ import (
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtph265"
 	"github.com/bluenviron/gortsplib/v4/pkg/liberrors"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
+	"github.com/bluenviron/mediacommon/pkg/codecs/h265"
 	"github.com/erh/viamupnp"
 	"github.com/pion/rtp"
 	"github.com/viam-modules/viamrtsp/formatprocessor"
@@ -42,6 +43,8 @@ const (
 	defaultPayloadType = 96
 	// h264NALUTypeMask is the mask to extract the NALU type from the first byte of an H264 NALU.
 	h264NALUTypeMask = 0x1F
+	// h264NALUTypeMask is the mask to extract the NALU type from the first byte of an H264 NALU.
+	h265NALUTypeMask = 0x7F
 	// initialFramePoolSize is the initial size of the frame pool.
 	initialFramePoolSize = 5
 )
@@ -393,7 +396,17 @@ func (rc *rtspCamera) consumeAU() {
 	rc.auMu.Lock()
 	defer rc.auMu.Unlock()
 	if len(rc.au) > 0 {
-		rc.storeH264Frame(rc.au)
+		rc.logger.Infof("consumeAU: len: %d", len(rc.au))
+		codec := videoCodec(rc.currentCodec.Load())
+		switch codec {
+		case H264:
+			rc.storeH264Frame(rc.au)
+		case H265:
+			rc.storeH265Frame(rc.au)
+		default:
+			rc.logger.Infof("consumeAU: called with unexpected codec: %s, int: %d", codec, codec)
+		}
+
 		rc.au = nil
 	}
 }
@@ -402,12 +415,14 @@ func (rc *rtspCamera) resetAU(au [][]byte) {
 	rc.auMu.Lock()
 	defer rc.auMu.Unlock()
 	rc.au = au
+	rc.logger.Infof("restAU: len: %d", len(au))
 }
 
 func (rc *rtspCamera) appendAU(au [][]byte) {
 	rc.auMu.Lock()
 	defer rc.auMu.Unlock()
 	rc.au = append(rc.au, au...)
+	rc.logger.Infof("appendAU: len: %d", len(rc.au))
 }
 
 // initH264 initializes the H264 decoder and sets up the client to receive H264 packets.
@@ -599,43 +614,59 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 			return
 		}
 
-		// If the AU has more than one NALU, compact them into a single payload with NALUs separated
-		// in AnnexB format. This is necessary because the H.265 decoder expects all NALUs for a frame
-		// to be in a single payload rather than chunked across multiple decode calls.
-		packed := []byte{}
-		firstNALU := true
-		for _, nalu := range au {
-			if len(nalu) == 0 {
-				rc.logger.Warn("empty NALU found in H265 AU, skipping NALU")
-				continue
+		packedAU := packH265Au(au, rc.logger)
+		if rc.lazyDecode {
+			if h265.IsRandomAccess(au) {
+				rc.resetAU([][]byte{packedAU})
+			} else {
+				rc.appendAU([][]byte{packedAU})
 			}
-			// Add start code prefix to all NALUs except the first non-empty one.
-			if !firstNALU {
-				packed = append(packed, H2645StartCode()...)
-			}
-			packed = append(packed, nalu...)
-			firstNALU = false
-		}
-
-		if len(packed) == 0 {
-			rc.logger.Warn("no NALUs found in H265 AU, skipping packet")
-			return
-		}
-
-		frame, err := rc.rawDecoder.decode(packed)
-		if err != nil {
-			// This error is created with `github.com/pkg/errors`. Explicitly call `Error()` to
-			// avoid logging the stacktrace.
-			rc.logger.Debugw("error decoding(2) h265 rtsp stream", "err", err.Error())
-			return
-		}
-
-		if frame != nil {
-			rc.handleLatestFrame(frame)
+		} else {
+			rc.storeH265Frame(packedAU)
 		}
 	})
 
 	return nil
+}
+
+func packH265Au(au [][]byte, logger logging.Logger) []byte {
+	// If the AU has more than one NALU, compact them into a single payload with NALUs separated
+	// in AnnexB format. This is necessary because the H.265 decoder expects all NALUs for a frame
+	// to be in a single payload rather than chunked across multiple decode calls.
+	packed := []byte{}
+	firstNALU := true
+	for _, nalu := range au {
+		if len(nalu) == 0 {
+			logger.Warn("empty NALU found in H265 AU, skipping NALU")
+			continue
+		}
+		// Add start code prefix to all NALUs except the first non-empty one.
+		if !firstNALU {
+			packed = append(packed, H2645StartCode()...)
+		}
+		packed = append(packed, nalu...)
+		firstNALU = false
+	}
+	return packed
+}
+
+func (rc *rtspCamera) storeH265Frame(au []byte) {
+	if len(au) == 0 {
+		rc.logger.Warn("no NALUs found in H265 AU, skipping packet")
+		return
+	}
+
+	frame, err := rc.rawDecoder.decode(au)
+	if err != nil {
+		// This error is created with `github.com/pkg/errors`. Explicitly call `Error()` to
+		// avoid logging the stacktrace.
+		rc.logger.Debugw("error decoding(2) h265 rtsp stream", "err", err.Error())
+		return
+	}
+
+	if frame != nil {
+		rc.handleLatestFrame(frame)
+	}
 }
 
 // initMJPEG initializes the MJPEG decoder and sets up the client to receive JPEG frames.
@@ -1095,6 +1126,10 @@ func isCompactableH264(nalu []byte) bool {
 func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
 	rc.closeMu.RLock()
 	defer rc.closeMu.RUnlock()
+	start := time.Now()
+	defer func() {
+		rc.logger.Infof("codec: %s, lazy: %t, time: %s", videoCodec(rc.currentCodec.Load()), rc.lazyDecode, time.Since(start))
+	}()
 	if err := rc.cancelCtx.Err(); err != nil {
 		return nil, camera.ImageMetadata{}, err
 	}
