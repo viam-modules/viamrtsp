@@ -329,6 +329,16 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib
 	if err != nil {
 		return fmt.Errorf("when calling RTSP DESCRIBE on %s: %w", rc.u, err)
 	}
+	rc.logger.Debugf("Session media info: %+v", session)
+	for _, media := range session.Medias {
+		for i, format := range media.Formats {
+			rc.logger.Debugf("Media %d format: %s", i+1, format.Codec())
+			rc.logger.Debugf("Format clock rate: %d", format.ClockRate())
+			rc.logger.Debugf("Format payload type: %d", format.PayloadType())
+			rc.logger.Debugf("Format RTPMap: %s", format.RTPMap())
+			rc.logger.Debugf("Format FMTP: %+v", format.FMTP())
+		}
+	}
 
 	if codecInfo == Agnostic {
 		codecInfo = getAvailableCodec(session)
