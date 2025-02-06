@@ -106,7 +106,7 @@ func init() {
 type Config struct {
 	Address        string               `json:"rtsp_address"`
 	RTPPassthrough *bool                `json:"rtp_passthrough"`
-	LazyDecode     bool                 `json:"lazy_decode"`
+	LazyDecode     bool                 `json:"lazy_decode,omitempty"`
 	Query          viamupnp.DeviceQuery `json:"query"`
 }
 
