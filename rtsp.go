@@ -212,6 +212,7 @@ func (rc *rtspCamera) Close(_ context.Context) error {
 	rc.closeConnection()
 	rc.avFramePool.close()
 	rc.mimeHandler.close()
+	rc.rawSegmenter.Close()
 	return nil
 }
 
@@ -477,11 +478,11 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 				return
 			}
 		}
-		// Pack AU into a single payload with NALUs seperated in AVC format.
+		// Pack AU into a single payload with NALUs separated in AVC format.
 		packed := []byte{}
 		for _, nalu := range au {
 			if len(nalu) == 0 {
-				rc.logger.Warn("segmenter found empty NALU found in H264 AU, skipping NALU")
+				rc.logger.Warn("segmenter found empty NALU in H264 AU, skipping NALU")
 				continue
 			}
 			// Skip in-band parameter sets as they are already provided in the codec context during
