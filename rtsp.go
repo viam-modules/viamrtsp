@@ -43,8 +43,6 @@ const (
 	defaultPayloadType = 96
 	// h264NALUTypeMask is the mask to extract the NALU type from the first byte of an H264 NALU.
 	h264NALUTypeMask = 0x1F
-	// h264NALUTypeMask is the mask to extract the NALU type from the first byte of an H264 NALU.
-	h265NALUTypeMask = 0x7F
 	// initialFramePoolSize is the initial size of the frame pool.
 	initialFramePoolSize = 5
 )
@@ -396,13 +394,14 @@ func (rc *rtspCamera) consumeAU() {
 	rc.auMu.Lock()
 	defer rc.auMu.Unlock()
 	if len(rc.au) > 0 {
-		rc.logger.Infof("consumeAU: len: %d", len(rc.au))
 		codec := videoCodec(rc.currentCodec.Load())
 		switch codec {
 		case H264:
 			rc.storeH264Frame(rc.au)
 		case H265:
-			rc.storeH265Frame(rc.au)
+			for _, au := range rc.au {
+				rc.storeH265Frame(au)
+			}
 		default:
 			rc.logger.Infof("consumeAU: called with unexpected codec: %s, int: %d", codec, codec)
 		}
@@ -415,14 +414,14 @@ func (rc *rtspCamera) resetAU(au [][]byte) {
 	rc.auMu.Lock()
 	defer rc.auMu.Unlock()
 	rc.au = au
-	rc.logger.Infof("restAU: len: %d", len(au))
+	// rc.logger.Infof("restAU: len: %d", len(au))
 }
 
 func (rc *rtspCamera) appendAU(au [][]byte) {
 	rc.auMu.Lock()
 	defer rc.auMu.Unlock()
 	rc.au = append(rc.au, au...)
-	rc.logger.Infof("appendAU: len: %d", len(rc.au))
+	// rc.logger.Infof("appendAU: len: %d", len(rc.au))
 }
 
 // initH264 initializes the H264 decoder and sets up the client to receive H264 packets.
@@ -550,9 +549,6 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		rc.logger.Warn("rtp_passthrough is only supported for H264 codec. rtp_passthrough features disabled due to H265 RTSP track")
 	}
 
-	if rc.lazyDecode {
-		rc.logger.Warn("lazy_decode is currently only supported for H264 codec. lazy_decode features disabled due to H265 RTSP track")
-	}
 	var f *format.H265
 
 	media := session.FindFormat(&f)
