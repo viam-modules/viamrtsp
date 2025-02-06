@@ -72,6 +72,7 @@ ifeq ($(SOURCE_OS),linux)
 	CGO_LDFLAGS += -l:libx264.a
 endif
 CGO_CFLAGS := -I$(FFMPEG_BUILD)/include
+export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
 # If we are building for android, we need to set the correct flags
 # and toolchain paths for FFMPEG and go binary cross-compilation.
