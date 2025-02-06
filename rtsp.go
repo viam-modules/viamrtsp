@@ -400,6 +400,8 @@ func (rc *rtspCamera) consumeAU() {
 			rc.storeH264Frame(rc.au)
 		case H265:
 			for _, au := range rc.au {
+				// h265 AUs are already packed into a single frame
+				// before they were added to rc.au
 				rc.storeH265Frame(au)
 			}
 		default:
