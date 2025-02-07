@@ -105,10 +105,11 @@ func init() {
 
 // Config are the config attributes for an RTSP camera model.
 type Config struct {
-	Address        string               `json:"rtsp_address"`
-	RTPPassthrough *bool                `json:"rtp_passthrough"`
-	LazyDecode     bool                 `json:"lazy_decode,omitempty"`
-	Query          viamupnp.DeviceQuery `json:"query"`
+	Address          string               `json:"rtsp_address"`
+	RTPPassthrough   *bool                `json:"rtp_passthrough"`
+	LazyDecode       bool                 `json:"lazy_decode,omitempty"`
+	IframeOnlyDecode bool                 `json:"i_frame_only_decode,omitempty"`
+	Query            viamupnp.DeviceQuery `json:"query"`
 }
 
 // CodecFormat contains a pointer to a format and the corresponding FFmpeg codec.
@@ -163,8 +164,9 @@ type rtspCamera struct {
 	resource.AlwaysRebuild
 	model resource.Model
 	gostream.VideoReader
-	u          *base.URL
-	lazyDecode bool
+	u                *base.URL
+	lazyDecode       bool
+	iframeOnlyDecode bool
 
 	closeMu sync.RWMutex
 
@@ -178,8 +180,11 @@ type rtspCamera struct {
 
 	activeBackgroundWorkers sync.WaitGroup
 
-	latestMJPEGBytes atomic.Pointer[[]byte]
-	latestFrame      *avFrameWrapper
+	latestMJPEGBytes         atomic.Pointer[[]byte]
+	latestFrame              *avFrameWrapper
+	latestFrameMimeType      string
+	latestFrameImageMetadata camera.ImageMetadata
+	latestFrameBytes         []byte
 	// frameSwapMu protects critical sections where frame state changes (e.g. ref counting) need to be atomic
 	// with swapping out the latest frame.
 	frameSwapMu sync.Mutex
@@ -486,8 +491,13 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 			return
 		}
 
+		if rc.iframeOnlyDecode && !h264.IDRPresent(au) {
+			return
+		}
+
 		if rc.lazyDecode {
 			if h264.IDRPresent(au) {
+				rc.logger.Info("iframe")
 				rc.resetLazyAU(au)
 			} else {
 				rc.appendLazyAU(au)
@@ -613,9 +623,14 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 			return
 		}
 
+		if rc.iframeOnlyDecode && !h265.IsRandomAccess(au) {
+			return
+		}
+
 		packedAU := packH265AUIntoNALU(au, rc.logger)
 		if rc.lazyDecode {
 			if h265.IsRandomAccess(au) {
+				rc.logger.Info("iframe")
 				rc.resetLazyAU([][]byte{packedAU})
 			} else {
 				rc.appendLazyAU([][]byte{packedAU})
@@ -925,6 +940,7 @@ func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 	rc := &rtspCamera{
 		model:                       conf.Model,
 		lazyDecode:                  newConf.LazyDecode,
+		iframeOnlyDecode:            newConf.IframeOnlyDecode,
 		u:                           u,
 		name:                        conf.ResourceName(),
 		rtpPassthrough:              rtpPassthrough,
@@ -1108,6 +1124,9 @@ func (rc *rtspCamera) handleLatestFrame(newFrame *avFrameWrapper) {
 	}
 	newFrame.incrementRefs()
 	rc.latestFrame = newFrame
+	rc.latestFrameBytes = nil
+	rc.latestFrameMimeType = ""
+	rc.latestFrameImageMetadata = camera.ImageMetadata{}
 }
 
 func naluType(nalu []byte) h264.NALUType {
@@ -1125,7 +1144,7 @@ func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]int
 	defer rc.closeMu.RUnlock()
 	start := time.Now()
 	defer func() {
-		rc.logger.Infof("codec: %s, lazy: %t, time: %s", videoCodec(rc.currentCodec.Load()), rc.lazyDecode, time.Since(start))
+		rc.logger.Debugf("codec: %s, lazy: %t, iframe_only: %t, time: %s", videoCodec(rc.currentCodec.Load()), rc.lazyDecode, rc.iframeOnlyDecode, time.Since(start))
 	}()
 	if err := rc.cancelCtx.Err(); err != nil {
 		return nil, camera.ImageMetadata{}, err
@@ -1154,6 +1173,14 @@ func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, camera.ImageM
 	var bytes []byte
 	var metadata camera.ImageMetadata
 	var err error
+	if rc.latestFrameBytes != nil && rc.latestFrameMimeType == mimeType {
+		if refCount := currentFrame.decrementRefs(); refCount == 0 {
+			rc.avFramePool.put(currentFrame)
+		}
+		rc.logger.Info("cache hit")
+		return rc.latestFrameBytes, rc.latestFrameImageMetadata, nil
+	}
+
 	switch mimeType {
 	case rutils.MimeTypeJPEG, rutils.MimeTypeJPEG + "+" + rutils.MimeTypeSuffixLazy:
 		bytes, metadata, err = rc.mimeHandler.convertJPEG(currentFrame.frame)
@@ -1171,6 +1198,9 @@ func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, camera.ImageM
 	if err != nil {
 		return nil, camera.ImageMetadata{}, err
 	}
+	rc.latestFrameBytes = bytes
+	rc.latestFrameImageMetadata = metadata
+	rc.latestFrameMimeType = mimeType
 	return bytes, metadata, err
 }
 
