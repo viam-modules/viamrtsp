@@ -608,8 +608,6 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		au, err := rtpDec.Decode(pkt)
 		if err != nil {
 			if !errors.Is(err, rtph265.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph265.ErrMorePacketsNeeded) {
-				// This error is created with `github.com/pkg/errors`. Explicitly call `Error()` to
-				// avoid logging the stacktrace.
 				rc.logger.Debugw("error decoding(1) h265 rstp stream", "err", err.Error())
 			}
 			return
@@ -659,8 +657,6 @@ func (rc *rtspCamera) storeH265Frame(nalu []byte) {
 
 	frame, err := rc.rawDecoder.decode(nalu)
 	if err != nil {
-		// This error is created with `github.com/pkg/errors`. Explicitly call `Error()` to
-		// avoid logging the stacktrace.
 		rc.logger.Debugw("error decoding(2) h265 rtsp stream", "err", err.Error())
 		return
 	}
