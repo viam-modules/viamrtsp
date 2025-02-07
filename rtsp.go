@@ -259,7 +259,7 @@ func (rc *rtspCamera) closeConnection() {
 		rc.client.Close()
 		rc.client = nil
 	}
-	rc.resetLazyAU(nil)
+	rc.resetLazyAU([][]byte{})
 	rc.currentCodec.Store(0)
 	if rc.rawDecoder != nil {
 		rc.rawDecoder.close()
