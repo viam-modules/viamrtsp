@@ -161,8 +161,8 @@ type (
 
 type cache struct {
 	mimeType      string
-	imageMetadata camera.ImageMetadata
 	bytes         []byte
+	imageMetadata camera.ImageMetadata
 }
 
 // rtspCamera contains the rtsp client, and the reader function that fulfills the camera interface.
@@ -191,7 +191,7 @@ type rtspCamera struct {
 	latestFrameMu    sync.Mutex
 	latestMJPEGBytes atomic.Pointer[[]byte]
 	latestFrame      *avFrameWrapper
-	cache            cache
+	latestFrameCache cache
 	// We use a pool data structure to amortize the malloc cost of AVFrames and reduce pressure on memory
 	// management. We create one pool for the entire lifetime of the RTSP camera. Additionally, frames
 	// from the pool may be for a resolution that does not match the current image. The user of the pool
@@ -1140,7 +1140,7 @@ func (rc *rtspCamera) handleLatestFrame(newFrame *avFrameWrapper) {
 	}
 	newFrame.incrementRefs()
 	rc.latestFrame = newFrame
-	rc.cache = cache{}
+	rc.latestFrameCache = cache{}
 }
 
 func naluType(nalu []byte) h264.NALUType {
@@ -1188,12 +1188,12 @@ func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, camera.ImageM
 	var bytes []byte
 	var metadata camera.ImageMetadata
 	var err error
-	if rc.cache.bytes != nil && rc.cache.mimeType == mimeType {
+	if rc.latestFrameCache.bytes != nil && rc.latestFrameCache.mimeType == mimeType {
 		if refCount := currentFrame.decrementRefs(); refCount == 0 {
 			rc.avFramePool.put(currentFrame)
 		}
 		rc.logger.Debug("cache hit")
-		return rc.cache.bytes, rc.cache.imageMetadata, nil
+		return rc.latestFrameCache.bytes, rc.latestFrameCache.imageMetadata, nil
 	}
 
 	switch mimeType {
@@ -1213,7 +1213,7 @@ func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, camera.ImageM
 	if err != nil {
 		return nil, camera.ImageMetadata{}, err
 	}
-	rc.cache = cache{
+	rc.latestFrameCache = cache{
 		mimeType:      mimeType,
 		bytes:         bytes,
 		imageMetadata: metadata,
