@@ -686,9 +686,15 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 	if rc.rtpPassthrough {
 		rc.logger.Warn("rtp_passthrough is only supported for H264 codec. rtp_passthrough features disabled due to MJPEG RTSP track")
 	}
+
 	if rc.lazyDecode {
-		rc.logger.Warn("lazy_decode is currently only supported for H264 codec. lazy_decode features disabled due to MJPEG RTSP track")
+		rc.logger.Warn("lazy_decode is currently only supported for H264 and H265 codecs. lazy_decode features disabled due to MJPEG RTSP track")
 	}
+
+	if rc.iframeOnlyDecode {
+		rc.logger.Warn("i_frame_only_decode is currently only supported for H264 and H265 codecs. lazy_decode features disabled due to MJPEG RTSP track")
+	}
+
 	var f *format.MJPEG
 	media := session.FindFormat(&f)
 	if media == nil {
@@ -728,7 +734,11 @@ func (rc *rtspCamera) initMPEG4(session *description.Session) error {
 	}
 
 	if rc.lazyDecode {
-		rc.logger.Warn("lazy_decode is currently only supported for H264 codec. lazy_decode features disabled due to MPEG4 RTSP track")
+		rc.logger.Warn("lazy_decode is currently only supported for H264 and H265 codecs. lazy_decode features disabled due to MPEG4 RTSP track")
+	}
+
+	if rc.iframeOnlyDecode {
+		rc.logger.Warn("i_frame_only_decode is currently only supported for H264 and H265 codecs. lazy_decode features disabled due to MPEG4 RTSP track")
 	}
 
 	var f *format.MPEG4Video
