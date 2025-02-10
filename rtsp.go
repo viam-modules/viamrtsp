@@ -1135,8 +1135,8 @@ func (rc *rtspCamera) handleLatestFrame(newFrame *avFrameWrapper) {
 	newFrame.incrementRefs()
 	rc.latestFrame = newFrame
 	rc.latestFrameBytes = nil
-	rc.latestFrameMimeType = ""
 	rc.latestFrameImageMetadata = camera.ImageMetadata{}
+	rc.latestFrameMimeType = ""
 }
 
 func naluType(nalu []byte) h264.NALUType {
