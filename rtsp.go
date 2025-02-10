@@ -180,14 +180,14 @@ type rtspCamera struct {
 
 	activeBackgroundWorkers sync.WaitGroup
 
+	// latestFrameMu protects critical sections where frame state changes (e.g. ref counting) need to be atomic
+	// with swapping out the latest frame.
+	latestFrameMu            sync.Mutex
 	latestMJPEGBytes         atomic.Pointer[[]byte]
 	latestFrame              *avFrameWrapper
 	latestFrameMimeType      string
 	latestFrameImageMetadata camera.ImageMetadata
 	latestFrameBytes         []byte
-	// frameSwapMu protects critical sections where frame state changes (e.g. ref counting) need to be atomic
-	// with swapping out the latest frame.
-	frameSwapMu sync.Mutex
 	// We use a pool data structure to amortize the malloc cost of AVFrames and reduce pressure on memory
 	// management. We create one pool for the entire lifetime of the RTSP camera. Additionally, frames
 	// from the pool may be for a resolution that does not match the current image. The user of the pool
@@ -1113,8 +1113,8 @@ func (rc *rtspCamera) decodeAndStore(nalu []byte) error {
 // the previous frame by trying to put it back in the pool. It might not make
 // it back into the pool immediately or at all depending on its state.
 func (rc *rtspCamera) handleLatestFrame(newFrame *avFrameWrapper) {
-	rc.frameSwapMu.Lock()
-	defer rc.frameSwapMu.Unlock()
+	rc.latestFrameMu.Lock()
+	defer rc.latestFrameMu.Unlock()
 
 	prevFrame := rc.latestFrame
 	if prevFrame != nil {
@@ -1144,7 +1144,7 @@ func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]int
 	defer rc.closeMu.RUnlock()
 	start := time.Now()
 	defer func() {
-		rc.logger.Debugf("codec: %s, lazy: %t, iframe_only: %t, time: %s",
+		rc.logger.Infof("codec: %s, lazy: %t, iframe_only: %t, time: %s",
 			videoCodec(rc.currentCodec.Load()), rc.lazyDecode, rc.iframeOnlyDecode, time.Since(start))
 	}()
 	if err := rc.cancelCtx.Err(); err != nil {
@@ -1164,8 +1164,8 @@ func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]int
 
 func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, camera.ImageMetadata, error) {
 	rc.consumeLazyAU()
-	rc.frameSwapMu.Lock()
-	defer rc.frameSwapMu.Unlock()
+	rc.latestFrameMu.Lock()
+	defer rc.latestFrameMu.Unlock()
 	if rc.latestFrame == nil {
 		return nil, camera.ImageMetadata{}, errors.New("no frame yet")
 	}
@@ -1178,7 +1178,7 @@ func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, camera.ImageM
 		if refCount := currentFrame.decrementRefs(); refCount == 0 {
 			rc.avFramePool.put(currentFrame)
 		}
-		rc.logger.Info("cache hit")
+		rc.logger.Debug("cache hit")
 		return rc.latestFrameBytes, rc.latestFrameImageMetadata, nil
 	}
 
