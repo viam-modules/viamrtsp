@@ -497,7 +497,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 
 		if rc.lazyDecode {
 			if h264.IDRPresent(au) {
-				rc.logger.Info("iframe")
+				rc.logger.Debug("iframe")
 				rc.resetLazyAU(au)
 			} else {
 				rc.appendLazyAU(au)
@@ -630,7 +630,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		packedAU := packH265AUIntoNALU(au, rc.logger)
 		if rc.lazyDecode {
 			if h265.IsRandomAccess(au) {
-				rc.logger.Info("iframe")
+				rc.logger.Debug("iframe")
 				rc.resetLazyAU([][]byte{packedAU})
 			} else {
 				rc.appendLazyAU([][]byte{packedAU})
