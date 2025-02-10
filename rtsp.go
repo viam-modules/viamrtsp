@@ -685,7 +685,7 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 }
 
 // detectMPEG4Format attempts to create an MPEG4Video format from a Generic format
-// Returns the MPEG4Video format if successful, nil and error otherwise
+// Returns the MPEG4Video format if successful, nil and error otherwise.
 func detectMPEG4Format(forma format.Format) (*format.MPEG4Video, error) {
 	generic, ok := forma.(*format.Generic)
 	if !ok {
@@ -699,7 +699,6 @@ func detectMPEG4Format(forma format.Format) (*format.MPEG4Video, error) {
 	mpeg4 := &format.MPEG4Video{
 		PayloadTyp:     generic.PayloadType(),
 		ProfileLevelID: defaultMPEG4ProfileLevelID,
-		SampleRate:     generic.ClockRate(),
 	}
 
 	if fmtp := generic.FMTP(); fmtp != nil {
