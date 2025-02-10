@@ -1154,7 +1154,7 @@ func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]int
 	defer rc.closeMu.RUnlock()
 	start := time.Now()
 	defer func() {
-		rc.logger.Infof("codec: %s, lazy: %t, iframe_only: %t, time: %s",
+		rc.logger.Debugf("codec: %s, lazy: %t, iframe_only: %t, time: %s",
 			videoCodec(rc.currentCodec.Load()), rc.lazyDecode, rc.iframeOnlyDecode, time.Since(start))
 	}()
 	if err := rc.cancelCtx.Err(); err != nil {
