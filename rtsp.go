@@ -182,12 +182,12 @@ type rtspCamera struct {
 
 	// latestFrameMu protects critical sections where frame state changes (e.g. ref counting) need to be atomic
 	// with swapping out the latest frame.
-	latestFrameMu            sync.Mutex
-	latestMJPEGBytes         atomic.Pointer[[]byte]
-	latestFrame              *avFrameWrapper
-	latestFrameMimeType      string
-	latestFrameImageMetadata camera.ImageMetadata
-	latestFrameBytes         []byte
+	latestFrameMu                  sync.Mutex
+	latestMJPEGBytes               atomic.Pointer[[]byte]
+	latestFrame                    *avFrameWrapper
+	latestCachedFrameMimeType      string
+	latestCachedFrameImageMetadata camera.ImageMetadata
+	latestCachedFrameBytes         []byte
 	// We use a pool data structure to amortize the malloc cost of AVFrames and reduce pressure on memory
 	// management. We create one pool for the entire lifetime of the RTSP camera. Additionally, frames
 	// from the pool may be for a resolution that does not match the current image. The user of the pool
@@ -692,7 +692,8 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 	}
 
 	if rc.iframeOnlyDecode {
-		rc.logger.Warn("i_frame_only_decode is currently only supported for H264 and H265 codecs. lazy_decode features disabled due to MJPEG RTSP track")
+		rc.logger.Warn("i_frame_only_decode is currently only supported for H264 and H265 codecs. " +
+			"lazy_decode features disabled due to MJPEG RTSP track")
 	}
 
 	var f *format.MJPEG
@@ -738,7 +739,8 @@ func (rc *rtspCamera) initMPEG4(session *description.Session) error {
 	}
 
 	if rc.iframeOnlyDecode {
-		rc.logger.Warn("i_frame_only_decode is currently only supported for H264 and H265 codecs. lazy_decode features disabled due to MPEG4 RTSP track")
+		rc.logger.Warn("i_frame_only_decode is currently only supported for H264 and H265 codecs. " +
+			"lazy_decode features disabled due to MPEG4 RTSP track")
 	}
 
 	var f *format.MPEG4Video
@@ -1134,9 +1136,9 @@ func (rc *rtspCamera) handleLatestFrame(newFrame *avFrameWrapper) {
 	}
 	newFrame.incrementRefs()
 	rc.latestFrame = newFrame
-	rc.latestFrameBytes = nil
-	rc.latestFrameImageMetadata = camera.ImageMetadata{}
-	rc.latestFrameMimeType = ""
+	rc.latestCachedFrameBytes = nil
+	rc.latestCachedFrameImageMetadata = camera.ImageMetadata{}
+	rc.latestCachedFrameMimeType = ""
 }
 
 func naluType(nalu []byte) h264.NALUType {
@@ -1184,12 +1186,12 @@ func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, camera.ImageM
 	var bytes []byte
 	var metadata camera.ImageMetadata
 	var err error
-	if rc.latestFrameBytes != nil && rc.latestFrameMimeType == mimeType {
+	if rc.latestCachedFrameBytes != nil && rc.latestCachedFrameMimeType == mimeType {
 		if refCount := currentFrame.decrementRefs(); refCount == 0 {
 			rc.avFramePool.put(currentFrame)
 		}
 		rc.logger.Debug("cache hit")
-		return rc.latestFrameBytes, rc.latestFrameImageMetadata, nil
+		return rc.latestCachedFrameBytes, rc.latestCachedFrameImageMetadata, nil
 	}
 
 	switch mimeType {
@@ -1209,9 +1211,9 @@ func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, camera.ImageM
 	if err != nil {
 		return nil, camera.ImageMetadata{}, err
 	}
-	rc.latestFrameBytes = bytes
-	rc.latestFrameImageMetadata = metadata
-	rc.latestFrameMimeType = mimeType
+	rc.latestCachedFrameBytes = bytes
+	rc.latestCachedFrameImageMetadata = metadata
+	rc.latestCachedFrameMimeType = mimeType
 	return bytes, metadata, err
 }
 
