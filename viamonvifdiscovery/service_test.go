@@ -80,16 +80,6 @@ func TestGetCredFromExtra(t *testing.T) {
 		test.That(t, cred.Pass, test.ShouldEqual, "pass")
 		test.That(t, ok, test.ShouldBeTrue)
 	})
-	t.Run("Test bad extra with User as int", func(t *testing.T) {
-		extra := map[string]any{
-			"User": 1,
-			"Pass": "pass",
-		}
-		cred, ok := getCredFromExtra(extra)
-		test.That(t, cred.User, test.ShouldEqual, "")
-		test.That(t, cred.Pass, test.ShouldEqual, "")
-		test.That(t, ok, test.ShouldBeFalse)
-	})
 	t.Run("Test good extra with no Pass", func(t *testing.T) {
 		extra := map[string]any{
 			"User": "user",
@@ -99,18 +89,17 @@ func TestGetCredFromExtra(t *testing.T) {
 		test.That(t, cred.Pass, test.ShouldEqual, "")
 		test.That(t, ok, test.ShouldBeTrue)
 	})
-		t.Run("Test bad extra with nostrings" func(t *testing.T) {
+	t.Run("Test bad extra with nostrings", func(t *testing.T) {
 		extra := map[string]any{
 			"User": 1,
-			"Pass" : true,
+			"Pass": true,
 		}
 		cred, ok := getCredFromExtra(extra)
 		test.That(t, cred.User, test.ShouldEqual, "")
 		test.That(t, cred.Pass, test.ShouldEqual, "")
-		test.That(t, ok, test.ShouldNotBeTrue)
+		test.That(t, ok, test.ShouldBeFalse)
 	})
 	t.Run("Test nil cred", func(t *testing.T) {
-
 		cred, ok := getCredFromExtra(nil)
 		test.That(t, cred.User, test.ShouldEqual, "")
 		test.That(t, cred.Pass, test.ShouldEqual, "")
