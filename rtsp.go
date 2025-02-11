@@ -109,7 +109,7 @@ type Config struct {
 	RTPPassthrough   *bool                `json:"rtp_passthrough"`
 	LazyDecode       bool                 `json:"lazy_decode,omitempty"`
 	IframeOnlyDecode bool                 `json:"i_frame_only_decode,omitempty"`
-	Query            viamupnp.DeviceQuery `json:"query"`
+	Query            viamupnp.DeviceQuery `json:"query,omitempty"`
 }
 
 // CodecFormat contains a pointer to a format and the corresponding FFmpeg codec.
