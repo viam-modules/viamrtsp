@@ -688,8 +688,8 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 // Returns the format and media if found.
 func getMPEG4FromGeneric(session *description.Session) (*format.MPEG4Video, *description.Media, error) {
 	for _, media := range session.Medias {
-		for _, forma := range media.Formats {
-			generic, ok := forma.(*format.Generic)
+		for _, f := range media.Formats {
+			generic, ok := f.(*format.Generic)
 			if !ok {
 				continue
 			}
@@ -703,22 +703,27 @@ func getMPEG4FromGeneric(session *description.Session) (*format.MPEG4Video, *des
 				ProfileLevelID: defaultMPEG4ProfileLevelID,
 			}
 
-			if fmtp := generic.FMTP(); fmtp != nil {
-				if config, ok := fmtp["config"]; ok {
-					configBytes, err := hex.DecodeString(config)
-					if err != nil {
-						return nil, nil, fmt.Errorf("failed to decode MPEG4 config: %w", err)
-					}
-					mpeg4.Config = configBytes
-				}
-				if profileID, ok := fmtp["profile-level-id"]; ok {
-					id, err := strconv.Atoi(profileID)
-					if err != nil {
-						return nil, nil, fmt.Errorf("failed to parse profile-level-id: %w", err)
-					}
-					mpeg4.ProfileLevelID = id
-				}
+			fmtp := generic.FMTP()
+			if fmtp == nil {
+				return mpeg4, media, nil
 			}
+
+			if config, ok := fmtp["config"]; ok {
+				configBytes, err := hex.DecodeString(config)
+				if err != nil {
+					return nil, nil, fmt.Errorf("failed to decode MPEG4 config: %w", err)
+				}
+				mpeg4.Config = configBytes
+			}
+
+			if profileID, ok := fmtp["profile-level-id"]; ok {
+				id, err := strconv.Atoi(profileID)
+				if err != nil {
+					return nil, nil, fmt.Errorf("failed to parse profile-level-id: %w", err)
+				}
+				mpeg4.ProfileLevelID = id
+			}
+
 			return mpeg4, media, nil
 		}
 	}
