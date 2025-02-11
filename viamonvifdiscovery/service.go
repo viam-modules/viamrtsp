@@ -74,10 +74,21 @@ func newDiscovery(_ context.Context, _ resource.Dependencies,
 }
 
 // DiscoverResources discovers different rtsp cameras that use onvif.
-func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, _ map[string]any) ([]resource.Config, error) {
+func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[string]any) ([]resource.Config, error) {
 	cams := []resource.Config{}
 
-	list, err := viamonvif.DiscoverCameras(ctx, dis.Credentials, nil, dis.logger)
+	discoverCreds := dis.Credentials
+	extraUser, ok := extra["User"].(string)
+	if ok {
+		dis.logger.Info("yo ok")
+		extraPass, ok := extra["Pass"].(string)
+		if ok {
+			dis.logger.Info("yo cred")
+			addCred := device.Credentials{User: extraUser, Pass: extraPass}
+			discoverCreds = append(discoverCreds, addCred)
+		}
+	}
+	list, err := viamonvif.DiscoverCameras(ctx, discoverCreds, nil, dis.logger)
 	if err != nil {
 		return nil, err
 	}

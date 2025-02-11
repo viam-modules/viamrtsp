@@ -91,8 +91,19 @@ The following attributes are available for all models of `viamrtsp` discovery se
     {
       "user": "<USERNAME2>",
       "pass": "<PASSWORD2>"
-    },
+    }
    ]
+}
+```
+
+### DiscoverResources Extras
+
+The DiscoverResources API also can take a credential as `extra`s fields. To discover cameras using this method, add the following to the extras field of the request:
+
+```json
+{
+  "User": "<username>",
+  "Pass": "<password>"
 }
 ```
 
