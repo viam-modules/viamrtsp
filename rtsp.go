@@ -684,60 +684,42 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 	return nil
 }
 
-// detectMPEG4Format attempts to create an MPEG4Video format from a Generic format
-// Returns the MPEG4Video format if successful, nil and error otherwise.
-func detectMPEG4Format(forma format.Format) (*format.MPEG4Video, error) {
-	generic, ok := forma.(*format.Generic)
-	if !ok {
-		return nil, fmt.Errorf("format is not a Generic format: %s", forma.Codec())
-	}
-
-	if !strings.HasPrefix(strings.ToUpper(generic.RTPMap()), "MP4V-ES/") {
-		return nil, fmt.Errorf("generic format is not MPEG4: %s", forma.Codec())
-	}
-
-	mpeg4 := &format.MPEG4Video{
-		PayloadTyp:     generic.PayloadType(),
-		ProfileLevelID: defaultMPEG4ProfileLevelID,
-	}
-
-	if fmtp := generic.FMTP(); fmtp != nil {
-		if config, ok := fmtp["config"]; ok {
-			configBytes, err := hex.DecodeString(config)
-			if err != nil {
-				return nil, fmt.Errorf("failed to decode MPEG4 config: %w", err)
-			}
-			mpeg4.Config = configBytes
-		}
-		if profileID, ok := fmtp["profile-level-id"]; ok {
-			id, err := strconv.Atoi(profileID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse profile-level-id: %w", err)
-			}
-			mpeg4.ProfileLevelID = id
-		}
-	}
-	return mpeg4, nil
-}
-
-// findMPEG4InSession attempts to find an MPEG4 format in the session, either as a direct MPEG4Video format
-// or as a generic format that can be converted to MPEG4. Returns the format and media if found.
-func findMPEG4InSession(session *description.Session) (*format.MPEG4Video, *description.Media, error) {
-	var f *format.MPEG4Video
-	if media := session.FindFormat(&f); media != nil {
-		return f, media, nil
-	}
-
-	// If we didn't find a direct MPEG4Video format, check for generic formats
+// getMPEG4FromGeneric attempts to find an MPEG4 format from generic format(s) in the session that can be converted to MPEG4.
+// Returns the format and media if found.
+func getMPEG4FromGeneric(session *description.Session) (*format.MPEG4Video, *description.Media, error) {
 	for _, media := range session.Medias {
 		for _, forma := range media.Formats {
-			mpeg4, err := detectMPEG4Format(forma)
-			if err != nil {
-				return nil, nil, fmt.Errorf("error detecting MPEG4 format: %w", err)
+			generic, ok := forma.(*format.Generic)
+			if !ok {
+				continue
 			}
-			if mpeg4 != nil {
-				return mpeg4, media, nil
+
+			if !strings.HasPrefix(strings.ToUpper(generic.RTPMap()), "MP4V-ES/") {
+				continue
 			}
+
+			mpeg4 := &format.MPEG4Video{
+				PayloadTyp:     generic.PayloadType(),
+				ProfileLevelID: defaultMPEG4ProfileLevelID,
+			}
+
+			if fmtp := generic.FMTP(); fmtp != nil {
+				if config, ok := fmtp["config"]; ok {
+					configBytes, err := hex.DecodeString(config)
+					if err != nil {
+						return nil, nil, fmt.Errorf("failed to decode MPEG4 config: %w", err)
+					}
+					mpeg4.Config = configBytes
+				}
+				if profileID, ok := fmtp["profile-level-id"]; ok {
+					id, err := strconv.Atoi(profileID)
+					if err != nil {
+						return nil, nil, fmt.Errorf("failed to parse profile-level-id: %w", err)
+					}
+					mpeg4.ProfileLevelID = id
+				}
+			}
+			return mpeg4, media, nil
 		}
 	}
 	return nil, nil, nil
@@ -753,16 +735,21 @@ func (rc *rtspCamera) initMPEG4(session *description.Session) error {
 		rc.logger.Warn("lazy_decode is currently only supported for H264 codec. lazy_decode features disabled due to MPEG4 RTSP track")
 	}
 
-	f, media, err := findMPEG4InSession(session)
-	if err != nil {
-		return fmt.Errorf("error finding MPEG4 track: %w", err)
-	}
+	var f *format.MPEG4Video
+	media := session.FindFormat(&f)
+	var err error
 	if media == nil {
-		rc.logger.Warn("No MPEG4 track found")
-		for _, x := range session.Medias {
-			rc.logger.Warnf("\t %v", x)
+		// If direct MPEG4 format not found, try to find it in generic formats
+		f, media, err = getMPEG4FromGeneric(session)
+		if err != nil {
+			return fmt.Errorf("error finding MPEG4 track: %w", err)
 		}
-		return errors.New("MPEG4 track not found")
+		if media == nil {
+			for _, x := range session.Medias {
+				rc.logger.Debugf("\t %v", x)
+			}
+			return errors.New("MPEG4 track not found")
+		}
 	}
 
 	mpeg4Decoder, err := f.CreateDecoder()
@@ -1047,30 +1034,32 @@ func (rc *rtspCamera) getAvailableCodec(session *description.Session) videoCodec
 	var h264 *format.H264
 	var h265 *format.H265
 	var mjpeg *format.MJPEG
-
+	var mpeg4 *format.MPEG4Video
 	// List of formats/codecs in priority order
 	codecFormats := []codecFormat{
 		{&h264, H264},
 		{&h265, H265},
 		{&mjpeg, MJPEG},
-		{nil, MPEG4}, // ambiguous codec, MPEG4 can be in a generic format
+		{&mpeg4, MPEG4}, // MPEG4 video can be encoded in multiple RTP payload formats:
+		// 1. MP4V-ES
+		// 2. Generic RTP payload format
+		// So we handle it separately from other codecs
 	}
 
 	for _, codecFormat := range codecFormats {
+		// For all codecs, check if the format exists directly in the session
+		if media := session.FindFormat(codecFormat.formatPointer); media != nil {
+			return codecFormat.codec
+		}
+
 		if codecFormat.codec == MPEG4 {
-			mpeg4, _, err := findMPEG4InSession(session)
+			mpeg4, _, err := getMPEG4FromGeneric(session)
 			switch {
 			case err != nil:
 				rc.logger.Debugf("error checking for MPEG4 format: %v", err)
 			case mpeg4 != nil:
 				return MPEG4
 			}
-			continue
-		}
-
-		// For all other codecs, check if format exists directly
-		if media := session.FindFormat(codecFormat.formatPointer); media != nil {
-			return codecFormat.codec
 		}
 	}
 
