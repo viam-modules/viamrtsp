@@ -16,7 +16,7 @@ Navigate to the [**CONFIGURE** tab](https://docs.viam.com/build/configure/) of y
 
 ## Configure your `viamrtsp` camera
 
-Copy and paste the following attributes template into the resulting component's attribute panel:
+Copy and paste the following attributes template into the JSON configuration:
 
 ```json
 {
