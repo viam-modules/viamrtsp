@@ -1061,6 +1061,8 @@ func (rc *rtspCamera) getAvailableCodec(session *description.Session) videoCodec
 			mpeg4, _, err := getMPEG4FromGeneric(session)
 			switch {
 			case err != nil:
+				// We eat the error here because an error parsing MPEG4 format details
+				// shouldn't prevent us from checking other codecs.
 				rc.logger.Debugf("error checking for MPEG4 format: %v", err)
 			case mpeg4 != nil:
 				return MPEG4
