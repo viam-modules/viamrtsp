@@ -17,12 +17,12 @@ require (
 	github.com/pion/rtp v1.8.7
 	github.com/rhysd/actionlint v1.6.27
 	github.com/stretchr/testify v1.9.0
+	github.com/viam-modules/video-store v0.0.3
 	go.uber.org/zap v1.27.0
 	go.viam.com/rdk v0.57.1-0.20250108163155-2071720cd8d3
 	go.viam.com/test v1.2.4
 	go.viam.com/utils v0.1.118
 	golang.org/x/net v0.30.0
-	github.com/viam-modules/video-store v0.0.3
 
 )
 
@@ -342,4 +342,4 @@ require (
 	nhooyr.io/websocket v1.8.7 // indirect
 )
 
-replace github.com/viam-modules/video-store => ./video-store/video-store-review
+replace github.com/viam-modules/video-store => ./video-store
