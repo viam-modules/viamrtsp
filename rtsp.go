@@ -633,7 +633,6 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		packedAU := packH265AUIntoNALU(au, rc.logger)
 		if rc.lazyDecode {
 			if h265.IsRandomAccess(au) {
-				rc.logger.Debug("iframe")
 				rc.resetLazyAU([][]byte{packedAU})
 			} else {
 				rc.appendLazyAU([][]byte{packedAU})
