@@ -1190,7 +1190,6 @@ func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, camera.ImageM
 		if refCount := currentFrame.decrementRefs(); refCount == 0 {
 			rc.avFramePool.put(currentFrame)
 		}
-		rc.logger.Debug("cache hit")
 		return rc.latestFrameCache.bytes, rc.latestFrameCache.imageMetadata, nil
 	}
 
