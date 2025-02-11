@@ -89,7 +89,7 @@ func TestGetCredFromExtra(t *testing.T) {
 		test.That(t, cred.Pass, test.ShouldEqual, "")
 		test.That(t, ok, test.ShouldBeTrue)
 	})
-	t.Run("Test bad extra with nostrings", func(t *testing.T) {
+	t.Run("Test bad extra with no strings", func(t *testing.T) {
 		extra := map[string]any{
 			"User": 1,
 			"Pass": true,
