@@ -79,7 +79,7 @@ The following attributes are available for all models of `viamrtsp` discovery se
 | ------- | ------ | ------------ | ----------- |
 | `credentials` | struct | Optional | set the username and password for any amount of credentials. |
 
-### Example configuration
+### Example Configuration
 
 ```json
 {
