@@ -78,16 +78,10 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 	cams := []resource.Config{}
 
 	discoverCreds := dis.Credentials
-	// check for a username from extras
-	extraUser, ok := extra["User"].(string)
+
+	extraCred, ok := getCredFromExtra(extra)
 	if ok {
-		// not requiring a password to match config
-		extraPass, ok := extra["Pass"].(string)
-		if !ok {
-			extraPass = ""
-		}
-		addCred := device.Credentials{User: extraUser, Pass: extraPass}
-		discoverCreds = append(discoverCreds, addCred)
+		discoverCreds = append(discoverCreds, extraCred)
 	}
 	list, err := viamonvif.DiscoverCameras(ctx, discoverCreds, nil, dis.logger)
 	if err != nil {
@@ -147,4 +141,19 @@ func createCameraConfig(name, address string) (resource.Config, error) {
 		Name: name, API: camera.API, Model: viamrtsp.ModelAgnostic,
 		Attributes: result, ConvertedAttributes: &attributes,
 	}, nil
+}
+
+func getCredFromExtra(extra map[string]any) (device.Credentials, bool) {
+	// check for a username from extras
+	extraUser, ok := extra["User"].(string)
+	if !ok {
+		return device.Credentials{}, false
+	}
+	// not requiring a password to match config
+	extraPass, ok := extra["Pass"].(string)
+	if !ok {
+		extraPass = ""
+	}
+
+	return device.Credentials{User: extraUser, Pass: extraPass}, true
 }
