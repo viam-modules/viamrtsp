@@ -501,7 +501,6 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 
 		if rc.lazyDecode {
 			if h264.IDRPresent(au) {
-				rc.logger.Debug("iframe")
 				rc.resetLazyAU(au)
 			} else {
 				rc.appendLazyAU(au)
