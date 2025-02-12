@@ -339,3 +339,5 @@ require (
 	mvdan.cc/unparam v0.0.0-20240528143540-8a5130ca722f // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 )
+
+replace github.com/erh/viamupnp => /Users/johnnicholson/viam-slam/viamupnp
