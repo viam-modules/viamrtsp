@@ -3,11 +3,9 @@ package main
 import (
 	"context"
 
-	"github.com/viam-modules/viamrtsp"
-	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
-	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/robot/client"
+	"go.viam.com/rdk/services/discovery"
 	"go.viam.com/utils/rpc"
 )
 
@@ -30,21 +28,21 @@ func main() {
 
 	defer machine.Close(context.Background())
 
-	qs := []resource.DiscoveryQuery{
-		{
-			API:   camera.API,
-			Model: viamrtsp.ModelAgnostic,
-			Extra: map[string]interface{}{
-				"username": "<onvif-username>", // optional credentials for if your device is ONVIF authenticated
-				"password": "<onvif-password>",
-			},
-		},
-	}
-	discoveries, err := machine.DiscoverComponents(context.Background(), qs)
-	for _, discovery := range discoveries {
-		logger.Infof("Discovered: %v", discovery.Results)
-	}
+	dis, err := discovery.FromRobot(machine, "<discovery-name>")
 	if err != nil {
-		logger.Fatalf("Failed to discover due to: %v", err)
+		logger.Fatal(err)
+	}
+
+	extras := map[string]any{}
+	extras["User"] = "<onvif-username>" // optional credentials for if your device is ONVIF authenticated
+	extras["Pass"] = "<onvif-password>" // can also be configured in the discovery service
+	cfgs, err := dis.DiscoverResources(context.Background(), extras)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	// print all discovered resources
+	for _, cfg := range cfgs {
+		logger.Infof("Name: %v\tModel: %v\tAPI: %v", cfg.Name, cfg.Model, cfg.API)
+		logger.Infof("Attributes: ", cfg.Attributes)
 	}
 }

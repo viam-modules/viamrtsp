@@ -1,5 +1,5 @@
-// Package viamonvifdiscovery provides the discovery service that wraps ONVIF integration for the viamrtsp module
-package viamonvifdiscovery
+// Package viamonvif provides the discovery service that wraps ONVIF integration for the viamrtsp module
+package viamonvif
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/viam-modules/viamrtsp"
-	"github.com/viam-modules/viamrtsp/viamonvif"
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
@@ -83,7 +82,7 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 	if ok {
 		discoverCreds = append(discoverCreds, extraCred)
 	}
-	list, err := viamonvif.DiscoverCameras(ctx, discoverCreds, nil, dis.logger)
+	list, err := DiscoverCameras(ctx, discoverCreds, nil, dis.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +106,7 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 	return cams, nil
 }
 
-func createCamerasFromURLs(l viamonvif.CameraInfo, logger logging.Logger) ([]resource.Config, error) {
+func createCamerasFromURLs(l CameraInfo, logger logging.Logger) ([]resource.Config, error) {
 	cams := []resource.Config{}
 	for index, u := range l.RTSPURLs {
 		logger.Debugf("camera URL:\t%s", u)

@@ -21,8 +21,6 @@ import (
 	"github.com/erh/viamupnp"
 	"github.com/pion/rtp"
 	"github.com/viam-modules/viamrtsp/formatprocessor"
-	"github.com/viam-modules/viamrtsp/viamonvif"
-	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"go.uber.org/zap/zapcore"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/components/camera/rtppassthrough"
@@ -66,39 +64,10 @@ var (
 	ErrH264PassthroughNotEnabled = errors.New("H264 passthrough is not enabled")
 )
 
-func getStringFromExtra(extra map[string]interface{}, key string) (string, error) {
-	extraVal, ok := extra[key]
-	if !ok {
-		return "", fmt.Errorf("key not found in 'extra': %s", key)
-	}
-	extraValStr, ok := extraVal.(string)
-	if !ok {
-		return "", errors.New("'extra' value must be a string")
-	}
-	return extraValStr, nil
-}
-
 func init() {
 	for _, model := range Models {
 		resource.RegisterComponent(camera.API, model, resource.Registration[camera.Camera, *Config]{
 			Constructor: NewRTSPCamera,
-			Discover: func(ctx context.Context, logger logging.Logger, extra map[string]interface{}) (interface{}, error) {
-				logger.Debugf("viamrtsp discovery received extra credentials: %v", extra)
-				username, err := getStringFromExtra(extra, "username")
-				if err != nil {
-					logger.Infof("error getting username from extra: %v", err)
-				}
-				password, err := getStringFromExtra(extra, "password")
-				if err != nil {
-					logger.Infof("error getting password from extra: %v", err)
-				}
-				creds := []device.Credentials{{User: username, Pass: password}}
-				camInfoList, err := viamonvif.DiscoverCameras(ctx, creds, nil, logger)
-				if err != nil {
-					return nil, err
-				}
-				return camInfoList, nil
-			},
 		})
 	}
 }
