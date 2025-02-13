@@ -225,6 +225,10 @@ func SetLibAVLogLevelFatal() {
 	C.av_log_set_level(C.AV_LOG_FATAL)
 }
 
+func SetLibAVLogLevelDebug() {
+	C.av_log_set_level(C.AV_LOG_DEBUG)
+}
+
 // newDecoder creates a new decoder for the given codec, including any extra configuration data.
 func newDecoder(codecID C.enum_AVCodecID, avFramePool *framePool, logger logging.Logger, extraData []byte) (*decoder, error) {
 	codec := C.avcodec_find_decoder(codecID)

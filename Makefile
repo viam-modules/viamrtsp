@@ -37,23 +37,51 @@ FFMPEG_VERSION ?= $(shell pwd)/FFmpeg/$(FFMPEG_TAG)
 FFMPEG_VERSION_PLATFORM ?= $(FFMPEG_VERSION)/$(TARGET_OS)-$(TARGET_ARCH)
 FFMPEG_BUILD ?= $(FFMPEG_VERSION_PLATFORM)/build
 FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
-               --enable-static \
-               --disable-shared \
-               --disable-programs \
-               --disable-doc \
-               --disable-everything \
-               --enable-decoder=h264 \
-               --enable-decoder=hevc \
-               --enable-decoder=mpeg4 \
-               --enable-encoder=mjpeg \
-               --enable-encoder=mpeg4 \
-               --enable-network \
-               --enable-parser=h264 \
-               --enable-parser=hevc
+--enable-static \
+--disable-shared \
+--disable-programs \
+--disable-doc \
+--disable-everything \
+--enable-bsf=h264_mp4toannexb \
+--enable-decoder=mpeg4 \
+--enable-decoder=h264 \
+--enable-decoder=hevc \
+--enable-decoder=mjpeg \
+--enable-demuxer=concat \
+--enable-demuxer=mov \
+--enable-demuxer=mp4 \
+--enable-demuxer=segment \
+--enable-encoder=libx264 \
+--enable-encoder=mjpeg \
+--enable-encoder=mpeg4 \
+--enable-gpl \
+--enable-libx264 \
+--enable-muxer=mp4 \
+--enable-muxer=segment \
+--enable-network \
+--enable-parser=h264 \
+--enable-parser=hevc \
+--enable-protocol=concat \
+--enable-protocol=crypto \
+--enable-protocol=file \
 
 # Add linker flag -checklinkname=0 for anet https://github.com/wlynxg/anet?tab=readme-ov-file#how-to-build-with-go-1230-or-later.
+GO_LDFLAGS := -ldflags="-checklinkname=0 "
+CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib -lavcodec -lavutil -lavformat -lswscale -lz
+# TODO(seanp): Make sure this works on our CI runners.
+ifeq ($(SOURCE_OS),linux)
+	CGO_LDFLAGS += -l:libx264.a
+endif
+ifeq ($(SOURCE_OS),darwin)
+	CGO_LDFLAGS += $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a -liconv
+endif
+ifeq ($(SOURCE_OS),darwin)
+ifeq ($(shell brew list | grep -w x264 > /dev/null; echo $$?), 1)
+	brew update && brew install x264
+endif
+endif
 GO_LDFLAGS := -ldflags="-checklinkname=0"
-CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib
+# CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib
 CGO_CFLAGS := -I$(FFMPEG_BUILD)/include
 export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
@@ -89,11 +117,11 @@ all: $(BIN_OUTPUT_PATH)/viamrtsp $(BIN_OUTPUT_PATH)/discovery
 
 # We set GOOS, GOARCH, GO_TAGS, and GO_LDFLAGS to support cross-compilation for android targets.
 $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
-	CGO_LDFLAGS=$(CGO_LDFLAGS) \
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" \
 	GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) $(GO_LDFLAGS) -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
 
 $(BIN_OUTPUT_PATH)/discovery: build-ffmpeg *.go cmd/discovery/*.go
-	CGO_LDFLAGS=$(CGO_LDFLAGS) \
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" \
 	GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) $(GO_LDFLAGS) -o $(BIN_OUTPUT_PATH)/discovery cmd/discovery/cmd.go
 
 tool-install:
