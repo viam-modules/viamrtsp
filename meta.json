@@ -29,6 +29,12 @@
       "short_description": "configure a rtsp camera that uses the M-JPEG codec."
     },
     {
+      "api": "rdk:component:camera",
+      "model": "viam:viamrtsp:rtsp-mpeg4",
+      "markdown_link": "README.md#configure-your-viamrtsp-camera", 
+      "short_description": "configure a rtsp camera that uses the MPEG4 codec."
+    },
+    {
       "api": "rdk:service:discovery",
       "model": "viam:viamrtsp:onvif",
       "markdown_link": "README.md#configure-the-viamrtsponvif-discovery-service",
