@@ -1,5 +1,5 @@
-// Package viamonvifdiscovery provides the discovery service that wraps ONVIF integration for the viamrtsp module
-package viamonvifdiscovery
+// Package viamonvif provides the discovery service that wraps ONVIF integration for the viamrtsp module
+package viamonvif
 
 import (
 	"context"
