@@ -225,6 +225,7 @@ func SetLibAVLogLevelFatal() {
 	C.av_log_set_level(C.AV_LOG_FATAL)
 }
 
+// SetLibAVLogLevelDebug sets libav errors to debug log level
 func SetLibAVLogLevelDebug() {
 	C.av_log_set_level(C.AV_LOG_DEBUG)
 }

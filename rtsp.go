@@ -27,9 +27,8 @@ import (
 	"github.com/erh/viamupnp"
 	"github.com/pion/rtp"
 	"github.com/viam-modules/viamrtsp/formatprocessor"
-	"go.uber.org/zap/zapcore"
-
 	"github.com/viam-modules/video-store/videostore"
+	"go.uber.org/zap/zapcore"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/components/camera/rtppassthrough"
 	"go.viam.com/rdk/gostream"
@@ -54,11 +53,11 @@ const (
 	// defaultMPEG4ProfileLevelID is the default profile-level-id value for MPEG4 video
 	// as specified in RFC 6416 Section 7.1 https://datatracker.ietf.org/doc/html/rfc6416#section-7.1
 	defaultMPEG4ProfileLevelID = 1
-	initialFramePoolSize       = 5
 	defaultSegmentSeconds      = 30 // seconds
 	defaultUploadPath          = ".viam/capture/video-upload"
 	defaultStoragePath         = ".viam/video-storage"
 	maxGRPCSize                = 1024 * 1024 * 32 // bytes
+	videoStoreInitCloseTimeout = time.Second * 10
 )
 
 var (
@@ -289,7 +288,7 @@ func (rc *rtspCamera) closeConnection() {
 	}
 
 	if rc.vs != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		ctx, cancel := context.WithTimeout(context.Background(), videoStoreInitCloseTimeout)
 		defer cancel()
 		if err := rc.vs.Close(ctx); err != nil {
 			rc.logger.Error(err.Error())
@@ -464,9 +463,9 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 	// setup RTP/H264 -> H264 decoder
 	var f *format.H264
 
-	//TODO: Figure out if this is the right place to put this
+	// TODO: Figure out if this is the right place to put this
 	if rc.vsConfig != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		ctx, cancel := context.WithTimeout(context.Background(), videoStoreInitCloseTimeout)
 		defer cancel()
 		vs, err := videostore.NewH264RTPVideoStore(ctx, *rc.vsConfig, rc.logger)
 		if err != nil {
