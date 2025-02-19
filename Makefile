@@ -139,7 +139,7 @@ lint: gofmt tool-install build-ffmpeg
 	GOGC=50 $(TOOL_BIN)/golangci-lint run -v --fix --config=./etc/.golangci.yaml
 
 test: build-ffmpeg
-	CGO_CFLAGS=$(CGO_CFLAGS) CGO_LDFLAGS=$(CGO_LDFLAGS) go test -race -v ./...
+	CGO_CFLAGS="$(CGO_CFLAGS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" go test -race -v ./...
 
 profile-cpu:
 	go test -v -cpuprofile cpu.prof -run "^TestRTSPCameraPerformance$$" -bench github.com/viam-modules/viamrtsp
