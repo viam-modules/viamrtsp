@@ -72,7 +72,7 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
 
 # Add linker flag -checklinkname=0 for anet https://github.com/wlynxg/anet?tab=readme-ov-file#how-to-build-with-go-1230-or-later.
 PKG_CONFIG_PATH = $(FFMPEG_BUILD)/lib/pkgconfig
-CGO_CFLAGS = $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags $(FFMPEG_LIBS)) -I$(BUILD_DIR)
+CGO_CFLAGS = $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags $(FFMPEG_LIBS))
 ifeq ($(SOURCE_OS),linux)
 	SUBST = -l:libx264.a
 endif
@@ -118,10 +118,17 @@ all: $(BIN_OUTPUT_PATH)/viamrtsp $(BIN_OUTPUT_PATH)/discovery
 
 # We set GOOS, GOARCH, GO_TAGS, and GO_LDFLAGS to support cross-compilation for android targets.
 $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) $(GO_LDFLAGS) -ldflags="-checklinkname=0" -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" \
+	CGO_CFLAGS="$(CGO_CFLAGS)" \
+	GOOS=$(TARGET_OS) \
+	GOARCH=$(TARGET_ARCH) \
+	go build $(GO_TAGS) -ldflags="-checklinkname=0" -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
 
 $(BIN_OUTPUT_PATH)/discovery: build-ffmpeg *.go cmd/discovery/*.go
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) $(GO_LDFLAGS) -ldflags="-checklinkname=0"-o $(BIN_OUTPUT_PATH)/discovery cmd/discovery/cmd.go
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" \
+	CGO_CFLAGS="$(CGO_CFLAGS)" \
+	GOOS=$(TARGET_OS) \
+	GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) -ldflags="-checklinkname=0" -o $(BIN_OUTPUT_PATH)/discovery cmd/discovery/cmd.go
 
 tool-install:
 	GOBIN=`pwd`/$(TOOL_BIN) go install \
