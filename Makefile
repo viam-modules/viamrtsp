@@ -36,6 +36,11 @@ FFMPEG_TAG ?= n6.1
 FFMPEG_VERSION ?= $(shell pwd)/FFmpeg/$(FFMPEG_TAG)
 FFMPEG_VERSION_PLATFORM ?= $(FFMPEG_VERSION)/$(TARGET_OS)-$(TARGET_ARCH)
 FFMPEG_BUILD ?= $(FFMPEG_VERSION_PLATFORM)/build
+FFMPEG_LIBS=    libavformat                        \
+                libavcodec                         \
+                libavutil                          \
+                libswscale                          \
+
 FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
 --enable-static \
 --disable-shared \
@@ -66,24 +71,20 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
 --enable-protocol=file \
 
 # Add linker flag -checklinkname=0 for anet https://github.com/wlynxg/anet?tab=readme-ov-file#how-to-build-with-go-1230-or-later.
-GO_LDFLAGS := -ldflags="-checklinkname=0 "
-CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib -lavcodec -lavutil -lavformat -lswscale -lz
-# TODO(seanp): Make sure this works on our CI runners.
+PKG_CONFIG_PATH = $(FFMPEG_BUILD)/lib/pkgconfig
+CGO_CFLAGS = $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags $(FFMPEG_LIBS)) -I$(BUILD_DIR)
 ifeq ($(SOURCE_OS),linux)
-	CGO_LDFLAGS += -l:libx264.a
+	SUBST = -l:libx264.a
 endif
 ifeq ($(SOURCE_OS),darwin)
-	CGO_LDFLAGS += $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a -liconv
+	SUBST = $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a
 endif
+CGO_LDFLAGS = $(subst -lx264, $(SUBST),$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS))) 
 ifeq ($(SOURCE_OS),darwin)
 ifeq ($(shell brew list | grep -w x264 > /dev/null; echo $$?), 1)
 	brew update && brew install x264
 endif
 endif
-GO_LDFLAGS := -ldflags="-checklinkname=0"
-# CGO_LDFLAGS := -L$(FFMPEG_BUILD)/lib
-CGO_CFLAGS := -I$(FFMPEG_BUILD)/include
-export PKG_CONFIG_PATH=$(FFMPEG_BUILD)/lib/pkgconfig
 
 # If we are building for android, we need to set the correct flags
 # and toolchain paths for FFMPEG and go binary cross-compilation.
@@ -117,12 +118,10 @@ all: $(BIN_OUTPUT_PATH)/viamrtsp $(BIN_OUTPUT_PATH)/discovery
 
 # We set GOOS, GOARCH, GO_TAGS, and GO_LDFLAGS to support cross-compilation for android targets.
 $(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" \
-	GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) $(GO_LDFLAGS) -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) $(GO_LDFLAGS) -ldflags="-checklinkname=0" -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
 
 $(BIN_OUTPUT_PATH)/discovery: build-ffmpeg *.go cmd/discovery/*.go
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" \
-	GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) $(GO_LDFLAGS) -o $(BIN_OUTPUT_PATH)/discovery cmd/discovery/cmd.go
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) $(GO_LDFLAGS) -ldflags="-checklinkname=0"-o $(BIN_OUTPUT_PATH)/discovery cmd/discovery/cmd.go
 
 tool-install:
 	GOBIN=`pwd`/$(TOOL_BIN) go install \
@@ -139,7 +138,7 @@ lint: gofmt tool-install build-ffmpeg
 	GOGC=50 $(TOOL_BIN)/golangci-lint run -v --fix --config=./etc/.golangci.yaml
 
 test: build-ffmpeg
-	CGO_CFLAGS="$(CGO_CFLAGS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" go test -race -v ./...
+	CGO_CFLAGS="$(CGO_CFLAGS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" go test -ldflags="-checklinkname=0" -race -v ./...
 
 profile-cpu:
 	go test -v -cpuprofile cpu.prof -run "^TestRTSPCameraPerformance$$" -bench github.com/viam-modules/viamrtsp
