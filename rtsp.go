@@ -227,13 +227,20 @@ type rtspCamera struct {
 
 // Close closes the camera. It always returns nil, but because of Close() interface, it needs to return an error.
 func (rc *rtspCamera) Close(_ context.Context) error {
+	rc.logger.Info("close called")
 	rc.cancelFunc()
+	rc.logger.Info("before closeMu.Lock")
 	rc.closeMu.Lock()
 	defer rc.closeMu.Unlock()
+	rc.logger.Info("before unsubscribeAll")
 	rc.unsubscribeAll()
+	rc.logger.Info("before activeBackgroundWorkers.Wait")
 	rc.activeBackgroundWorkers.Wait()
+	rc.logger.Info("before closeConnection")
 	rc.closeConnection()
+	rc.logger.Info("before close")
 	rc.avFramePool.close()
+	rc.logger.Info("before close")
 	rc.mimeHandler.close()
 	return nil
 }
