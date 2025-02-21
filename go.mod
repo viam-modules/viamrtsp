@@ -342,4 +342,5 @@ require (
 )
 
 // replace github.com/viam-modules/video-store => ../video-store
-replace github.com/viam-modules/video-store => github.com/nicksanford/video-store v0.0.0-20250220191856-31a337672473
+
+replace github.com/viam-modules/video-store => github.com/nicksanford/video-store v0.0.0-20250221220458-2671ed89339e
