@@ -298,8 +298,9 @@ func (rc *rtspCamera) closeConnection() {
 		ctx, cancel := context.WithTimeout(context.Background(), videoStoreInitCloseTimeout)
 		defer cancel()
 		if err := rc.vs.Close(ctx); err != nil {
-			rc.logger.Error(err.Error())
+			rc.logger.Errorf("videostore.Close error: %s", err.Error())
 		}
+		rc.vs = nil
 	}
 }
 
@@ -472,6 +473,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 
 	// TODO: Figure out if this is the right place to put this
 	if rc.vsConfig != nil {
+		rc.logger.Info("creating video-store from config")
 		ctx, cancel := context.WithTimeout(context.Background(), videoStoreInitCloseTimeout)
 		defer cancel()
 		vs, err := videostore.NewH264RTPVideoStore(ctx, *rc.vsConfig, rc.logger)
@@ -502,10 +504,17 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		return fmt.Errorf("creating H264 raw decoder: %w", err)
 	}
 
-	if rc.vs != nil && len(f.SPS) != 0 && len(f.PPS) != 0 {
-		// TODO: have approach to tease out
-		if err := rc.vs.InitH264(f.SPS, f.PPS); err != nil {
-			return err
+	if rc.vs != nil {
+		rc.logger.Info("video-store is not nil, attempting to call InitH264")
+		if len(f.SPS) != 0 && len(f.PPS) != 0 {
+			// TODO: have approach to tease out
+			if err := rc.vs.InitH264(f.SPS, f.PPS); err != nil {
+				rc.logger.Errorf("videostore.InitH264 error: %s", err.Error())
+				return err
+			}
+			rc.logger.Info("videostore.InitH264 succeeded")
+		} else {
+			rc.logger.Warnf("sps or pps not present so video-store is not initializes sps len: %d, pps len: %d", len(f.SPS), len(f.PPS))
 		}
 	}
 
