@@ -88,10 +88,9 @@ func init() {
 }
 
 type videoStoreStorageConfig struct {
-	SegmentSeconds int    `json:"segment_seconds,omitempty"`
-	SizeGB         int    `json:"size_gb"`
-	UploadPath     string `json:"upload_path,omitempty"`
-	StoragePath    string `json:"storage_path,omitempty"`
+	SizeGB      int    `json:"size_gb"`
+	UploadPath  string `json:"upload_path,omitempty"`
+	StoragePath string `json:"storage_path,omitempty"`
 }
 
 type videoStoreConfig struct {
