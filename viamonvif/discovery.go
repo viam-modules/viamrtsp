@@ -9,7 +9,9 @@ import (
 	"net/url"
 	"regexp"
 	"slices"
+	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"github.com/viam-modules/viamrtsp/viamonvif/xsd/onvif"
@@ -108,6 +110,8 @@ type CameraInfo struct {
 	SerialNumber    string   `json:"serial_number"`
 	FirmwareVersion string   `json:"firmware_version"`
 	HardwareID      string   `json:"hardware_id"`
+
+	deviceIP net.IP
 }
 
 // regex to remove non alpha numerics.
@@ -119,6 +123,39 @@ func (cam *CameraInfo) Name(urlNum int) string {
 	stripModel := reg.ReplaceAllString(cam.Model, "")
 	stripSerial := reg.ReplaceAllString(cam.SerialNumber, "")
 	return fmt.Sprintf("%s-%s-%s-url%v", stripManufacturer, stripModel, stripSerial, urlNum)
+}
+
+func (cam *CameraInfo) tryMDNS(mdnsServer *mdnsServer, logger logging.Logger) {
+	// Sanity check the input required to make an mdns mapping.
+	if cam.deviceIP == nil || cam.SerialNumber == "" {
+		logger.Debugf("Not making mdns mapping for device. Host: %v IP: %v SerialNumber: %v",
+			cam.Host, cam.deviceIP, cam.SerialNumber)
+		return
+	}
+
+	// Clean the serial number to be dns compatible.
+	cleanedSerialNumber := strToHostName(cam.SerialNumber)
+	// Generate full .local hostname for the device.
+	derivedHostname := fmt.Sprintf("%v.local", cleanedSerialNumber)
+
+	// The mdns server expects a hostname without* the `.local` TLD suffix.
+	if err := mdnsServer.Add(cleanedSerialNumber, cam.deviceIP); err != nil {
+		logger.Debugf("Unable to make mdns mapping for device. Host: %v IP: %v SerialNumber: %v Err: %v",
+			cam.Host, cam.deviceIP, cam.SerialNumber, err)
+		return
+	}
+
+	// Replace the URLs in-place such that configs generated from these objects will point to the
+	// logical dns hostname rather than a raw IP.
+	for idx := range cam.RTSPURLs {
+		if strings.Contains(cam.RTSPURLs[idx], cam.deviceIP.String()) {
+			cam.RTSPURLs[idx] = strings.Replace(cam.RTSPURLs[idx], cam.deviceIP.String(), derivedHostname, 1)
+		} else {
+			logger.Debugf("RTSP URL did not contain expected hostname. URL: %v HostName: %v",
+				cam.RTSPURLs[idx], cam.deviceIP.String())
+			mdnsServer.Remove(cleanedSerialNumber)
+		}
+	}
 }
 
 // CameraInfoList is a struct containing a list of CameraInfo structs.
@@ -163,6 +200,26 @@ func DiscoverCameraInfo(
 	return zero, fmt.Errorf("no credentials matched IP %s", xaddr)
 }
 
+var consecutiveDashesRegexp = regexp.MustCompile("\\-\\-+")
+
+func strToHostName(inp string) string {
+	// Turn strings into valid hostnames. We perform the following steps:
+	// - For each character:
+	//   - Any alphanumeric is copied over. Casing is preserved.
+	//   - Any non-alphanumeric is turned into a dash.
+	// - As a final pass, replace any string of dashes with a single dash.
+	sb := strings.Builder{}
+	for _, ch := range inp {
+		if unicode.IsLetter(ch) || unicode.IsNumber(ch) {
+			sb.WriteRune(ch)
+		} else {
+			sb.WriteRune('-')
+		}
+	}
+
+	return consecutiveDashesRegexp.ReplaceAllLiteralString(sb.String(), "-")
+}
+
 // GetCameraInfo uses the ONVIF Media service to get the RTSP stream URLs and camera details.
 func GetCameraInfo(dev OnvifDevice, xaddr *url.URL, creds device.Credentials, logger logging.Logger) (CameraInfo, error) {
 	var zero CameraInfo
@@ -187,6 +244,9 @@ func GetCameraInfo(dev OnvifDevice, xaddr *url.URL, creds device.Credentials, lo
 		SerialNumber:    resp.SerialNumber,
 		FirmwareVersion: resp.FirmwareVersion,
 		HardwareID:      resp.HardwareID,
+
+		// Will be nil if there's an error.
+		deviceIP: net.ParseIP(xaddr.Host),
 	}
 
 	return cameraInfo, nil

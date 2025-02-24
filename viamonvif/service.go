@@ -50,8 +50,8 @@ func (cfg *Config) Validate(_ string) ([]string, error) {
 type rtspDiscovery struct {
 	resource.Named
 	resource.AlwaysRebuild
-	resource.TriviallyCloseable
 	Credentials []device.Credentials
+	mdnsServer  mdnsServer
 	logger      logging.Logger
 }
 
@@ -66,6 +66,7 @@ func newDiscovery(_ context.Context, _ resource.Dependencies,
 	dis := &rtspDiscovery{
 		Named:       conf.ResourceName().AsNamed(),
 		Credentials: append([]device.Credentials{emptyCred}, cfg.Credentials...),
+		mdnsServer:  newMDNSServer(logger.Sublogger("mdns")),
 		logger:      logger,
 	}
 
@@ -90,20 +91,34 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 		return nil, errors.New("no cameras found, ensure cameras are working or check credentials")
 	}
 
-	for _, l := range list.Cameras {
-		dis.logger.Debugf("%s %s %s", l.Manufacturer, l.Model, l.SerialNumber)
+	for _, camInfo := range list.Cameras {
+		dis.logger.Debugf("%s %s %s", camInfo.Manufacturer, camInfo.Model, camInfo.SerialNumber)
 		// some cameras return with no urls. explicitly skipping those so the behavior is clear in the service.
-		if len(l.RTSPURLs) == 0 {
-			dis.logger.Errorf("No urls found for camera, skipping. %s %s %s", l.Manufacturer, l.Model, l.SerialNumber)
+		if len(camInfo.RTSPURLs) == 0 {
+			dis.logger.Errorf("No urls found for camera, skipping. %s %s %s",
+				camInfo.Manufacturer, camInfo.Model, camInfo.SerialNumber)
 			continue
 		}
-		camConfigs, err := createCamerasFromURLs(l, dis.logger)
+
+		// tryMDNS will attempt to register an mdns entry for the camera. If successfully
+		// registered, `tryMDNS` will additionally mutate the `camInfo.RTSPURLs` to use the dns
+		// hostname rather than a raw IP. Such that the camera configs we are about to generate will
+		// use the dns hostname.
+		camInfo.tryMDNS(&dis.mdnsServer, dis.logger)
+
+		camConfigs, err := createCamerasFromURLs(camInfo, dis.logger)
 		if err != nil {
 			return nil, err
 		}
 		cams = append(cams, camConfigs...)
 	}
+
 	return cams, nil
+}
+
+func (dis *rtspDiscovery) Close(ctx context.Context) error {
+	dis.mdnsServer.Shutdown()
+	return nil
 }
 
 func createCamerasFromURLs(l CameraInfo, logger logging.Logger) ([]resource.Config, error) {
