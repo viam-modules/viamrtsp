@@ -227,20 +227,13 @@ type rtspCamera struct {
 
 // Close closes the camera. It always returns nil, but because of Close() interface, it needs to return an error.
 func (rc *rtspCamera) Close(_ context.Context) error {
-	rc.logger.Info("close called")
 	rc.cancelFunc()
-	rc.logger.Info("before closeMu.Lock")
 	rc.closeMu.Lock()
 	defer rc.closeMu.Unlock()
-	rc.logger.Info("before unsubscribeAll")
 	rc.unsubscribeAll()
-	rc.logger.Info("before activeBackgroundWorkers.Wait")
 	rc.activeBackgroundWorkers.Wait()
-	rc.logger.Info("before closeConnection")
 	rc.closeConnection()
-	rc.logger.Info("before close")
 	rc.avFramePool.close()
-	rc.logger.Info("before close")
 	rc.mimeHandler.close()
 	return nil
 }
@@ -471,7 +464,6 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 	// setup RTP/H264 -> H264 decoder
 	var f *format.H264
 
-	// TODO: Figure out if this is the right place to put this
 	if rc.vsConfig != nil {
 		rc.logger.Info("creating video-store from config")
 		ctx, cancel := context.WithTimeout(context.Background(), videoStoreInitCloseTimeout)
@@ -480,7 +472,6 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		if err != nil {
 			return err
 		}
-		// TODO set this to nil on reconnect
 		rc.vs = vs
 	}
 	media := session.FindFormat(&f)
@@ -507,7 +498,6 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 	if rc.vs != nil {
 		rc.logger.Info("video-store is not nil, attempting to call InitH264")
 		if len(f.SPS) != 0 && len(f.PPS) != 0 {
-			// TODO: have approach to tease out
 			if err := rc.vs.InitH264(f.SPS, f.PPS); err != nil {
 				rc.logger.Errorf("videostore.InitH264 error: %s", err.Error())
 				return err
@@ -1084,7 +1074,6 @@ func (rc *rtspCamera) Unsubscribe(_ context.Context, id rtppassthrough.Subscript
 
 // NewRTSPCamera creates a new rtsp camera from the config, that has to have a viamrtsp.Config.
 func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.Config, logger logging.Logger) (camera.Camera, error) {
-	// SetLibAVLogLevelDebug()
 	if logger.Level() != zapcore.DebugLevel {
 		logger.Info("suppressing non fatal libav errors / warnings due to false positives. to unsuppress, set module log_level to 'debug'")
 		SetLibAVLogLevelFatal()
@@ -1508,7 +1497,6 @@ func (rc *rtspCamera) DoCommand(ctx context.Context, command map[string]interfac
 		return ret, nil
 	case "fetch":
 		rc.logger.Debug("fetch command received")
-		// vs.logger.Debug("video bytes: ", len(videoBytes))
 		req, err := toFetchCommand(command)
 		if err != nil {
 			return nil, err
