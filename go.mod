@@ -17,6 +17,7 @@ require (
 	github.com/pion/rtp v1.8.11
 	github.com/rhysd/actionlint v1.6.27
 	github.com/stretchr/testify v1.10.0
+	github.com/viam-modules/video-store v0.0.5-rc1
 	go.uber.org/zap v1.27.0
 	go.viam.com/rdk v0.57.1-0.20250108163155-2071720cd8d3
 	go.viam.com/test v1.2.4
@@ -97,7 +98,7 @@ require (
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/firefart/nonamedreturns v1.0.5 // indirect
 	github.com/fogleman/gg v1.3.0 // indirect
-	github.com/fsnotify/fsnotify v1.6.0 // indirect
+	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/fullstorydev/grpcurl v1.8.6 // indirect
 	github.com/fzipp/gocyclo v0.6.0 // indirect
 	github.com/gen2brain/malgo v0.11.21 // indirect

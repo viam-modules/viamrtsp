@@ -1,7 +1,6 @@
 package viamrtsp
 
 /*
-#cgo pkg-config: libavutil libavcodec libswscale
 #include <libavcodec/avcodec.h>
 #include <libavutil/error.h>
 #include <libavutil/opt.h>
