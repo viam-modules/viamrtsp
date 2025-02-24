@@ -55,7 +55,7 @@ const (
 	defaultMPEG4ProfileLevelID = 1
 	defaultSegmentSeconds      = 30 // seconds
 	defaultUploadPath          = ".viam/capture/video-upload"
-	defaultStoragePath         = ".viam/video-storage"
+	defaultStoragePath         = ".viam/video-storage-viamrtsp"
 	maxGRPCSize                = 1024 * 1024 * 32 // bytes
 	videoStoreInitCloseTimeout = time.Second * 10
 )
