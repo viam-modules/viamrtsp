@@ -165,6 +165,20 @@ $(FFMPEG_VERSION_PLATFORM):
 	git clone https://github.com/FFmpeg/FFmpeg.git --depth 1 --branch $(FFMPEG_TAG) $(FFMPEG_VERSION_PLATFORM)
 
 $(FFMPEG_BUILD): $(FFMPEG_VERSION_PLATFORM)
+# Only need nasm to build assembly kernels for amd64 targets.
+ifeq ($(SOURCE_OS),linux)
+ifeq ($(shell dpkg -l | grep -w x264 > /dev/null; echo $$?), 1)
+	sudo apt update && sudo apt install -y libx264-dev
+endif
+ifeq ($(SOURCE_ARCH),amd64)
+	which nasm || (sudo apt update && sudo apt install -y nasm)
+endif
+endif
+ifeq ($(SOURCE_OS),darwin)
+ifeq ($(shell brew list | grep -w x264 > /dev/null; echo $$?), 1)
+	brew update && brew install x264
+endif
+endif
 	cd $(FFMPEG_VERSION_PLATFORM) && ./configure $(FFMPEG_OPTS) && $(MAKE) -j$(NPROC) && $(MAKE) install
 
 build-ffmpeg: $(NDK_ROOT)
