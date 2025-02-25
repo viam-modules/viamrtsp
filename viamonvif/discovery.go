@@ -9,8 +9,10 @@ import (
 	"net/url"
 	"regexp"
 	"slices"
+	"strings"
 	"sync"
 
+	"github.com/edaniels/zeroconf"
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"github.com/viam-modules/viamrtsp/viamonvif/xsd/onvif"
 	"go.viam.com/rdk/logging"
@@ -177,6 +179,35 @@ func GetCameraInfo(dev OnvifDevice, xaddr *url.URL, creds device.Credentials, lo
 	rtspURLs, err := GetRTSPStreamURIsFromProfiles(dev, creds, logger)
 	if err != nil {
 		return zero, fmt.Errorf("failed to get RTSP URLs: %w", err)
+	}
+
+	hostNameWithLocal := fmt.Sprintf("%s.local", resp.SerialNumber)
+	for idx := range rtspURLs {
+		// We expect all of the `rtspURLs` to contain the `xaddr.Host` as a substring. But we'll
+		// warn in case that assumption is not always true.
+		if strings.Contains(rtspURLs[idx], xaddr.Host) {
+			rtspURLs[idx] = strings.Replace(rtspURLs[idx], xaddr.Host, hostNameWithLocal, 1)
+		} else {
+			logger.Warnf("RTSP URL did not contain expected hostname. URL: %v HostName: %v", rtspURLs[idx], xaddr.Host)
+		}
+	}
+
+	mdnsServer, err := zeroconf.RegisterProxy(
+		resp.SerialNumber,    // Dan: As far as I can tell, just a name.
+		"_rtsp._tcp",         // Dan: The mDNS "service" to register. Doesn't make a difference?
+		"local",              // the domain
+		8080,                 // The service's port is ignored here
+		resp.SerialNumber,    // actual mDNS hostname, without the .local domain
+		[]string{xaddr.Host}, // ip to use
+		[]string{},           // txt fields, not needed
+		nil,                  // resolve this name for requests from all network interfaces
+		// RSDK-8205: logger.Desugar().Sugar() is necessary to massage a ZapCompatibleLogger into a
+		// *zap.SugaredLogger to match zeroconf function signatures.
+		logger.Desugar().Sugar(),
+	)
+	_ = mdnsServer
+	if err != nil {
+		logger.Warnf("Did not make hostname mapping for camera. Err:", err)
 	}
 
 	cameraInfo := CameraInfo{
