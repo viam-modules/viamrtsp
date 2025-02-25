@@ -6,8 +6,8 @@ toolchain go1.23.2
 
 require (
 	github.com/beevik/etree v1.1.0
-	github.com/bluenviron/gortsplib/v4 v4.12.2
-	github.com/bluenviron/mediacommon v1.13.3
+	github.com/bluenviron/gortsplib/v4 v4.12.3
+	github.com/bluenviron/mediacommon v1.14.0
 	github.com/edaniels/golinters v0.0.5-0.20220906153528-641155550742
 	github.com/elgs/gostrgen v0.0.0-20161222160715-9d61ae07eeae
 	github.com/erh/viamupnp v0.0.0-20241217142932-2fecf833407c
@@ -342,4 +342,4 @@ require (
 	nhooyr.io/websocket v1.8.7 // indirect
 )
 
-replace github.com/viam-modules/video-store => github.com/nicksanford/video-store v0.0.0-20250225195908-bbcbf389561c
+replace github.com/viam-modules/video-store => github.com/nicksanford/video-store v0.0.0-20250225203826-fe1e2fdc40a8

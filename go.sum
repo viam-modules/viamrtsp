@@ -152,10 +152,10 @@ github.com/blackjack/webcam v0.6.1 h1:K0T6Q0zto23U99gNAa5q/hFoye6uGcKr2aE6hFoxVo
 github.com/blackjack/webcam v0.6.1/go.mod h1:zs+RkUZzqpFPHPiwBZ6U5B34ZXXe9i+SiHLKnnukJuI=
 github.com/blizzy78/varnamelen v0.8.0 h1:oqSblyuQvFsW1hbBHh1zfwrKe3kcSj0rnXkKzsQ089M=
 github.com/blizzy78/varnamelen v0.8.0/go.mod h1:V9TzQZ4fLJ1DSrjVDfl89H7aMnTvKkApdHeyESmyR7k=
-github.com/bluenviron/gortsplib/v4 v4.12.2 h1:ZCiveyk8gumqyVGdliUmfaTJFOSt0JoqsPJ/Ly3gOXI=
-github.com/bluenviron/gortsplib/v4 v4.12.2/go.mod h1:QCUYd9eiD44ISFGvgUSbGgJjgjpalYb0SlsHzJ/h0FQ=
-github.com/bluenviron/mediacommon v1.13.3 h1:PgprN9mAd/F5ew7Ym+UZCiCJstQVT5mZXtmN9JZvv4Y=
-github.com/bluenviron/mediacommon v1.13.3/go.mod h1:RrO01FltoVUlTBGXbOYtmx1ft1oBOpLxfNGsYlaFAO8=
+github.com/bluenviron/gortsplib/v4 v4.12.3 h1:3EzbyGb5+MIOJQYiWytRegFEP4EW5paiyTrscQj63WE=
+github.com/bluenviron/gortsplib/v4 v4.12.3/go.mod h1:SkZPdaMNr+IvHt2PKRjUXxZN6FDutmSZn4eT0GmF0sk=
+github.com/bluenviron/mediacommon v1.14.0 h1:lWCwOBKNKgqmspRpwpvvg3CidYm+XOc2+z/Jw7LM5dQ=
+github.com/bluenviron/mediacommon v1.14.0/go.mod h1:z5LP9Tm1ZNfQV5Co54PyOzaIhGMusDfRKmh42nQSnyo=
 github.com/bombsimon/wsl/v3 v3.2.0/go.mod h1:st10JtZYLE4D5sC7b8xV4zTKZwAQjCH/Hy2Pm1FNZIc=
 github.com/bombsimon/wsl/v4 v4.4.1 h1:jfUaCkN+aUpobrMO24zwyAMwMAV5eSziCkOKEauOLdw=
 github.com/bombsimon/wsl/v4 v4.4.1/go.mod h1:Xu/kDxGZTofQcDGCtQe9KCzhHphIe0fDuyWTxER9Feo=
@@ -870,8 +870,8 @@ github.com/nats-io/nuid v1.0.1/go.mod h1:19wcPz3Ph3q0Jbyiqsd0kePYG7A95tJPxeL+1OS
 github.com/nbutton23/zxcvbn-go v0.0.0-20201221231540-e56b841a3c88/go.mod h1:KSVJerMDfblTH7p5MZaTt+8zaT2iEk3AkVb9PQdZuE8=
 github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 h1:zYyBkD/k9seD2A7fsi6Oo2LfFZAehjjQMERAvZLEDnQ=
 github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646/go.mod h1:jpp1/29i3P1S/RLdc7JQKbRpFeM1dOBd8T9ki5s+AY8=
-github.com/nicksanford/video-store v0.0.0-20250225195908-bbcbf389561c h1:6YjOx++ShKiJggLta8xjqDaHs5CQg7lGXQK1rRmJen8=
-github.com/nicksanford/video-store v0.0.0-20250225195908-bbcbf389561c/go.mod h1:T6s3dykxmlrpa/uSVk9kosN51ERSnpkagnxQw3RgOPM=
+github.com/nicksanford/video-store v0.0.0-20250225203826-fe1e2fdc40a8 h1:crgiacunk1m8b65Xub3zHeZmFN5m5VX7/xaV4u+CKto=
+github.com/nicksanford/video-store v0.0.0-20250225203826-fe1e2fdc40a8/go.mod h1:T6s3dykxmlrpa/uSVk9kosN51ERSnpkagnxQw3RgOPM=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=
 github.com/nishanths/exhaustive v0.1.0/go.mod h1:S1j9110vxV1ECdCudXRkeMnFQ/DQk9ajLT0Uf2MYZQQ=
 github.com/nishanths/exhaustive v0.12.0 h1:vIY9sALmw6T/yxiASewa4TQcFsVYZQQRUQJhKRf3Swg=
