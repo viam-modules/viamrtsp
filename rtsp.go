@@ -27,6 +27,7 @@ import (
 	"github.com/erh/viamupnp"
 	"github.com/pion/rtp"
 	"github.com/viam-modules/viamrtsp/formatprocessor"
+	"github.com/viam-modules/video-store/vcr"
 	"github.com/viam-modules/video-store/videostore"
 	"go.uber.org/zap/zapcore"
 	"go.viam.com/rdk/components/camera"
@@ -568,7 +569,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		}
 		packed, err := h264.AVCCMarshal(au)
 		if err != nil {
-			rc.logger.Errorf("AnnexBMarshal err: %s", err.Error())
+			rc.logger.Errorf("AVCCMarshal err: %s", err.Error())
 			return
 		}
 		err = rc.vs.WritePacket(packed, pts, h264.IDRPresent(au))
@@ -702,17 +703,22 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		return fmt.Errorf("when calling RTSP Setup on %s for H265: %w", session.BaseURL, err)
 	}
 
-	// On packet retreival, turn it into an image, and store it in shared memory
-	rc.client.OnPacketRTP(media, f, func(pkt *rtp.Packet) {
-		// Extract access units from RTP packets
-		au, err := rtpDec.Decode(pkt)
-		if err != nil {
-			if !errors.Is(err, rtph265.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph265.ErrMorePacketsNeeded) {
-				rc.logger.Debugw("error decoding(1) h265 rstp stream", "err", err.Error())
-			}
-			return
-		}
+	if len(f.VPS) == 0 || len(f.SPS) == 0 || len(f.PPS) == 0 {
+		panic("vps, sps, and pps must all not be empt")
+	}
+	extradata := []byte{}
+	extradata = append(extradata, f.VPS...)
+	extradata = append(extradata, f.SPS...)
+	extradata = append(extradata, f.PPS...)
+	r, err := vcr.NewRecorder("/Users/nicksanford/code/viamrtsp/dbs/"+time.Now().Format(time.RFC3339)+".db", rc.logger)
+	if err != nil {
+		panic(err.Error())
+	}
 
+	if err := r.Init(extradata); err != nil {
+		panic(err.Error())
+	}
+	storeImage := func(au [][]byte) {
 		if rc.iframeOnlyDecode && !h265.IsRandomAccess(au) {
 			return
 		}
@@ -727,6 +733,51 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		} else {
 			rc.storeH265Frame(packedAU)
 		}
+	}
+
+	var receivedFirstSegmentKeyframe bool
+	segmentPacket := func(pkt *rtp.Packet, au [][]byte) {
+		if rc.vs == nil {
+			return
+		}
+		pts, ok := rc.client.PacketPTS2(media, pkt)
+		if !ok {
+			rc.logger.Debug("no pts found for packet")
+			return
+		}
+		// Video files must start with a keyframe. Wait for the first keyframe before starting to
+		// segment the video.
+		if !receivedFirstSegmentKeyframe {
+			if h265.IsRandomAccess(au) {
+				rc.logger.Debug("segmenter found first segment keyframe")
+				receivedFirstSegmentKeyframe = true
+			} else {
+				rc.logger.Debug("segmenter is waiting for first keyframe")
+				return
+			}
+		}
+		packed, err := h264.AVCCMarshal(au)
+		if err != nil {
+			rc.logger.Errorf("AVCCMarshal err: %s", err.Error())
+			return
+		}
+		err = rc.vs.WritePacket(packed, pts, h265.IsRandomAccess(au))
+		if err != nil {
+			rc.logger.Errorf("error writing packet to segmenter: %s", err)
+		}
+	}
+	// On packet retreival, turn it into an image, and store it in shared memory
+	rc.client.OnPacketRTP(media, f, func(pkt *rtp.Packet) {
+		// Extract access units from RTP packets
+		au, err := rtpDec.Decode(pkt)
+		if err != nil {
+			if !errors.Is(err, rtph265.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph265.ErrMorePacketsNeeded) {
+				rc.logger.Debugw("error decoding(1) h265 rstp stream", "err", err.Error())
+			}
+			return
+		}
+		storeImage(au)
+		segmentPacket(pkt, au)
 	})
 
 	return nil
