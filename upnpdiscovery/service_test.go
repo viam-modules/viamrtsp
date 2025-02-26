@@ -5,6 +5,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/erh/viamupnp"
 	"github.com/viam-modules/viamrtsp"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
@@ -26,20 +27,23 @@ func TestDiscoveryService(t *testing.T) {
 		test.That(t, dis.Name().ShortName(), test.ShouldResemble, testName)
 		cfgs, err := dis.DiscoverResources(ctx, nil)
 		test.That(t, cfgs, test.ShouldBeEmpty)
-		test.That(t, err, test.ShouldBeError, errNoCamerasFound)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "no match found for queries:")
 	})
 }
 
 func TestCamConfig(t *testing.T) {
 	camName := "my-cam"
 	camURL := "my-cam-url"
-	conf, err := createCameraConfig(camName, camURL)
+	modelName := "my-model"
+	query := viamupnp.DeviceQuery{ModelName: modelName}
+	conf, err := createCameraConfig(camName, camURL, query)
 	test.That(t, err, test.ShouldBeNil)
 	test.That(t, conf.Name, test.ShouldEqual, camName)
 	cfg, err := resource.NativeConfig[*viamrtsp.Config](conf)
 	test.That(t, err, test.ShouldBeNil)
 	test.That(t, cfg.Address, test.ShouldEqual, camURL)
 	test.That(t, *cfg.RTPPassthrough, test.ShouldBeTrue)
+	test.That(t, cfg.Query.ModelName, test.ShouldEqual, modelName)
 }
 
 func TestDiscoveryConfig(t *testing.T) {
@@ -60,7 +64,7 @@ func TestDiscoveryConfig(t *testing.T) {
 		// config needs a ModelName, Manufacturer, or SerialNumber
 		cfg := Config{Queries: []queryConfig{{Network: "bad"}}}
 		deps, err := cfg.Validate("")
-		test.That(t, err.Error(), test.ShouldBeError, errEmptyQuery)
+		test.That(t, err, test.ShouldBeError, errEmptyQuery)
 		test.That(t, deps, test.ShouldBeEmpty)
 	})
 }

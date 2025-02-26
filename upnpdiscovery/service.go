@@ -18,10 +18,9 @@ import (
 
 // Model is the model for a rtsp discovery service.
 var (
-	Model             = viamrtsp.Family.WithModel("upnp")
-	errNoCamerasFound = errors.New("no cameras found, ensure cameras are working or check queries")
-	errNoQueries      = errors.New("must provide a query to use the discovery service")
-	errEmptyQuery     = errors.New("queries cannot be empty")
+	Model         = viamrtsp.Family.WithModel("upnp")
+	errNoQueries  = errors.New("must provide a query to use the discovery service")
+	errEmptyQuery = errors.New("queries cannot be empty")
 )
 
 func init() {
@@ -98,10 +97,12 @@ func convertqueryConfigToDeviceQuery(queryCfgs []queryConfig) ([]viamupnp.Device
 	endpointMap := make(map[viamupnp.DeviceQuery][]string)
 
 	for _, queryCfg := range queryCfgs {
-		upnpQuery := viamupnp.DeviceQuery{ModelName: queryCfg.ModelName,
+		upnpQuery := viamupnp.DeviceQuery{
+			ModelName:    queryCfg.ModelName,
 			Manufacturer: queryCfg.Manufacturer,
 			SerialNumber: queryCfg.SerialNumber,
-			Network:      queryCfg.Network}
+			Network:      queryCfg.Network,
+		}
 		queries = append(queries, upnpQuery)
 		if len(queryCfg.Endpoints) > 0 {
 			endpointMap[upnpQuery] = queryCfg.Endpoints
@@ -126,15 +127,13 @@ func (dis *upnpDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 	if err != nil {
 		return nil, err
 	}
-	if len(hosts) == 0 {
-		return nil, errNoCamerasFound
-	}
+
 	for hostNum, host := range hosts {
 		query := hostmap[host]
 		endpoints, ok := dis.endpointMap[query]
 		// the query had no endpoints
 		if !ok {
-			camConfig, err := createCameraConfig(createCameraName(hostNum, -1, query), "rtsp://"+host)
+			camConfig, err := createCameraConfig(createCameraName(hostNum, -1, query), "rtsp://"+host, query)
 			if err != nil {
 				return nil, err
 			}
@@ -143,7 +142,7 @@ func (dis *upnpDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 		}
 		for endpointNum, endpoint := range endpoints {
 			camConfig, err := createCameraConfig(createCameraName(hostNum, endpointNum, query),
-				fmt.Sprintf("rtsp://%s:%s", host, endpoint))
+				fmt.Sprintf("rtsp://%s:%s", host, endpoint), query)
 			if err != nil {
 				return nil, err
 			}
@@ -175,10 +174,10 @@ func createCameraName(hostNum, endpointNum int, query viamupnp.DeviceQuery) stri
 	return camName
 }
 
-func createCameraConfig(name, address string) (resource.Config, error) {
+func createCameraConfig(name, address string, query viamupnp.DeviceQuery) (resource.Config, error) {
 	// using the camera's Config struct in case a breaking change occurs
 	_true := true
-	attributes := viamrtsp.Config{Address: address, RTPPassthrough: &_true}
+	attributes := viamrtsp.Config{Address: address, Query: query, RTPPassthrough: &_true}
 	var result map[string]interface{}
 
 	// marshal to bytes
