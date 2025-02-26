@@ -95,13 +95,13 @@ func convertQueryConfigToDeviceQuery(queryCfgs []QueryConfig) ([]viamupnp.Device
 func (dis *upnpDiscovery) DiscoverResources(ctx context.Context, extra map[string]any) ([]resource.Config, error) {
 	cams := []resource.Config{}
 
-	// discoverCreds := dis.Credentials
+	discoverQueries := dis.queries
 
-	// extraCred, ok := getCredFromExtra(extra)
-	// if ok {
-	// 	discoverCreds = append(discoverCreds, extraCred)
-	// }
-	hosts, hostmap, err := viamupnp.FindHost(ctx, dis.logger, dis.queries, dis.rootOnly)
+	extraQuery, ok := getQueryFromExtra(extra)
+	if ok {
+		discoverQueries = append(discoverQueries, extraQuery)
+	}
+	hosts, hostmap, err := viamupnp.FindHost(ctx, dis.logger, discoverQueries, dis.rootOnly)
 	if err != nil {
 		return nil, err
 	}
@@ -176,17 +176,31 @@ func createCameraConfig(name, address string) (resource.Config, error) {
 	}, nil
 }
 
-// func getQueryFromExtra(extra map[string]any) (device.Credentials, bool) {
-// 	// check for a username from extras
-// 	extraUser, ok := extra["User"].(string)
-// 	if !ok {
-// 		return device.Credentials{}, false
-// 	}
-// 	// not requiring a password to match config
-// 	extraPass, ok := extra["Pass"].(string)
-// 	if !ok {
-// 		extraPass = ""
-// 	}
+func getQueryFromExtra(extra map[string]any) (viamupnp.DeviceQuery, bool) {
+	// check for a username from extras
+	extraModel, ok := extra["model_name"].(string)
+	if !ok {
+		extraModel = ""
+	}
+	// not requiring a password to match config
+	extraManufacturer, ok := extra["manufacturer"].(string)
+	if !ok {
+		extraManufacturer = ""
+	}
+	// not requiring a password to match config
+	extraSerial, ok := extra["serial_number"].(string)
+	if !ok {
+		extraSerial = ""
+	}
+	// not requiring a password to match config
+	extraNetwork, ok := extra["network"].(string)
+	if !ok {
+		extraNetwork = ""
+	}
+	if extraModel == "" && extraManufacturer == "" && extraSerial == "" {
+		return viamupnp.DeviceQuery{}, false
+	}
 
-// 	return device.Credentials{User: extraUser, Pass: extraPass}, true
-// }
+	return viamupnp.DeviceQuery{ModelName: extraModel, Manufacturer: extraManufacturer,
+		SerialNumber: extraSerial, Network: extraNetwork}, true
+}
