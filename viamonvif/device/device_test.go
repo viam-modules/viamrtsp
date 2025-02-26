@@ -68,7 +68,7 @@ func TestSendSoapNoHang(t *testing.T) {
 		}, logger)
 		test.That(t, err, test.ShouldBeNil)
 
-		_, err = dev.sendSoap(server.URL, "test message")
+		_, err = dev.sendSoap(ctx, server.URL, "test message")
 		// Cast to url.Error to check if the error is a context deadline exceeded
 		var urlErr *url.Error
 		if errors.As(err, &urlErr) {

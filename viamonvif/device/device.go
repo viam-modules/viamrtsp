@@ -54,7 +54,6 @@ type Device struct {
 	logger    logging.Logger
 	params    Params
 	endpoints map[string]string
-	ctx       context.Context
 }
 
 // Params configures the device connection.
@@ -95,14 +94,13 @@ func NewDevice(ctx context.Context, params Params, logger logging.Logger) (*Devi
 		logger:    logger,
 		params:    params,
 		endpoints: map[string]string{"device": params.Xaddr.String()},
-		ctx:       ctx,
 	}
 
 	if dev.params.HTTPClient == nil {
 		dev.params.HTTPClient = new(http.Client)
 	}
 
-	data, err := dev.callDevice(GetCapabilities{Category: "All"})
+	data, err := dev.callDevice(ctx, GetCapabilities{Category: "All"})
 	if err != nil {
 		return nil, err
 	}
@@ -150,9 +148,9 @@ type GetDeviceInformationResponseEnvelope struct {
 }
 
 // GetDeviceInformation returns device information.
-func (dev *Device) GetDeviceInformation() (GetDeviceInformationResponse, error) {
+func (dev *Device) GetDeviceInformation(ctx context.Context) (GetDeviceInformationResponse, error) {
 	var zero GetDeviceInformationResponse
-	b, err := dev.callOnvifServiceMethod(dev.endpoints["device"], GetDeviceInformation{})
+	b, err := dev.callOnvifServiceMethod(ctx, dev.endpoints["device"], GetDeviceInformation{})
 	if err != nil {
 		return zero, fmt.Errorf("failed to get device information: %w", err)
 	}
@@ -181,10 +179,10 @@ type GetProfilesResponseEnvelope struct {
 }
 
 // GetProfiles returns the device's profiles.
-func (dev *Device) GetProfiles() (GetProfilesResponse, error) {
+func (dev *Device) GetProfiles(ctx context.Context) (GetProfilesResponse, error) {
 	var zero GetProfilesResponse
 	getProfiles := GetProfiles{}
-	b, err := dev.callMedia(getProfiles)
+	b, err := dev.callMedia(ctx, getProfiles)
 	if err != nil {
 		return zero, fmt.Errorf("failed to get media profiles: %w", err)
 	}
@@ -226,9 +224,9 @@ type Credentials struct {
 }
 
 // GetStreamURI returns a device's stream URI for a given profile.
-func (dev *Device) GetStreamURI(profile onvif.Profile, creds Credentials) (*url.URL, error) {
+func (dev *Device) GetStreamURI(ctx context.Context, profile onvif.Profile, creds Credentials) (*url.URL, error) {
 	dev.logger.Debugf("GetStreamUri token: %s, profile: %#v", profile.Token, profile)
-	body, err := dev.callMedia(GetStreamURI{
+	body, err := dev.callMedia(ctx, GetStreamURI{
 		StreamSetup: onvif.StreamSetup{
 			Stream:    onvif.StreamType(streamTypeRTPUnicast),
 			Transport: onvif.Transport{Protocol: streamSetupProtocol},
@@ -268,15 +266,15 @@ func (dev *Device) GetEndpoint(name string) string {
 	return dev.endpoints[name]
 }
 
-func (dev Device) callMedia(method interface{}) ([]byte, error) {
-	return dev.callOnvifServiceMethod(dev.endpoints["media"], method)
+func (dev Device) callMedia(ctx context.Context, method interface{}) ([]byte, error) {
+	return dev.callOnvifServiceMethod(ctx, dev.endpoints["media"], method)
 }
 
-func (dev Device) callDevice(method interface{}) ([]byte, error) {
-	return dev.callOnvifServiceMethod(dev.endpoints["device"], method)
+func (dev Device) callDevice(ctx context.Context, method interface{}) ([]byte, error) {
+	return dev.callOnvifServiceMethod(ctx, dev.endpoints["device"], method)
 }
 
-func (dev Device) callOnvifServiceMethod(endpoint string, method interface{}) ([]byte, error) {
+func (dev Device) callOnvifServiceMethod(ctx context.Context, endpoint string, method interface{}) ([]byte, error) {
 	output, err := xml.MarshalIndent(method, "  ", "    ")
 	if err != nil {
 		return nil, err
@@ -310,13 +308,13 @@ func (dev Device) callOnvifServiceMethod(endpoint string, method interface{}) ([
 		}
 	}
 
-	return dev.sendSoap(endpoint, soap.String())
+	return dev.sendSoap(ctx, endpoint, soap.String())
 }
 
-func (dev *Device) sendSoap(endpoint, message string) ([]byte, error) {
+func (dev *Device) sendSoap(ctx context.Context, endpoint, message string) ([]byte, error) {
 	contentType := "application/soap+xml; charset=utf-8"
 
-	req, err := http.NewRequestWithContext(dev.ctx, http.MethodPost, endpoint, bytes.NewBufferString(message))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewBufferString(message))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
