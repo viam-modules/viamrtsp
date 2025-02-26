@@ -35,12 +35,13 @@ func init() {
 
 // Config is the config for the discovery service.
 type Config struct {
-	Queries     []QueryConfig `json:"queries,omitempty"`
+	Queries     []queryConfig `json:"queries,omitempty"`
 	UseRootOnly bool          `json:"root_only_search"`
 }
 
-type QueryConfig struct {
+type queryConfig struct {
 	viamupnp.DeviceQuery
+	// users define what endpoints they want to append to discovered queries.
 	Endpoints []string `json:"endpoints"`
 }
 
@@ -82,14 +83,14 @@ func newDiscovery(_ context.Context, _ resource.Dependencies,
 		logger:   logger,
 	}
 
-	dis.queries, dis.endpointMap = convertQueryConfigToDeviceQuery(cfg.Queries)
+	dis.queries, dis.endpointMap = convertqueryConfigToDeviceQuery(cfg.Queries)
 
 	return dis, nil
 }
 
-// convertQueryConfigToDeviceQuery pulls out the device query from a QueryConfig and creates a map of queries to endpoints.
+// convertqueryConfigToDeviceQuery pulls out the device query from a queryConfig and creates a map of queries to endpoints.
 // The map is needed to add the endpoints to a host when creating the RTSP url.
-func convertQueryConfigToDeviceQuery(queryCfgs []QueryConfig) ([]viamupnp.DeviceQuery, map[viamupnp.DeviceQuery][]string) {
+func convertqueryConfigToDeviceQuery(queryCfgs []queryConfig) ([]viamupnp.DeviceQuery, map[viamupnp.DeviceQuery][]string) {
 	var queries []viamupnp.DeviceQuery
 	endpointMap := make(map[viamupnp.DeviceQuery][]string)
 
@@ -112,6 +113,8 @@ func (dis *upnpDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 	if ok {
 		discoverQueries = append(discoverQueries, extraQuery)
 	}
+	// worth noting that the discovered hosts are not guaranteed to be rtsp camera.
+	// We assume that the user knew what they were looking for.
 	hosts, hostmap, err := viamupnp.FindHost(ctx, dis.logger, discoverQueries, dis.rootOnly)
 	if err != nil {
 		return nil, err
@@ -124,7 +127,7 @@ func (dis *upnpDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 		endpoints, ok := dis.endpointMap[query]
 		// the query had no endpoints
 		if !ok {
-			camConfig, err := createCameraConfig(createCameraName(hostNum, -1, query), host)
+			camConfig, err := createCameraConfig(createCameraName(hostNum, -1, query), "rtsp://"+host)
 			if err != nil {
 				return nil, err
 			}
@@ -132,7 +135,8 @@ func (dis *upnpDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 			continue
 		}
 		for endpointNum, endpoint := range endpoints {
-			camConfig, err := createCameraConfig(createCameraName(hostNum, endpointNum, query), fmt.Sprintf("%s:%s", host, endpoint))
+			camConfig, err := createCameraConfig(createCameraName(hostNum, endpointNum, query),
+				fmt.Sprintf("rtsp://%s:%s", host, endpoint))
 			if err != nil {
 				return nil, err
 			}

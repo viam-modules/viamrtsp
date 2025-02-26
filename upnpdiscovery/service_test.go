@@ -15,7 +15,7 @@ import (
 
 func TestDiscoveryService(t *testing.T) {
 	deviceQuery := viamupnp.DeviceQuery{ModelName: "bad"}
-	cfg := Config{Queries: []QueryConfig{{DeviceQuery: deviceQuery}}}
+	cfg := Config{Queries: []queryConfig{{DeviceQuery: deviceQuery}}}
 	ctx := context.Background()
 	logger := logging.NewTestLogger(t)
 
@@ -53,7 +53,7 @@ func TestDiscoveryConfig(t *testing.T) {
 	})
 	t.Run("Test Valid config", func(t *testing.T) {
 		deviceQuery := viamupnp.DeviceQuery{ModelName: "good"}
-		cfg := Config{Queries: []QueryConfig{{DeviceQuery: deviceQuery}}}
+		cfg := Config{Queries: []queryConfig{{DeviceQuery: deviceQuery}}}
 
 		deps, err := cfg.Validate("")
 		test.That(t, err, test.ShouldBeNil)
@@ -61,7 +61,7 @@ func TestDiscoveryConfig(t *testing.T) {
 	})
 	t.Run("Test Invalid Config", func(t *testing.T) {
 		deviceQuery := viamupnp.DeviceQuery{Network: "bad"}
-		cfg := Config{Queries: []QueryConfig{{DeviceQuery: deviceQuery}}}
+		cfg := Config{Queries: []queryConfig{{DeviceQuery: deviceQuery}}}
 		deps, err := cfg.Validate("")
 		test.That(t, err.Error(), test.ShouldBeError, errEmptyQuery)
 		test.That(t, deps, test.ShouldBeEmpty)
