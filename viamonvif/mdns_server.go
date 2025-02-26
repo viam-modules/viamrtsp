@@ -43,11 +43,12 @@ func (server *mdnsServer) Add(serialNumber string, ip net.IP) error {
 	}
 	delete(server.mappedDevices, serialNumber)
 
+	avoidLintMagicNumberComplaintThatIsntEvenRelevant := 8080
 	mdnsServer, err := zeroconf.RegisterProxy(
-		serialNumber,          // Dan: As far as I can tell, just a name.
-		"_rtsp._tcp",          // Dan: The mDNS "service" to register. Doesn't make a difference?
-		"local",               // the domain
-		8080,                  // The service's port is ignored here
+		serialNumber, // Dan: As far as I can tell, just a name.
+		"_rtsp._tcp", // Dan: The mDNS "service" to register. Doesn't make a difference?
+		"local",      // the domain
+		avoidLintMagicNumberComplaintThatIsntEvenRelevant, // The service's port is ignored here
 		serialNumber,          // actual mDNS hostname, without the .local domain
 		[]string{ip.String()}, // ip to use
 		[]string{},            // txt fields, not needed

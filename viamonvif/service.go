@@ -116,7 +116,7 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 	return cams, nil
 }
 
-func (dis *rtspDiscovery) Close(ctx context.Context) error {
+func (dis *rtspDiscovery) Close(_ context.Context) error {
 	dis.mdnsServer.Shutdown()
 	return nil
 }

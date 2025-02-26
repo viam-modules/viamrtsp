@@ -200,7 +200,7 @@ func DiscoverCameraInfo(
 	return zero, fmt.Errorf("no credentials matched IP %s", xaddr)
 }
 
-var consecutiveDashesRegexp = regexp.MustCompile("\\-\\-+")
+var consecutiveDashesRegexp = regexp.MustCompile(`\-\-+`)
 
 func strToHostName(inp string) string {
 	// Turn strings into valid hostnames. We perform the following steps:
