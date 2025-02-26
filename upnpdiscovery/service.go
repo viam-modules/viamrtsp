@@ -40,7 +40,10 @@ type Config struct {
 }
 
 type queryConfig struct {
-	viamupnp.DeviceQuery
+	ModelName    string `json:"model_name"`
+	Manufacturer string `json:"manufacturer"`
+	SerialNumber string `json:"serial_number"`
+	Network      string `json:"network"`
 	// users define what endpoints they want to append to discovered queries.
 	Endpoints []string `json:"endpoints"`
 }
@@ -95,9 +98,13 @@ func convertqueryConfigToDeviceQuery(queryCfgs []queryConfig) ([]viamupnp.Device
 	endpointMap := make(map[viamupnp.DeviceQuery][]string)
 
 	for _, queryCfg := range queryCfgs {
-		queries = append(queries, queryCfg.DeviceQuery)
+		upnpQuery := viamupnp.DeviceQuery{ModelName: queryCfg.ModelName,
+			Manufacturer: queryCfg.Manufacturer,
+			SerialNumber: queryCfg.SerialNumber,
+			Network:      queryCfg.Network}
+		queries = append(queries, upnpQuery)
 		if len(queryCfg.Endpoints) > 0 {
-			endpointMap[queryCfg.DeviceQuery] = queryCfg.Endpoints
+			endpointMap[upnpQuery] = queryCfg.Endpoints
 		}
 	}
 	return queries, endpointMap
@@ -106,6 +113,7 @@ func convertqueryConfigToDeviceQuery(queryCfgs []queryConfig) ([]viamupnp.Device
 // DiscoverResources discovers different rtsp cameras that use onvif.
 func (dis *upnpDiscovery) DiscoverResources(ctx context.Context, extra map[string]any) ([]resource.Config, error) {
 	cams := []resource.Config{}
+	dis.logger.Info(dis.endpointMap)
 
 	discoverQueries := dis.queries
 
@@ -127,6 +135,7 @@ func (dis *upnpDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 		endpoints, ok := dis.endpointMap[query]
 		// the query had no endpoints
 		if !ok {
+			dis.logger.Info("yo no endpoints")
 			camConfig, err := createCameraConfig(createCameraName(hostNum, -1, query), "rtsp://"+host)
 			if err != nil {
 				return nil, err
@@ -156,13 +165,13 @@ func createCameraName(hostNum, endpointNum int, query viamupnp.DeviceQuery) stri
 	if endpointNum != -1 {
 		camName = fmt.Sprintf("%s-endpoint%v", camName, endpointNum)
 	}
-	if stripManufacturer := reg.ReplaceAllString(query.Manufacturer, ""); stripManufacturer == "" {
+	if stripManufacturer := reg.ReplaceAllString(query.Manufacturer, ""); stripManufacturer != "" {
 		camName = fmt.Sprintf("%s-%s", camName, stripManufacturer)
 	}
-	if stripModel := reg.ReplaceAllString(query.ModelName, ""); stripModel == "" {
+	if stripModel := reg.ReplaceAllString(query.ModelName, ""); stripModel != "" {
 		camName = fmt.Sprintf("%s-%s", camName, stripModel)
 	}
-	if stripSerial := reg.ReplaceAllString(query.SerialNumber, ""); stripSerial == "" {
+	if stripSerial := reg.ReplaceAllString(query.SerialNumber, ""); stripSerial != "" {
 		camName = fmt.Sprintf("%s-%s", camName, stripSerial)
 	}
 	return camName

@@ -5,7 +5,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/erh/viamupnp"
 	"github.com/viam-modules/viamrtsp"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
@@ -14,8 +13,7 @@ import (
 )
 
 func TestDiscoveryService(t *testing.T) {
-	deviceQuery := viamupnp.DeviceQuery{ModelName: "bad"}
-	cfg := Config{Queries: []queryConfig{{DeviceQuery: deviceQuery}}}
+	cfg := Config{Queries: []queryConfig{{ModelName: "bad"}}}
 	ctx := context.Background()
 	logger := logging.NewTestLogger(t)
 
@@ -52,16 +50,15 @@ func TestDiscoveryConfig(t *testing.T) {
 		test.That(t, deps, test.ShouldBeEmpty)
 	})
 	t.Run("Test Valid config", func(t *testing.T) {
-		deviceQuery := viamupnp.DeviceQuery{ModelName: "good"}
-		cfg := Config{Queries: []queryConfig{{DeviceQuery: deviceQuery}}}
+		cfg := Config{Queries: []queryConfig{{ModelName: "good"}}}
 
 		deps, err := cfg.Validate("")
 		test.That(t, err, test.ShouldBeNil)
 		test.That(t, deps, test.ShouldBeEmpty)
 	})
 	t.Run("Test Invalid Config", func(t *testing.T) {
-		deviceQuery := viamupnp.DeviceQuery{Network: "bad"}
-		cfg := Config{Queries: []queryConfig{{DeviceQuery: deviceQuery}}}
+		// config needs a ModelName, Manufacturer, or SerialNumber
+		cfg := Config{Queries: []queryConfig{{Network: "bad"}}}
 		deps, err := cfg.Validate("")
 		test.That(t, err.Error(), test.ShouldBeError, errEmptyQuery)
 		test.That(t, deps, test.ShouldBeEmpty)
