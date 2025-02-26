@@ -18,7 +18,10 @@ import (
 
 // Model is the model for a rtsp discovery service.
 var (
-	Model = viamrtsp.Family.WithModel("upnp")
+	Model             = viamrtsp.Family.WithModel("upnp")
+	errNoCamerasFound = errors.New("no cameras found, ensure cameras are working or check queries")
+	errNoQueries      = errors.New("must provide a query to use the discovery service")
+	errEmptyQuery     = errors.New("queries cannot be empty")
 )
 
 func init() {
@@ -43,6 +46,14 @@ type QueryConfig struct {
 
 // Validate validates the discovery service.
 func (cfg *Config) Validate(_ string) ([]string, error) {
+	if len(cfg.Queries) == 0 {
+		return []string{}, errNoQueries
+	}
+	for _, query := range cfg.Queries {
+		if query.ModelName == "" && query.Manufacturer == "" && query.SerialNumber == "" {
+			return []string{}, errEmptyQuery
+		}
+	}
 	return []string{}, nil
 }
 
@@ -106,7 +117,7 @@ func (dis *upnpDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 		return nil, err
 	}
 	if len(hosts) == 0 {
-		return nil, errors.New("no cameras found, ensure cameras are working or check queries")
+		return nil, errNoCamerasFound
 	}
 	for hostNum, host := range hosts {
 		query := hostmap[host]
@@ -135,7 +146,7 @@ func (dis *upnpDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 // regex to remove non alpha numerics.
 var reg = regexp.MustCompile("[^a-zA-Z0-9]+")
 
-// createCameraName creates a camera name based on the query
+// createCameraName creates a camera name based on the query.
 func createCameraName(hostNum, endpointNum int, query viamupnp.DeviceQuery) string {
 	camName := fmt.Sprintf("camera%v", hostNum)
 	if endpointNum != -1 {
@@ -201,6 +212,8 @@ func getQueryFromExtra(extra map[string]any) (viamupnp.DeviceQuery, bool) {
 		return viamupnp.DeviceQuery{}, false
 	}
 
-	return viamupnp.DeviceQuery{ModelName: extraModel, Manufacturer: extraManufacturer,
-		SerialNumber: extraSerial, Network: extraNetwork}, true
+	return viamupnp.DeviceQuery{
+		ModelName: extraModel, Manufacturer: extraManufacturer,
+		SerialNumber: extraSerial, Network: extraNetwork,
+	}, true
 }
