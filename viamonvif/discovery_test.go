@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"os/exec"
 	"testing"
-	"time"
 
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"github.com/viam-modules/viamrtsp/viamonvif/xsd/onvif"
@@ -149,6 +148,10 @@ func TestStrToHostName(t *testing.T) {
 }
 
 func TestMDNSMapping(t *testing.T) {
+	// This test relies on having access to multicast network interfaces. Cloud instances often
+	// disable multicast capabilities. We skip this test by default as we can't expect CI testing to
+	// succeed.
+	t.Skip("fails in CI")
 	logger := logging.NewTestLogger(t)
 	mdnsServer := newMDNSServer(logger)
 	defer mdnsServer.Shutdown()
@@ -174,8 +177,6 @@ func TestMDNSMapping(t *testing.T) {
 
 	err := mdnsServer.Add(nonSense, net.ParseIP("127.0.0.1"))
 	test.That(t, err, test.ShouldBeNil)
-
-	time.Sleep(10 * time.Second)
 
 	cmd = exec.Command("ping", "-c1", nonSenseWithLocal)
 	output, _ = cmd.CombinedOutput()
