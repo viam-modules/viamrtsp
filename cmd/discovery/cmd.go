@@ -11,11 +11,14 @@ import (
 	"net/url"
 	"os"
 	"slices"
+	"time"
 
 	"github.com/viam-modules/viamrtsp/viamonvif"
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"go.viam.com/rdk/logging"
 )
+
+const defaultTimeoutSeconds = 10
 
 // Config for the disovery command.
 type Config struct {
@@ -26,9 +29,10 @@ type Config struct {
 }
 
 type options struct {
-	config Config
-	debug  bool
-	output string
+	config  Config
+	debug   bool
+	output  string
+	timeout time.Duration
 }
 
 func main() {
@@ -38,7 +42,6 @@ func main() {
 }
 
 func realMain() error {
-	ctx := context.Background()
 	opts, err := parseOpts()
 	if err != nil {
 		return err
@@ -61,8 +64,15 @@ func realMain() error {
 		xaddrs[u.Host] = u
 	}
 
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), opts.timeout)
+	defer cancel()
 	urls := slices.Collect(maps.Values(xaddrs))
-	list, err := viamonvif.DiscoverCameras(ctx, opts.config.Creds, urls, logger)
+	list, err := viamonvif.DiscoverCameras(timeoutCtx, opts.config.Creds, urls, logger)
+
+	if timeoutCtx.Err() == context.DeadlineExceeded {
+		logger.Errorf("Discovery timed out after %v", opts.timeout)
+	}
+
 	if err != nil {
 		return err
 	}
@@ -87,12 +97,14 @@ func parseOpts() (options, error) {
 	genConfig := false
 	configFile := "./config.json"
 	output := "./output.json"
+	timeout := defaultTimeoutSeconds
 	var zero options
 
 	flag.BoolVar(&debug, "debug", debug, "debug")
 	flag.BoolVar(&genConfig, "gen_config", genConfig, "generate config file template")
 	flag.StringVar(&configFile, "config", configFile, "path to json config file.")
 	flag.StringVar(&output, "output", output, "output file")
+	flag.IntVar(&timeout, "timeout", timeout, "discovery timeout in seconds")
 	flag.Parse()
 
 	if genConfig {
@@ -121,8 +133,9 @@ func parseOpts() (options, error) {
 	}
 
 	return options{
-		debug:  debug,
-		output: output,
-		config: config,
+		debug:   debug,
+		output:  output,
+		config:  config,
+		timeout: time.Duration(timeout) * time.Second,
 	}, nil
 }

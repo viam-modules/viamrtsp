@@ -7,6 +7,7 @@ package device
 
 import (
 	"bytes"
+	"context"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -87,7 +88,7 @@ type GetCapabilities struct {
 }
 
 // NewDevice function construct a ONVIF Device entity.
-func NewDevice(params Params, logger logging.Logger) (*Device, error) {
+func NewDevice(ctx context.Context, params Params, logger logging.Logger) (*Device, error) {
 	dev := &Device{
 		xaddr:     params.Xaddr,
 		logger:    logger,
@@ -99,7 +100,7 @@ func NewDevice(params Params, logger logging.Logger) (*Device, error) {
 		dev.params.HTTPClient = new(http.Client)
 	}
 
-	data, err := dev.callDevice(GetCapabilities{Category: "All"})
+	data, err := dev.callDevice(ctx, GetCapabilities{Category: "All"})
 	if err != nil {
 		return nil, err
 	}
@@ -147,9 +148,9 @@ type GetDeviceInformationResponseEnvelope struct {
 }
 
 // GetDeviceInformation returns device information.
-func (dev *Device) GetDeviceInformation() (GetDeviceInformationResponse, error) {
+func (dev *Device) GetDeviceInformation(ctx context.Context) (GetDeviceInformationResponse, error) {
 	var zero GetDeviceInformationResponse
-	b, err := dev.callOnvifServiceMethod(dev.endpoints["device"], GetDeviceInformation{})
+	b, err := dev.callOnvifServiceMethod(ctx, dev.endpoints["device"], GetDeviceInformation{})
 	if err != nil {
 		return zero, fmt.Errorf("failed to get device information: %w", err)
 	}
@@ -178,10 +179,10 @@ type GetProfilesResponseEnvelope struct {
 }
 
 // GetProfiles returns the device's profiles.
-func (dev *Device) GetProfiles() (GetProfilesResponse, error) {
+func (dev *Device) GetProfiles(ctx context.Context) (GetProfilesResponse, error) {
 	var zero GetProfilesResponse
 	getProfiles := GetProfiles{}
-	b, err := dev.callMedia(getProfiles)
+	b, err := dev.callMedia(ctx, getProfiles)
 	if err != nil {
 		return zero, fmt.Errorf("failed to get media profiles: %w", err)
 	}
@@ -223,9 +224,9 @@ type Credentials struct {
 }
 
 // GetStreamURI returns a device's stream URI for a given profile.
-func (dev *Device) GetStreamURI(profile onvif.Profile, creds Credentials) (*url.URL, error) {
+func (dev *Device) GetStreamURI(ctx context.Context, profile onvif.Profile, creds Credentials) (*url.URL, error) {
 	dev.logger.Debugf("GetStreamUri token: %s, profile: %#v", profile.Token, profile)
-	body, err := dev.callMedia(GetStreamURI{
+	body, err := dev.callMedia(ctx, GetStreamURI{
 		StreamSetup: onvif.StreamSetup{
 			Stream:    onvif.StreamType(streamTypeRTPUnicast),
 			Transport: onvif.Transport{Protocol: streamSetupProtocol},
@@ -265,15 +266,15 @@ func (dev *Device) GetEndpoint(name string) string {
 	return dev.endpoints[name]
 }
 
-func (dev Device) callMedia(method interface{}) ([]byte, error) {
-	return dev.callOnvifServiceMethod(dev.endpoints["media"], method)
+func (dev Device) callMedia(ctx context.Context, method interface{}) ([]byte, error) {
+	return dev.callOnvifServiceMethod(ctx, dev.endpoints["media"], method)
 }
 
-func (dev Device) callDevice(method interface{}) ([]byte, error) {
-	return dev.callOnvifServiceMethod(dev.endpoints["device"], method)
+func (dev Device) callDevice(ctx context.Context, method interface{}) ([]byte, error) {
+	return dev.callOnvifServiceMethod(ctx, dev.endpoints["device"], method)
 }
 
-func (dev Device) callOnvifServiceMethod(endpoint string, method interface{}) ([]byte, error) {
+func (dev Device) callOnvifServiceMethod(ctx context.Context, endpoint string, method interface{}) ([]byte, error) {
 	output, err := xml.MarshalIndent(method, "  ", "    ")
 	if err != nil {
 		return nil, err
@@ -307,15 +308,20 @@ func (dev Device) callOnvifServiceMethod(endpoint string, method interface{}) ([
 		}
 	}
 
-	return dev.sendSoap(endpoint, soap.String())
+	return dev.sendSoap(ctx, endpoint, soap.String())
 }
 
-func (dev *Device) sendSoap(endpoint, message string) ([]byte, error) {
+func (dev *Device) sendSoap(ctx context.Context, endpoint, message string) ([]byte, error) {
 	contentType := "application/soap+xml; charset=utf-8"
-	//nolint: noctx
-	// TODO(Nick S): This is pretty bad as it can cause the goroutine calling this to hang forever
-	// this should be converted to the http interface that takes a context
-	resp, err := dev.params.HTTPClient.Post(endpoint, contentType, bytes.NewBufferString(message))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewBufferString(message))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", contentType)
+
+	// Using Do instead of POST to support context cancellation and timeout.
+	resp, err := dev.params.HTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

@@ -20,9 +20,9 @@ import (
 // OnvifDevice is an interface to abstract device methods used in the code.
 // Used instead of onvif.Device to allow for mocking in tests.
 type OnvifDevice interface {
-	GetDeviceInformation() (device.GetDeviceInformationResponse, error)
-	GetProfiles() (device.GetProfilesResponse, error)
-	GetStreamURI(profile onvif.Profile, creds device.Credentials) (*url.URL, error)
+	GetDeviceInformation(ctx context.Context) (device.GetDeviceInformationResponse, error)
+	GetProfiles(ctx context.Context) (device.GetProfilesResponse, error)
+	GetStreamURI(ctx context.Context, profile onvif.Profile, creds device.Credentials) (*url.URL, error)
 }
 
 // DiscoverCameras performs WS-Discovery
@@ -46,7 +46,7 @@ func DiscoverCameras(
 		utils.ManagedGo(func() {
 			cameraInfo, err := DiscoverCameraInfo(ctx, xaddr, creds, logger)
 			if err != nil {
-				logger.Warnf("failed to connect to ONVIF device %w", err)
+				logger.Warnf("failed to connect to ONVIF device %s", err)
 				return
 			}
 			ch <- cameraInfo
@@ -142,7 +142,7 @@ func DiscoverCameraInfo(
 			return zero, fmt.Errorf("context canceled while connecting to ONVIF device: %s", xaddr)
 		}
 		// This calls GetCapabilities
-		dev, err := device.NewDevice(device.Params{
+		dev, err := device.NewDevice(ctx, device.Params{
 			Xaddr:    xaddr,
 			Username: cred.User,
 			Password: cred.Pass,
@@ -152,7 +152,7 @@ func DiscoverCameraInfo(
 			continue
 		}
 
-		cameraInfo, err := GetCameraInfo(dev, xaddr, cred, logger)
+		cameraInfo, err := GetCameraInfo(ctx, dev, xaddr, cred, logger)
 		if err != nil {
 			logger.Warnf("Failed to get camera info from %s: %v", xaddr, err)
 			continue
@@ -164,17 +164,23 @@ func DiscoverCameraInfo(
 }
 
 // GetCameraInfo uses the ONVIF Media service to get the RTSP stream URLs and camera details.
-func GetCameraInfo(dev OnvifDevice, xaddr *url.URL, creds device.Credentials, logger logging.Logger) (CameraInfo, error) {
+func GetCameraInfo(
+	ctx context.Context,
+	dev OnvifDevice,
+	xaddr *url.URL,
+	creds device.Credentials,
+	logger logging.Logger,
+) (CameraInfo, error) {
 	var zero CameraInfo
 	// Fetch device information (manufacturer, serial number, etc.)
-	resp, err := dev.GetDeviceInformation()
+	resp, err := dev.GetDeviceInformation(ctx)
 	if err != nil {
 		return zero, fmt.Errorf("failed to read device information response body: %w", err)
 	}
 	logger.Debugf("ip: %s GetCapabilities: DeviceInfo: %#v", xaddr, dev)
 
 	// Call the ONVIF Media service to get the available media profiles using the same device instance
-	rtspURLs, err := GetRTSPStreamURIsFromProfiles(dev, creds, logger)
+	rtspURLs, err := GetRTSPStreamURIsFromProfiles(ctx, dev, creds, logger)
 	if err != nil {
 		return zero, fmt.Errorf("failed to get RTSP URLs: %w", err)
 	}
@@ -193,8 +199,13 @@ func GetCameraInfo(dev OnvifDevice, xaddr *url.URL, creds device.Credentials, lo
 }
 
 // GetRTSPStreamURIsFromProfiles uses the ONVIF Media service to get the RTSP stream URLs for all available profiles.
-func GetRTSPStreamURIsFromProfiles(dev OnvifDevice, creds device.Credentials, logger logging.Logger) ([]string, error) {
-	resp, err := dev.GetProfiles()
+func GetRTSPStreamURIsFromProfiles(
+	ctx context.Context,
+	dev OnvifDevice,
+	creds device.Credentials,
+	logger logging.Logger,
+) ([]string, error) {
+	resp, err := dev.GetProfiles(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +215,7 @@ func GetRTSPStreamURIsFromProfiles(dev OnvifDevice, creds device.Credentials, lo
 
 	// Iterate over all profiles and get the RTSP stream URI for each one
 	for _, profile := range resp.Profiles {
-		uri, err := dev.GetStreamURI(profile, creds)
+		uri, err := dev.GetStreamURI(ctx, profile, creds)
 		if err != nil {
 			logger.Warn(err.Error())
 			continue
