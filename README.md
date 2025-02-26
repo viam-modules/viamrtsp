@@ -123,6 +123,76 @@ Discovery relies on the IP camera adhering to the ONVIF Profile S standard, whic
 #### ONVIF authentication
 For some IP cameras, ONVIF authentication may be flaky or broken. A workaround is to disable the camera's ONVIF authentication temporarily to discover the RTSP address, then (optionally) re-enable the setting.
 
+## Configure the `viamrtsp:upnp` discovery service
+
+This model is used to locate rtsp cameras on a network that utilize the upnp interface and surface their configuration. Users can define a set of `queries` to detect rtsp cameras with, as well as specify what `endpoints` should be returned with the rtsp address.
+
+```json
+{
+   "queries": [
+    {
+      "model_name": "<MODEL_NAME>",
+      "manufacturer": "<MANUFACTURER>",
+      "serial_number": "<SERIAL_NUMBER>",
+      "network": "<NETWORK>",
+      "endpoints": ["<ENDPOINT1>","<ENDPOINT2>"]
+    }
+   ],
+   "root_only_search": bool
+}
+```
+
+### Attributes
+
+The following attributes are available for all models of `viamrtsp` discovery services:
+
+| Name    | Type   | Inclusion    | Description |
+| ------- | ------ | ------------ | ----------- |
+| `queries` | struct | Optional | set any number of device queries to search for cameras with. |
+| `root_only_search` | bool | Optional | specify whether the upnp search should search all services, or to only search for root devices. By default is **false**, which will search all services |
+
+#### Query attributes
+
+At least one of `model_name`, `manufacturer`, or `serial_number` must be configured on each query to use the discovery service.
+
+| Name    | Type   | Inclusion    | Description |
+| ------- | ------ | ------------ | ----------- |
+| `model_name` | string | Optional | the model name of the rtsp camera to discover. |
+| `manufacturer` | string | Optional | the manufacturer of the rtsp camera to discover. |
+| `serial_number` | string | Optional | the serial_number of the rtsp camera to discover. |
+| `network` | string | Optional | the network to query for rtsp cameras. Default is `empty`. |
+| `endpoints` | []string | Optional | the port and endpoints to configure for the rtsp address if the query is discovered. |
+
+### Example Configuration
+
+this example searches for all devices made by `FLIR` and adds the predefined endpoints to the rtsp address.
+```json
+{
+   "queries": [
+    {
+      "manufacturer": "FLIR.*",
+      "endpoints": ["8554/ir.1","8554/vis.1"]
+    }
+   ],
+   "root_only_search": true
+}
+```
+
+### DiscoverResources Extras
+
+The DiscoverResources API also can take a credential as `extra`s fields. To discover cameras using this method, add the following to the extras field of the request:
+
+```json
+{
+  "model_name": "<MODEL_NAME>",
+  "manufacturer": "<MANUFACTURER>",
+  "serial_number": "<SERIAL_NUMBER>",
+  "network": "<NETWORK>",
+}
+```
+
+Currently specifying endpoints is not supported through the extras field.
+
 ## UPnP Host Discovery
 If in your rtsp_address your hostname is UPNP_DISCOVER then we will try to find a UPnP host that matches.
 You can filter the results by fillong out the `query` field in the configuration. See `viamupnp.DeviceQuery` for supported filters.
