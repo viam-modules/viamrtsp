@@ -3,8 +3,14 @@ package viamrtsp
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -17,11 +23,11 @@ import (
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtph265"
 	"github.com/bluenviron/gortsplib/v4/pkg/liberrors"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
+	"github.com/bluenviron/mediacommon/pkg/codecs/h265"
 	"github.com/erh/viamupnp"
 	"github.com/pion/rtp"
 	"github.com/viam-modules/viamrtsp/formatprocessor"
-	"github.com/viam-modules/viamrtsp/viamonvif"
-	"github.com/viam-modules/viamrtsp/viamonvif/device"
+	"github.com/viam-modules/video-store/videostore"
 	"go.uber.org/zap/zapcore"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/components/camera/rtppassthrough"
@@ -44,6 +50,14 @@ const (
 	h264NALUTypeMask = 0x1F
 	// initialFramePoolSize is the initial size of the frame pool.
 	initialFramePoolSize = 5
+	// defaultMPEG4ProfileLevelID is the default profile-level-id value for MPEG4 video
+	// as specified in RFC 6416 Section 7.1 https://datatracker.ietf.org/doc/html/rfc6416#section-7.1
+	defaultMPEG4ProfileLevelID = 1
+	defaultSegmentSeconds      = 30 // seconds
+	defaultUploadPath          = ".viam/capture/video-upload"
+	defaultStoragePath         = ".viam/video-storage-viamrtsp"
+	maxGRPCSize                = 1024 * 1024 * 32 // bytes
+	videoStoreInitCloseTimeout = time.Second * 10
 )
 
 var (
@@ -65,48 +79,32 @@ var (
 	ErrH264PassthroughNotEnabled = errors.New("H264 passthrough is not enabled")
 )
 
-func getStringFromExtra(extra map[string]interface{}, key string) (string, error) {
-	extraVal, ok := extra[key]
-	if !ok {
-		return "", fmt.Errorf("key not found in 'extra': %s", key)
-	}
-	extraValStr, ok := extraVal.(string)
-	if !ok {
-		return "", errors.New("'extra' value must be a string")
-	}
-	return extraValStr, nil
-}
-
 func init() {
 	for _, model := range Models {
 		resource.RegisterComponent(camera.API, model, resource.Registration[camera.Camera, *Config]{
 			Constructor: NewRTSPCamera,
-			Discover: func(ctx context.Context, logger logging.Logger, extra map[string]interface{}) (interface{}, error) {
-				logger.Debugf("viamrtsp discovery received extra credentials: %v", extra)
-				username, err := getStringFromExtra(extra, "username")
-				if err != nil {
-					logger.Infof("error getting username from extra: %v", err)
-				}
-				password, err := getStringFromExtra(extra, "password")
-				if err != nil {
-					logger.Infof("error getting password from extra: %v", err)
-				}
-				creds := []device.Credentials{{User: username, Pass: password}}
-				camInfoList, err := viamonvif.DiscoverCameras(ctx, creds, nil, logger)
-				if err != nil {
-					return nil, err
-				}
-				return camInfoList, nil
-			},
 		})
 	}
 }
 
+type videoStoreStorageConfig struct {
+	SizeGB      int    `json:"size_gb"`
+	UploadPath  string `json:"upload_path,omitempty"`
+	StoragePath string `json:"storage_path,omitempty"`
+}
+
+type videoStoreConfig struct {
+	Storage videoStoreStorageConfig `json:"storage"`
+}
+
 // Config are the config attributes for an RTSP camera model.
 type Config struct {
-	Address        string               `json:"rtsp_address"`
-	RTPPassthrough *bool                `json:"rtp_passthrough"`
-	Query          viamupnp.DeviceQuery `json:"query"`
+	Address          string               `json:"rtsp_address"`
+	RTPPassthrough   *bool                `json:"rtp_passthrough"`
+	LazyDecode       bool                 `json:"lazy_decode,omitempty"`
+	IframeOnlyDecode bool                 `json:"i_frame_only_decode,omitempty"`
+	Query            viamupnp.DeviceQuery `json:"query,omitempty"`
+	VideoStore       *videoStoreConfig    `json:"video_store,omitempty"`
 }
 
 // CodecFormat contains a pointer to a format and the corresponding FFmpeg codec.
@@ -120,6 +118,21 @@ func (conf *Config) Validate(path string) ([]string, error) {
 	_, err := base.ParseURL(conf.Address)
 	if err != nil {
 		return nil, fmt.Errorf("invalid address '%s' for component at path '%s': %w", conf.Address, path, err)
+	}
+
+	if conf.VideoStore != nil {
+		logging.Global().Infof("VideoStore: %#v", *conf.VideoStore)
+		sc, err := applyStorageDefaults(conf.VideoStore.Storage, "anyname")
+		if err != nil {
+			return nil, err
+		}
+		vsc := videostore.Config{
+			Type:    videostore.SourceTypeH264RTPPacket,
+			Storage: sc,
+		}
+		if err := vsc.Validate(); err != nil {
+			return nil, err
+		}
 	}
 
 	return nil, nil
@@ -156,13 +169,26 @@ type (
 	}
 )
 
+type cache struct {
+	mimeType      string
+	bytes         []byte
+	imageMetadata camera.ImageMetadata
+}
+
 // rtspCamera contains the rtsp client, and the reader function that fulfills the camera interface.
 type rtspCamera struct {
 	resource.AlwaysRebuild
 	model resource.Model
 	gostream.VideoReader
-	u *base.URL
+	u                *base.URL
+	lazyDecode       bool
+	iframeOnlyDecode bool
 
+	closeMu    sync.RWMutex
+	vsConfig   *videostore.Config
+	vs         videostore.H264RTPVideoStore
+	auMu       sync.Mutex
+	au         [][]byte
 	client     *gortsplib.Client
 	rawDecoder *decoder
 
@@ -171,11 +197,12 @@ type rtspCamera struct {
 
 	activeBackgroundWorkers sync.WaitGroup
 
+	// latestFrameMu protects critical sections where frame state changes (e.g. ref counting) need to be atomic
+	// with swapping out the latest frame.
+	latestFrameMu    sync.Mutex
 	latestMJPEGBytes atomic.Pointer[[]byte]
 	latestFrame      *avFrameWrapper
-	// frameSwapMu protects critical sections where frame state changes (e.g. ref counting) need to be atomic
-	// with swapping out the latest frame.
-	frameSwapMu sync.Mutex
+	latestFrameCache cache
 	// We use a pool data structure to amortize the malloc cost of AVFrames and reduce pressure on memory
 	// management. We create one pool for the entire lifetime of the RTSP camera. Additionally, frames
 	// from the pool may be for a resolution that does not match the current image. The user of the pool
@@ -200,6 +227,8 @@ type rtspCamera struct {
 // Close closes the camera. It always returns nil, but because of Close() interface, it needs to return an error.
 func (rc *rtspCamera) Close(_ context.Context) error {
 	rc.cancelFunc()
+	rc.closeMu.Lock()
+	defer rc.closeMu.Unlock()
 	rc.unsubscribeAll()
 	rc.activeBackgroundWorkers.Wait()
 	rc.closeConnection()
@@ -250,10 +279,20 @@ func (rc *rtspCamera) closeConnection() {
 		rc.client.Close()
 		rc.client = nil
 	}
+	rc.resetLazyAU([][]byte{})
 	rc.currentCodec.Store(0)
 	if rc.rawDecoder != nil {
 		rc.rawDecoder.close()
 		rc.rawDecoder = nil
+	}
+
+	if rc.vs != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), videoStoreInitCloseTimeout)
+		defer cancel()
+		if err := rc.vs.Close(ctx); err != nil {
+			rc.logger.Errorf("videostore.Close error: %s", err.Error())
+		}
+		rc.vs = nil
 	}
 }
 
@@ -320,9 +359,19 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib
 	if err != nil {
 		return fmt.Errorf("when calling RTSP DESCRIBE on %s: %w", rc.u, err)
 	}
+	rc.logger.Debugf("Session media info: %+v", session)
+	for _, media := range session.Medias {
+		for i, format := range media.Formats {
+			rc.logger.Debugf("Media %d format: %s", i+1, format.Codec())
+			rc.logger.Debugf("Format clock rate: %d", format.ClockRate())
+			rc.logger.Debugf("Format payload type: %d", format.PayloadType())
+			rc.logger.Debugf("Format RTPMap: %s", format.RTPMap())
+			rc.logger.Debugf("Format FMTP: %+v", format.FMTP())
+		}
+	}
 
 	if codecInfo == Agnostic {
-		codecInfo = getAvailableCodec(session)
+		codecInfo = rc.getAvailableCodec(session)
 	}
 
 	switch codecInfo {
@@ -370,11 +419,60 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib
 	return nil
 }
 
+func (rc *rtspCamera) consumeLazyAU() {
+	rc.auMu.Lock()
+	defer rc.auMu.Unlock()
+	if len(rc.au) > 0 {
+		codec := videoCodec(rc.currentCodec.Load())
+		switch codec {
+		case H264:
+			rc.storeH264Frame(rc.au)
+		case H265:
+			for _, au := range rc.au {
+				// h265 AUs are already packed into a single frame
+				// before they were added to rc.au
+				rc.storeH265Frame(au)
+			}
+		case Unknown:
+		case Agnostic:
+		case MJPEG:
+		case MPEG4:
+			fallthrough
+		default:
+			rc.logger.Infof("consumeLazyAU: called with unexpected codec: %s, int: %d", codec, codec)
+		}
+
+		rc.au = nil
+	}
+}
+
+func (rc *rtspCamera) resetLazyAU(au [][]byte) {
+	rc.auMu.Lock()
+	defer rc.auMu.Unlock()
+	rc.au = au
+}
+
+func (rc *rtspCamera) appendLazyAU(au [][]byte) {
+	rc.auMu.Lock()
+	defer rc.auMu.Unlock()
+	rc.au = append(rc.au, au...)
+}
+
 // initH264 initializes the H264 decoder and sets up the client to receive H264 packets.
 func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 	// setup RTP/H264 -> H264 decoder
 	var f *format.H264
 
+	if rc.vsConfig != nil {
+		rc.logger.Info("creating video-store from config")
+		ctx, cancel := context.WithTimeout(context.Background(), videoStoreInitCloseTimeout)
+		defer cancel()
+		vs, err := videostore.NewH264RTPVideoStore(ctx, *rc.vsConfig, rc.logger)
+		if err != nil {
+			return err
+		}
+		rc.vs = vs
+	}
 	media := session.FindFormat(&f)
 	if media == nil {
 		rc.logger.Warn("tracks available")
@@ -396,6 +494,19 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		return fmt.Errorf("creating H264 raw decoder: %w", err)
 	}
 
+	if rc.vs != nil {
+		rc.logger.Info("video-store is not nil, attempting to call InitH264")
+		if len(f.SPS) != 0 && len(f.PPS) != 0 {
+			if err := rc.vs.InitH264(f.SPS, f.PPS); err != nil {
+				rc.logger.Errorf("videostore.InitH264 error: %s", err.Error())
+				return err
+			}
+			rc.logger.Info("videostore.InitH264 succeeded")
+		} else {
+			rc.logger.Warnf("sps or pps not present so video-store is not initializes sps len: %d, pps len: %d", len(f.SPS), len(f.PPS))
+		}
+	}
+
 	// if SPS and PPS are present into the SDP, send them to the decoder
 	initialSPSAndPPS := [][]byte{}
 	if f.SPS != nil {
@@ -410,7 +521,63 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 	}
 
 	var receivedFirstIDR bool
-	storeImage := func(pkt *rtp.Packet) {
+	storeImage := func(au [][]byte) {
+		if !receivedFirstIDR && h264.IDRPresent(au) {
+			rc.logger.Debug("adding initial SPS & PPS")
+			receivedFirstIDR = true
+			au = append(initialSPSAndPPS, au...)
+			rc.storeH264Frame(au)
+			return
+		}
+
+		if rc.iframeOnlyDecode && !h264.IDRPresent(au) {
+			return
+		}
+
+		if rc.lazyDecode {
+			if h264.IDRPresent(au) {
+				rc.resetLazyAU(au)
+			} else {
+				rc.appendLazyAU(au)
+			}
+		} else {
+			rc.storeH264Frame(au)
+		}
+	}
+
+	var receivedFirstSegmentKeyframe bool
+	segmentPacket := func(pkt *rtp.Packet, au [][]byte) {
+		if rc.vs == nil {
+			return
+		}
+		pts, ok := rc.client.PacketPTS2(media, pkt)
+		if !ok {
+			rc.logger.Debug("no pts found for packet")
+			return
+		}
+		// Video files must start with a keyframe. Wait for the first keyframe before starting to
+		// segment the video.
+		if !receivedFirstSegmentKeyframe {
+			if h264.IDRPresent(au) {
+				rc.logger.Debug("segmenter found first segment keyframe")
+				receivedFirstSegmentKeyframe = true
+			} else {
+				rc.logger.Debug("segmenter is waiting for first keyframe")
+				return
+			}
+		}
+		packed, err := h264.AVCCMarshal(au)
+		if err != nil {
+			rc.logger.Errorf("AnnexBMarshal err: %s", err.Error())
+			return
+		}
+		err = rc.vs.WritePacket(packed, pts, h264.IDRPresent(au))
+		if err != nil {
+			rc.logger.Errorf("error writing packet to segmenter: %s", err)
+		}
+	}
+
+	onPacketRTP := func(pkt *rtp.Packet) {
 		au, err := rtpDec.Decode(pkt)
 		if err != nil {
 			if !errors.Is(err, rtph264.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph264.ErrMorePacketsNeeded) {
@@ -418,18 +585,8 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 			}
 			return
 		}
-
-		if !receivedFirstIDR && h264.IDRPresent(au) {
-			rc.logger.Debug("adding initial SPS & PPS")
-			receivedFirstIDR = true
-			au = append(initialSPSAndPPS, au...)
-		}
-
-		rc.storeH264Frame(au)
-	}
-
-	onPacketRTP := func(pkt *rtp.Packet) {
-		storeImage(pkt)
+		storeImage(au)
+		segmentPacket(pkt, au)
 	}
 
 	if rc.rtpPassthrough {
@@ -465,7 +622,15 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 
 		onPacketRTP = func(pkt *rtp.Packet) {
 			publishToWebRTC(pkt)
-			storeImage(pkt)
+			au, err := rtpDec.Decode(pkt)
+			if err != nil {
+				if !errors.Is(err, rtph264.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph264.ErrMorePacketsNeeded) {
+					rc.logger.Debugf("error decoding(1) h264 rstp stream %w", err)
+				}
+				return
+			}
+			storeImage(au)
+			segmentPacket(pkt, au)
 		}
 	}
 
@@ -484,6 +649,11 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 	if rc.rtpPassthrough {
 		rc.logger.Warn("rtp_passthrough is only supported for H264 codec. rtp_passthrough features disabled due to H265 RTSP track")
 	}
+
+	if rc.vsConfig != nil {
+		rc.logger.Warn("video_store is only supported for H264 codec. video_store features disabled due to H265 RTSP track")
+	}
+
 	var f *format.H265
 
 	media := session.FindFormat(&f)
@@ -538,50 +708,66 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		au, err := rtpDec.Decode(pkt)
 		if err != nil {
 			if !errors.Is(err, rtph265.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph265.ErrMorePacketsNeeded) {
-				// This error is created with `github.com/pkg/errors`. Explicitly call `Error()` to
-				// avoid logging the stacktrace.
 				rc.logger.Debugw("error decoding(1) h265 rstp stream", "err", err.Error())
 			}
 			return
 		}
 
-		// If the AU has more than one NALU, compact them into a single payload with NALUs seperated
-		// in AnnexB format. This is necessary because the H.265 decoder expects all NALUs for a frame
-		// to be in a single payload rather than chunked across multiple decode calls.
-		packed := []byte{}
-		firstNALU := true
-		for _, nalu := range au {
-			if len(nalu) == 0 {
-				rc.logger.Warn("empty NALU found in H265 AU, skipping NALU")
-				continue
-			}
-			// Add start code prefix to all NALUs except the first non-empty one.
-			if !firstNALU {
-				packed = append(packed, H2645StartCode()...)
-			}
-			packed = append(packed, nalu...)
-			firstNALU = false
-		}
-
-		if len(packed) == 0 {
-			rc.logger.Warn("no NALUs found in H265 AU, skipping packet")
+		if rc.iframeOnlyDecode && !h265.IsRandomAccess(au) {
 			return
 		}
 
-		frame, err := rc.rawDecoder.decode(packed)
-		if err != nil {
-			// This error is created with `github.com/pkg/errors`. Explicitly call `Error()` to
-			// avoid logging the stacktrace.
-			rc.logger.Debugw("error decoding(2) h265 rtsp stream", "err", err.Error())
-			return
-		}
-
-		if frame != nil {
-			rc.handleLatestFrame(frame)
+		packedAU := packH265AUIntoNALU(au, rc.logger)
+		if rc.lazyDecode {
+			if h265.IsRandomAccess(au) {
+				rc.resetLazyAU([][]byte{packedAU})
+			} else {
+				rc.appendLazyAU([][]byte{packedAU})
+			}
+		} else {
+			rc.storeH265Frame(packedAU)
 		}
 	})
 
 	return nil
+}
+
+func packH265AUIntoNALU(au [][]byte, logger logging.Logger) []byte {
+	// If the AU has more than one NALU, compact them into a single payload with NALUs separated
+	// in AnnexB format. This is necessary because the H.265 decoder expects all NALUs for a frame
+	// to be in a single payload rather than chunked across multiple decode calls.
+	packedNALU := []byte{}
+	firstNALU := true
+	for _, nalu := range au {
+		if len(nalu) == 0 {
+			logger.Warn("empty NALU found in H265 AU, skipping NALU")
+			continue
+		}
+		// Add start code prefix to all NALUs except the first non-empty one.
+		if !firstNALU {
+			packedNALU = append(packedNALU, H2645StartCode()...)
+		}
+		packedNALU = append(packedNALU, nalu...)
+		firstNALU = false
+	}
+	return packedNALU
+}
+
+func (rc *rtspCamera) storeH265Frame(nalu []byte) {
+	if len(nalu) == 0 {
+		rc.logger.Warn("no NALUs found in H265 AU, skipping packet")
+		return
+	}
+
+	frame, err := rc.rawDecoder.decode(nalu)
+	if err != nil {
+		rc.logger.Debugw("error decoding(2) h265 rtsp stream", "err", err.Error())
+		return
+	}
+
+	if frame != nil {
+		rc.handleLatestFrame(frame)
+	}
 }
 
 // initMJPEG initializes the MJPEG decoder and sets up the client to receive JPEG frames.
@@ -589,6 +775,20 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 	if rc.rtpPassthrough {
 		rc.logger.Warn("rtp_passthrough is only supported for H264 codec. rtp_passthrough features disabled due to MJPEG RTSP track")
 	}
+
+	if rc.lazyDecode {
+		rc.logger.Warn("lazy_decode is currently only supported for H264 and H265 codecs. lazy_decode features disabled due to MJPEG RTSP track")
+	}
+
+	if rc.iframeOnlyDecode {
+		rc.logger.Warn("i_frame_only_decode is currently only supported for H264 and H265 codecs. " +
+			"lazy_decode features disabled due to MJPEG RTSP track")
+	}
+
+	if rc.vsConfig != nil {
+		rc.logger.Warn("video_store is only supported for H264 codec. video_store features disabled due to MJPEG RTSP track")
+	}
+
 	var f *format.MJPEG
 	media := session.FindFormat(&f)
 	if media == nil {
@@ -621,20 +821,86 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 	return nil
 }
 
+// getMPEG4FromGeneric attempts to find an MPEG4 format from generic format(s) in the session that can be converted to MPEG4.
+// Returns the format and media if found.
+func getMPEG4FromGeneric(session *description.Session) (*format.MPEG4Video, *description.Media, error) {
+	for _, media := range session.Medias {
+		for _, f := range media.Formats {
+			generic, ok := f.(*format.Generic)
+			if !ok {
+				continue
+			}
+
+			if !strings.HasPrefix(strings.ToUpper(generic.RTPMap()), "MP4V-ES/") {
+				continue
+			}
+
+			mpeg4 := &format.MPEG4Video{
+				PayloadTyp:     generic.PayloadType(),
+				ProfileLevelID: defaultMPEG4ProfileLevelID,
+			}
+
+			fmtp := generic.FMTP()
+			if fmtp == nil {
+				return mpeg4, media, nil
+			}
+
+			if config, ok := fmtp["config"]; ok {
+				configBytes, err := hex.DecodeString(config)
+				if err != nil {
+					return nil, nil, fmt.Errorf("failed to decode MPEG4 config: %w", err)
+				}
+				mpeg4.Config = configBytes
+			}
+
+			if profileID, ok := fmtp["profile-level-id"]; ok {
+				id, err := strconv.Atoi(profileID)
+				if err != nil {
+					return nil, nil, fmt.Errorf("failed to parse profile-level-id: %w", err)
+				}
+				mpeg4.ProfileLevelID = id
+			}
+
+			return mpeg4, media, nil
+		}
+	}
+	return nil, nil, nil
+}
+
 // initMPEG4 initializes the MPEG4 decoder and sets up the client to receive MPEG4 packets.
 func (rc *rtspCamera) initMPEG4(session *description.Session) error {
 	if rc.rtpPassthrough {
 		rc.logger.Warn("rtp_passthrough is only supported for H264 codec. rtp_passthrough features disabled due to MPEG4 RTSP track")
 	}
 
+	if rc.lazyDecode {
+		rc.logger.Warn("lazy_decode is currently only supported for H264 and H265 codecs. lazy_decode features disabled due to MPEG4 RTSP track")
+	}
+
+	if rc.iframeOnlyDecode {
+		rc.logger.Warn("i_frame_only_decode is currently only supported for H264 and H265 codecs. " +
+			"lazy_decode features disabled due to MPEG4 RTSP track")
+	}
+
+	if rc.vsConfig != nil {
+		rc.logger.Warn("video_store is only supported for H264 codec. video_store features disabled due to MPEG4 RTSP track")
+	}
+
 	var f *format.MPEG4Video
 	media := session.FindFormat(&f)
+	var err error
 	if media == nil {
-		rc.logger.Warn("No MPEG4 track found")
-		for _, x := range session.Medias {
-			rc.logger.Warnf("\t %v", x)
+		// If direct MPEG4 format not found, try to find it in generic formats
+		f, media, err = getMPEG4FromGeneric(session)
+		if err != nil {
+			return fmt.Errorf("error finding MPEG4 track: %w", err)
 		}
-		return errors.New("MPEG4 track not found")
+		if media == nil {
+			for _, x := range session.Medias {
+				rc.logger.Debugf("\t %v", x)
+			}
+			return errors.New("MPEG4 track not found")
+		}
 	}
 
 	mpeg4Decoder, err := f.CreateDecoder()
@@ -832,10 +1098,30 @@ func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		rtpPassthrough = *newConf.RTPPassthrough
 	}
 
+	var vsc *videostore.Config
+	if newConf.VideoStore != nil {
+		sc, err := applyStorageDefaults(newConf.VideoStore.Storage, conf.ResourceName().Name)
+		if err != nil {
+			return nil, err
+		}
+		tmpVsc := videostore.Config{
+			Type:    videostore.SourceTypeH264RTPPacket,
+			Storage: sc,
+		}
+		if err := tmpVsc.Validate(); err != nil {
+			return nil, err
+		}
+
+		vsc = &tmpVsc
+	}
+
 	rtpPassthroughCtx, rtpPassthroughCancelCauseFn := context.WithCancelCause(context.Background())
 	rc := &rtspCamera{
 		model:                       conf.Model,
+		lazyDecode:                  newConf.LazyDecode,
+		iframeOnlyDecode:            newConf.IframeOnlyDecode,
 		u:                           u,
+		vsConfig:                    vsc,
 		name:                        conf.ResourceName(),
 		rtpPassthrough:              rtpPassthrough,
 		bufAndCBByID:                make(map[rtppassthrough.SubscriptionID]bufAndCB),
@@ -863,6 +1149,40 @@ func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 	rc.clientReconnectBackgroundWorker(codecInfo)
 
 	return rc, nil
+}
+
+// getHomeDir returns the home directory of the user.
+func getHomeDir() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return home, nil
+}
+
+func applyStorageDefaults(c videoStoreStorageConfig, name string) (videostore.StorageConfig, error) {
+	var zero videostore.StorageConfig
+	if c.UploadPath == "" {
+		home, err := getHomeDir()
+		if err != nil {
+			return zero, err
+		}
+		c.UploadPath = filepath.Join(home, defaultUploadPath, name)
+	}
+	if c.StoragePath == "" {
+		home, err := getHomeDir()
+		if err != nil {
+			return zero, err
+		}
+		c.StoragePath = filepath.Join(home, defaultStoragePath, name)
+	}
+	return videostore.StorageConfig{
+		SegmentSeconds:       defaultSegmentSeconds,
+		SizeGB:               c.SizeGB,
+		OutputFileNamePrefix: name,
+		UploadPath:           c.UploadPath,
+		StoragePath:          c.StoragePath,
+	}, nil
 }
 
 func (rc *rtspCamera) unsubscribeAll() {
@@ -914,23 +1234,38 @@ func modelToCodec(model resource.Model) (videoCodec, error) {
 
 // getAvailableCodec determines the first supported codec from a session's SDP data
 // returning Unknown if none are found.
-func getAvailableCodec(session *description.Session) videoCodec {
+func (rc *rtspCamera) getAvailableCodec(session *description.Session) videoCodec {
 	var h264 *format.H264
 	var h265 *format.H265
 	var mjpeg *format.MJPEG
 	var mpeg4 *format.MPEG4Video
-
 	// List of formats/codecs in priority order
 	codecFormats := []codecFormat{
 		{&h264, H264},
 		{&h265, H265},
 		{&mjpeg, MJPEG},
-		{&mpeg4, MPEG4},
+		{&mpeg4, MPEG4}, // MPEG4 video can be encoded in multiple RTP payload formats:
+		// 1. MP4V-ES
+		// 2. Generic RTP payload format
+		// So we handle it separately from other codecs
 	}
 
 	for _, codecFormat := range codecFormats {
-		if session.FindFormat(codecFormat.formatPointer) != nil {
+		// For all codecs, check if the format exists directly in the session
+		if media := session.FindFormat(codecFormat.formatPointer); media != nil {
 			return codecFormat.codec
+		}
+
+		if codecFormat.codec == MPEG4 {
+			mpeg4, _, err := getMPEG4FromGeneric(session)
+			switch {
+			case err != nil:
+				// We eat the error here because an error parsing MPEG4 format details
+				// shouldn't prevent us from checking other codecs.
+				rc.logger.Debugf("error checking for MPEG4 format: %v", err)
+			case mpeg4 != nil:
+				return MPEG4
+			}
 		}
 	}
 
@@ -946,7 +1281,7 @@ func (rc *rtspCamera) storeH264Frame(au [][]byte) {
 			// the NALUs that were compacted.
 			// We do this so that the libav functions the decoder uses under the hood don't log
 			// spam error messages (which happens when it is fed SPS or PPS without an IDR
-			nalu, nalusCompacted := rc.compactH264SPSAndPPSAndIDR(au[naluIndex:])
+			nalu, nalusCompacted := compactH264SPSAndPPSAndIDR(au[naluIndex:])
 			if err := rc.decodeAndStore(nalu); err != nil {
 				rc.logger.Debugf("error decoding(2) h264 rtsp stream  %s", err.Error())
 				return
@@ -964,7 +1299,7 @@ func (rc *rtspCamera) storeH264Frame(au [][]byte) {
 	}
 }
 
-func (rc *rtspCamera) compactH264SPSAndPPSAndIDR(au [][]byte) ([]byte, int) {
+func compactH264SPSAndPPSAndIDR(au [][]byte) ([]byte, int) {
 	compactedNALU, numCompacted := []byte{}, 0
 	for _, nalu := range au {
 		if !isCompactableH264(nalu) {
@@ -1007,8 +1342,8 @@ func (rc *rtspCamera) decodeAndStore(nalu []byte) error {
 // the previous frame by trying to put it back in the pool. It might not make
 // it back into the pool immediately or at all depending on its state.
 func (rc *rtspCamera) handleLatestFrame(newFrame *avFrameWrapper) {
-	rc.frameSwapMu.Lock()
-	defer rc.frameSwapMu.Unlock()
+	rc.latestFrameMu.Lock()
+	defer rc.latestFrameMu.Unlock()
 
 	prevFrame := rc.latestFrame
 	if prevFrame != nil {
@@ -1018,6 +1353,7 @@ func (rc *rtspCamera) handleLatestFrame(newFrame *avFrameWrapper) {
 	}
 	newFrame.incrementRefs()
 	rc.latestFrame = newFrame
+	rc.latestFrameCache = cache{}
 }
 
 func naluType(nalu []byte) h264.NALUType {
@@ -1031,6 +1367,16 @@ func isCompactableH264(nalu []byte) bool {
 
 // Image returns the latest frame as JPEG bytes.
 func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
+	rc.closeMu.RLock()
+	defer rc.closeMu.RUnlock()
+	start := time.Now()
+	defer func() {
+		rc.logger.Debugf("codec: %s, lazy: %t, iframe_only: %t, time: %s",
+			videoCodec(rc.currentCodec.Load()), rc.lazyDecode, rc.iframeOnlyDecode, time.Since(start))
+	}()
+	if err := rc.cancelCtx.Err(); err != nil {
+		return nil, camera.ImageMetadata{}, err
+	}
 	if videoCodec(rc.currentCodec.Load()) == MJPEG {
 		mjpegBytes := rc.latestMJPEGBytes.Load()
 		if mjpegBytes == nil {
@@ -1044,8 +1390,9 @@ func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]int
 }
 
 func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, camera.ImageMetadata, error) {
-	rc.frameSwapMu.Lock()
-	defer rc.frameSwapMu.Unlock()
+	rc.consumeLazyAU()
+	rc.latestFrameMu.Lock()
+	defer rc.latestFrameMu.Unlock()
 	if rc.latestFrame == nil {
 		return nil, camera.ImageMetadata{}, errors.New("no frame yet")
 	}
@@ -1054,6 +1401,13 @@ func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, camera.ImageM
 	var bytes []byte
 	var metadata camera.ImageMetadata
 	var err error
+	if rc.latestFrameCache.bytes != nil && rc.latestFrameCache.mimeType == mimeType {
+		if refCount := currentFrame.decrementRefs(); refCount == 0 {
+			rc.avFramePool.put(currentFrame)
+		}
+		return rc.latestFrameCache.bytes, rc.latestFrameCache.imageMetadata, nil
+	}
+
 	switch mimeType {
 	case rutils.MimeTypeJPEG, rutils.MimeTypeJPEG + "+" + rutils.MimeTypeSuffixLazy:
 		bytes, metadata, err = rc.mimeHandler.convertJPEG(currentFrame.frame)
@@ -1070,6 +1424,11 @@ func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, camera.ImageM
 	}
 	if err != nil {
 		return nil, camera.ImageMetadata{}, err
+	}
+	rc.latestFrameCache = cache{
+		mimeType:      mimeType,
+		bytes:         bytes,
+		imageMetadata: metadata,
 	}
 	return bytes, metadata, err
 }
@@ -1098,6 +1457,113 @@ func (rc *rtspCamera) NextPointCloud(_ context.Context) (pointcloud.PointCloud, 
 	return nil, errors.New("not implemented")
 }
 
-func (rc *rtspCamera) DoCommand(_ context.Context, _ map[string]interface{}) (map[string]interface{}, error) {
-	return nil, errors.New("not implemented")
+func (rc *rtspCamera) DoCommand(ctx context.Context, command map[string]interface{}) (map[string]interface{}, error) {
+	if rc.vs == nil {
+		return nil, errors.New("not implemented")
+	}
+	cmd, ok := command["command"].(string)
+	if !ok {
+		return nil, errors.New("invalid command type")
+	}
+
+	switch cmd {
+	// Save command is used to concatenate video clips between the given timestamps.
+	// The concatenated video file is then uploaded to the cloud the upload path.
+	// The response contains the name of the uploaded file.
+	case "save":
+		rc.logger.Debug("save command received")
+		req, err := toSaveCommand(command)
+		if err != nil {
+			return nil, err
+		}
+
+		res, err := rc.vs.Save(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+
+		ret := map[string]interface{}{
+			"command":  "save",
+			"filename": res.Filename,
+		}
+
+		if req.Async {
+			ret["status"] = "async"
+		}
+		return ret, nil
+	case "fetch":
+		rc.logger.Debug("fetch command received")
+		req, err := toFetchCommand(command)
+		if err != nil {
+			return nil, err
+		}
+		res, err := rc.vs.Fetch(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+		if len(res.Video) > maxGRPCSize {
+			return nil, errors.New("video file size exceeds max grpc size")
+		}
+		// TODO(seanp): Do we need to encode the video bytes to base64?
+		videoBytesBase64 := base64.StdEncoding.EncodeToString(res.Video)
+		return map[string]interface{}{
+			"command": "fetch",
+			"video":   videoBytesBase64,
+		}, nil
+	default:
+		return nil, errors.New("invalid command")
+	}
+}
+
+func toSaveCommand(command map[string]interface{}) (*videostore.SaveRequest, error) {
+	fromStr, ok := command["from"].(string)
+	if !ok {
+		return nil, errors.New("from timestamp not found")
+	}
+	from, err := videostore.ParseDateTimeString(fromStr)
+	if err != nil {
+		return nil, err
+	}
+	toStr, ok := command["to"].(string)
+	if !ok {
+		return nil, errors.New("to timestamp not found")
+	}
+	to, err := videostore.ParseDateTimeString(toStr)
+	if err != nil {
+		return nil, err
+	}
+	metadata, ok := command["metadata"].(string)
+	if !ok {
+		metadata = ""
+	}
+	async, ok := command["async"].(bool)
+	if !ok {
+		async = false
+	}
+	return &videostore.SaveRequest{
+		From:     from,
+		To:       to,
+		Metadata: metadata,
+		Async:    async,
+	}, nil
+}
+
+func toFetchCommand(command map[string]interface{}) (*videostore.FetchRequest, error) {
+	fromStr, ok := command["from"].(string)
+	if !ok {
+		return nil, errors.New("from timestamp not found")
+	}
+	from, err := videostore.ParseDateTimeString(fromStr)
+	if err != nil {
+		return nil, err
+	}
+	toStr, ok := command["to"].(string)
+	if !ok {
+		return nil, errors.New("to timestamp not found")
+	}
+	to, err := videostore.ParseDateTimeString(toStr)
+	if err != nil {
+		return nil, err
+	}
+	return &videostore.FetchRequest{From: from, To: to}, nil
 }
