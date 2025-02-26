@@ -145,16 +145,26 @@ func (cam *CameraInfo) tryMDNS(mdnsServer *mdnsServer, logger logging.Logger) {
 		return
 	}
 
+	wasIPFound := false
 	// Replace the URLs in-place such that configs generated from these objects will point to the
 	// logical dns hostname rather than a raw IP.
 	for idx := range cam.RTSPURLs {
 		if strings.Contains(cam.RTSPURLs[idx], cam.deviceIP.String()) {
 			cam.RTSPURLs[idx] = strings.Replace(cam.RTSPURLs[idx], cam.deviceIP.String(), derivedHostname, 1)
+			wasIPFound = true
 		} else {
 			logger.Debugf("RTSP URL did not contain expected hostname. URL: %v HostName: %v",
 				cam.RTSPURLs[idx], cam.deviceIP.String())
-			mdnsServer.Remove(cleanedSerialNumber)
 		}
+	}
+
+	if !wasIPFound {
+		// If for some reason, the `deviceIP`/`xaddr.Host` IP was not found in any of the RTSP urls,
+		// stop serving mdns requests for that serial number.
+		//
+		// We have* observed a device returning RTSP urls with multiple IPs, but do not yet know of
+		// a case where none of the URLs contained an IP that matches where the response came from.
+		mdnsServer.Remove(cleanedSerialNumber)
 	}
 }
 
