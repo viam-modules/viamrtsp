@@ -10,7 +10,7 @@ require (
 	github.com/bluenviron/mediacommon v1.13.3
 	github.com/edaniels/golinters v0.0.5-0.20220906153528-641155550742
 	github.com/elgs/gostrgen v0.0.0-20161222160715-9d61ae07eeae
-	github.com/erh/viamupnp v0.0.0-20241217142932-2fecf833407c
+	github.com/erh/viamupnp v0.0.0-20250225174543-39c68c119b3e
 	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/golangci/golangci-lint v1.61.0
 	github.com/koron/go-ssdp v0.0.4
@@ -341,4 +341,4 @@ require (
 	nhooyr.io/websocket v1.8.7 // indirect
 )
 
-replace github.com/erh/viamupnp => /Users/johnnicholson/viam-slam/viamupnp
+// replace github.com/erh/viamupnp => /Users/johnnicholson/viam-slam/viamupnp

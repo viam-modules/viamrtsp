@@ -145,16 +145,16 @@ func (conf *Config) parseAndFixAddress(ctx context.Context, logger logging.Logge
 	}
 
 	if u.Hostname() == "UPNP_DISCOVER" {
-		host, err := viamupnp.FindHost(ctx, logger, []viamupnp.DeviceQuery{conf.Query}, false)
+		hosts, _, err := viamupnp.FindHost(ctx, logger, []viamupnp.DeviceQuery{conf.Query}, false)
 		if err != nil {
 			return nil, err
 		}
 
 		p := u.Port()
 		if p == "" {
-			u.Host = host[0]
+			u.Host = hosts[0]
 		} else {
-			u.Host = fmt.Sprintf("%s:%s", host[0], u.Port())
+			u.Host = fmt.Sprintf("%s:%s", hosts[0], u.Port())
 		}
 	}
 
