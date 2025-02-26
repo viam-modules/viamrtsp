@@ -754,7 +754,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 				return
 			}
 		}
-		packed, err := h264.AVCC(au).Marshal()
+		packed, err := h264.AnnexB(au).Marshal()
 		if err != nil {
 			rc.logger.Errorf("AVCCMarshal err: %s", err.Error())
 			return
