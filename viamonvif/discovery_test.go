@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os"
 	"os/exec"
+	"slices"
 	"testing"
 
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
@@ -187,4 +189,73 @@ func TestMDNSMapping(t *testing.T) {
 	// again. However, I've observed a small sleep is necessary to ensure that the mdns entry is no
 	// longer being served. I'd rather not play the game of having to use increasingly larger sleeps
 	// to ensure the test remains reliable.
+}
+
+func TestFileCaching(t *testing.T) {
+	logger := logging.NewTestLogger(t)
+	file, err := os.CreateTemp("", "*")
+	test.That(t, err, test.ShouldBeNil)
+	cachedMDNSMappingsFilename := file.Name()
+	file.Close()
+
+	mdnsServer := newMDNSServerFromCachedData(cachedMDNSMappingsFilename, logger)
+	defer mdnsServer.Shutdown()
+
+	// The above create/close should create an empty file. Given the empty string is not valid json,
+	// we expect nil to be returned.
+	cachedDNSResults := mdnsServer.readCacheFile()
+	test.That(t, cachedDNSResults, test.ShouldBeNil)
+	test.That(t, len(cachedDNSResults), test.ShouldEqual, 0)
+
+	// Delete the file
+	test.That(t, os.Remove(cachedMDNSMappingsFilename), test.ShouldBeNil)
+
+	// Similarly, a file that does not exist also returns nil.
+	cachedDNSResults = mdnsServer.readCacheFile()
+	test.That(t, cachedDNSResults, test.ShouldBeNil)
+
+	// Choose a random string for our two mappings `nonSenseOne` and `nonSenseTwo`. Start
+	// `nonSenseOne` with an `a` and `nonSenseTwo` with a `z`. Such that `nonSenseOne` sorts before
+	// `nonSenseTwo`. To ease assertion testing.
+	nonSenseOne := "a" + utils.RandomAlphaString(10)
+	logger.Info("First conjured DNS name:", nonSenseOne)
+
+	nonSenseTwo := "z" + utils.RandomAlphaString(10)
+	logger.Info("Second conjured DNS name:", nonSenseTwo)
+
+	// Add the two mappings to the mdns server.
+	mdnsServer.Add(nonSenseOne, net.ParseIP("127.0.0.1"))
+	mdnsServer.Add(nonSenseTwo, net.ParseIP("127.0.0.2"))
+	test.That(t, len(mdnsServer.mappedDevices), test.ShouldEqual, 2)
+
+	// Write out a cache file that ought to contain both mappings.
+	mdnsServer.UpdateCacheFile()
+
+	// Read it in by hand and verify the results make match.
+	cachedDNSResults = mdnsServer.readCacheFile()
+	test.That(t, len(cachedDNSResults), test.ShouldEqual, 2)
+
+	slices.SortFunc(cachedDNSResults, func(left, right cachedEntry) int {
+		if left.DNSName < right.DNSName {
+			return -1
+		} else {
+			return 1
+		}
+
+		// Can't be equal -- omitting for brevity.
+	})
+
+	// Leverage the sorting to safely assume the first entry represents `nonSenseOne`.
+	test.That(t, cachedDNSResults[0].DNSName, test.ShouldEqual, nonSenseOne)
+	test.That(t, cachedDNSResults[0].IP, test.ShouldEqual, "127.0.0.1")
+	test.That(t, cachedDNSResults[1].DNSName, test.ShouldEqual, nonSenseTwo)
+	test.That(t, cachedDNSResults[1].IP, test.ShouldEqual, "127.0.0.2")
+
+	// Start a new mdns server against the same file. This will load/apply the cache file. This test
+	// is not skipped, so we do not assert `ping`ing works. Just the existence of the expected
+	// entries in the `mappedDevices` map.
+	cleanMDNSServer := newMDNSServerFromCachedData(cachedMDNSMappingsFilename, logger)
+	test.That(t, len(cleanMDNSServer.mappedDevices), test.ShouldEqual, 2)
+	test.That(t, cleanMDNSServer.mappedDevices[nonSenseOne].ip.String(), test.ShouldEqual, "127.0.0.1")
+	test.That(t, cleanMDNSServer.mappedDevices[nonSenseTwo].ip.String(), test.ShouldEqual, "127.0.0.2")
 }
