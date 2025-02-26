@@ -1,5 +1,5 @@
-// Package viamonvifdiscovery provides the discovery service that wraps ONVIF integration for the viamrtsp module
-package viamonvifdiscovery
+// Package viamonvif provides the discovery service that wraps ONVIF integration for the viamrtsp module
+package viamonvif
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/viam-modules/viamrtsp"
-	"github.com/viam-modules/viamrtsp/viamonvif"
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
@@ -74,10 +73,16 @@ func newDiscovery(_ context.Context, _ resource.Dependencies,
 }
 
 // DiscoverResources discovers different rtsp cameras that use onvif.
-func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, _ map[string]any) ([]resource.Config, error) {
+func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[string]any) ([]resource.Config, error) {
 	cams := []resource.Config{}
 
-	list, err := viamonvif.DiscoverCameras(ctx, dis.Credentials, nil, dis.logger)
+	discoverCreds := dis.Credentials
+
+	extraCred, ok := getCredFromExtra(extra)
+	if ok {
+		discoverCreds = append(discoverCreds, extraCred)
+	}
+	list, err := DiscoverCameras(ctx, discoverCreds, nil, dis.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +106,7 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, _ map[string]an
 	return cams, nil
 }
 
-func createCamerasFromURLs(l viamonvif.CameraInfo, logger logging.Logger) ([]resource.Config, error) {
+func createCamerasFromURLs(l CameraInfo, logger logging.Logger) ([]resource.Config, error) {
 	cams := []resource.Config{}
 	for index, u := range l.RTSPURLs {
 		logger.Debugf("camera URL:\t%s", u)
@@ -135,4 +140,19 @@ func createCameraConfig(name, address string) (resource.Config, error) {
 		Name: name, API: camera.API, Model: viamrtsp.ModelAgnostic,
 		Attributes: result, ConvertedAttributes: &attributes,
 	}, nil
+}
+
+func getCredFromExtra(extra map[string]any) (device.Credentials, bool) {
+	// check for a username from extras
+	extraUser, ok := extra["User"].(string)
+	if !ok {
+		return device.Credentials{}, false
+	}
+	// not requiring a password to match config
+	extraPass, ok := extra["Pass"].(string)
+	if !ok {
+		extraPass = ""
+	}
+
+	return device.Credentials{User: extraUser, Pass: extraPass}, true
 }

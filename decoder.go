@@ -1,7 +1,6 @@
 package viamrtsp
 
 /*
-#cgo pkg-config: libavcodec libavutil libswscale
 #include <libavcodec/avcodec.h>
 #include <libavutil/imgutils.h>
 #include <libavutil/error.h>
@@ -223,6 +222,11 @@ func newRecoverableError(err error) *recoverableError {
 // to cut down on log spam
 func SetLibAVLogLevelFatal() {
 	C.av_log_set_level(C.AV_LOG_FATAL)
+}
+
+// SetLibAVLogLevelDebug sets libav errors to debug log level
+func SetLibAVLogLevelDebug() {
+	C.av_log_set_level(C.AV_LOG_DEBUG)
 }
 
 // newDecoder creates a new decoder for the given codec, including any extra configuration data.

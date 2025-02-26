@@ -1,5 +1,5 @@
-// Package viamonvifdiscovery provides the discovery service that wraps ONVIF integration for the viamrtsp module
-package viamonvifdiscovery
+// Package viamonvif provides the discovery service that wraps ONVIF integration for the viamrtsp module
+package viamonvif
 
 import (
 	"context"
@@ -66,5 +66,43 @@ func TestDiscoveryConfig(t *testing.T) {
 		deps, err := cfg.Validate("")
 		test.That(t, err.Error(), test.ShouldContainSubstring, "credential missing username, has password pass1")
 		test.That(t, deps, test.ShouldBeEmpty)
+	})
+}
+
+func TestGetCredFromExtra(t *testing.T) {
+	t.Run("Test good extra with User and Pass as strings", func(t *testing.T) {
+		extra := map[string]any{
+			"User": "user",
+			"Pass": "pass",
+		}
+		cred, ok := getCredFromExtra(extra)
+		test.That(t, cred.User, test.ShouldEqual, "user")
+		test.That(t, cred.Pass, test.ShouldEqual, "pass")
+		test.That(t, ok, test.ShouldBeTrue)
+	})
+	t.Run("Test good extra with no Pass", func(t *testing.T) {
+		extra := map[string]any{
+			"User": "user",
+		}
+		cred, ok := getCredFromExtra(extra)
+		test.That(t, cred.User, test.ShouldEqual, "user")
+		test.That(t, cred.Pass, test.ShouldEqual, "")
+		test.That(t, ok, test.ShouldBeTrue)
+	})
+	t.Run("Test bad extra with no strings", func(t *testing.T) {
+		extra := map[string]any{
+			"User": 1,
+			"Pass": true,
+		}
+		cred, ok := getCredFromExtra(extra)
+		test.That(t, cred.User, test.ShouldEqual, "")
+		test.That(t, cred.Pass, test.ShouldEqual, "")
+		test.That(t, ok, test.ShouldBeFalse)
+	})
+	t.Run("Test nil cred", func(t *testing.T) {
+		cred, ok := getCredFromExtra(nil)
+		test.That(t, cred.User, test.ShouldEqual, "")
+		test.That(t, cred.Pass, test.ShouldEqual, "")
+		test.That(t, ok, test.ShouldBeFalse)
 	})
 }
