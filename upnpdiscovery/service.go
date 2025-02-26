@@ -10,7 +10,6 @@ import (
 
 	"github.com/erh/viamupnp"
 	"github.com/viam-modules/viamrtsp"
-	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
@@ -19,9 +18,7 @@ import (
 
 // Model is the model for a rtsp discovery service.
 var (
-	Model             = viamrtsp.Family.WithModel("onvif")
-	errNoCamerasFound = errors.New("no cameras found, ensure cameras are working or check credentials")
-	emptyCred         = device.Credentials{}
+	Model = viamrtsp.Family.WithModel("upnp")
 )
 
 func init() {
