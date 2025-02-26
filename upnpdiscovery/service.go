@@ -113,7 +113,6 @@ func convertqueryConfigToDeviceQuery(queryCfgs []queryConfig) ([]viamupnp.Device
 // DiscoverResources discovers different rtsp cameras that use onvif.
 func (dis *upnpDiscovery) DiscoverResources(ctx context.Context, extra map[string]any) ([]resource.Config, error) {
 	cams := []resource.Config{}
-	dis.logger.Info(dis.endpointMap)
 
 	discoverQueries := dis.queries
 
@@ -135,7 +134,6 @@ func (dis *upnpDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 		endpoints, ok := dis.endpointMap[query]
 		// the query had no endpoints
 		if !ok {
-			dis.logger.Info("yo no endpoints")
 			camConfig, err := createCameraConfig(createCameraName(hostNum, -1, query), "rtsp://"+host)
 			if err != nil {
 				return nil, err
