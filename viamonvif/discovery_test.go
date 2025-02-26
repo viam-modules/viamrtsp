@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os/exec"
 	"testing"
+	"time"
 
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"github.com/viam-modules/viamrtsp/viamonvif/xsd/onvif"
@@ -173,6 +174,8 @@ func TestMDNSMapping(t *testing.T) {
 
 	err := mdnsServer.Add(nonSense, net.ParseIP("127.0.0.1"))
 	test.That(t, err, test.ShouldBeNil)
+
+	time.Sleep(10 * time.Second)
 
 	cmd = exec.Command("ping", "-c1", nonSenseWithLocal)
 	output, _ = cmd.CombinedOutput()
