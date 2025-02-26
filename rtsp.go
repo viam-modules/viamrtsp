@@ -186,7 +186,7 @@ type rtspCamera struct {
 
 	closeMu    sync.RWMutex
 	vsConfig   *videostore.Config
-	vs         videostore.H264RTPVideoStore
+	vs         videostore.RTPVideoStore
 	auMu       sync.Mutex
 	au         [][]byte
 	client     *gortsplib.Client
@@ -467,7 +467,9 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		rc.logger.Info("creating video-store from config")
 		ctx, cancel := context.WithTimeout(context.Background(), videoStoreInitCloseTimeout)
 		defer cancel()
-		vs, err := videostore.NewH264RTPVideoStore(ctx, *rc.vsConfig, rc.logger)
+		config := *rc.vsConfig
+		config.Type = videostore.SourceTypeH264RTPPacket
+		vs, err := videostore.NewRTPVideoStore(ctx, config, rc.logger)
 		if err != nil {
 			return err
 		}
@@ -495,13 +497,22 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 	}
 
 	if rc.vs != nil {
-		rc.logger.Info("video-store is not nil, attempting to call InitH264")
+		rc.logger.Info("video-store is not nil, attempting to call Init")
 		if len(f.SPS) != 0 && len(f.PPS) != 0 {
-			if err := rc.vs.InitH264(f.SPS, f.PPS); err != nil {
-				rc.logger.Errorf("videostore.InitH264 error: %s", err.Error())
+			extradata, err := videostore.BuildAVCExtradata(f.SPS, f.PPS)
+			if err != nil {
 				return err
 			}
-			rc.logger.Info("videostore.InitH264 succeeded")
+			var hsps h264.SPS
+			if err := hsps.Unmarshal(f.SPS); err != nil {
+				return err
+			}
+
+			if err := rc.vs.Init(hsps.Width(), hsps.Height(), extradata); err != nil {
+				rc.logger.Errorf("videostore.Init error: %s", err.Error())
+				return err
+			}
+			rc.logger.Info("videostore.Init succeeded")
 		} else {
 			rc.logger.Warnf("sps or pps not present so video-store is not initializes sps len: %d, pps len: %d", len(f.SPS), len(f.PPS))
 		}
@@ -650,11 +661,19 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		rc.logger.Warn("rtp_passthrough is only supported for H264 codec. rtp_passthrough features disabled due to H265 RTSP track")
 	}
 
-	if rc.vsConfig != nil {
-		rc.logger.Warn("video_store is only supported for H264 codec. video_store features disabled due to H265 RTSP track")
-	}
-
 	var f *format.H265
+	if rc.vsConfig != nil {
+		rc.logger.Info("creating video-store from config")
+		ctx, cancel := context.WithTimeout(context.Background(), videoStoreInitCloseTimeout)
+		defer cancel()
+		config := *rc.vsConfig
+		config.Type = videostore.SourceTypeH265RTPPacket
+		vs, err := videostore.NewRTPVideoStore(ctx, config, rc.logger)
+		if err != nil {
+			return err
+		}
+		rc.vs = vs
+	}
 
 	media := session.FindFormat(&f)
 	if media == nil {
@@ -697,26 +716,33 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		rc.logger.Warn("no PPS found in H265 format")
 	}
 
-	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
-	if err != nil {
-		return fmt.Errorf("when calling RTSP Setup on %s for H265: %w", session.BaseURL, err)
+	if rc.vs != nil {
+		rc.logger.Info("video-store is not nil, attempting to call Init")
+		if len(f.VPS) != 0 && len(f.SPS) != 0 && len(f.PPS) != 0 {
+			var hsps h265.SPS
+			if err := hsps.Unmarshal(f.SPS); err != nil {
+				return err
+			}
+
+			extradata := []byte{}
+			extradata = append(extradata, f.VPS...)
+			extradata = append(extradata, f.SPS...)
+			extradata = append(extradata, f.PPS...)
+
+			if err := rc.vs.Init(hsps.Width(), hsps.Height(), extradata); err != nil {
+				rc.logger.Errorf("videostore.Init error: %s", err.Error())
+				return err
+			}
+			rc.logger.Info("videostore.Init succeeded")
+		} else {
+			rc.logger.Warnf("vps, sps or pps not present so video-store is not initializes vps len: %d, sps len: %d, pps len: %d", len(f.VPS), len(f.SPS), len(f.PPS))
+		}
 	}
 
-	// On packet retreival, turn it into an image, and store it in shared memory
-	rc.client.OnPacketRTP(media, f, func(pkt *rtp.Packet) {
-		// Extract access units from RTP packets
-		au, err := rtpDec.Decode(pkt)
-		if err != nil {
-			if !errors.Is(err, rtph265.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph265.ErrMorePacketsNeeded) {
-				rc.logger.Debugw("error decoding(1) h265 rstp stream", "err", err.Error())
-			}
-			return
-		}
-
+	storeImage := func(au [][]byte) {
 		if rc.iframeOnlyDecode && !h265.IsRandomAccess(au) {
 			return
 		}
-
 		packedAU := packH265AUIntoNALU(au, rc.logger)
 		if rc.lazyDecode {
 			if h265.IsRandomAccess(au) {
@@ -727,7 +753,58 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		} else {
 			rc.storeH265Frame(packedAU)
 		}
-	})
+	}
+
+	var receivedFirstSegmentKeyframe bool
+	segmentPacket := func(au [][]byte, pts int64) {
+		// Video files must start with a keyframe. Wait for the first keyframe before starting to
+		// segment the video.
+		if !receivedFirstSegmentKeyframe {
+			if h265.IsRandomAccess(au) {
+				rc.logger.Debug("segmenter found first segment keyframe")
+				receivedFirstSegmentKeyframe = true
+			} else {
+				rc.logger.Debug("segmenter is waiting for first keyframe")
+				return
+			}
+		}
+		packed, err := h264.AnnexBMarshal(au)
+		if err != nil {
+			rc.logger.Errorf("AVCCMarshal err: %s", err.Error())
+			return
+		}
+		err = rc.vs.WritePacket(packed, pts, h265.IsRandomAccess(au))
+		if err != nil {
+			rc.logger.Errorf("error writing packet to segmenter: %s", err)
+		}
+	}
+
+	onPacketRTP := func(pkt *rtp.Packet) {
+		// we need to do this before calling Decode as apparently rtpDec.Decode mutates
+		// the packet such that one can't get the pts out after Decode is called
+		pts, havePTS := rc.client.PacketPTS2(media, pkt)
+
+		// Extract access units from RTP packets
+		au, err := rtpDec.Decode(pkt)
+		if err != nil {
+			if !errors.Is(err, rtph265.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph265.ErrMorePacketsNeeded) {
+				rc.logger.Debugw("error decoding(1) h265 rstp stream", "err", err.Error())
+			}
+			return
+		}
+		storeImage(au)
+		if havePTS {
+			segmentPacket(au, pts)
+		}
+	}
+
+	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
+	if err != nil {
+		return fmt.Errorf("when calling RTSP Setup on %s for H265: %w", session.BaseURL, err)
+	}
+
+	// On packet retreival, turn it into an image, and store it in shared memory
+	rc.client.OnPacketRTP(media, f, onPacketRTP)
 
 	return nil
 }
