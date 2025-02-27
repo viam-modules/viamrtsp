@@ -1149,7 +1149,6 @@ func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 	err = rc.reconnectClientWithFallbackTransports(codecInfo)
 	if err != nil {
 		logger.Error(err.Error())
-		cameraErrorCallback()
 		return nil, err
 	}
 
