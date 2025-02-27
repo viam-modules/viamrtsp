@@ -87,6 +87,14 @@ func init() {
 	}
 }
 
+var cameraErrorCallback func()
+
+// SetCameraErrorCallback may only be called prior to any cameras are instantiated. E.g: at program
+// initialization.
+func SetCameraErrorCallback(poke func()) {
+	cameraErrorCallback = poke
+}
+
 type videoStoreStorageConfig struct {
 	SizeGB      int    `json:"size_gb"`
 	UploadPath  string `json:"upload_path,omitempty"`
@@ -264,6 +272,7 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 			}
 
 			if badState {
+				cameraErrorCallback()
 				if err := rc.reconnectClientWithFallbackTransports(codecInfo); err != nil {
 					rc.logger.Warnf("cannot reconnect to rtsp server err: %s", err.Error())
 				} else {
@@ -1140,6 +1149,7 @@ func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 	err = rc.reconnectClientWithFallbackTransports(codecInfo)
 	if err != nil {
 		logger.Error(err.Error())
+		cameraErrorCallback()
 		return nil, err
 	}
 
