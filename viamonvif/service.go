@@ -6,6 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/viam-modules/viamrtsp"
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
@@ -51,7 +54,7 @@ type rtspDiscovery struct {
 	resource.Named
 	resource.AlwaysRebuild
 	Credentials []device.Credentials
-	mdnsServer  mdnsServer
+	mdnsServer  *mdnsServer
 	logger      logging.Logger
 }
 
@@ -63,11 +66,21 @@ func newDiscovery(_ context.Context, _ resource.Dependencies,
 	if err != nil {
 		return nil, err
 	}
+
 	dis := &rtspDiscovery{
 		Named:       conf.ResourceName().AsNamed(),
 		Credentials: append([]device.Credentials{emptyCred}, cfg.Credentials...),
-		mdnsServer:  newMDNSServer(logger.Sublogger("mdns")),
 		logger:      logger,
+	}
+
+	// viam-server sets this environment variable. The contents of this directory is expected to
+	// persist across process restarts and module upgrades.
+	moduleDataDir := os.Getenv("VIAM_MODULE_DATA")
+	if !strings.HasPrefix(moduleDataDir, "/") {
+		dis.mdnsServer = newMDNSServer(logger)
+	} else {
+		dis.mdnsServer = newMDNSServerFromCachedData(
+			filepath.Join(moduleDataDir, "mdns_cache.json"), logger.Sublogger("mdns"))
 	}
 
 	return dis, nil
@@ -104,7 +117,7 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 		// registered, `tryMDNS` will additionally mutate the `camInfo.RTSPURLs` to use the dns
 		// hostname rather than a raw IP. Such that the camera configs we are about to generate will
 		// use the dns hostname.
-		camInfo.tryMDNS(&dis.mdnsServer, dis.logger)
+		camInfo.tryMDNS(dis.mdnsServer, dis.logger)
 
 		camConfigs, err := createCamerasFromURLs(camInfo, dis.logger)
 		if err != nil {
@@ -112,6 +125,8 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 		}
 		cams = append(cams, camConfigs...)
 	}
+
+	dis.mdnsServer.UpdateCacheFile()
 
 	return cams, nil
 }
