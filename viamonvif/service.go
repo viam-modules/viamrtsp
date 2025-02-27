@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 
 	"github.com/viam-modules/viamrtsp"
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
@@ -18,6 +19,23 @@ import (
 	"go.viam.com/rdk/services/discovery"
 )
 
+var someDiscoveryServiceObj atomic.Pointer[rtspDiscovery]
+var someLoggerObj atomic.Pointer[logging.Logger]
+
+// poke looks to see if there is a discovery service running. If so, ask it to run discovery and
+// create any new mdns mappings. If there is no discovery service and* there happens to be an mdns
+// mapping cache file from a prior run, log a warning saying that discovery should be re-enabled.
+func poke() {
+	svc := someDiscoveryServiceObj.Load()
+	if svc == nil {
+		(*someLoggerObj.Load()).Warn("No discovery service")
+		return
+	} else {
+		(*someLoggerObj.Load()).Warn("Running discovery")
+		svc.DiscoverResources(context.Background(), nil)
+	}
+}
+
 // Model is the model for a rtsp discovery service.
 var (
 	Model             = viamrtsp.Family.WithModel("onvif")
@@ -26,6 +44,9 @@ var (
 )
 
 func init() {
+	initLogger := logging.NewLogger("viamrtsp")
+	someLoggerObj.Store(&initLogger)
+	viamrtsp.SetCameraErrorCallback(poke)
 	resource.RegisterService(
 		discovery.API,
 		Model,
@@ -62,6 +83,8 @@ func newDiscovery(_ context.Context, _ resource.Dependencies,
 	conf resource.Config,
 	logger logging.Logger,
 ) (discovery.Service, error) {
+	someLoggerObj.Store(&logger)
+
 	cfg, err := resource.NativeConfig[*Config](conf)
 	if err != nil {
 		return nil, err
@@ -82,6 +105,7 @@ func newDiscovery(_ context.Context, _ resource.Dependencies,
 		dis.mdnsServer = newMDNSServerFromCachedData(
 			filepath.Join(moduleDataDir, "mdns_cache.json"), logger.Sublogger("mdns"))
 	}
+	someDiscoveryServiceObj.Store(dis)
 
 	return dis, nil
 }
