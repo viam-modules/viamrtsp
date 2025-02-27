@@ -579,7 +579,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		}
 		packed, err := h264.AVCCMarshal(au)
 		if err != nil {
-			rc.logger.Errorf("AnnexBMarshal err: %s", err.Error())
+			rc.logger.Errorf("AVCCMarshal err: %s", err.Error())
 			return
 		}
 		err = rc.vs.WritePacket(packed, pts, h264.IDRPresent(au))
@@ -661,7 +661,14 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		rc.logger.Warn("rtp_passthrough is only supported for H264 codec. rtp_passthrough features disabled due to H265 RTSP track")
 	}
 
-	var f *format.H265
+	var (
+		f   *format.H265
+		vps []byte
+		sps []byte
+		pps []byte
+
+		dtsExtractor *h265.DTSExtractor2
+	)
 	if rc.vsConfig != nil {
 		rc.logger.Info("creating video-store from config")
 		ctx, cancel := context.WithTimeout(context.Background(), videoStoreInitCloseTimeout)
@@ -698,6 +705,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 	if f.VPS != nil {
 		//nolint:gosec
 		rc.rawDecoder.decode(f.VPS)
+		vps = f.VPS
 	} else {
 		rc.logger.Warn("no VPS found in H265 format")
 	}
@@ -705,6 +713,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 	if f.SPS != nil {
 		//nolint:gosec
 		rc.rawDecoder.decode(f.SPS)
+		sps = f.SPS
 	} else {
 		rc.logger.Warn("no SPS found in H265 format")
 	}
@@ -712,6 +721,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 	if f.PPS != nil {
 		//nolint:gosec
 		rc.rawDecoder.decode(f.PPS)
+		pps = f.PPS
 	} else {
 		rc.logger.Warn("no PPS found in H265 format")
 	}
@@ -755,30 +765,109 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		}
 	}
 
-	var receivedFirstSegmentKeyframe bool
+	// var receivedFirstSegmentKeyframe bool
 	segmentPacket := func(au [][]byte, pts int64) {
 		// Video files must start with a keyframe. Wait for the first keyframe before starting to
 		// segment the video.
-		if !receivedFirstSegmentKeyframe {
-			if h265.IsRandomAccess(au) {
-				rc.logger.Debug("segmenter found first segment keyframe")
-				receivedFirstSegmentKeyframe = true
-			} else {
-				rc.logger.Debug("segmenter is waiting for first keyframe")
-				return
+		// if !receivedFirstSegmentKeyframe {
+		// 	if h265.IsRandomAccess(au) {
+		// 		rc.logger.Debug("segmenter found first segment keyframe")
+		// 		receivedFirstSegmentKeyframe = true
+		// 	} else {
+		// 		rc.logger.Debug("segmenter is waiting for first keyframe")
+		// 		return
+		// 	}
+		// }
+
+		// rc.logger.Info("using AVCCMarshal")
+		// packed, err := h264.AVCCMarshal(au)
+		// if err != nil {
+		// 	rc.logger.Errorf("AVCCMarshal err: %s", err.Error())
+		// 	return
+		// }
+		// err = rc.vs.WritePacket(packed, pts, h265.IsRandomAccess(au))
+		// if err != nil {
+		// 	rc.logger.Errorf("error writing packet to segmenter: %s", err)
+		// }
+		// BEGIN
+		var filteredAU [][]byte
+
+		isRandomAccess := false
+
+		for _, nalu := range au {
+			typ := h265.NALUType((nalu[0] >> 1) & 0b111111)
+			switch typ {
+			case h265.NALUType_VPS_NUT:
+				vps = nalu
+				continue
+
+			case h265.NALUType_SPS_NUT:
+				sps = nalu
+				continue
+
+			case h265.NALUType_PPS_NUT:
+				pps = nalu
+				continue
+
+			case h265.NALUType_AUD_NUT:
+				continue
+
+			case h265.NALUType_IDR_W_RADL, h265.NALUType_IDR_N_LP, h265.NALUType_CRA_NUT:
+				isRandomAccess = true
 			}
+
+			filteredAU = append(filteredAU, nalu)
 		}
-		packed, err := h264.AnnexBMarshal(au)
-		if err != nil {
-			rc.logger.Errorf("AVCCMarshal err: %s", err.Error())
+
+		au = filteredAU
+
+		if au == nil {
 			return
 		}
-		err = rc.vs.WritePacket(packed, pts, h265.IsRandomAccess(au))
+
+		// add VPS, SPS and PPS before random access access unit
+		if isRandomAccess {
+			au = append([][]byte{vps, sps, pps}, au...)
+		}
+
+		if dtsExtractor == nil {
+			// skip samples silently until we find one with a IDR
+			if !isRandomAccess {
+				return
+			}
+			dtsExtractor = h265.NewDTSExtractor2()
+		}
+
+		dts, err := dtsExtractor.Extract(au, pts)
+		if err != nil {
+			rc.logger.Errorf("error extracting dts: %s", err)
+			return
+		}
+
+		if pts != dts {
+			panic("pts doesn't equal dts")
+		}
+
+		// prepend an AUD. This is required by video.js, iOS, QuickTime
+		if au[0][0] != byte(h264.NALUTypeAccessUnitDelimiter) {
+			au = append([][]byte{
+				{byte(h264.NALUTypeAccessUnitDelimiter), 240},
+			}, au...)
+		}
+
+		nalu, err := h264.AnnexBMarshal(au)
+		if err != nil {
+			panic(err)
+		}
+		err = rc.vs.WritePacket(nalu, pts, isRandomAccess)
 		if err != nil {
 			rc.logger.Errorf("error writing packet to segmenter: %s", err)
 		}
 	}
 
+	// begin
+
+	// end
 	onPacketRTP := func(pkt *rtp.Packet) {
 		// we need to do this before calling Decode as apparently rtpDec.Decode mutates
 		// the packet such that one can't get the pts out after Decode is called
@@ -1644,3 +1733,77 @@ func toFetchCommand(command map[string]interface{}) (*videostore.FetchRequest, e
 	}
 	return &videostore.FetchRequest{From: from, To: to}, nil
 }
+
+// type muxer struct {
+// 	vps []byte
+// 	sps []byte
+// 	pps []byte
+
+// 	dtsExtractor *h265.DTSExtractor2
+// }
+
+// // writeH265 writes a H265 access unit into MPEG-TS.
+// func (e *muxer) writeH265(au [][]byte, pts int64) error {
+// 	var filteredAU [][]byte
+
+// 	isRandomAccess := false
+
+// 	for _, nalu := range au {
+// 		typ := h265.NALUType((nalu[0] >> 1) & 0b111111)
+// 		switch typ {
+// 		case h265.NALUType_VPS_NUT:
+// 			e.vps = nalu
+// 			continue
+
+// 		case h265.NALUType_SPS_NUT:
+// 			e.sps = nalu
+// 			continue
+
+// 		case h265.NALUType_PPS_NUT:
+// 			e.pps = nalu
+// 			continue
+
+// 		case h265.NALUType_AUD_NUT:
+// 			continue
+
+// 		case h265.NALUType_IDR_W_RADL, h265.NALUType_IDR_N_LP, h265.NALUType_CRA_NUT:
+// 			isRandomAccess = true
+// 		}
+
+// 		filteredAU = append(filteredAU, nalu)
+// 	}
+
+// 	au = filteredAU
+
+// 	if au == nil {
+// 		return nil
+// 	}
+
+// 	// add VPS, SPS and PPS before random access access unit
+// 	if isRandomAccess {
+// 		au = append([][]byte{e.vps, e.sps, e.pps}, au...)
+// 	}
+
+// 	if e.dtsExtractor == nil {
+// 		// skip samples silently until we find one with a IDR
+// 		if !isRandomAccess {
+// 			return nil
+// 		}
+// 		e.dtsExtractor = h265.NewDTSExtractor2()
+// 	}
+
+// 	dts, err := e.dtsExtractor.Extract(au, pts)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	if pts != dts {
+// 		panic("pts doesn't equal dts")
+// 	}
+
+// 	// encode into MPEG-TS
+// 	err = rc.vs.WritePacket(au, pts, h265.IsRandomAccess(au))
+// 	if err != nil {
+// 		rc.logger.Errorf("error writing packet to segmenter: %s", err)
+// 	}
+// }
