@@ -238,11 +238,10 @@ func TestFileCaching(t *testing.T) {
 	slices.SortFunc(cachedDNSResults, func(left, right cachedEntry) int {
 		if left.DNSName < right.DNSName {
 			return -1
-		} else {
-			return 1
 		}
 
-		// Can't be equal -- omitting for brevity.
+		// Can't be equal -- omitting equality check for brevity.
+		return 1
 	})
 
 	// Leverage the sorting to safely assume the first entry represents `nonSenseOne`.

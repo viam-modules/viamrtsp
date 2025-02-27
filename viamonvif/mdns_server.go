@@ -144,7 +144,9 @@ func (server *mdnsServer) apply(newEntries []cachedEntry) {
 		}
 
 		server.logger.Debug("Adding DNS entry from cache file. DNSName:", entry.DNSName, "IP:", entry.IP)
-		server.Add(entry.DNSName, ip)
+		if err := server.Add(entry.DNSName, ip); err != nil {
+			server.logger.Warn("Error creating DNS entry. DNSName:", entry.DNSName, "IP:", entry.IP)
+		}
 	}
 }
 
