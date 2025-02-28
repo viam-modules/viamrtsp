@@ -9,6 +9,7 @@ require (
 	github.com/bluenviron/gortsplib/v4 v4.12.2
 	github.com/bluenviron/mediacommon v1.13.3
 	github.com/edaniels/golinters v0.0.5-0.20220906153528-641155550742
+	github.com/edaniels/zeroconf v1.0.10
 	github.com/elgs/gostrgen v0.0.0-20161222160715-9d61ae07eeae
 	github.com/erh/viamupnp v0.0.0-20241217142932-2fecf833407c
 	github.com/gofrs/uuid v4.2.0+incompatible
@@ -89,7 +90,6 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/edaniels/golog v0.0.0-20230215213219-28954395e8d0 // indirect
 	github.com/edaniels/lidario v0.0.0-20220607182921-5879aa7b96dd // indirect
-	github.com/edaniels/zeroconf v1.0.10 // indirect
 	github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5 // indirect
 	github.com/ettle/strcase v0.2.0 // indirect
 	github.com/fatih/camelcase v1.0.0 // indirect
