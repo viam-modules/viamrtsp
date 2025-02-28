@@ -112,6 +112,7 @@ type CameraInfo struct {
 	HardwareID      string   `json:"hardware_id"`
 
 	deviceIP net.IP
+	mdnsName string
 }
 
 // regex to remove non alpha numerics.
@@ -136,7 +137,7 @@ func (cam *CameraInfo) tryMDNS(mdnsServer *mdnsServer, logger logging.Logger) {
 	// Clean the serial number to be dns compatible.
 	cleanedSerialNumber := strToHostName(cam.SerialNumber)
 	// Generate full .local hostname for the device.
-	derivedHostname := fmt.Sprintf("%v.local", cleanedSerialNumber)
+	cam.mdnsName = fmt.Sprintf("%v.local", cleanedSerialNumber)
 
 	// The mdns server expects a hostname without* the `.local` TLD suffix.
 	if err := mdnsServer.Add(cleanedSerialNumber, cam.deviceIP); err != nil {
@@ -150,7 +151,7 @@ func (cam *CameraInfo) tryMDNS(mdnsServer *mdnsServer, logger logging.Logger) {
 	// logical dns hostname rather than a raw IP.
 	for idx := range cam.RTSPURLs {
 		if strings.Contains(cam.RTSPURLs[idx], cam.deviceIP.String()) {
-			cam.RTSPURLs[idx] = strings.Replace(cam.RTSPURLs[idx], cam.deviceIP.String(), derivedHostname, 1)
+			cam.RTSPURLs[idx] = strings.Replace(cam.RTSPURLs[idx], cam.deviceIP.String(), cam.mdnsName, 1)
 			wasIPFound = true
 		} else {
 			logger.Debugf("RTSP URL did not contain expected hostname. URL: %v HostName: %v",
@@ -166,6 +167,10 @@ func (cam *CameraInfo) tryMDNS(mdnsServer *mdnsServer, logger logging.Logger) {
 		// a case where none of the URLs contained an IP that matches where the response came from.
 		mdnsServer.Remove(cleanedSerialNumber)
 	}
+}
+
+func (cam *CameraInfo) URLDependsOnMDNS(idx int) bool {
+	return strings.Contains(cam.RTSPURLs[idx], cam.mdnsName)
 }
 
 // CameraInfoList is a struct containing a list of CameraInfo structs.
