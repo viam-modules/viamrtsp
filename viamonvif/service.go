@@ -62,7 +62,6 @@ func newDiscovery(_ context.Context, _ resource.Dependencies,
 	conf resource.Config,
 	logger logging.Logger,
 ) (discovery.Service, error) {
-
 	cfg, err := resource.NativeConfig[*Config](conf)
 	if err != nil {
 		return nil, err
@@ -141,6 +140,10 @@ func createCamerasFromURLs(l CameraInfo, discoveryDependencyName string, logger 
 	cams := []resource.Config{}
 	for index, u := range l.RTSPURLs {
 		logger.Debugf("camera URL:\t%s", u)
+
+		// Some URLs may contain a hostname that is served by the DiscoveryService's mDNS
+		// server. For those that are, we create a config where the dependency is explicitly written
+		// down.
 		discDep := ""
 		if l.URLDependsOnMDNS(index) {
 			discDep = discoveryDependencyName
