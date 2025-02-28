@@ -362,7 +362,9 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib
 		if !clientSuccessful {
 			if rc.discoverySvc != nil {
 				rc.logger.Debug("Running discovery to update IP addresses.")
-				rc.discoverySvc.DiscoverResources(rc.cancelCtx, nil)
+				if _, err := rc.discoverySvc.DiscoverResources(rc.cancelCtx, nil); err != nil {
+					rc.logger.Debug("Error discovering resources to update IP addresses:", err)
+				}
 			}
 			rc.closeConnection()
 		}

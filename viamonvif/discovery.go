@@ -169,7 +169,7 @@ func (cam *CameraInfo) tryMDNS(mdnsServer *mdnsServer, logger logging.Logger) {
 	}
 }
 
-func (cam *CameraInfo) URLDependsOnMDNS(idx int) bool {
+func (cam *CameraInfo) urlDependsOnMDNS(idx int) bool {
 	return strings.Contains(cam.RTSPURLs[idx], cam.mdnsName)
 }
 
