@@ -145,7 +145,7 @@ func createCamerasFromURLs(l CameraInfo, discoveryDependencyName string, logger 
 		// server. For those that are, we create a config where the dependency is explicitly written
 		// down.
 		discDep := ""
-		if l.URLDependsOnMDNS(index) {
+		if l.urlDependsOnMDNS(index) {
 			discDep = discoveryDependencyName
 		}
 
