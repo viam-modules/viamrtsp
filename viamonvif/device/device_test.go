@@ -161,7 +161,7 @@ func TestTLSVerificationConfig(t *testing.T) {
 				}
 
 				if dev.params.HTTPClient == nil {
-					// Use our tc's isLocal value instead of calling actual isLocalIPAddress function
+					// Use our tc's isLocal value instead of calling actual func
 					skipVerify := params.SkipLocalTLSVerification && tc.isLocal
 					transport := &http.Transport{
 						TLSClientConfig: &tls.Config{
