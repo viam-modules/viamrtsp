@@ -27,9 +27,7 @@ func TestSendSoapNoHang(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// For GetCapabilities request during initialization, we must return a valid response
 			body, err := readBody(r)
-			if err != nil {
-				t.Fatalf("failed to read body: %v", err)
-			}
+			test.That(t, err, test.ShouldBeNil)
 			if strings.Contains(r.Header.Get("Content-Type"), "soap") &&
 				strings.Contains(body, "GetCapabilities") {
 				w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
@@ -192,6 +190,72 @@ func TestTLSVerificationConfig(t *testing.T) {
 			test.That(t, ok, test.ShouldBeTrue)
 
 			test.That(t, transport.TLSClientConfig.InsecureSkipVerify, test.ShouldEqual, tc.expectSkipVerify)
+		})
+	}
+}
+
+func TestDeviceFlowWithTLSServer(t *testing.T) {
+	testCases := []struct {
+		name                     string
+		skipLocalTLSVerification bool
+		expectError              bool
+	}{
+		{
+			name:                     "TLS local IP, skip enabled",
+			skipLocalTLSVerification: true,
+			expectError:              false,
+		},
+		{
+			name:                     "TLS local IP, skip disabled",
+			skipLocalTLSVerification: false,
+			expectError:              true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a TLS server that uses a self-signed certificate.
+			// The server replies with a valid SOAP response to a GetCapabilities request.
+			tlsServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				body, err := readBody(r)
+				test.That(t, err, test.ShouldBeNil)
+
+				if strings.Contains(r.Header.Get("Content-Type"), "soap") &&
+					strings.Contains(body, "GetCapabilities") {
+					w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+						<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+							<SOAP-ENV:Body>
+								<GetCapabilitiesResponse>
+									<Capabilities>
+										<Media>
+											<XAddr>http://example.com/onvif/media</XAddr>
+										</Media>
+									</Capabilities>
+								</GetCapabilitiesResponse>
+							</SOAP-ENV:Body>
+						</SOAP-ENV:Envelope>`))
+				}
+			}))
+			defer tlsServer.Close()
+
+			u, err := url.Parse(tlsServer.URL)
+			test.That(t, err, test.ShouldBeNil)
+
+			ctx := context.Background()
+			logger := logging.NewTestLogger(t)
+			params := Params{
+				Xaddr:                    u,
+				SkipLocalTLSVerification: tc.skipLocalTLSVerification,
+			}
+
+			_, err = NewDevice(ctx, params, logger)
+
+			if tc.expectError {
+				test.That(t, err, test.ShouldNotBeNil)
+				test.That(t, strings.Contains(err.Error(), "x509:"), test.ShouldBeTrue)
+			} else {
+				test.That(t, err, test.ShouldBeNil)
+			}
 		})
 	}
 }
