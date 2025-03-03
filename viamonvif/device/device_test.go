@@ -17,47 +17,6 @@ import (
 	"go.viam.com/test"
 )
 
-func TestIsLocalIPAddress(t *testing.T) {
-	testCases := []struct {
-		hostname string
-		expected bool
-	}{
-		// Loopback addresses
-		{"localhost", true},
-		{"127.0.0.1", true},
-		{"::1", true},
-
-		// Private IPv4 ranges
-		{"10.0.0.1", true},
-		{"10.255.255.255", true},
-		{"172.16.0.1", true},
-		{"172.31.255.255", true},
-		{"192.168.0.1", true},
-		{"192.168.255.255", true},
-
-		// IPv6 ULA
-		{"fc00::1", true},
-		{"fd00::1", true},
-
-		// Public addresses
-		{"8.8.8.8", false},
-		{"203.0.113.1", false},
-		{"2001:db8::1", false},
-
-		// Invalid addresses
-		{"", false},
-		{"not-an-ip", false},
-		{"999.999.999.999", false},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.hostname, func(t *testing.T) {
-			result := isLocalIPAddress(tc.hostname)
-			test.That(t, result, test.ShouldEqual, tc.expected)
-		})
-	}
-}
-
 func TestSendSoapNoHang(t *testing.T) {
 	logger := logging.NewTestLogger(t)
 

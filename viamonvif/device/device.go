@@ -13,8 +13,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strings"
 
@@ -92,50 +92,7 @@ type GetCapabilities struct {
 	Category onvif.CapabilityCategory `xml:"tds:Category"`
 }
 
-func isLocalIPAddress(hostname string) bool {
-	hostname = strings.TrimSpace(hostname)
-
-	if hostname == "localhost" {
-		return true
-	}
-
-	ip := net.ParseIP(hostname)
-	if ip == nil {
-		return false
-	}
-
-	if ip.IsLoopback() {
-		return true
-	}
-
-	// IPv4 private addresses.
-	if ip4 := ip.To4(); ip4 != nil {
-		// 10 prefixed addresses e.g. 10.0.0.0/8.
-		if ip4[0] == 10 { //nolint:mnd
-			return true
-		}
-		// 172.16.0.0/12.
-		if ip4[0] == 172 && ip4[1] >= 16 && ip4[1] <= 31 {
-			return true
-		}
-		// 192.168.0.0/16.
-		if ip4[0] == 192 && ip4[1] == 168 {
-			return true
-		}
-	}
-
-	// IPv6 unique local addresses (fc00::/7).
-	if ip.To16() != nil && ip.To4() == nil {
-		// ULA addresses start with fc or fd.
-		if ip[0]&0xfe == 0xfc { //nolint:mnd
-			return true
-		}
-	}
-
-	return false
-}
-
-// NewDevice function construct a ONVIF Device entity.
+// NewDevice construct an ONVIF Device entity.
 func NewDevice(ctx context.Context, params Params, logger logging.Logger) (*Device, error) {
 	dev := &Device{
 		xaddr:     params.Xaddr,
@@ -145,7 +102,11 @@ func NewDevice(ctx context.Context, params Params, logger logging.Logger) (*Devi
 	}
 
 	if dev.params.HTTPClient == nil {
-		skipVerify := params.SkipLocalTLSVerification && isLocalIPAddress(params.Xaddr.Hostname())
+		var skipVerify bool
+		if params.SkipLocalTLSVerification {
+			ip := netip.MustParseAddr(params.Xaddr.Hostname())
+			skipVerify = ip.IsPrivate() || ip.IsLoopback()
+		}
 		transport := &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: skipVerify, //nolint:gosec
