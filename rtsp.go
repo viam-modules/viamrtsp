@@ -184,9 +184,8 @@ type rtspCamera struct {
 	lazyDecode       bool
 	iframeOnlyDecode bool
 
-	closeMu  sync.RWMutex
-	vsConfig *videostore.Config
-	// vs         videostore.RTPVideoStore
+	closeMu         sync.RWMutex
+	vsConfig        *videostore.Config
 	videoStoreMuxer *videoStoreMuxer
 	auMu            sync.Mutex
 	au              [][]byte
@@ -288,11 +287,7 @@ func (rc *rtspCamera) closeConnection() {
 	}
 
 	if rc.videoStoreMuxer != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), videoStoreInitCloseTimeout)
-		defer cancel()
-		if err := rc.videoStoreMuxer.Close(ctx); err != nil {
-			rc.logger.Errorf("videostore.Close error: %s", err.Error())
-		}
+		rc.videoStoreMuxer.CloseVideoStore()
 		rc.videoStoreMuxer = nil
 	}
 }
@@ -485,7 +480,6 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 	}
 
 	if rc.vsConfig != nil {
-		rc.logger.Info("creating video-store from config")
 		config := *rc.vsConfig
 		config.Type = videostore.SourceTypeH264RTPPacket
 		vs, err := videostore.NewRTPVideoStore(config, rc.logger)
@@ -493,11 +487,11 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 			return err
 		}
 		rc.videoStoreMuxer = &videoStoreMuxer{
-			SourceType: config.Type,
-			vs:         vs,
-			sps:        f.SPS,
-			pps:        f.PPS,
-			logger:     rc.logger,
+			Config: config,
+			vs:     vs,
+			sps:    f.SPS,
+			pps:    f.PPS,
+			logger: rc.logger,
 		}
 	}
 
@@ -662,15 +656,12 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 			return err
 		}
 		rc.videoStoreMuxer = &videoStoreMuxer{
-			SourceType: config.Type,
-			vs:         vs,
-			vps:        f.VPS,
-			sps:        f.SPS,
-			pps:        f.PPS,
-			logger:     rc.logger,
-		}
-		if err := rc.videoStoreMuxer.initVideoStore(); err == nil {
-			rc.logger.Info("videostore.Init succeeded")
+			Config: config,
+			vs:     vs,
+			vps:    f.VPS,
+			sps:    f.SPS,
+			pps:    f.PPS,
+			logger: rc.logger,
 		}
 	}
 
@@ -1563,19 +1554,26 @@ type extractor interface {
 }
 
 type videoStoreMuxer struct {
-	videostore.SourceType
-	vs           videostore.RTPVideoStore
-	initialized  bool
+	videostore.Config
+	width        int
+	height       int
 	vps          []byte
 	sps          []byte
 	pps          []byte
 	dtsExtractor extractor
+	spsUnChanged bool
+	mu           sync.Mutex
+	vs           videostore.RTPVideoStore
 	logger       logging.Logger
 }
 
-func (e *videoStoreMuxer) initVideoStore() error {
-	var height, width int
-	switch e.SourceType {
+// maybeReInitVideoStore assumes mu is held by caller.
+func (e *videoStoreMuxer) maybeReInitVideoStore() error {
+	if e.spsUnChanged {
+		return nil
+	}
+	var width, height int
+	switch e.Config.Type {
 	case videostore.SourceTypeH265RTPPacket:
 		var hsps h265.SPS
 		if err := hsps.Unmarshal(e.sps); err != nil {
@@ -1596,10 +1594,37 @@ func (e *videoStoreMuxer) initVideoStore() error {
 		return errors.New("invalid videostore.SourceType")
 	}
 
-	if err := e.vs.Init(width, height); err != nil {
+	if width <= 0 || height <= 0 {
+		return errors.New("width and height must both be greater than 0")
+	}
+	// if vs is initialized and the height & width have not changed,
+	// record the sps as unchanged and return
+	if e.vs != nil && e.width == width && e.height == height {
+		e.spsUnChanged = true
+		return nil
+	}
+
+	// if initialized and the height & width have changed,
+	// close and nil out the videostore
+	if e.vs != nil {
+		e.vs.Close()
+		e.vs = nil
+	}
+
+	// if we don't have a video-store we should attempt to initialize one
+	vs, err := videostore.NewRTPVideoStore(e.Config, e.logger)
+	if err != nil {
 		return err
 	}
-	e.initialized = true
+
+	if err := vs.Init(width, height); err != nil {
+		return err
+	}
+
+	e.width = width
+	e.height = height
+	e.vs = vs
+	e.spsUnChanged = true
 	return nil
 }
 
@@ -1607,6 +1632,9 @@ func (e *videoStoreMuxer) writeH265(au [][]byte, pts int64) {
 	if e == nil {
 		return
 	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
 	var filteredAU [][]byte
 
 	isRandomAccess := false
@@ -1621,6 +1649,7 @@ func (e *videoStoreMuxer) writeH265(au [][]byte, pts int64) {
 
 		case h265.NALUType_SPS_NUT:
 			e.sps = nalu
+			e.spsUnChanged = false
 			continue
 
 		case h265.NALUType_PPS_NUT:
@@ -1672,11 +1701,9 @@ func (e *videoStoreMuxer) writeH265(au [][]byte, pts int64) {
 		return
 	}
 
-	if !e.initialized {
-		if err := e.initVideoStore(); err != nil {
-			e.logger.Debugf("unable to init video store: %s", err.Error())
-			return
-		}
+	if err := e.maybeReInitVideoStore(); err != nil {
+		e.logger.Debugf("unable to init video store: %s", err.Error())
+		return
 	}
 
 	// add VPS, SPS and PPS before random access au
@@ -1698,14 +1725,6 @@ func (e *videoStoreMuxer) writeH265(au [][]byte, pts int64) {
 		return
 	}
 
-	// prepend an AUD. This is required by video.js, iOS, QuickTime
-	// TODO: Do we need this?
-	// if au[0][0] != byte(h264.NALUTypeAccessUnitDelimiter) {
-	// 	au = append([][]byte{
-	// 		{byte(h264.NALUTypeAccessUnitDelimiter), 240},
-	// 	}, au...)
-	// }
-
 	// h265 uses the same annexb format as h264
 	nalu, err := h264.AnnexBMarshal(au)
 	if err != nil {
@@ -1723,7 +1742,8 @@ func (e *videoStoreMuxer) writeH264(au [][]byte, pts int64) {
 	if e == nil {
 		return
 	}
-	//  BEGIN
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	var filteredAU [][]byte
 	nonIDRPresent := false
 	idrPresent := false
@@ -1734,6 +1754,7 @@ func (e *videoStoreMuxer) writeH264(au [][]byte, pts int64) {
 		switch typ {
 		case h264.NALUTypeSPS:
 			e.sps = nalu
+			e.spsUnChanged = false
 			continue
 
 		case h264.NALUTypePPS:
@@ -1779,15 +1800,13 @@ func (e *videoStoreMuxer) writeH264(au [][]byte, pts int64) {
 
 	au = filteredAU
 
-	if au == nil || (!nonIDRPresent && !idrPresent) || e.sps == nil {
+	if au == nil || (!nonIDRPresent && !idrPresent) {
 		return
 	}
 
-	if !e.initialized {
-		if err := e.initVideoStore(); err != nil {
-			e.logger.Debugf("unable to init video store: %s", err.Error())
-			return
-		}
+	if err := e.maybeReInitVideoStore(); err != nil {
+		e.logger.Debugf("unable to init video store: %s", err.Error())
+		return
 	}
 
 	// add SPS and PPS before access unit that contains an IDR
@@ -1820,13 +1839,28 @@ func (e *videoStoreMuxer) writeH264(au [][]byte, pts int64) {
 }
 
 func (e *videoStoreMuxer) Save(ctx context.Context, r *videostore.SaveRequest) (*videostore.SaveResponse, error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.vs == nil {
+		return nil, errors.New("video-store uninitialized")
+	}
 	return e.vs.Save(ctx, r)
 }
 
 func (e *videoStoreMuxer) Fetch(ctx context.Context, r *videostore.FetchRequest) (*videostore.FetchResponse, error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.vs == nil {
+		return nil, errors.New("video-store uninitialized")
+	}
 	return e.vs.Fetch(ctx, r)
 }
 
-func (e *videoStoreMuxer) Close(ctx context.Context) error {
-	return e.vs.Close(ctx)
+func (e *videoStoreMuxer) CloseVideoStore() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.vs == nil {
+		return
+	}
+	e.vs.Close()
 }
