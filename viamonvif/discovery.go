@@ -195,9 +195,10 @@ func DiscoverCameraInfo(
 		}
 		// This calls GetCapabilities
 		dev, err := device.NewDevice(ctx, device.Params{
-			Xaddr:    xaddr,
-			Username: cred.User,
-			Password: cred.Pass,
+			Xaddr:                    xaddr,
+			Username:                 cred.User,
+			Password:                 cred.Pass,
+			SkipLocalTLSVerification: true,
 		}, logger)
 		if err != nil {
 			logger.Debugf("Failed to get camera capabilities from %s: %v", xaddr, err)

@@ -8,11 +8,13 @@ package device
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strings"
 
@@ -62,6 +64,9 @@ type Params struct {
 	Username   string
 	Password   string
 	HTTPClient *http.Client
+	// SkipLocalTLSVerification controls whether TLS certificate verification is skipped for local IP addresses.
+	// This is necessary for cameras with self-signed certificates.
+	SkipLocalTLSVerification bool
 }
 
 // GetProfiles is a request to the GetProfiles onvif endpoint.
@@ -87,7 +92,7 @@ type GetCapabilities struct {
 	Category onvif.CapabilityCategory `xml:"tds:Category"`
 }
 
-// NewDevice function construct a ONVIF Device entity.
+// NewDevice construct an ONVIF Device entity.
 func NewDevice(ctx context.Context, params Params, logger logging.Logger) (*Device, error) {
 	dev := &Device{
 		xaddr:     params.Xaddr,
@@ -97,7 +102,27 @@ func NewDevice(ctx context.Context, params Params, logger logging.Logger) (*Devi
 	}
 
 	if dev.params.HTTPClient == nil {
-		dev.params.HTTPClient = new(http.Client)
+		var skipVerify bool
+		if params.SkipLocalTLSVerification {
+			ip, err := netip.ParseAddr(params.Xaddr.Hostname())
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse xaddr hostname %s: %w", params.Xaddr.Hostname(), err)
+			}
+			skipVerify = ip.IsPrivate() || ip.IsLoopback()
+		}
+		transport := &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: skipVerify, //nolint:gosec
+			},
+		}
+		dev.params.HTTPClient = &http.Client{
+			Transport: transport,
+		}
+
+		if skipVerify {
+			logger.Infof("TLS certificate verification disabled for local IP address: %s.",
+				params.Xaddr.Hostname())
+		}
 	}
 
 	data, err := dev.callDevice(ctx, GetCapabilities{Category: "All"})
