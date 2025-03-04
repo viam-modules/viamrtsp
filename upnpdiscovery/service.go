@@ -34,8 +34,10 @@ func init() {
 
 // Config is the config for the discovery service.
 type Config struct {
-	Queries     []queryConfig `json:"queries,omitempty"`
-	UseRootOnly bool          `json:"root_only_search"`
+	Queries []queryConfig `json:"queries,omitempty"`
+	// UseRootOnly = false will search all services on a network, rather than just the root services.
+	// setting this to true is useful when you already know what services/endpoints you wish to use from a device.
+	UseRootOnly bool `json:"root_only_search"`
 }
 
 type queryConfig struct {
