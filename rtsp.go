@@ -648,7 +648,6 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 	}
 
 	if rc.vsConfig != nil {
-		rc.logger.Info("creating video-store from config")
 		config := *rc.vsConfig
 		config.Type = videostore.SourceTypeH265RTPPacket
 		vs, err := videostore.NewRTPVideoStore(config, rc.logger)
