@@ -86,6 +86,41 @@ func TestRTSPCamera(t *testing.T) {
 			test.That(t, im.Bounds(), test.ShouldResemble, image.Rect(0, 0, 480, 270))
 		})
 
+		t.Run("AvFramePool", func(t *testing.T) {
+			h, closeFunc := newH264ServerHandler(t, forma, bURL, logger)
+			defer closeFunc()
+			test.That(t, h.s.Start(), test.ShouldBeNil)
+			timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
+			defer timeoutCancel()
+			config := resource.NewEmptyConfig(camera.Named("foo"), ModelAgnostic)
+			config.ConvertedAttributes = &Config{Address: "rtsp://" + h.s.RTSPAddress + "/stream1"}
+			rtspCam, err := NewRTSPCamera(timeoutCtx, nil, config, logger)
+			test.That(t, err, test.ShouldBeNil)
+			defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
+			imageTimeoutCtx, imageTimeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
+			defer imageTimeoutCancel()
+			// Fetch images while allowing the pool to grow and shrink as needed.
+			imgCount := 0
+			for imageTimeoutCtx.Err() == nil {
+				time.Sleep(100 * time.Millisecond)
+				img, err := camera.DecodeImageFromCamera(imageTimeoutCtx, rutils.MimeTypeJPEG, nil, rtspCam)
+				if err != nil {
+					continue
+				}
+				if img != nil {
+					imgCount++
+				}
+				if imgCount == 30 {
+					break
+				}
+			}
+			// Test that we put as many frames as we received back into the pool.
+			rtspCam.Close(timeoutCtx)
+			test.That(t, imageTimeoutCtx.Err(), test.ShouldBeNil)
+			totalPoolFramesSeen := rtspCam.(*rtspCamera).avFramePool.newCount + rtspCam.(*rtspCamera).avFramePool.getCount
+			test.That(t, rtspCam.(*rtspCamera).avFramePool.putCount, test.ShouldEqual, totalPoolFramesSeen)
+		})
+
 		t.Run("SubscribeRTP", func(t *testing.T) {
 			t.Run("RTPPassthrough config variations", func(t *testing.T) {
 				cases := []struct {
