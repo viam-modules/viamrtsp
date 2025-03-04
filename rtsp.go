@@ -35,6 +35,7 @@ import (
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/pointcloud"
 	"go.viam.com/rdk/resource"
+	"go.viam.com/rdk/services/discovery"
 	rutils "go.viam.com/rdk/utils"
 	"go.viam.com/utils"
 )
@@ -104,8 +105,9 @@ type Config struct {
 	LazyDecode       bool   `json:"lazy_decode,omitempty"`
 	IframeOnlyDecode bool   `json:"i_frame_only_decode,omitempty"`
 	// TODO: remove query & UPNP_DISCOVER logic
-	Query      viamupnp.DeviceQuery `json:"query,omitempty"`
-	VideoStore *videoStoreConfig    `json:"video_store,omitempty"`
+	Query        viamupnp.DeviceQuery `json:"query,omitempty"`
+	VideoStore   *videoStoreConfig    `json:"video_store,omitempty"`
+	DiscoveryDep string               `json:"discovery_dep,omitempty"`
 }
 
 // CodecFormat contains a pointer to a format and the corresponding FFmpeg codec.
@@ -136,7 +138,12 @@ func (conf *Config) Validate(path string) ([]string, error) {
 		}
 	}
 
-	return nil, nil
+	var deps []string
+	if conf.DiscoveryDep != "" {
+		deps = []string{conf.DiscoveryDep}
+	}
+
+	return deps, nil
 }
 
 func (conf *Config) parseAndFixAddress(ctx context.Context, logger logging.Logger) (*base.URL, error) {
@@ -222,6 +229,8 @@ type rtspCamera struct {
 
 	subsMu       sync.RWMutex
 	bufAndCBByID map[rtppassthrough.SubscriptionID]bufAndCB
+
+	discoverySvc discovery.Service
 
 	name resource.Name
 }
@@ -353,6 +362,12 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib
 	var clientSuccessful bool
 	defer func() {
 		if !clientSuccessful {
+			if rc.discoverySvc != nil {
+				rc.logger.Debug("Running discovery to update IP addresses.")
+				if _, err := rc.discoverySvc.DiscoverResources(rc.cancelCtx, nil); err != nil {
+					rc.logger.Debug("Error discovering resources to update IP addresses:", err)
+				}
+			}
 			rc.closeConnection()
 		}
 	}()
@@ -1074,7 +1089,7 @@ func (rc *rtspCamera) Unsubscribe(_ context.Context, id rtppassthrough.Subscript
 }
 
 // NewRTSPCamera creates a new rtsp camera from the config, that has to have a viamrtsp.Config.
-func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.Config, logger logging.Logger) (camera.Camera, error) {
+func NewRTSPCamera(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger logging.Logger) (camera.Camera, error) {
 	if logger.Level() != zapcore.DebugLevel {
 		logger.Info("suppressing non fatal libav errors / warnings due to false positives. to unsuppress, set module log_level to 'debug'")
 		SetLibAVLogLevelFatal()
@@ -1089,6 +1104,17 @@ func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 	if err != nil {
 		logger.Error(err.Error())
 		return nil, err
+	}
+
+	var discSvc discovery.Service
+	if newConf.DiscoveryDep != "" {
+		// Some camera configs may rely on an mDNS server running that is managed by the (viamrtsp)
+		// discovery service.
+		discSvc, err = discovery.FromDependencies(deps, newConf.DiscoveryDep)
+		if err != nil {
+			logger.Error("Error finding discovery service dependency:", err)
+			return nil, err
+		}
 	}
 
 	framePool := newFramePool(initialFramePoolSize, logger)
@@ -1118,6 +1144,7 @@ func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 	}
 
 	rtpPassthroughCtx, rtpPassthroughCancelCauseFn := context.WithCancelCause(context.Background())
+	cancelCtx, cancel := context.WithCancel(context.Background())
 	rc := &rtspCamera{
 		model:                       conf.Model,
 		lazyDecode:                  newConf.LazyDecode,
@@ -1131,6 +1158,9 @@ func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		rtpPassthroughCancelCauseFn: rtpPassthroughCancelCauseFn,
 		avFramePool:                 framePool,
 		mimeHandler:                 mimeHandler,
+		discoverySvc:                discSvc,
+		cancelCtx:                   cancelCtx,
+		cancelFunc:                  cancel,
 		logger:                      logger,
 	}
 	codecInfo, err := modelToCodec(conf.Model)
@@ -1145,9 +1175,6 @@ func NewRTSPCamera(ctx context.Context, _ resource.Dependencies, conf resource.C
 		return nil, err
 	}
 
-	cancelCtx, cancel := context.WithCancel(context.Background())
-	rc.cancelCtx = cancelCtx
-	rc.cancelFunc = cancel
 	rc.clientReconnectBackgroundWorker(codecInfo)
 
 	return rc, nil
