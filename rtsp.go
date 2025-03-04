@@ -1730,7 +1730,6 @@ func (e *videoStoreMuxer) writeH265(au [][]byte, pts int64) {
 		e.logger.Errorf("failed to marshal annex b: %s", err)
 		return
 	}
-	// TODO: Take dts as input
 	err = e.vs.WritePacket(nalu, pts, dts, isRandomAccess)
 	if err != nil {
 		e.logger.Errorf("error writing packet to segmenter: %s", err)
