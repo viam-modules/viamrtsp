@@ -191,13 +191,13 @@ type rtspCamera struct {
 	lazyDecode       bool
 	iframeOnlyDecode bool
 
-	closeMu    sync.RWMutex
-	vsConfig   *videostore.Config
-	vs         videostore.H264RTPVideoStore
-	auMu       sync.Mutex
-	au         [][]byte
-	client     *gortsplib.Client
-	rawDecoder *decoder
+	closeMu         sync.RWMutex
+	vsConfig        *videostore.Config
+	videoStoreMuxer *videoStoreMuxer
+	auMu            sync.Mutex
+	au              [][]byte
+	client          *gortsplib.Client
+	rawDecoder      *decoder
 
 	cancelCtx  context.Context
 	cancelFunc context.CancelFunc
@@ -295,13 +295,9 @@ func (rc *rtspCamera) closeConnection() {
 		rc.rawDecoder = nil
 	}
 
-	if rc.vs != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), videoStoreInitCloseTimeout)
-		defer cancel()
-		if err := rc.vs.Close(ctx); err != nil {
-			rc.logger.Errorf("videostore.Close error: %s", err.Error())
-		}
-		rc.vs = nil
+	if rc.videoStoreMuxer != nil {
+		rc.videoStoreMuxer.CloseVideoStore()
+		rc.videoStoreMuxer = nil
 	}
 }
 
@@ -477,17 +473,6 @@ func (rc *rtspCamera) appendLazyAU(au [][]byte) {
 func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 	// setup RTP/H264 -> H264 decoder
 	var f *format.H264
-
-	if rc.vsConfig != nil {
-		rc.logger.Info("creating video-store from config")
-		ctx, cancel := context.WithTimeout(context.Background(), videoStoreInitCloseTimeout)
-		defer cancel()
-		vs, err := videostore.NewH264RTPVideoStore(ctx, *rc.vsConfig, rc.logger)
-		if err != nil {
-			return err
-		}
-		rc.vs = vs
-	}
 	media := session.FindFormat(&f)
 	if media == nil {
 		rc.logger.Warn("tracks available")
@@ -509,16 +494,19 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		return fmt.Errorf("creating H264 raw decoder: %w", err)
 	}
 
-	if rc.vs != nil {
-		rc.logger.Info("video-store is not nil, attempting to call InitH264")
-		if len(f.SPS) != 0 && len(f.PPS) != 0 {
-			if err := rc.vs.InitH264(f.SPS, f.PPS); err != nil {
-				rc.logger.Errorf("videostore.InitH264 error: %s", err.Error())
-				return err
-			}
-			rc.logger.Info("videostore.InitH264 succeeded")
-		} else {
-			rc.logger.Warnf("sps or pps not present so video-store is not initializes sps len: %d, pps len: %d", len(f.SPS), len(f.PPS))
+	if rc.vsConfig != nil {
+		config := *rc.vsConfig
+		config.Type = videostore.SourceTypeH264RTPPacket
+		vs, err := videostore.NewRTPVideoStore(config, rc.logger)
+		if err != nil {
+			return err
+		}
+		rc.videoStoreMuxer = &videoStoreMuxer{
+			Config: config,
+			vs:     vs,
+			sps:    f.SPS,
+			pps:    f.PPS,
+			logger: rc.logger,
 		}
 	}
 
@@ -537,6 +525,10 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 
 	var receivedFirstIDR bool
 	storeImage := func(au [][]byte) {
+		// NOTE(Nick S): This is duplicating work that the videoStoreMuxer is doing
+		// we could probably save a few iterations through au by
+		// consolidating that logic
+		// it is also potentially not resillient if we never get sps & pps from the SDP
 		if !receivedFirstIDR && h264.IDRPresent(au) {
 			rc.logger.Debug("adding initial SPS & PPS")
 			receivedFirstIDR = true
@@ -560,61 +552,14 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		}
 	}
 
-	var receivedFirstSegmentKeyframe bool
-	segmentPacket := func(pkt *rtp.Packet, au [][]byte) {
-		if rc.vs == nil {
-			return
-		}
-		pts, ok := rc.client.PacketPTS2(media, pkt)
-		if !ok {
-			rc.logger.Debug("no pts found for packet")
-			return
-		}
-		// Video files must start with a keyframe. Wait for the first keyframe before starting to
-		// segment the video.
-		if !receivedFirstSegmentKeyframe {
-			if h264.IDRPresent(au) {
-				rc.logger.Debug("segmenter found first segment keyframe")
-				receivedFirstSegmentKeyframe = true
-			} else {
-				rc.logger.Debug("segmenter is waiting for first keyframe")
-				return
-			}
-		}
-		packed, err := h264.AVCCMarshal(au)
-		if err != nil {
-			rc.logger.Errorf("AnnexBMarshal err: %s", err.Error())
-			return
-		}
-		err = rc.vs.WritePacket(packed, pts, h264.IDRPresent(au))
-		if err != nil {
-			rc.logger.Errorf("error writing packet to segmenter: %s", err)
-		}
-	}
-
-	onPacketRTP := func(pkt *rtp.Packet) {
-		au, err := rtpDec.Decode(pkt)
-		if err != nil {
-			if !errors.Is(err, rtph264.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph264.ErrMorePacketsNeeded) {
-				rc.logger.Debugf("error decoding(1) h264 rstp stream %w", err)
-			}
-			return
-		}
-		storeImage(au)
-		segmentPacket(pkt, au)
-	}
-
+	var publishToWebRTC func(pkt *rtp.Packet, pts int64)
 	if rc.rtpPassthrough {
 		fp, err := formatprocessor.New(webRTCPayloadMaxSize, f, true)
 		if err != nil {
 			return fmt.Errorf("unable to create new h264 rtp formatprocessor: %w", err)
 		}
 
-		publishToWebRTC := func(pkt *rtp.Packet) {
-			pts, ok := rc.client.PacketPTS2(media, pkt)
-			if !ok {
-				return
-			}
+		publishToWebRTC = func(pkt *rtp.Packet, pts int64) {
 			ntp := time.Now()
 			u, err := fp.ProcessRTPPacket(pkt, ntp, time.Duration(pts), true)
 			if err != nil {
@@ -634,19 +579,26 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 				}
 			}
 		}
+	}
 
-		onPacketRTP = func(pkt *rtp.Packet) {
-			publishToWebRTC(pkt)
-			au, err := rtpDec.Decode(pkt)
-			if err != nil {
-				if !errors.Is(err, rtph264.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph264.ErrMorePacketsNeeded) {
-					rc.logger.Debugf("error decoding(1) h264 rstp stream %w", err)
-				}
-				return
-			}
-			storeImage(au)
-			segmentPacket(pkt, au)
+	onPacketRTP := func(pkt *rtp.Packet) {
+		pts, ok := rc.client.PacketPTS2(media, pkt)
+		if !ok {
+			rc.logger.Debug("no pts found for packet")
+			return
 		}
+		if publishToWebRTC != nil {
+			publishToWebRTC(pkt, pts)
+		}
+		au, err := rtpDec.Decode(pkt)
+		if err != nil {
+			if !errors.Is(err, rtph264.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph264.ErrMorePacketsNeeded) {
+				rc.logger.Debugf("error decoding(1) h264 rstp stream %w", err)
+			}
+			return
+		}
+		storeImage(au)
+		rc.videoStoreMuxer.writeH264(au, pts)
 	}
 
 	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
@@ -665,12 +617,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		rc.logger.Warn("rtp_passthrough is only supported for H264 codec. rtp_passthrough features disabled due to H265 RTSP track")
 	}
 
-	if rc.vsConfig != nil {
-		rc.logger.Warn("video_store is only supported for H264 codec. video_store features disabled due to H265 RTSP track")
-	}
-
 	var f *format.H265
-
 	media := session.FindFormat(&f)
 	if media == nil {
 		rc.logger.Warn("tracks available")
@@ -692,46 +639,50 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 
 	// For H.265, handle VPS, SPS, and PPS
 	if f.VPS != nil {
-		//nolint:gosec
-		rc.rawDecoder.decode(f.VPS)
+		if _, err := rc.rawDecoder.decode(f.VPS); err != nil {
+			rc.logger.Debugf("failed to decode vps from SDP: %#v", f.VPS)
+		}
 	} else {
 		rc.logger.Warn("no VPS found in H265 format")
 	}
 
 	if f.SPS != nil {
-		//nolint:gosec
-		rc.rawDecoder.decode(f.SPS)
+		if _, err := rc.rawDecoder.decode(f.SPS); err != nil {
+			rc.logger.Debugf("failed to decode sps from SDP: %#v", f.SPS)
+		}
 	} else {
 		rc.logger.Warn("no SPS found in H265 format")
 	}
 
 	if f.PPS != nil {
-		//nolint:gosec
-		rc.rawDecoder.decode(f.PPS)
+		if _, err := rc.rawDecoder.decode(f.PPS); err != nil {
+			rc.logger.Debugf("failed to decode pps from SDP: %#v", f.PPS)
+		}
 	} else {
 		rc.logger.Warn("no PPS found in H265 format")
 	}
 
-	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
-	if err != nil {
-		return fmt.Errorf("when calling RTSP Setup on %s for H265: %w", session.BaseURL, err)
+	if rc.vsConfig != nil {
+		config := *rc.vsConfig
+		config.Type = videostore.SourceTypeH265RTPPacket
+		vs, err := videostore.NewRTPVideoStore(config, rc.logger)
+		if err != nil {
+			return err
+		}
+		rc.videoStoreMuxer = &videoStoreMuxer{
+			Config: config,
+			vs:     vs,
+			vps:    f.VPS,
+			sps:    f.SPS,
+			pps:    f.PPS,
+			logger: rc.logger,
+		}
 	}
 
-	// On packet retreival, turn it into an image, and store it in shared memory
-	rc.client.OnPacketRTP(media, f, func(pkt *rtp.Packet) {
-		// Extract access units from RTP packets
-		au, err := rtpDec.Decode(pkt)
-		if err != nil {
-			if !errors.Is(err, rtph265.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph265.ErrMorePacketsNeeded) {
-				rc.logger.Debugw("error decoding(1) h265 rstp stream", "err", err.Error())
-			}
-			return
-		}
-
+	storeImage := func(au [][]byte) {
 		if rc.iframeOnlyDecode && !h265.IsRandomAccess(au) {
 			return
 		}
-
 		packedAU := packH265AUIntoNALU(au, rc.logger)
 		if rc.lazyDecode {
 			if h265.IsRandomAccess(au) {
@@ -742,7 +693,36 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		} else {
 			rc.storeH265Frame(packedAU)
 		}
-	})
+	}
+
+	onPacketRTP := func(pkt *rtp.Packet) {
+		// we need to do this before calling Decode as apparently rtpDec.Decode mutates
+		// the packet such that one can't get the pts out after Decode is called
+		pts, ok := rc.client.PacketPTS2(media, pkt)
+		if !ok {
+			rc.logger.Debug("no pts found for packet")
+			return
+		}
+
+		// Extract access units from RTP packets
+		au, err := rtpDec.Decode(pkt)
+		if err != nil {
+			if !errors.Is(err, rtph265.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph265.ErrMorePacketsNeeded) {
+				rc.logger.Debugw("error decoding(1) h265 rstp stream", "err", err.Error())
+			}
+			return
+		}
+		storeImage(au)
+		rc.videoStoreMuxer.writeH265(au, pts)
+	}
+
+	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
+	if err != nil {
+		return fmt.Errorf("when calling RTSP Setup on %s for H265: %w", session.BaseURL, err)
+	}
+
+	// On packet retreival, turn it into an image, and store it in shared memory
+	rc.client.OnPacketRTP(media, f, onPacketRTP)
 
 	return nil
 }
@@ -1485,7 +1465,7 @@ func (rc *rtspCamera) NextPointCloud(_ context.Context) (pointcloud.PointCloud, 
 }
 
 func (rc *rtspCamera) DoCommand(ctx context.Context, command map[string]interface{}) (map[string]interface{}, error) {
-	if rc.vs == nil {
+	if rc.videoStoreMuxer == nil {
 		return nil, errors.New("not implemented")
 	}
 	cmd, ok := command["command"].(string)
@@ -1504,7 +1484,7 @@ func (rc *rtspCamera) DoCommand(ctx context.Context, command map[string]interfac
 			return nil, err
 		}
 
-		res, err := rc.vs.Save(ctx, req)
+		res, err := rc.videoStoreMuxer.Save(ctx, req)
 		if err != nil {
 			return nil, err
 		}
@@ -1524,7 +1504,7 @@ func (rc *rtspCamera) DoCommand(ctx context.Context, command map[string]interfac
 		if err != nil {
 			return nil, err
 		}
-		res, err := rc.vs.Fetch(ctx, req)
+		res, err := rc.videoStoreMuxer.Fetch(ctx, req)
 		if err != nil {
 			return nil, err
 		}
@@ -1593,4 +1573,319 @@ func toFetchCommand(command map[string]interface{}) (*videostore.FetchRequest, e
 		return nil, err
 	}
 	return &videostore.FetchRequest{From: from, To: to}, nil
+}
+
+type extractor interface {
+	Extract(au [][]byte, pts int64) (int64, error)
+}
+
+type videoStoreMuxer struct {
+	videostore.Config
+	width        int
+	height       int
+	vps          []byte
+	sps          []byte
+	pps          []byte
+	dtsExtractor extractor
+	spsUnChanged bool
+	mu           sync.Mutex
+	vs           videostore.RTPVideoStore
+	logger       logging.Logger
+}
+
+// maybeReInitVideoStore assumes mu is held by caller.
+func (e *videoStoreMuxer) maybeReInitVideoStore() error {
+	if e.spsUnChanged {
+		return nil
+	}
+	var width, height int
+	switch e.Config.Type {
+	case videostore.SourceTypeH265RTPPacket:
+		var hsps h265.SPS
+		if err := hsps.Unmarshal(e.sps); err != nil {
+			return err
+		}
+		width, height = hsps.Width(), hsps.Height()
+	case videostore.SourceTypeH264RTPPacket:
+		var hsps h264.SPS
+		if err := hsps.Unmarshal(e.sps); err != nil {
+			return err
+		}
+		width, height = hsps.Width(), hsps.Height()
+	case videostore.SourceTypeFrame:
+		fallthrough
+	case videostore.SourceTypeUnknown:
+		fallthrough
+	default:
+		return errors.New("invalid videostore.SourceType")
+	}
+
+	if width <= 0 || height <= 0 {
+		return errors.New("width and height must both be greater than 0")
+	}
+	// if vs is initialized and the height & width have not changed,
+	// record the sps as unchanged and return
+	if e.vs != nil && e.width == width && e.height == height {
+		e.spsUnChanged = true
+		return nil
+	}
+
+	// if initialized and the height & width have changed,
+	// close and nil out the videostore
+	if e.vs != nil {
+		e.vs.Close()
+		e.vs = nil
+	}
+
+	// if we don't have a video-store we should attempt to initialize one
+	vs, err := videostore.NewRTPVideoStore(e.Config, e.logger)
+	if err != nil {
+		return err
+	}
+
+	if err := vs.Init(width, height); err != nil {
+		return err
+	}
+
+	e.width = width
+	e.height = height
+	e.vs = vs
+	e.spsUnChanged = true
+	return nil
+}
+
+func (e *videoStoreMuxer) writeH265(au [][]byte, pts int64) {
+	if e == nil {
+		return
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	var filteredAU [][]byte
+
+	isRandomAccess := false
+
+	for _, nalu := range au {
+		//nolint:mnd
+		typ := h265.NALUType((nalu[0] >> 1) & 0b111111)
+		switch typ {
+		case h265.NALUType_VPS_NUT:
+			e.vps = nalu
+			continue
+
+		case h265.NALUType_SPS_NUT:
+			e.sps = nalu
+			e.spsUnChanged = false
+			continue
+
+		case h265.NALUType_PPS_NUT:
+			e.pps = nalu
+			continue
+
+		case h265.NALUType_AUD_NUT:
+			continue
+
+		case h265.NALUType_IDR_W_RADL, h265.NALUType_IDR_N_LP, h265.NALUType_CRA_NUT:
+			isRandomAccess = true
+		case h265.NALUType_TRAIL_N,
+			h265.NALUType_TRAIL_R,
+			h265.NALUType_TSA_N,
+			h265.NALUType_TSA_R,
+			h265.NALUType_STSA_N,
+			h265.NALUType_STSA_R,
+			h265.NALUType_RADL_N,
+			h265.NALUType_RADL_R,
+			h265.NALUType_RASL_N,
+			h265.NALUType_RASL_R,
+			h265.NALUType_RSV_VCL_N10,
+			h265.NALUType_RSV_VCL_N12,
+			h265.NALUType_RSV_VCL_N14,
+			h265.NALUType_RSV_VCL_R11,
+			h265.NALUType_RSV_VCL_R13,
+			h265.NALUType_RSV_VCL_R15,
+			h265.NALUType_BLA_W_LP,
+			h265.NALUType_BLA_W_RADL,
+			h265.NALUType_BLA_N_LP,
+			h265.NALUType_RSV_IRAP_VCL22,
+			h265.NALUType_RSV_IRAP_VCL23,
+			h265.NALUType_EOS_NUT,
+			h265.NALUType_EOB_NUT,
+			h265.NALUType_FD_NUT,
+			h265.NALUType_PREFIX_SEI_NUT,
+			h265.NALUType_SUFFIX_SEI_NUT,
+			h265.NALUType_AggregationUnit,
+			h265.NALUType_FragmentationUnit,
+			h265.NALUType_PACI:
+		}
+
+		filteredAU = append(filteredAU, nalu)
+	}
+
+	au = filteredAU
+
+	if au == nil {
+		return
+	}
+
+	if err := e.maybeReInitVideoStore(); err != nil {
+		e.logger.Debugf("unable to init video store: %s", err.Error())
+		return
+	}
+
+	// add VPS, SPS and PPS before random access au
+	if isRandomAccess {
+		au = append([][]byte{e.vps, e.sps, e.pps}, au...)
+	}
+
+	if e.dtsExtractor == nil {
+		// skip samples silently until we find one with a IDR
+		if !isRandomAccess {
+			return
+		}
+		e.dtsExtractor = h265.NewDTSExtractor2()
+	}
+
+	dts, err := e.dtsExtractor.Extract(au, pts)
+	if err != nil {
+		e.logger.Errorf("error extracting dts: %s", err)
+		return
+	}
+
+	// h265 uses the same annexb format as h264
+	nalu, err := h264.AnnexBMarshal(au)
+	if err != nil {
+		e.logger.Errorf("failed to marshal annex b: %s", err)
+		return
+	}
+	err = e.vs.WritePacket(nalu, pts, dts, isRandomAccess)
+	if err != nil {
+		e.logger.Errorf("error writing packet to segmenter: %s", err)
+	}
+}
+
+func (e *videoStoreMuxer) writeH264(au [][]byte, pts int64) {
+	if e == nil {
+		return
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	var filteredAU [][]byte
+	nonIDRPresent := false
+	idrPresent := false
+
+	for _, nalu := range au {
+		//nolint:mnd
+		typ := h264.NALUType(nalu[0] & 0x1F)
+		switch typ {
+		case h264.NALUTypeSPS:
+			e.sps = nalu
+			e.spsUnChanged = false
+			continue
+
+		case h264.NALUTypePPS:
+			e.pps = nalu
+			continue
+
+		case h264.NALUTypeAccessUnitDelimiter:
+			continue
+
+		case h264.NALUTypeIDR:
+			idrPresent = true
+
+		case h264.NALUTypeNonIDR:
+			nonIDRPresent = true
+		case h264.NALUTypeDataPartitionA,
+			h264.NALUTypeDataPartitionB,
+			h264.NALUTypeDataPartitionC,
+			h264.NALUTypeSEI,
+			h264.NALUTypeEndOfSequence,
+			h264.NALUTypeEndOfStream,
+			h264.NALUTypeFillerData,
+			h264.NALUTypeSPSExtension,
+			h264.NALUTypePrefix,
+			h264.NALUTypeSubsetSPS,
+			h264.NALUTypeReserved16,
+			h264.NALUTypeReserved17,
+			h264.NALUTypeReserved18,
+			h264.NALUTypeSliceLayerWithoutPartitioning,
+			h264.NALUTypeSliceExtension,
+			h264.NALUTypeSliceExtensionDepth,
+			h264.NALUTypeReserved22,
+			h264.NALUTypeReserved23,
+			h264.NALUTypeSTAPA,
+			h264.NALUTypeSTAPB,
+			h264.NALUTypeMTAP16,
+			h264.NALUTypeMTAP24,
+			h264.NALUTypeFUA,
+			h264.NALUTypeFUB:
+		}
+
+		filteredAU = append(filteredAU, nalu)
+	}
+
+	au = filteredAU
+
+	if au == nil || (!nonIDRPresent && !idrPresent) {
+		return
+	}
+
+	if err := e.maybeReInitVideoStore(); err != nil {
+		e.logger.Debugf("unable to init video store: %s", err.Error())
+		return
+	}
+
+	// add SPS and PPS before access unit that contains an IDR
+	if idrPresent {
+		au = append([][]byte{e.sps, e.pps}, au...)
+	}
+
+	if e.dtsExtractor == nil {
+		// skip samples silently until we find one with a IDR
+		if !idrPresent {
+			return
+		}
+		e.dtsExtractor = h264.NewDTSExtractor2()
+	}
+
+	dts, err := e.dtsExtractor.Extract(au, pts)
+	if err != nil {
+		return
+	}
+
+	packed, err := h264.AnnexBMarshal(au)
+	if err != nil {
+		e.logger.Errorf("AnnexBMarshal err: %s", err.Error())
+		return
+	}
+	err = e.vs.WritePacket(packed, pts, dts, idrPresent)
+	if err != nil {
+		e.logger.Errorf("error writing packet to segmenter: %s", err)
+	}
+}
+
+func (e *videoStoreMuxer) Save(ctx context.Context, r *videostore.SaveRequest) (*videostore.SaveResponse, error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.vs == nil {
+		return nil, errors.New("video-store uninitialized")
+	}
+	return e.vs.Save(ctx, r)
+}
+
+func (e *videoStoreMuxer) Fetch(ctx context.Context, r *videostore.FetchRequest) (*videostore.FetchResponse, error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.vs == nil {
+		return nil, errors.New("video-store uninitialized")
+	}
+	return e.vs.Fetch(ctx, r)
+}
+
+func (e *videoStoreMuxer) CloseVideoStore() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.vs == nil {
+		return
+	}
+	e.vs.Close()
 }
