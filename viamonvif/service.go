@@ -15,7 +15,7 @@ import (
 	"go.viam.com/rdk/services/discovery"
 )
 
-// Model is the model for a rtsp discovery service.
+// Model is the model for a onvif discovery service for rtsp cameras.
 var (
 	Model             = viamrtsp.Family.WithModel("onvif")
 	errNoCamerasFound = errors.New("no cameras found, ensure cameras are working or check credentials")

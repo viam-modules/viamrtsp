@@ -16,7 +16,7 @@ import (
 	"go.viam.com/rdk/services/discovery"
 )
 
-// Model is the model for a rtsp discovery service.
+// Model is the model for a upnp discovery service for rtsp cameras.
 var (
 	Model         = viamrtsp.Family.WithModel("upnp")
 	errNoQueries  = errors.New("must provide a query to use the discovery service")
@@ -111,7 +111,7 @@ func convertqueryConfigToDeviceQuery(queryCfgs []queryConfig) ([]viamupnp.Device
 	return queries, endpointMap
 }
 
-// DiscoverResources discovers different rtsp cameras that use onvif.
+// DiscoverResources discovers different rtsp cameras that use upnp.
 func (dis *upnpDiscovery) DiscoverResources(ctx context.Context, extra map[string]any) ([]resource.Config, error) {
 	cams := []resource.Config{}
 

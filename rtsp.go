@@ -99,12 +99,13 @@ type videoStoreConfig struct {
 
 // Config are the config attributes for an RTSP camera model.
 type Config struct {
-	Address          string               `json:"rtsp_address"`
-	RTPPassthrough   *bool                `json:"rtp_passthrough"`
-	LazyDecode       bool                 `json:"lazy_decode,omitempty"`
-	IframeOnlyDecode bool                 `json:"i_frame_only_decode,omitempty"`
-	Query            viamupnp.DeviceQuery `json:"query,omitempty"`
-	VideoStore       *videoStoreConfig    `json:"video_store,omitempty"`
+	Address          string `json:"rtsp_address"`
+	RTPPassthrough   *bool  `json:"rtp_passthrough"`
+	LazyDecode       bool   `json:"lazy_decode,omitempty"`
+	IframeOnlyDecode bool   `json:"i_frame_only_decode,omitempty"`
+	// TODO: remove query & UPNP_DISCOVER logic
+	Query      viamupnp.DeviceQuery `json:"query,omitempty"`
+	VideoStore *videoStoreConfig    `json:"video_store,omitempty"`
 }
 
 // CodecFormat contains a pointer to a format and the corresponding FFmpeg codec.
@@ -144,6 +145,7 @@ func (conf *Config) parseAndFixAddress(ctx context.Context, logger logging.Logge
 		return nil, err
 	}
 
+	// TODO: remove this & query logic
 	if u.Hostname() == "UPNP_DISCOVER" {
 		hosts, _, err := viamupnp.FindHost(ctx, logger, []viamupnp.DeviceQuery{conf.Query}, false)
 		if err != nil {
