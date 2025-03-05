@@ -241,8 +241,18 @@ func (rc *rtspCamera) Close(_ context.Context) error {
 	rc.unsubscribeAll()
 	rc.activeBackgroundWorkers.Wait()
 	rc.closeConnection()
-	rc.avFramePool.close()
 	rc.mimeHandler.close()
+	// Clean up latestFrame cache if it exists. This is necessary to ensure that the frame is properly
+	// freed when the avFramePool is closed.
+	rc.latestFrameMu.Lock()
+	if rc.latestFrame != nil {
+		if refCount := rc.latestFrame.decrementRefs(); refCount == 0 {
+			rc.avFramePool.put(rc.latestFrame)
+		}
+		rc.latestFrame = nil
+	}
+	rc.latestFrameMu.Unlock()
+	rc.avFramePool.close()
 	return nil
 }
 
