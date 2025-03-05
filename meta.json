@@ -36,6 +36,12 @@
     },
     {
       "api": "rdk:service:discovery",
+      "model": "viam:viamrtsp:upnp",
+      "markdown_link": "README.md#configure-the-viamrtspupnp-discovery-service",
+      "short_description": "A discovery service to find rtsp cameras that use the upnp interface."
+    },
+    {
+      "api": "rdk:service:discovery",
       "model": "viam:viamrtsp:onvif",
       "markdown_link": "README.md#configure-the-viamrtsponvif-discovery-service",
       "short_description": "A discovery service to find rtsp cameras that use the onvif interface."

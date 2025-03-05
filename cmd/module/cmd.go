@@ -5,6 +5,7 @@ import (
 	"context"
 
 	"github.com/viam-modules/viamrtsp"
+	"github.com/viam-modules/viamrtsp/upnpdiscovery"
 	"github.com/viam-modules/viamrtsp/viamonvif"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/module"
@@ -31,6 +32,10 @@ func realMain(ctx context.Context) error {
 		}
 	}
 	err = myMod.AddModelFromRegistry(ctx, discovery.API, viamonvif.Model)
+	if err != nil {
+		return err
+	}
+	err = myMod.AddModelFromRegistry(ctx, discovery.API, upnpdiscovery.Model)
 	if err != nil {
 		return err
 	}
