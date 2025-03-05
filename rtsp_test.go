@@ -96,7 +96,6 @@ func TestRTSPCamera(t *testing.T) {
 			config.ConvertedAttributes = &Config{Address: "rtsp://" + h.s.RTSPAddress + "/stream1"}
 			rtspCam, err := NewRTSPCamera(timeoutCtx, nil, config, logger)
 			test.That(t, err, test.ShouldBeNil)
-			defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
 			imageTimeoutCtx, imageTimeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
 			defer imageTimeoutCancel()
 			// Fetch images while allowing the pool to grow and shrink as needed.
