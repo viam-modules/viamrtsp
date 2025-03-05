@@ -624,7 +624,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 			}
 			segSDPParamsSent = true
 		}
-		if err := rc.seg.WritePacket(au, pts); err != nil {
+		if err := rc.seg.WritePacket(videostore.CodecTypeH264, au, pts); err != nil {
 			rc.logger.Debugf("videostore WritePacket returned error, unsubscribing video-store, err: %s", err.Error())
 			if err := rc.seg.CloseSegmenter(); err != nil {
 				rc.logger.Errorf("videostore CloseSegmenter returned error, err: %s", err.Error())
@@ -806,7 +806,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 			segSDPParamsSent = true
 		}
 
-		if err := rc.seg.WritePacket(au, pts); err != nil {
+		if err := rc.seg.WritePacket(videostore.CodecTypeH265, au, pts); err != nil {
 			rc.logger.Debugf("videostore WritePacket returned error, unsubscribing video-store, err: %s", err.Error())
 			if err := rc.seg.CloseSegmenter(); err != nil {
 				rc.logger.Errorf("videostore CloseSegmenter returned error, err: %s", err.Error())

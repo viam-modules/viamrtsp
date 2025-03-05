@@ -67,8 +67,8 @@ func (p *videoStoreProxy) SDPParams(typ videostore.CodecType, au [][]byte) error
 	return p.vs.SDPParams(typ, au)
 }
 
-func (p *videoStoreProxy) WritePacket(au [][]byte, pts int64) error {
-	return p.vs.WritePacket(au, pts)
+func (p *videoStoreProxy) WritePacket(typ videostore.CodecType, au [][]byte, pts int64) error {
+	return p.vs.WritePacket(typ, au, pts)
 }
 
 func (p *videoStoreProxy) CloseSegmenter() error {
