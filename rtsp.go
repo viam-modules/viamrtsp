@@ -191,10 +191,9 @@ type rtspCamera struct {
 	lazyDecode       bool
 	iframeOnlyDecode bool
 
-	closeMu          sync.RWMutex
-	vsMu             sync.Mutex
-	segSDPParamsSent bool
-	seg              videostore.RTPSegmenter
+	closeMu sync.RWMutex
+	segMu   sync.Mutex
+	seg     videostore.RTPSegmenter
 	// vsConfig *videostore.Config
 	// videoStoreMuxer *videoStoreMuxer
 	auMu       sync.Mutex
@@ -312,12 +311,13 @@ func (rc *rtspCamera) closeConnection() {
 	// 	rc.videoStoreMuxer.CloseVideoStore()
 	// 	rc.videoStoreMuxer = nil
 	// }
-	rc.vsMu.Lock()
-	defer rc.vsMu.Unlock()
+	rc.segMu.Lock()
+	defer rc.segMu.Unlock()
 	if rc.seg != nil {
 		if err := rc.seg.CloseSegmenter(); err != nil {
 			rc.logger.Error("error closing segmenter: %s", err.Error())
 		}
+		rc.seg = nil
 	}
 	// if rc.videoStoreMuxer != nil {
 	// 	rc.videoStoreMuxer.CloseVideoStore()
@@ -604,6 +604,35 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		}
 	}
 
+	params := [][]byte{f.SPS, f.PPS}
+	var segSDPParamsSent bool
+	storeSegment := func(au [][]byte, pts int64) {
+		rc.segMu.Lock()
+		defer rc.segMu.Unlock()
+		if rc.seg == nil {
+			return
+		}
+
+		if !segSDPParamsSent {
+			if err := rc.seg.SDPParams(videostore.CodecTypeH264, params); err != nil {
+				rc.logger.Errorf("failed to send SDP params to raw segmenter: %s", err.Error())
+				if err := rc.seg.CloseSegmenter(); err != nil {
+					rc.logger.Errorf("videostore CloseSegmenter returned error, err: %s", err.Error())
+				}
+				rc.seg = nil
+				return
+			}
+			segSDPParamsSent = true
+		}
+		if err := rc.seg.WritePacket(au, pts); err != nil {
+			rc.logger.Debugf("videostore WritePacket returned error, unsubscribing video-store, err: %s", err.Error())
+			if err := rc.seg.CloseSegmenter(); err != nil {
+				rc.logger.Errorf("videostore CloseSegmenter returned error, err: %s", err.Error())
+			}
+			rc.seg = nil
+		}
+		// rc.videoStoreMuxer.writeH264(au, pts)
+	}
 	onPacketRTP := func(pkt *rtp.Packet) {
 		pts, ok := rc.client.PacketPTS2(media, pkt)
 		if !ok {
@@ -621,22 +650,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 			return
 		}
 		storeImage(au)
-		rc.vsMu.Lock()
-		defer rc.vsMu.Unlock()
-		if rc.seg != nil {
-			if !rc.segSDPParamsSent {
-				if err := rc.seg.SDPParams(videostore.CodecTypeH264, [][]byte{f.SPS, f.PPS}); err != nil {
-					rc.logger.Errorf("failed to send SDP params to raw segmenter: %s", err.Error())
-
-				}
-				rc.segSDPParamsSent = true
-			}
-			if err := rc.seg.WritePacket(au, pts); err != nil {
-				rc.logger.Debug("videostore WritePacket returned error, unsubscribing video-store, err: %Ts", err.Error())
-				rc.seg = nil
-			}
-		}
-		// rc.videoStoreMuxer.writeH264(au, pts)
+		storeSegment(au, pts)
 	}
 
 	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
@@ -657,21 +671,21 @@ var codecToSource = map[videoCodec]videostore.CodecType{
 	H265: videostore.CodecTypeH264,
 }
 
-//	func (rc *rtspCamera) DeRegister(vs registry.ModuleVideoStores) error {
-//		rc.vsMu.Lock()
-//		defer rc.vsMu.Unlock()
-//		if rc.vs == nil {
-//			return nil
-//		}
-//		if rc.vs != vs {
-//			return registry.ErrNotFound
-//		}
-//		rc.vs = nil
-//		return nil
-//	}
+func (rc *rtspCamera) DeRegister(vs videostore.RTPSegmenter) error {
+	rc.segMu.Lock()
+	defer rc.segMu.Unlock()
+	if rc.seg == nil {
+		return nil
+	}
+	if rc.seg != vs {
+		return registry.ErrNotFound
+	}
+	rc.seg = nil
+	return nil
+}
 func (rc *rtspCamera) Register(vs videostore.RTPSegmenter) error {
-	rc.vsMu.Lock()
-	defer rc.vsMu.Unlock()
+	rc.segMu.Lock()
+	defer rc.segMu.Unlock()
 	if rc.seg != nil {
 		return registry.ErrBusy
 	}
@@ -771,6 +785,35 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		}
 	}
 
+	params := [][]byte{f.VPS, f.SPS, f.PPS}
+	var segSDPParamsSent bool
+	storeSegment := func(au [][]byte, pts int64) {
+		rc.segMu.Lock()
+		defer rc.segMu.Unlock()
+		if rc.seg == nil {
+			return
+		}
+
+		if !segSDPParamsSent {
+			if err := rc.seg.SDPParams(videostore.CodecTypeH265, params); err != nil {
+				rc.logger.Errorf("failed to send SDP params to raw segmenter: %s", err.Error())
+				if err := rc.seg.CloseSegmenter(); err != nil {
+					rc.logger.Errorf("videostore CloseSegmenter returned error, err: %s", err.Error())
+				}
+				rc.seg = nil
+				return
+			}
+			segSDPParamsSent = true
+		}
+
+		if err := rc.seg.WritePacket(au, pts); err != nil {
+			rc.logger.Debugf("videostore WritePacket returned error, unsubscribing video-store, err: %s", err.Error())
+			if err := rc.seg.CloseSegmenter(); err != nil {
+				rc.logger.Errorf("videostore CloseSegmenter returned error, err: %s", err.Error())
+			}
+			rc.seg = nil
+		}
+	}
 	onPacketRTP := func(pkt *rtp.Packet) {
 		// we need to do this before calling Decode as apparently rtpDec.Decode mutates
 		// the packet such that one can't get the pts out after Decode is called
@@ -789,21 +832,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 			return
 		}
 		storeImage(au)
-		// rc.videoStoreMuxer.writeH265(au, pts)
-		rc.vsMu.Lock()
-		defer rc.vsMu.Unlock()
-		if rc.seg != nil {
-			if !rc.segSDPParamsSent {
-				if err := rc.seg.SDPParams(videostore.CodecTypeH265, [][]byte{f.VPS, f.SPS, f.PPS}); err != nil {
-					rc.logger.Errorf("failed to send SDP params to raw segmenter: %s", err.Error())
-				}
-				rc.segSDPParamsSent = true
-			}
-			if err := rc.seg.WritePacket(au, pts); err != nil {
-				rc.logger.Debug("videostore WritePacket returned error, unsubscribing video-store, err: %Ts", err.Error())
-				rc.seg = nil
-			}
-		}
+		storeSegment(au, pts)
 	}
 
 	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)

@@ -9,7 +9,7 @@ import (
 
 type ModuleCamera interface {
 	Register(vs videostore.RTPSegmenter) error
-	// DeRegister(vs ModuleVideoStores) error
+	DeRegister(vs videostore.RTPSegmenter) error
 }
 
 // type ModuleVideoStores interface {
