@@ -28,7 +28,7 @@ var (
 	ErrNotFound          = errors.New("not in registry")
 	ErrUnsupported       = errors.New("unsupported")
 	ErrBusy              = errors.New("busy")
-	Global               = &ModuleRegistry{}
+	Global               = &ModuleRegistry{cams: map[string]ModuleCamera{}}
 )
 
 func (mr *ModuleRegistry) AddCamera(key string, val ModuleCamera) error {
