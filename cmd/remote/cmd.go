@@ -46,7 +46,7 @@ func mainWithArgs(ctx context.Context, _ []string, logger logging.Logger) error 
 		},
 	}
 
-	myRobot, err := robotimpl.New(ctx, conf, logger)
+	myRobot, err := robotimpl.New(ctx, conf, nil, logger)
 	if err != nil {
 		return err
 	}
