@@ -139,8 +139,7 @@ tool-install:
 gofmt:
 	gofmt -w -s .
 
-lint: gofmt tool-install build-ffmpeg
-	go mod tidy
+lint: gofmt tool-install build-ffmpeg update-rdk
 	CGO_CFLAGS=$(CGO_CFLAGS) GOFLAGS=$(GOFLAGS) $(TOOL_BIN)/golangci-lint run -v --fix --config=./etc/.golangci.yaml --timeout=2m
 
 test: build-ffmpeg
