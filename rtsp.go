@@ -1463,11 +1463,6 @@ func (rc *rtspCamera) Name() resource.Name {
 	return rc.name
 }
 
-// Unimplemented camera interface methods.
-func (rc *rtspCamera) Stream(_ context.Context, _ ...gostream.ErrorHandler) (gostream.VideoStream, error) {
-	return nil, errors.New("stream not implemented")
-}
-
 func (rc *rtspCamera) Images(_ context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
 	return nil, resource.ResponseMetadata{}, errors.New("not implemented")
 }
