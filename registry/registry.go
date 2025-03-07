@@ -7,9 +7,15 @@ import (
 	"github.com/viam-modules/video-store/videostore"
 )
 
+type Mux interface {
+	Start(codec videostore.CodecType, au [][]byte) error
+	WritePacket(codec videostore.CodecType, au [][]byte, pts int64) error
+	Stop() error
+}
+
 type ModuleCamera interface {
-	Register(vs videostore.RTPSegmenter) error
-	DeRegister(vs videostore.RTPSegmenter) error
+	Register(vs Mux, codecCandiates []videostore.CodecType) error
+	DeRegister(vs Mux) error
 }
 
 // type ModuleVideoStores interface {
