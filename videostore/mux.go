@@ -72,7 +72,7 @@ var codecs = []videostore.CodecType{
 }
 
 func (m *rawSegmenterMux) Init() error {
-	cam, err := registry.Global.Camera(m.camName.String())
+	cam, err := registry.Global.Get(m.camName.String())
 	if err != nil {
 		return err
 	}
@@ -116,7 +116,7 @@ func (m *rawSegmenterMux) monitorRegistration(ctx context.Context) {
 
 		case <-timer.C:
 			if !registered {
-				cam, err := registry.Global.Camera(m.camName.String())
+				cam, err := registry.Global.Get(m.camName.String())
 				if err != nil {
 					m.logger.Warnf("failed to find camera %s", err.Error())
 					timer.Reset(monitorInterval)

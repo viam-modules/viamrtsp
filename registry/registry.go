@@ -9,7 +9,7 @@ import (
 	"github.com/viam-modules/video-store/videostore"
 )
 
-// Mux is how viamrtsp writes it's video data to a video-store that has reqeusted it.
+// Mux is how viamrtsp writes it's video data to a video-store that has requested it.
 type Mux interface {
 	// Start starts saving an rtsp stream's video
 	Start(codec videostore.CodecType, initialParameters [][]byte) error
@@ -46,6 +46,17 @@ var (
 	Global = &ModuleRegistry{cams: map[string]ModuleCamera{}}
 )
 
+// Get returns the ModuleCamera with the name from the global registry.
+func (mr *ModuleRegistry) Get(name string) (ModuleCamera, error) {
+	mr.mu.Lock()
+	defer mr.mu.Unlock()
+	cam, ok := mr.cams[name]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	return cam, nil
+}
+
 // Add adds a ModuleCamera with a name to the global registry.
 func (mr *ModuleRegistry) Add(name string, val ModuleCamera) error {
 	mr.mu.Lock()
@@ -66,15 +77,4 @@ func (mr *ModuleRegistry) Remove(name string) error {
 	}
 	delete(mr.cams, name)
 	return nil
-}
-
-// Camera returns the ModuleCamera with the name from the global registry.
-func (mr *ModuleRegistry) Camera(name string) (ModuleCamera, error) {
-	mr.mu.Lock()
-	defer mr.mu.Unlock()
-	cam, ok := mr.cams[name]
-	if !ok {
-		return nil, ErrNotFound
-	}
-	return cam, nil
 }

@@ -122,21 +122,6 @@ func (conf *Config) Validate(path string) ([]string, error) {
 		return nil, fmt.Errorf("invalid address '%s' for component at path '%s': %w", conf.Address, path, err)
 	}
 
-	// if conf.VideoStore != nil {
-	// 	logging.Global().Infof("VideoStore: %#v", *conf.VideoStore)
-	// 	sc, err := applyStorageDefaults(conf.VideoStore.Storage, "anyname")
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	vsc := videostore.Config{
-	// 		Type:    videostore.SourceTypeRTP,
-	// 		Storage: sc,
-	// 	}
-	// 	if err := vsc.Validate(); err != nil {
-	// 		return nil, err
-	// 	}
-	// }
-
 	var deps []string
 	if conf.DiscoveryDep != "" {
 		deps = []string{conf.DiscoveryDep}
@@ -199,12 +184,10 @@ type rtspCamera struct {
 	mux                   registry.Mux
 	muxStarted            bool
 	muxRegistrationCancel context.CancelFunc
-	// vsConfig *videostore.Config
-	// videoStoreMuxer *videoStoreMuxer
-	auMu       sync.Mutex
-	au         [][]byte
-	client     *gortsplib.Client
-	rawDecoder *decoder
+	auMu                  sync.Mutex
+	au                    [][]byte
+	client                *gortsplib.Client
+	rawDecoder            *decoder
 
 	cancelCtx  context.Context
 	cancelFunc context.CancelFunc
@@ -325,10 +308,6 @@ func (rc *rtspCamera) closeConnection() {
 		rc.rawDecoder = nil
 	}
 
-	// if rc.videoStoreMuxer != nil {
-	// 	rc.videoStoreMuxer.CloseVideoStore()
-	// 	rc.videoStoreMuxer = nil
-	// }
 	rc.muxMu.Lock()
 	defer rc.muxMu.Unlock()
 	if rc.mux != nil {
@@ -337,10 +316,6 @@ func (rc *rtspCamera) closeConnection() {
 		}
 	}
 	rc.muxStarted = false
-	// if rc.videoStoreMuxer != nil {
-	// 	rc.videoStoreMuxer.CloseVideoStore()
-	// 	rc.videoStoreMuxer = nil
-	// }
 }
 
 // reconnectClientWithFallbackTransports attempts to setup the RTSP client with the given codec
@@ -535,21 +510,6 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 	if err != nil {
 		return fmt.Errorf("creating H264 raw decoder: %w", err)
 	}
-	// if rc.vsConfig != nil {
-	// 	config := *rc.vsConfig
-	// 	config.Type = videostore.SourceTypeH264RTPPacket
-	// 	vs, err := videostore.NewRTPVideoStore(config, rc.logger)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	rc.videoStoreMuxer = &videoStoreMuxer{
-	// 		Config: config,
-	// 		vs:     vs,
-	// 		sps:    f.SPS,
-	// 		pps:    f.PPS,
-	// 		logger: rc.logger,
-	// 	}
-	// }
 
 	// if SPS and PPS are present into the SDP, send them to the decoder
 	initialSPSAndPPS := [][]byte{}
@@ -768,23 +728,6 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		rc.logger.Warn("no PPS found in H265 format")
 	}
 
-	// if rc.vsConfig != nil {
-	// 	config := *rc.vsConfig
-	// 	config.Type = videostore.SourceTypeH265RTPPacket
-	// 	vs, err := videostore.NewRTPVideoStore(config, rc.logger)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	rc.videoStoreMuxer = &videoStoreMuxer{
-	// 		Config: config,
-	// 		vs:     vs,
-	// 		vps:    f.VPS,
-	// 		sps:    f.SPS,
-	// 		pps:    f.PPS,
-	// 		logger: rc.logger,
-	// 	}
-	// }
-
 	storeImage := func(au [][]byte) {
 		if rc.iframeOnlyDecode && !h265.IsRandomAccess(au) {
 			return
@@ -914,10 +857,6 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 	}
 	rc.muxMu.Unlock()
 
-	// if rc.vsConfig != nil {
-	// 	rc.logger.Warn("video_store is only supported for H264 codec. video_store features disabled due to MJPEG RTSP track")
-	// }
-
 	var f *format.MJPEG
 	media := session.FindFormat(&f)
 	if media == nil {
@@ -1017,10 +956,6 @@ func (rc *rtspCamera) initMPEG4(session *description.Session) error {
 			"unable to store video disabled due to MPEG4 RTSP track")
 	}
 	rc.muxMu.Unlock()
-
-	// if rc.vsConfig != nil {
-	// 	rc.logger.Warn("video_store is only supported for H264 codec. video_store features disabled due to MPEG4 RTSP track")
-	// }
 
 	var f *format.MPEG4Video
 	media := session.FindFormat(&f)
@@ -1245,31 +1180,13 @@ func NewRTSPCamera(ctx context.Context, deps resource.Dependencies, conf resourc
 		rtpPassthrough = *newConf.RTPPassthrough
 	}
 
-	// var vsc *videostore.Config
-	// if newConf.VideoStore != nil {
-	// 	sc, err := applyStorageDefaults(newConf.VideoStore.Storage, conf.ResourceName().Name)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	tmpVsc := videostore.Config{
-	// 		Type:    videostore.SourceTypeH264RTPPacket,
-	// 		Storage: sc,
-	// 	}
-	// 	if err := tmpVsc.Validate(); err != nil {
-	// 		return nil, err
-	// 	}
-
-	// 	vsc = &tmpVsc
-	// }
-
 	rtpPassthroughCtx, rtpPassthroughCancelCauseFn := context.WithCancelCause(context.Background())
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	rc := &rtspCamera{
-		model:            conf.Model,
-		lazyDecode:       newConf.LazyDecode,
-		iframeOnlyDecode: newConf.IframeOnlyDecode,
-		u:                u,
-		// vsConfig:                    vsc,
+		model:                       conf.Model,
+		lazyDecode:                  newConf.LazyDecode,
+		iframeOnlyDecode:            newConf.IframeOnlyDecode,
+		u:                           u,
 		name:                        conf.ResourceName(),
 		rtpPassthrough:              rtpPassthrough,
 		bufAndCBByID:                make(map[rtppassthrough.SubscriptionID]bufAndCB),
@@ -1308,32 +1225,6 @@ func NewRTSPCamera(ctx context.Context, deps resource.Dependencies, conf resourc
 	guard.Success()
 	return rc, nil
 }
-
-// getHomeDir returns the home directory of the user.
-// func applyStorageDefaults(c videoStoreStorageConfig, name string) (videostore.StorageConfig, error) {
-// 	var zero videostore.StorageConfig
-// 	if c.UploadPath == "" {
-// 		home, err := getHomeDir()
-// 		if err != nil {
-// 			return zero, err
-// 		}
-// 		c.UploadPath = filepath.Join(home, defaultUploadPath, name)
-// 	}
-// 	if c.StoragePath == "" {
-// 		home, err := getHomeDir()
-// 		if err != nil {
-// 			return zero, err
-// 		}
-// 		c.StoragePath = filepath.Join(home, defaultStoragePath, name)
-// 	}
-// 	return videostore.StorageConfig{
-// 		SegmentSeconds:       defaultSegmentSeconds,
-// 		SizeGB:               c.SizeGB,
-// 		OutputFileNamePrefix: name,
-// 		UploadPath:           c.UploadPath,
-// 		StoragePath:          c.StoragePath,
-// 	}, nil
-// }
 
 func (rc *rtspCamera) unsubscribeAll() {
 	rc.subsMu.Lock()
