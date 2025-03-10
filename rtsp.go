@@ -271,6 +271,7 @@ func (rc *rtspCamera) Close(_ context.Context) error {
 	}
 	rc.muxRegistrationCancel()
 	rc.mux = nil
+	rc.muxStarted = false
 	rc.muxRegistrationCancel = nil
 	return nil
 }
@@ -335,6 +336,7 @@ func (rc *rtspCamera) closeConnection() {
 			rc.logger.Errorf("error stopping mux: %s", err.Error())
 		}
 	}
+	rc.muxStarted = false
 	// if rc.videoStoreMuxer != nil {
 	// 	rc.videoStoreMuxer.CloseVideoStore()
 	// 	rc.videoStoreMuxer = nil
@@ -710,6 +712,7 @@ func (rc *rtspCamera) DeRegister(vs registry.Mux) error {
 	rc.muxRegistrationCancel()
 
 	rc.mux = nil
+	rc.muxStarted = false
 	rc.muxRegistrationCancel = nil
 	return nil
 }
