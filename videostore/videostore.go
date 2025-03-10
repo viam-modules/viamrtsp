@@ -12,7 +12,6 @@ import (
 	"go.viam.com/rdk/components/generic"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
-	"go.viam.com/utils"
 )
 
 const (
@@ -62,44 +61,26 @@ func New(_ context.Context, deps resource.Dependencies, conf resource.Config, lo
 		if err != nil {
 			return nil, err
 		}
-		vsc := videostore.Config{
+
+		rtpVs, err := videostore.NewRTPVideoStore(videostore.Config{
 			Type:    videostore.SourceTypeRTP,
 			Storage: sc,
-		}
-		if err := vsc.Validate(); err != nil {
-			return nil, err
-		}
-
-		rtpVs, err := videostore.NewRTPVideoStore(vsc, logger)
+		}, logger)
 		if err != nil {
 			return nil, err
 		}
 
-		rawSeg := rtpVs.Segmenter()
-		if rawSeg == nil {
-			return nil, errors.New("videostore.RTPVideoStore.Segmenter() is nil")
-		}
-
-		mux = &rawSegmenterMux{
-			rawSeg:  rawSeg,
-			camName: c.Name(),
-			worker:  utils.NewBackgroundStoppableWorkers(),
-			logger:  logger,
-		}
+		mux = newRawSegmenterMux(rtpVs.Segmenter(), c.Name(), logger)
 		if err := mux.init(); err != nil {
+			rtpVs.Close()
 			return nil, err
 		}
 		vs = rtpVs
 	} else {
-		vsc := videostore.Config{
+		vs, err = videostore.NewReadOnlyVideoStore(videostore.Config{
 			Type:    videostore.SourceTypeReadOnly,
 			Storage: sc,
-		}
-		if err := vsc.Validate(); err != nil {
-			return nil, err
-		}
-
-		vs, err = videostore.NewReadOnlyVideoStore(vsc, logger)
+		}, logger)
 		if err != nil {
 			return nil, err
 		}

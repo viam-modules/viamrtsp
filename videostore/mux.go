@@ -49,8 +49,20 @@ var codecs = []videostore.CodecType{
 	videostore.CodecTypeH264,
 }
 
+func newRawSegmenterMux(rawSeg *videostore.RawSegmenter, camName resource.Name, logger logging.Logger) *rawSegmenterMux {
+	return &rawSegmenterMux{
+		rawSeg:  rawSeg,
+		camName: camName,
+		worker:  utils.NewBackgroundStoppableWorkers(),
+		logger:  logger,
+	}
+}
+
 // init and close are called by videostore.
 func (m *rawSegmenterMux) init() error {
+	if m.rawSeg == nil {
+		return errors.New("videostore.RTPVideoStore.Segmenter() is nil")
+	}
 	cam, err := registry.Global.Get(m.camName.String())
 	if err != nil {
 		return err
@@ -532,7 +544,7 @@ func (m *rawSegmenterMux) maybeReInitVideoStore() error {
 	}
 	// if vs is initialized and the height & width have not changed,
 	// record the sps as unchanged and return
-	if m.rawSeg != nil && m.width == width && m.height == height {
+	if m.width == width && m.height == height {
 		m.spsUnChanged = true
 		return nil
 	}
