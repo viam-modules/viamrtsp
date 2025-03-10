@@ -18,11 +18,11 @@ require (
 	github.com/pion/rtp v1.8.11
 	github.com/rhysd/actionlint v1.6.27
 	github.com/stretchr/testify v1.10.0
-	github.com/viam-modules/video-store v0.0.5-rc2
+	github.com/viam-modules/video-store v0.0.5-rc4
 	go.uber.org/zap v1.27.0
-	go.viam.com/rdk v0.57.1-0.20250108163155-2071720cd8d3
+	go.viam.com/rdk v0.65.0
 	go.viam.com/test v1.2.4
-	go.viam.com/utils v0.1.118
+	go.viam.com/utils v0.1.130
 	golang.org/x/net v0.34.0
 )
 
@@ -308,7 +308,7 @@ require (
 	go.uber.org/automaxprocs v1.5.3 // indirect
 	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.viam.com/api v0.1.380 // indirect
+	go.viam.com/api v0.1.396 // indirect
 	goji.io v2.0.2+incompatible // indirect
 	golang.org/x/arch v0.0.0-20210923205945-b76863e36670 // indirect
 	golang.org/x/crypto v0.32.0 // indirect
@@ -331,6 +331,7 @@ require (
 	google.golang.org/grpc v1.66.0 // indirect
 	google.golang.org/protobuf v1.35.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gopkg.in/src-d/go-billy.v4 v4.3.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
@@ -340,5 +341,3 @@ require (
 	mvdan.cc/unparam v0.0.0-20240528143540-8a5130ca722f // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 )
-
-replace github.com/viam-modules/video-store => github.com/nicksanford/video-store v0.0.0-20250310180817-c65f2b655a0f
