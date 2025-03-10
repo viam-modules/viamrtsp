@@ -61,11 +61,11 @@ func (m *rawSegmenterMux) init() error {
 	}
 	m.regDone = regCtx.Done()
 	m.cam = cam
-	m.worker.Add(m.monitorRegistration)
+	m.worker.Add(m.registrationMonitor)
 	return nil
 }
 
-func (m *rawSegmenterMux) monitorRegistration(ctx context.Context) {
+func (m *rawSegmenterMux) registrationMonitor(ctx context.Context) {
 	registered := true
 	timer := time.NewTimer(monitorInterval)
 	defer timer.Stop()
@@ -80,6 +80,7 @@ func (m *rawSegmenterMux) monitorRegistration(ctx context.Context) {
 			return
 		case <-m.regDone:
 			registered = false
+			// set the channel to nil so we don't go down this case statement next iteration
 			m.regDone = nil
 
 		case <-timer.C:
@@ -94,11 +95,12 @@ func (m *rawSegmenterMux) monitorRegistration(ctx context.Context) {
 				regCtx, err := cam.RequestVideo(m, codecs)
 				if err != nil {
 					m.logger.Warnf("failed to register video-store with viamrtsp camera, err: %s", err.Error())
-				} else {
-					m.regDone = regCtx.Done()
-					m.cam = cam
-					registered = true
+					timer.Reset(monitorInterval)
+					continue
 				}
+				m.regDone = regCtx.Done()
+				m.cam = cam
+				registered = true
 				timer.Reset(monitorInterval)
 				continue
 			}
