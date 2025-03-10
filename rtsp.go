@@ -242,7 +242,7 @@ type rtspCamera struct {
 
 // Close closes the camera. It always returns nil, but because of Close() interface, it needs to return an error.
 func (rc *rtspCamera) Close(_ context.Context) error {
-	if err := registry.Global.RemoveCamera(rc.Name().String()); err != nil {
+	if err := registry.Global.Remove(rc.Name().String()); err != nil {
 		rc.logger.Errorf("error removing camera from global registry: %s", err.Error())
 	}
 	rc.cancelFunc()
@@ -678,7 +678,7 @@ var codecToCodecType = map[videoCodec]videostore.CodecType{
 	H265: videostore.CodecTypeH264,
 }
 
-func (rc *rtspCamera) Register(vs registry.Mux, codecCandiates []videostore.CodecType) (context.Context, error) {
+func (rc *rtspCamera) RequestVideo(vs registry.Mux, codecCandiates []videostore.CodecType) (context.Context, error) {
 	rc.logger.Info("Register START")
 	defer rc.logger.Info("Register STOP")
 
@@ -698,7 +698,7 @@ func (rc *rtspCamera) Register(vs registry.Mux, codecCandiates []videostore.Code
 	return ctx, nil
 }
 
-func (rc *rtspCamera) DeRegister(vs registry.Mux) error {
+func (rc *rtspCamera) CancelRequest(vs registry.Mux) error {
 	rc.logger.Info("Register START")
 	defer rc.logger.Info("Register STOP")
 	rc.muxMu.Lock()
@@ -1288,11 +1288,11 @@ func NewRTSPCamera(ctx context.Context, deps resource.Dependencies, conf resourc
 		return nil, err
 	}
 
-	if err := registry.Global.AddCamera(rc.Name().String(), rc); err != nil {
+	if err := registry.Global.Add(rc.Name().String(), rc); err != nil {
 		return nil, err
 	}
 	guard := rutils.NewGuard(func() {
-		if err := registry.Global.RemoveCamera(rc.Name().String()); err != nil {
+		if err := registry.Global.Remove(rc.Name().String()); err != nil {
 			rc.logger.Errorf("error removing camera: %s", err.Error())
 		}
 	})

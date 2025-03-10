@@ -1,3 +1,4 @@
+// Package registry provides a means for videostores to find viamrtsp cameras within the same OS process
 package registry
 
 import (
@@ -8,92 +9,72 @@ import (
 	"github.com/viam-modules/video-store/videostore"
 )
 
+// Mux is how viamrtsp writes it's video data to a video-store that has reqeusted it.
 type Mux interface {
-	Start(codec videostore.CodecType, au [][]byte) error
+	// Start starts saving an rtsp stream's video
+	Start(codec videostore.CodecType, initialParameters [][]byte) error
+	// WritePacket writes a packet
 	WritePacket(codec videostore.CodecType, au [][]byte, pts int64) error
+	// Stop stops the mux so any resources taken during Start can be released
 	Stop() error
 }
 
+// ModuleCamera allows videostore to request video from a camera and cancel that request.
 type ModuleCamera interface {
-	Register(vs Mux, codecCandiates []videostore.CodecType) (context.Context, error)
-	DeRegister(vs Mux) error
+	// RequestVideo requests the camera write video to the mux if the camera supports one of the codecs
+	RequestVideo(vs Mux, codecCandiates []videostore.CodecType) (context.Context, error)
+	// CancelRequest cancels a request
+	CancelRequest(vs Mux) error
 }
 
-// type ModuleVideoStores interface {
-// 	WritePacket(typ videostore.SourceType, au [][]byte, pts int64) error
-// 	Close()
-// }
-
+// ModuleRegistry allows ModuleCamera s to be added, removed and queried from the global registry.
 type ModuleRegistry struct {
 	mu   sync.Mutex
 	cams map[string]ModuleCamera
-	// videoStores map[string]ModuleVideoStores
 }
 
 var (
+	// ErrAlreadyInRegistry means that the resource is already in the registry.
 	ErrAlreadyInRegistry = errors.New("already in registry")
-	ErrNotFound          = errors.New("not in registry")
-	ErrUnsupported       = errors.New("unsupported codec")
-	ErrBusy              = errors.New("busy")
-	Global               = &ModuleRegistry{cams: map[string]ModuleCamera{}}
+	// ErrNotFound means that the resource was not found.
+	ErrNotFound = errors.New("not in registry")
+	// ErrUnsupported means that the codec is unsupported.
+	ErrUnsupported = errors.New("unsupported codec")
+	// ErrBusy means that the resource is busy.
+	ErrBusy = errors.New("busy")
+	// Global is the global registry.
+	Global = &ModuleRegistry{cams: map[string]ModuleCamera{}}
 )
 
-func (mr *ModuleRegistry) AddCamera(key string, val ModuleCamera) error {
+// Add adds a ModuleCamera with a name to the global registry.
+func (mr *ModuleRegistry) Add(name string, val ModuleCamera) error {
 	mr.mu.Lock()
 	defer mr.mu.Unlock()
-	if _, ok := mr.cams[key]; ok {
+	if _, ok := mr.cams[name]; ok {
 		return ErrAlreadyInRegistry
 	}
-	mr.cams[key] = val
+	mr.cams[name] = val
 	return nil
 }
 
-// func (mr *ModuleRegistry) AddVideoStore(key string, val ModuleVideoStores) error {
-// 	mr.mu.Lock()
-// 	defer mr.mu.Unlock()
-// 	if _, ok := mr.videoStores[key]; ok {
-// 		return ErrAlreadyInRegistry
-// 	}
-// 	mr.videoStores[key] = val
-// 	return nil
-// }
-
-func (mr *ModuleRegistry) RemoveCamera(key string) error {
+// Remove removes a ModuleCamera with a name from the global registry.
+func (mr *ModuleRegistry) Remove(name string) error {
 	mr.mu.Lock()
 	defer mr.mu.Unlock()
-	if _, ok := mr.cams[key]; !ok {
+	if _, ok := mr.cams[name]; !ok {
 		return ErrNotFound
 	}
-	delete(mr.cams, key)
+	delete(mr.cams, name)
 	return nil
 }
 
-// func (mr *ModuleRegistry) RemoveVideoStore(key string) error {
-// 	mr.mu.Lock()
-// 	defer mr.mu.Unlock()
-// 	if _, ok := mr.videoStores[key]; !ok {
-// 		return ErrNotFound
-// 	}
-// 	delete(mr.videoStores, key)
-// 	return nil
-// }
-
-func (mr *ModuleRegistry) Camera(key string) (ModuleCamera, error) {
+// Camera returns the ModuleCamera with the name from the global registry.
+func (mr *ModuleRegistry) Camera(name string) (ModuleCamera, error) {
 	mr.mu.Lock()
 	defer mr.mu.Unlock()
-	cam, ok := mr.cams[key]
+	cam, ok := mr.cams[name]
 	if !ok {
 		return nil, ErrNotFound
 	}
 	return cam, nil
 }
-
-// func (mr *ModuleRegistry) VideoStore(key string) (ModuleVideoStores, error) {
-// 	mr.mu.Lock()
-// 	defer mr.mu.Unlock()
-// 	vs, ok := mr.videoStores[key]
-// 	if !ok {
-// 		return nil, ErrNotFound
-// 	}
-// 	return vs, nil
-// }

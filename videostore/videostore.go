@@ -1,4 +1,4 @@
-// package videostore stores video
+// Package videostore stores video and allows it to be queried
 package videostore
 
 import (
@@ -23,6 +23,7 @@ const (
 	videoStoreInitCloseTimeout = time.Second * 10
 )
 
+// Model is videostore's Viam model.
 var Model = resource.ModelNamespace("viam").WithFamily("viamrtsp").WithModel("video-store")
 
 func init() {
@@ -39,7 +40,8 @@ type service struct {
 	rsMux  *rawSegmenterMux
 }
 
-func New(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger logging.Logger) (resource.Resource, error) {
+// New creates a new videostore.
+func New(_ context.Context, deps resource.Dependencies, conf resource.Config, logger logging.Logger) (resource.Resource, error) {
 	newConf, err := resource.NativeConfig[*Config](conf)
 	if err != nil {
 		logger.Error(err.Error())
@@ -87,10 +89,7 @@ func New(ctx context.Context, deps resource.Dependencies, conf resource.Config, 
 		if err := mux.Init(); err != nil {
 			return nil, err
 		}
-		// TODO: Start background goroutine to re-register if the stream breaks
-		// TODO: Nick create vs and have it be able to live for the lifetime of the videostore
 		vs = rtpVs
-
 	} else {
 		vsc := videostore.Config{
 			Type:    videostore.SourceTypeReadOnly,
@@ -181,6 +180,7 @@ func (s *service) DoCommand(ctx context.Context, command map[string]interface{})
 		return nil, errors.New("invalid command")
 	}
 }
+
 func toSaveCommand(command map[string]interface{}) (*videostore.SaveRequest, error) {
 	fromStr, ok := command["from"].(string)
 	if !ok {

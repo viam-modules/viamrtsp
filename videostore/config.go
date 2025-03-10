@@ -8,17 +8,20 @@ import (
 	"go.viam.com/utils"
 )
 
+// Config is the config for videostore.
 type Config struct {
 	Camera  *string `json:"camera,omitempty"`
 	Storage Storage `json:"storage"`
 }
 
+// Storage is the storage subconfig for videostore.
 type Storage struct {
 	SizeGB      int    `json:"size_gb"`
 	UploadPath  string `json:"upload_path,omitempty"`
 	StoragePath string `json:"storage_path,omitempty"`
 }
 
+// Validate validates the config and returns the resource graph dependencies.
 func (cfg *Config) Validate(path string) ([]string, error) {
 	if cfg.Storage == (Storage{}) {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "storage")

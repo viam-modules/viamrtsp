@@ -17,6 +17,8 @@ import (
 	"go.viam.com/utils"
 )
 
+const monitorInterval = time.Second * 5
+
 // -----------------
 // | State Machine |
 // -----------------
@@ -40,17 +42,16 @@ import (
 //		   -------
 //		 (WritePacket)
 type rawSegmenterMux struct {
-
 	// are valid for the lifetime of the rawSegmenterMux
 	camName resource.Name
 	logger  logging.Logger
 	worker  *utils.StoppableWorkers
-	regCtx  context.Context
+	regDone <-chan struct{}
 	cam     registry.ModuleCamera
 
 	mu           sync.Mutex
 	rawSeg       *videostore.RawSegmenter
-	codec        atomic.Int32
+	codec        atomic.Int64
 	width        int
 	height       int
 	vps          []byte
@@ -75,27 +76,28 @@ func (m *rawSegmenterMux) Init() error {
 	if err != nil {
 		return err
 	}
-	regCtx, err := cam.Register(m, codecs)
+	regCtx, err := cam.RequestVideo(m, codecs)
 	if err != nil {
 		return err
 	}
-	m.regCtx = regCtx
+	m.regDone = regCtx.Done()
 	m.cam = cam
 	m.worker.Add(m.monitorRegistration)
 	return nil
 }
+
 func (m *rawSegmenterMux) cleanup() {
 	if err := m.Stop(); err != nil {
 		m.logger.Warnf("failed to stop raw segmenter %s", err.Error())
 	}
-	if err := m.cam.DeRegister(m); err != nil {
+	if err := m.cam.CancelRequest(m); err != nil {
 		m.logger.Warnf("DeRegister video-store from viamrtsp camera %s", err.Error())
 	}
 }
+
 func (m *rawSegmenterMux) monitorRegistration(ctx context.Context) {
 	registered := true
-	interval := time.Second * 5
-	timer := time.NewTimer(interval)
+	timer := time.NewTimer(monitorInterval)
 	defer timer.Stop()
 	for {
 		if err := ctx.Err(); err != nil {
@@ -107,37 +109,37 @@ func (m *rawSegmenterMux) monitorRegistration(ctx context.Context) {
 		case <-ctx.Done():
 			m.cleanup()
 			return
-		case <-m.regCtx.Done():
+		case <-m.regDone:
 			m.logger.Info("Registration cancelled")
 			registered = false
-			m.regCtx = context.Background()
+			m.regDone = nil
 
 		case <-timer.C:
 			if !registered {
 				cam, err := registry.Global.Camera(m.camName.String())
 				if err != nil {
 					m.logger.Warnf("failed to find camera %s", err.Error())
-					timer.Reset(interval)
+					timer.Reset(monitorInterval)
 					continue
 				}
 
-				regCtx, err := cam.Register(m, codecs)
+				regCtx, err := cam.RequestVideo(m, codecs)
 				if err != nil {
 					m.logger.Warnf("failed to register video-store with viamrtsp camera, err: %s", err.Error())
 				} else {
 					m.logger.Info("ReRegistration Succeeded")
-					m.regCtx = regCtx
+					m.regDone = regCtx.Done()
 					m.cam = cam
 					registered = true
 				}
-				timer.Reset(interval)
+				timer.Reset(monitorInterval)
 				continue
 			}
 
 			if videostore.CodecType(m.codec.Load()) == videostore.CodecTypeUnknown {
 				m.logger.Warn("waiting for viamrtsp camera to send video data to video-store")
 			}
-			timer.Reset(interval)
+			timer.Reset(monitorInterval)
 		}
 	}
 }
@@ -166,6 +168,34 @@ func (m *rawSegmenterMux) Start(codec videostore.CodecType, au [][]byte) error {
 				m.sps = nalu
 			case h264.NALUTypePPS:
 				m.pps = nalu
+			case h264.NALUTypeNonIDR,
+				h264.NALUTypeDataPartitionA,
+				h264.NALUTypeDataPartitionB,
+				h264.NALUTypeDataPartitionC,
+				h264.NALUTypeIDR,
+				h264.NALUTypeSEI,
+				h264.NALUTypeAccessUnitDelimiter,
+				h264.NALUTypeEndOfSequence,
+				h264.NALUTypeEndOfStream,
+				h264.NALUTypeFillerData,
+				h264.NALUTypeSPSExtension,
+				h264.NALUTypePrefix,
+				h264.NALUTypeSubsetSPS,
+				h264.NALUTypeReserved16,
+				h264.NALUTypeReserved17,
+				h264.NALUTypeReserved18,
+				h264.NALUTypeSliceLayerWithoutPartitioning,
+				h264.NALUTypeSliceExtension,
+				h264.NALUTypeSliceExtensionDepth,
+				h264.NALUTypeReserved22,
+				h264.NALUTypeReserved23,
+				h264.NALUTypeSTAPA,
+				h264.NALUTypeSTAPB,
+				h264.NALUTypeMTAP16,
+				h264.NALUTypeMTAP24,
+				h264.NALUTypeFUA,
+				h264.NALUTypeFUB:
+				fallthrough
 			default:
 				return errors.New("invalid nalu")
 			}
@@ -183,14 +213,50 @@ func (m *rawSegmenterMux) Start(codec videostore.CodecType, au [][]byte) error {
 
 			case h265.NALUType_PPS_NUT:
 				m.pps = nalu
+			case h265.NALUType_TRAIL_N,
+				h265.NALUType_TRAIL_R,
+				h265.NALUType_TSA_N,
+				h265.NALUType_TSA_R,
+				h265.NALUType_STSA_N,
+				h265.NALUType_STSA_R,
+				h265.NALUType_RADL_N,
+				h265.NALUType_RADL_R,
+				h265.NALUType_RASL_N,
+				h265.NALUType_RASL_R,
+				h265.NALUType_RSV_VCL_N10,
+				h265.NALUType_RSV_VCL_N12,
+				h265.NALUType_RSV_VCL_N14,
+				h265.NALUType_RSV_VCL_R11,
+				h265.NALUType_RSV_VCL_R13,
+				h265.NALUType_RSV_VCL_R15,
+				h265.NALUType_BLA_W_LP,
+				h265.NALUType_BLA_W_RADL,
+				h265.NALUType_BLA_N_LP,
+				h265.NALUType_IDR_W_RADL,
+				h265.NALUType_IDR_N_LP,
+				h265.NALUType_CRA_NUT,
+				h265.NALUType_RSV_IRAP_VCL22,
+				h265.NALUType_RSV_IRAP_VCL23,
+				h265.NALUType_AUD_NUT,
+				h265.NALUType_EOS_NUT,
+				h265.NALUType_EOB_NUT,
+				h265.NALUType_FD_NUT,
+				h265.NALUType_PREFIX_SEI_NUT,
+				h265.NALUType_SUFFIX_SEI_NUT,
+				h265.NALUType_AggregationUnit,
+				h265.NALUType_FragmentationUnit,
+				h265.NALUType_PACI:
+				fallthrough
 			default:
 				return errors.New("invalid nalu")
 			}
 		}
+	case videostore.CodecTypeUnknown:
+		fallthrough
 	default:
 		return errors.New("invalid codec")
 	}
-	m.codec.Store(int32(codec))
+	m.codec.Store(int64(codec))
 	return nil
 }
 
@@ -210,6 +276,8 @@ func (m *rawSegmenterMux) WritePacket(codec videostore.CodecType, au [][]byte, p
 		return m.writeH264(au, pts)
 	case videostore.CodecTypeH265:
 		return m.writeH265(au, pts)
+	case videostore.CodecTypeUnknown:
+		fallthrough
 	default:
 		return errors.New("invalid codec")
 	}
@@ -221,7 +289,7 @@ func (m *rawSegmenterMux) Stop() error {
 	if err := m.rawSeg.Close(); err != nil {
 		return err
 	}
-	m.codec.Store(int32(videostore.CodecTypeUnknown))
+	m.codec.Store(int64(videostore.CodecTypeUnknown))
 	m.width = 0
 	m.height = 0
 	m.vps = nil
@@ -429,6 +497,7 @@ func (m *rawSegmenterMux) writeH264(au [][]byte, pts int64) error {
 
 	dts, err := m.dtsExtractor.Extract(au, pts)
 	if err != nil {
+		m.logger.Debugf("dtsExtractor Extract err: %s", err.Error())
 		return nil
 	}
 
@@ -472,6 +541,8 @@ func (m *rawSegmenterMux) maybeReInitVideoStore() error {
 			return nil
 		}
 		width, height = hsps.Width(), hsps.Height()
+	case videostore.CodecTypeUnknown:
+		fallthrough
 	default:
 		return errors.New("invalid videostore.CodecType")
 	}
