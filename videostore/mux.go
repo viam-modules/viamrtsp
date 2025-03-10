@@ -13,6 +13,7 @@ import (
 	"github.com/viam-modules/viamrtsp/registry"
 	"github.com/viam-modules/video-store/videostore"
 	"go.viam.com/rdk/logging"
+	"go.viam.com/rdk/resource"
 	"go.viam.com/utils"
 )
 
@@ -39,8 +40,17 @@ import (
 //		   -------
 //		 (WritePacket)
 type rawSegmenterMux struct {
+
+	// are valid for the lifetime of the rawSegmenterMux
+	camName resource.Name
+	logger  logging.Logger
+	worker  *utils.StoppableWorkers
+	regCtx  context.Context
+	cam     registry.ModuleCamera
+
+	mu           sync.Mutex
+	rawSeg       *videostore.RawSegmenter
 	codec        atomic.Int32
-	cam          registry.ModuleCamera
 	width        int
 	height       int
 	vps          []byte
@@ -49,46 +59,87 @@ type rawSegmenterMux struct {
 	dtsExtractor interface {
 		Extract(au [][]byte, pts int64) (int64, error)
 	}
-	spsUnChanged bool
-	mu           sync.Mutex
-	rawSeg       *videostore.RawSegmenter
-	logger       logging.Logger
-	worker       utils.StoppableWorkers
+	spsUnChanged       bool
+	firstTimeStampsSet bool
+	firstPTS           int64
+	firstDTS           int64
+}
+
+var codecs = []videostore.CodecType{
+	videostore.CodecTypeH265,
+	videostore.CodecTypeH264,
 }
 
 func (m *rawSegmenterMux) Init() error {
-	if err := m.cam.Register(m, []videostore.CodecType{
-		videostore.CodecTypeH265,
-		videostore.CodecTypeH264,
-	}); err != nil {
+	cam, err := registry.Global.Camera(m.camName.String())
+	if err != nil {
 		return err
 	}
-	m.worker.Add(func(ctx context.Context) {
-		var (
-			timeoutCtx context.Context
-			cancel     context.CancelFunc
-		)
+	regCtx, err := cam.Register(m, codecs)
+	if err != nil {
+		return err
+	}
+	m.regCtx = regCtx
+	m.cam = cam
+	m.worker.Add(m.monitorRegistration)
+	return nil
+}
+func (m *rawSegmenterMux) cleanup() {
+	if err := m.Stop(); err != nil {
+		m.logger.Warnf("failed to stop raw segmenter %s", err.Error())
+	}
+	if err := m.cam.DeRegister(m); err != nil {
+		m.logger.Warnf("DeRegister video-store from viamrtsp camera %s", err.Error())
+	}
+}
+func (m *rawSegmenterMux) monitorRegistration(ctx context.Context) {
+	registered := true
+	interval := time.Second * 5
+	timer := time.NewTimer(interval)
+	defer timer.Stop()
+	for {
+		if err := ctx.Err(); err != nil {
+			m.cleanup()
+			return
+		}
 
-		for {
-			if err := ctx.Err(); err != nil {
-				return
-			}
-			timeoutCtx, cancel = context.WithTimeout(context.Background(), time.Second*5)
+		select {
+		case <-ctx.Done():
+			m.cleanup()
+			return
+		case <-m.regCtx.Done():
+			m.logger.Info("Registration cancelled")
+			registered = false
+			m.regCtx = context.Background()
 
-			select {
-			case <-ctx.Done():
-				cancel()
-				return
-			case <-timeoutCtx.Done():
-				cancel()
-				if videostore.CodecType(m.codec.Load()) == videostore.CodecTypeUnknown {
-					m.logger.Warn("")
+		case <-timer.C:
+			if !registered {
+				cam, err := registry.Global.Camera(m.camName.String())
+				if err != nil {
+					m.logger.Warnf("failed to find camera %s", err.Error())
+					timer.Reset(interval)
+					continue
 				}
+
+				regCtx, err := cam.Register(m, codecs)
+				if err != nil {
+					m.logger.Warnf("failed to register video-store with viamrtsp camera, err: %s", err.Error())
+				} else {
+					m.logger.Info("ReRegistration Succeeded")
+					m.regCtx = regCtx
+					m.cam = cam
+					registered = true
+				}
+				timer.Reset(interval)
 				continue
 			}
+
+			if videostore.CodecType(m.codec.Load()) == videostore.CodecTypeUnknown {
+				m.logger.Warn("waiting for viamrtsp camera to send video data to video-store")
+			}
+			timer.Reset(interval)
 		}
-	})
-	return nil
+	}
 }
 
 func (m *rawSegmenterMux) Close() error {
@@ -96,13 +147,6 @@ func (m *rawSegmenterMux) Close() error {
 		return nil
 	}
 	m.worker.Stop()
-	if err := m.Stop(); err != nil {
-		return err
-	}
-	if err := m.cam.DeRegister(m); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -185,11 +229,14 @@ func (m *rawSegmenterMux) Stop() error {
 	m.pps = nil
 	m.dtsExtractor = nil
 	m.spsUnChanged = false
+	m.firstTimeStampsSet = false
+	m.firstPTS = 0
+	m.firstDTS = 0
+
 	return nil
 }
 
 func (m *rawSegmenterMux) writeH265(au [][]byte, pts int64) error {
-
 	var filteredAU [][]byte
 
 	isRandomAccess := false
@@ -287,7 +334,12 @@ func (m *rawSegmenterMux) writeH265(au [][]byte, pts int64) error {
 		m.logger.Errorf("failed to marshal annex b: %s", err)
 		return err
 	}
-	err = m.rawSeg.WritePacket(nalu, pts, dts, isRandomAccess) //WritePacket(nalu, pts, dts, isRandomAccess)
+	if !m.firstTimeStampsSet {
+		m.firstPTS = pts
+		m.firstDTS = dts
+		m.firstTimeStampsSet = true
+	}
+	err = m.rawSeg.WritePacket(nalu, pts-m.firstPTS, dts-m.firstDTS, isRandomAccess)
 	if err != nil {
 		m.logger.Errorf("error writing packet to segmenter: %s", err)
 	}
@@ -385,7 +437,13 @@ func (m *rawSegmenterMux) writeH264(au [][]byte, pts int64) error {
 		m.logger.Errorf("AnnexBMarshal err: %s", err.Error())
 		return err
 	}
-	err = m.rawSeg.WritePacket(packed, pts, dts, idrPresent)
+
+	if !m.firstTimeStampsSet {
+		m.firstPTS = pts
+		m.firstDTS = dts
+		m.firstTimeStampsSet = true
+	}
+	err = m.rawSeg.WritePacket(packed, pts-m.firstPTS, dts-m.firstDTS, idrPresent)
 	if err != nil {
 		m.logger.Errorf("error writing packet to segmenter: %s", err)
 	}
@@ -420,7 +478,7 @@ func (m *rawSegmenterMux) maybeReInitVideoStore() error {
 
 	if width <= 0 || height <= 0 {
 		err := errors.New("width and height must both be greater than 0")
-		m.logger.Debugf("unable to init video store: %s", err.Error())
+		m.logger.Infof("unable to init video store: %s", err.Error())
 		return nil
 	}
 	// if vs is initialized and the height & width have not changed,

@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"context"
 	"errors"
 	"sync"
 
@@ -14,7 +15,7 @@ type Mux interface {
 }
 
 type ModuleCamera interface {
-	Register(vs Mux, codecCandiates []videostore.CodecType) error
+	Register(vs Mux, codecCandiates []videostore.CodecType) (context.Context, error)
 	DeRegister(vs Mux) error
 }
 
@@ -32,7 +33,7 @@ type ModuleRegistry struct {
 var (
 	ErrAlreadyInRegistry = errors.New("already in registry")
 	ErrNotFound          = errors.New("not in registry")
-	ErrUnsupported       = errors.New("unsupported")
+	ErrUnsupported       = errors.New("unsupported codec")
 	ErrBusy              = errors.New("busy")
 	Global               = &ModuleRegistry{cams: map[string]ModuleCamera{}}
 )

@@ -7,12 +7,12 @@ import (
 	"errors"
 	"time"
 
-	"github.com/viam-modules/viamrtsp/registry"
 	"github.com/viam-modules/video-store/videostore"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/components/generic"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
+	"go.viam.com/utils"
 )
 
 const (
@@ -60,10 +60,6 @@ func New(ctx context.Context, deps resource.Dependencies, conf resource.Config, 
 		if err != nil {
 			return nil, err
 		}
-		cam, err := registry.Global.Camera(c.Name().String())
-		if err != nil {
-			return nil, err
-		}
 		vsc := videostore.Config{
 			Type:    videostore.SourceTypeRTP,
 			Storage: sc,
@@ -82,7 +78,12 @@ func New(ctx context.Context, deps resource.Dependencies, conf resource.Config, 
 			return nil, errors.New("videostore.RTPVideoStore.Segmenter() is nil")
 		}
 
-		mux = &rawSegmenterMux{rawSeg: rawSeg, cam: cam, logger: logger}
+		mux = &rawSegmenterMux{
+			rawSeg:  rawSeg,
+			camName: c.Name(),
+			worker:  utils.NewBackgroundStoppableWorkers(),
+			logger:  logger,
+		}
 		if err := mux.Init(); err != nil {
 			return nil, err
 		}
