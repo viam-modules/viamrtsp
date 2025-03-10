@@ -86,7 +86,7 @@ func New(_ context.Context, deps resource.Dependencies, conf resource.Config, lo
 			worker:  utils.NewBackgroundStoppableWorkers(),
 			logger:  logger,
 		}
-		if err := mux.Init(); err != nil {
+		if err := mux.init(); err != nil {
 			return nil, err
 		}
 		vs = rtpVs
@@ -119,7 +119,7 @@ func (s *service) Name() resource.Name {
 }
 
 func (s *service) Close(_ context.Context) error {
-	if err := s.rsMux.Close(); err != nil {
+	if err := s.rsMux.close(); err != nil {
 		return err
 	}
 	s.vs.Close()

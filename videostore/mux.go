@@ -19,28 +19,6 @@ import (
 
 const monitorInterval = time.Second * 5
 
-// -----------------
-// | State Machine |
-// -----------------
-//
-//	      Init
-//	        |
-//	        |
-//		      |        ___
-//		      v       /   \
-//
-// Closed  Unstarted<---- (5 second timeout): log still not started
-//
-//		   |      ^
-//		   |      |
-//	  	(Start)(Stop)
-//	  	  |      |
-//	  	  v      |
-//	 	   Started
-//		   |     ^
-//		   |     |
-//		   -------
-//		 (WritePacket)
 type rawSegmenterMux struct {
 	// are valid for the lifetime of the rawSegmenterMux
 	camName resource.Name
@@ -71,7 +49,8 @@ var codecs = []videostore.CodecType{
 	videostore.CodecTypeH264,
 }
 
-func (m *rawSegmenterMux) Init() error {
+// init and close are called by videostore.
+func (m *rawSegmenterMux) init() error {
 	cam, err := registry.Global.Get(m.camName.String())
 	if err != nil {
 		return err
@@ -86,31 +65,20 @@ func (m *rawSegmenterMux) Init() error {
 	return nil
 }
 
-func (m *rawSegmenterMux) cleanup() {
-	if err := m.Stop(); err != nil {
-		m.logger.Warnf("failed to stop raw segmenter %s", err.Error())
-	}
-	if err := m.cam.CancelRequest(m); err != nil {
-		m.logger.Warnf("DeRegister video-store from viamrtsp camera %s", err.Error())
-	}
-}
-
 func (m *rawSegmenterMux) monitorRegistration(ctx context.Context) {
 	registered := true
 	timer := time.NewTimer(monitorInterval)
 	defer timer.Stop()
+	defer m.cleanup()
 	for {
 		if err := ctx.Err(); err != nil {
-			m.cleanup()
 			return
 		}
 
 		select {
 		case <-ctx.Done():
-			m.cleanup()
 			return
 		case <-m.regDone:
-			m.logger.Info("Registration cancelled")
 			registered = false
 			m.regDone = nil
 
@@ -127,7 +95,6 @@ func (m *rawSegmenterMux) monitorRegistration(ctx context.Context) {
 				if err != nil {
 					m.logger.Warnf("failed to register video-store with viamrtsp camera, err: %s", err.Error())
 				} else {
-					m.logger.Info("ReRegistration Succeeded")
 					m.regDone = regCtx.Done()
 					m.cam = cam
 					registered = true
@@ -144,7 +111,16 @@ func (m *rawSegmenterMux) monitorRegistration(ctx context.Context) {
 	}
 }
 
-func (m *rawSegmenterMux) Close() error {
+func (m *rawSegmenterMux) cleanup() {
+	if err := m.Stop(); err != nil {
+		m.logger.Warnf("failed to stop raw segmenter %s", err.Error())
+	}
+	if err := m.cam.CancelRequest(m); err != nil {
+		m.logger.Warnf("DeRegister video-store from viamrtsp camera %s", err.Error())
+	}
+}
+
+func (m *rawSegmenterMux) close() error {
 	if m == nil {
 		return nil
 	}
@@ -156,7 +132,7 @@ func (m *rawSegmenterMux) Start(codec videostore.CodecType, au [][]byte) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if vsCodec := videostore.CodecType(m.codec.Load()); vsCodec != videostore.CodecTypeUnknown {
-		return fmt.Errorf("Init called when codec already set to %s", vsCodec)
+		return fmt.Errorf("init called when codec already set to %s", vsCodec)
 	}
 	switch codec {
 	case videostore.CodecTypeH264:
