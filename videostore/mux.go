@@ -19,17 +19,7 @@ import (
 
 const monitorInterval = time.Second * 5
 
-type rawSegmenterMux struct {
-	// are valid for the lifetime of the rawSegmenterMux
-	camName resource.Name
-	logger  logging.Logger
-	worker  *utils.StoppableWorkers
-	regDone <-chan struct{}
-	cam     registry.ModuleCamera
-
-	mu           sync.Mutex
-	rawSeg       *videostore.RawSegmenter
-	codec        atomic.Int64
+type metadata struct {
 	width        int
 	height       int
 	vps          []byte
@@ -42,6 +32,19 @@ type rawSegmenterMux struct {
 	firstTimeStampsSet bool
 	firstPTS           int64
 	firstDTS           int64
+}
+type rawSegmenterMux struct {
+	// are valid for the lifetime of the rawSegmenterMux
+	camName resource.Name
+	logger  logging.Logger
+	worker  *utils.StoppableWorkers
+	regDone <-chan struct{}
+	cam     registry.ModuleCamera
+
+	mu       sync.Mutex
+	rawSeg   *videostore.RawSegmenter
+	codec    atomic.Int64
+	metadata metadata
 }
 
 var codecs = []videostore.CodecType{
@@ -155,9 +158,9 @@ func (m *rawSegmenterMux) Start(codec videostore.CodecType, au [][]byte) error {
 			typ := h264.NALUType(nalu[0] & 0x1F)
 			switch typ {
 			case h264.NALUTypeSPS:
-				m.sps = nalu
+				m.metadata.sps = nalu
 			case h264.NALUTypePPS:
-				m.pps = nalu
+				m.metadata.pps = nalu
 			case h264.NALUTypeNonIDR,
 				h264.NALUTypeDataPartitionA,
 				h264.NALUTypeDataPartitionB,
@@ -196,13 +199,13 @@ func (m *rawSegmenterMux) Start(codec videostore.CodecType, au [][]byte) error {
 			typ := h265.NALUType((nalu[0] >> 1) & 0b111111)
 			switch typ {
 			case h265.NALUType_VPS_NUT:
-				m.vps = nalu
+				m.metadata.vps = nalu
 
 			case h265.NALUType_SPS_NUT:
-				m.sps = nalu
+				m.metadata.sps = nalu
 
 			case h265.NALUType_PPS_NUT:
-				m.pps = nalu
+				m.metadata.pps = nalu
 			case h265.NALUType_TRAIL_N,
 				h265.NALUType_TRAIL_R,
 				h265.NALUType_TSA_N,
@@ -280,17 +283,7 @@ func (m *rawSegmenterMux) Stop() error {
 		return err
 	}
 	m.codec.Store(int64(videostore.CodecTypeUnknown))
-	m.width = 0
-	m.height = 0
-	m.vps = nil
-	m.sps = nil
-	m.pps = nil
-	m.dtsExtractor = nil
-	m.spsUnChanged = false
-	m.firstTimeStampsSet = false
-	m.firstPTS = 0
-	m.firstDTS = 0
-
+	m.metadata = metadata{}
 	return nil
 }
 
@@ -304,16 +297,16 @@ func (m *rawSegmenterMux) writeH265(au [][]byte, pts int64) error {
 		typ := h265.NALUType((nalu[0] >> 1) & 0b111111)
 		switch typ {
 		case h265.NALUType_VPS_NUT:
-			m.vps = nalu
+			m.metadata.vps = nalu
 			continue
 
 		case h265.NALUType_SPS_NUT:
-			m.sps = nalu
-			m.spsUnChanged = false
+			m.metadata.sps = nalu
+			m.metadata.spsUnChanged = false
 			continue
 
 		case h265.NALUType_PPS_NUT:
-			m.pps = nalu
+			m.metadata.pps = nalu
 			continue
 
 		case h265.NALUType_AUD_NUT:
@@ -369,18 +362,18 @@ func (m *rawSegmenterMux) writeH265(au [][]byte, pts int64) error {
 
 	// add VPS, SPS and PPS before random access au
 	if isRandomAccess {
-		au = append([][]byte{m.vps, m.sps, m.pps}, au...)
+		au = append([][]byte{m.metadata.vps, m.metadata.sps, m.metadata.pps}, au...)
 	}
 
-	if m.dtsExtractor == nil {
+	if m.metadata.dtsExtractor == nil {
 		// skip samples silently until we find one with a IDR
 		if !isRandomAccess {
 			return nil
 		}
-		m.dtsExtractor = h265.NewDTSExtractor2()
+		m.metadata.dtsExtractor = h265.NewDTSExtractor2()
 	}
 
-	dts, err := m.dtsExtractor.Extract(au, pts)
+	dts, err := m.metadata.dtsExtractor.Extract(au, pts)
 	if err != nil {
 		m.logger.Errorf("error extracting dts: %s", err)
 		return nil
@@ -392,12 +385,12 @@ func (m *rawSegmenterMux) writeH265(au [][]byte, pts int64) error {
 		m.logger.Errorf("failed to marshal annex b: %s", err)
 		return err
 	}
-	if !m.firstTimeStampsSet {
-		m.firstPTS = pts
-		m.firstDTS = dts
-		m.firstTimeStampsSet = true
+	if !m.metadata.firstTimeStampsSet {
+		m.metadata.firstPTS = pts
+		m.metadata.firstDTS = dts
+		m.metadata.firstTimeStampsSet = true
 	}
-	err = m.rawSeg.WritePacket(nalu, pts-m.firstPTS, dts-m.firstDTS, isRandomAccess)
+	err = m.rawSeg.WritePacket(nalu, pts-m.metadata.firstPTS, dts-m.metadata.firstDTS, isRandomAccess)
 	if err != nil {
 		m.logger.Errorf("error writing packet to segmenter: %s", err)
 	}
@@ -414,12 +407,12 @@ func (m *rawSegmenterMux) writeH264(au [][]byte, pts int64) error {
 		typ := h264.NALUType(nalu[0] & 0x1F)
 		switch typ {
 		case h264.NALUTypeSPS:
-			m.sps = nalu
-			m.spsUnChanged = false
+			m.metadata.sps = nalu
+			m.metadata.spsUnChanged = false
 			continue
 
 		case h264.NALUTypePPS:
-			m.pps = nalu
+			m.metadata.pps = nalu
 			continue
 
 		case h264.NALUTypeAccessUnitDelimiter:
@@ -474,18 +467,18 @@ func (m *rawSegmenterMux) writeH264(au [][]byte, pts int64) error {
 
 	// add SPS and PPS before access unit that contains an IDR
 	if idrPresent {
-		au = append([][]byte{m.sps, m.pps}, au...)
+		au = append([][]byte{m.metadata.sps, m.metadata.pps}, au...)
 	}
 
-	if m.dtsExtractor == nil {
+	if m.metadata.dtsExtractor == nil {
 		// skip samples silently until we find one with a IDR
 		if !idrPresent {
 			return nil
 		}
-		m.dtsExtractor = h264.NewDTSExtractor2()
+		m.metadata.dtsExtractor = h264.NewDTSExtractor2()
 	}
 
-	dts, err := m.dtsExtractor.Extract(au, pts)
+	dts, err := m.metadata.dtsExtractor.Extract(au, pts)
 	if err != nil {
 		m.logger.Debugf("dtsExtractor Extract err: %s", err.Error())
 		return nil
@@ -497,12 +490,12 @@ func (m *rawSegmenterMux) writeH264(au [][]byte, pts int64) error {
 		return err
 	}
 
-	if !m.firstTimeStampsSet {
-		m.firstPTS = pts
-		m.firstDTS = dts
-		m.firstTimeStampsSet = true
+	if !m.metadata.firstTimeStampsSet {
+		m.metadata.firstPTS = pts
+		m.metadata.firstDTS = dts
+		m.metadata.firstTimeStampsSet = true
 	}
-	err = m.rawSeg.WritePacket(packed, pts-m.firstPTS, dts-m.firstDTS, idrPresent)
+	err = m.rawSeg.WritePacket(packed, pts-m.metadata.firstPTS, dts-m.metadata.firstDTS, idrPresent)
 	if err != nil {
 		m.logger.Errorf("error writing packet to segmenter: %s", err)
 	}
@@ -511,7 +504,7 @@ func (m *rawSegmenterMux) writeH264(au [][]byte, pts int64) error {
 
 // // maybeReInitVideoStore assumes mu is held by caller.
 func (m *rawSegmenterMux) maybeReInitVideoStore() error {
-	if m.spsUnChanged {
+	if m.metadata.spsUnChanged {
 		return nil
 	}
 	var width, height int
@@ -519,14 +512,14 @@ func (m *rawSegmenterMux) maybeReInitVideoStore() error {
 	switch codec {
 	case videostore.CodecTypeH265:
 		var hsps h265.SPS
-		if err := hsps.Unmarshal(m.sps); err != nil {
+		if err := hsps.Unmarshal(m.metadata.sps); err != nil {
 			m.logger.Debugf("unable to init video store: %s", err.Error())
 			return nil
 		}
 		width, height = hsps.Width(), hsps.Height()
 	case videostore.CodecTypeH264:
 		var hsps h264.SPS
-		if err := hsps.Unmarshal(m.sps); err != nil {
+		if err := hsps.Unmarshal(m.metadata.sps); err != nil {
 			m.logger.Debugf("unable to init video store: %s", err.Error())
 			return nil
 		}
@@ -544,8 +537,8 @@ func (m *rawSegmenterMux) maybeReInitVideoStore() error {
 	}
 	// if vs is initialized and the height & width have not changed,
 	// record the sps as unchanged and return
-	if m.width == width && m.height == height {
-		m.spsUnChanged = true
+	if m.metadata.width == width && m.metadata.height == height {
+		m.metadata.spsUnChanged = true
 		return nil
 	}
 
@@ -559,8 +552,8 @@ func (m *rawSegmenterMux) maybeReInitVideoStore() error {
 		return err
 	}
 
-	m.width = width
-	m.height = height
-	m.spsUnChanged = true
+	m.metadata.width = width
+	m.metadata.height = height
+	m.metadata.spsUnChanged = true
 	return nil
 }
