@@ -168,6 +168,98 @@ type cache struct {
 	imageMetadata camera.ImageMetadata
 }
 
+type videoRequest struct {
+	mu      sync.Mutex
+	mux     registry.Mux
+	started bool
+	cancel  context.CancelFunc
+	logger  logging.Logger
+}
+
+func (vr *videoRequest) active() bool {
+	vr.mu.Lock()
+	defer vr.mu.Unlock()
+	return vr.mux != nil
+}
+
+func (vr *videoRequest) newRequest(mux registry.Mux) (context.Context, error) {
+	vr.mu.Lock()
+	defer vr.mu.Unlock()
+	if vr.mux != nil {
+		return nil, registry.ErrBusy
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	vr.mux = mux
+	vr.cancel = cancel
+	return ctx, nil
+}
+
+func (vr *videoRequest) cancelRequest(mux registry.Mux) error {
+	vr.mu.Lock()
+	defer vr.mu.Unlock()
+	if vr.mux == nil {
+		return nil
+	}
+	if vr.mux != mux {
+		return registry.ErrNotFound
+	}
+	vr.cancel()
+	vr.mux = nil
+	vr.started = false
+	vr.cancel = nil
+	return nil
+}
+
+func (vr *videoRequest) write(codec videostore.CodecType, initialParameters [][]byte, au [][]byte, pts int64) {
+	vr.mu.Lock()
+	defer vr.mu.Unlock()
+	if vr.mux == nil {
+		return
+	}
+
+	if !vr.started {
+		if err := vr.mux.Start(codec, initialParameters); err != nil {
+			vr.logger.Errorf("codec: %s, failed to start Mux: %s", codec, err.Error())
+			return
+		}
+		vr.started = true
+	}
+	if err := vr.mux.WritePacket(codec, au, pts); err != nil {
+		vr.logger.Errorf("codec: %s, videostore WritePacket returned error, err: %s", codec, err.Error())
+	}
+}
+
+func (vr *videoRequest) stop() {
+	vr.mu.Lock()
+	defer vr.mu.Unlock()
+	if vr.mux != nil {
+		if err := vr.mux.Stop(); err != nil {
+			vr.logger.Errorf("error stopping mux: %s", err.Error())
+		}
+	}
+	vr.started = false
+}
+
+func (vr *videoRequest) clear() {
+	vr.mu.Lock()
+	defer vr.mu.Unlock()
+
+	if vr.mux == nil {
+		return
+	}
+
+	if err := vr.mux.Stop(); err != nil {
+		vr.logger.Errorf("error stopping mux: %s", err.Error())
+	}
+
+	if vr.cancel != nil {
+		vr.cancel()
+	}
+	vr.mux = nil
+	vr.started = false
+	vr.cancel = nil
+}
+
 // rtspCamera contains the rtsp client, and the reader function that fulfills the camera interface.
 type rtspCamera struct {
 	resource.AlwaysRebuild
@@ -177,17 +269,12 @@ type rtspCamera struct {
 	lazyDecode       bool
 	iframeOnlyDecode bool
 
-	closeMu sync.RWMutex
-	muxMu   sync.Mutex
-	// mux & muxRegistrationCancel must either both be nil or both non nil
-	// they have the same lifetime
-	mux                   registry.Mux
-	muxStarted            bool
-	muxRegistrationCancel context.CancelFunc
-	auMu                  sync.Mutex
-	au                    [][]byte
-	client                *gortsplib.Client
-	rawDecoder            *decoder
+	closeMu      sync.RWMutex
+	videoRequest *videoRequest
+	auMu         sync.Mutex
+	au           [][]byte
+	client       *gortsplib.Client
+	rawDecoder   *decoder
 
 	cancelCtx  context.Context
 	cancelFunc context.CancelFunc
@@ -246,16 +333,7 @@ func (rc *rtspCamera) Close(_ context.Context) error {
 	rc.latestFrameMu.Unlock()
 	rc.avFramePool.close()
 	rc.closeMu.Unlock()
-
-	rc.muxMu.Lock()
-	defer rc.muxMu.Unlock()
-	if rc.mux == nil {
-		return nil
-	}
-	rc.muxRegistrationCancel()
-	rc.mux = nil
-	rc.muxStarted = false
-	rc.muxRegistrationCancel = nil
+	rc.videoRequest.clear()
 	return nil
 }
 
@@ -307,15 +385,7 @@ func (rc *rtspCamera) closeConnection() {
 		rc.rawDecoder.close()
 		rc.rawDecoder = nil
 	}
-
-	rc.muxMu.Lock()
-	defer rc.muxMu.Unlock()
-	if rc.mux != nil {
-		if err := rc.mux.Stop(); err != nil {
-			rc.logger.Errorf("error stopping mux: %s", err.Error())
-		}
-	}
-	rc.muxStarted = false
+	rc.videoRequest.stop()
 }
 
 // reconnectClientWithFallbackTransports attempts to setup the RTSP client with the given codec
@@ -583,26 +653,6 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 	}
 
 	params := [][]byte{f.SPS, f.PPS}
-	storeSegment := func(au [][]byte, pts int64) {
-		rc.logger.Infof("H264 storeSegment pts: %d", pts)
-		rc.muxMu.Lock()
-		defer rc.muxMu.Unlock()
-		if rc.mux == nil {
-			rc.logger.Infof("H264 storeSegment no mux")
-			return
-		}
-
-		if !rc.muxStarted {
-			if err := rc.mux.Start(videostore.CodecTypeH264, params); err != nil {
-				rc.logger.Errorf("failed to start Mux: %s", err.Error())
-				return
-			}
-			rc.muxStarted = true
-		}
-		if err := rc.mux.WritePacket(videostore.CodecTypeH264, au, pts); err != nil {
-			rc.logger.Errorf("videostore WritePacket returned error, err: %s", err.Error())
-		}
-	}
 	onPacketRTP := func(pkt *rtp.Packet) {
 		pts, ok := rc.client.PacketPTS2(media, pkt)
 		if !ok {
@@ -620,7 +670,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 			return
 		}
 		storeImage(au)
-		storeSegment(au, pts)
+		rc.videoRequest.write(videostore.CodecTypeH264, params, au, pts)
 	}
 
 	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
@@ -638,43 +688,16 @@ var codecToCodecType = map[videoCodec]videostore.CodecType{
 	H265: videostore.CodecTypeH264,
 }
 
-func (rc *rtspCamera) RequestVideo(vs registry.Mux, codecCandiates []videostore.CodecType) (context.Context, error) {
-	rc.logger.Info("Register START")
-	defer rc.logger.Info("Register STOP")
-
-	rc.muxMu.Lock()
-	defer rc.muxMu.Unlock()
-	if rc.mux != nil {
-		return nil, registry.ErrBusy
-	}
+func (rc *rtspCamera) RequestVideo(mux registry.Mux, codecCandiates []videostore.CodecType) (context.Context, error) {
 	currentCodec := codecToCodecType[videoCodec(rc.currentCodec.Load())]
 	if !slices.Contains(codecCandiates, currentCodec) {
 		return nil, registry.ErrUnsupported
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	rc.mux = vs
-	rc.muxRegistrationCancel = cancel
-	return ctx, nil
+	return rc.videoRequest.newRequest(mux)
 }
 
-func (rc *rtspCamera) CancelRequest(vs registry.Mux) error {
-	rc.logger.Info("Register START")
-	defer rc.logger.Info("Register STOP")
-	rc.muxMu.Lock()
-	defer rc.muxMu.Unlock()
-	if rc.mux == nil {
-		return nil
-	}
-	if rc.mux != vs {
-		return registry.ErrNotFound
-	}
-	rc.muxRegistrationCancel()
-
-	rc.mux = nil
-	rc.muxStarted = false
-	rc.muxRegistrationCancel = nil
-	return nil
+func (rc *rtspCamera) CancelRequest(mux registry.Mux) error {
+	return rc.videoRequest.cancelRequest(mux)
 }
 
 // initH265 initializes the H265 decoder and sets up the client to receive H265 packets.
@@ -745,27 +768,6 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 	}
 
 	params := [][]byte{f.VPS, f.SPS, f.PPS}
-	storeSegment := func(au [][]byte, pts int64) {
-		rc.logger.Infof("H265 storeSegment pts: %d", pts)
-		rc.muxMu.Lock()
-		defer rc.muxMu.Unlock()
-		if rc.mux == nil {
-			rc.logger.Infof("H265 storeSegment no mux")
-			return
-		}
-
-		if !rc.muxStarted {
-			if err := rc.mux.Start(videostore.CodecTypeH265, params); err != nil {
-				rc.logger.Errorf("failed to start Mux: %s", err.Error())
-				return
-			}
-			rc.muxStarted = true
-		}
-
-		if err := rc.mux.WritePacket(videostore.CodecTypeH265, au, pts); err != nil {
-			rc.logger.Errorf("videostore WritePacket returned error, err: %s", err.Error())
-		}
-	}
 	onPacketRTP := func(pkt *rtp.Packet) {
 		// we need to do this before calling Decode as apparently rtpDec.Decode mutates
 		// the packet such that one can't get the pts out after Decode is called
@@ -784,7 +786,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 			return
 		}
 		storeImage(au)
-		storeSegment(au, pts)
+		rc.videoRequest.write(videostore.CodecTypeH265, params, au, pts)
 	}
 
 	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
@@ -850,12 +852,10 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 		rc.logger.Warn("i_frame_only_decode is currently only supported for H264 and H265 codecs. " +
 			"lazy_decode features disabled due to MJPEG RTSP track")
 	}
-	rc.muxMu.Lock()
-	if rc.mux != nil {
+	if rc.videoRequest.active() {
 		rc.logger.Warn("video-store is currently only supported for H264 and H265 codecs. " +
 			"unable to store video disabled due to MJPEG RTSP track")
 	}
-	rc.muxMu.Unlock()
 
 	var f *format.MJPEG
 	media := session.FindFormat(&f)
@@ -950,12 +950,10 @@ func (rc *rtspCamera) initMPEG4(session *description.Session) error {
 			"lazy_decode features disabled due to MPEG4 RTSP track")
 	}
 
-	rc.muxMu.Lock()
-	if rc.mux != nil {
+	if rc.videoRequest.active() {
 		rc.logger.Warn("video-store is currently only supported for H264 and H265 codecs. " +
 			"unable to store video disabled due to MPEG4 RTSP track")
 	}
-	rc.muxMu.Unlock()
 
 	var f *format.MPEG4Video
 	media := session.FindFormat(&f)
@@ -1189,6 +1187,7 @@ func NewRTSPCamera(ctx context.Context, deps resource.Dependencies, conf resourc
 		u:                           u,
 		name:                        conf.ResourceName(),
 		rtpPassthrough:              rtpPassthrough,
+		videoRequest:                &videoRequest{logger: logger},
 		bufAndCBByID:                make(map[rtppassthrough.SubscriptionID]bufAndCB),
 		rtpPassthroughCtx:           rtpPassthroughCtx,
 		rtpPassthroughCancelCauseFn: rtpPassthroughCancelCauseFn,
