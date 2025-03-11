@@ -37,7 +37,7 @@ var (
 	// ErrAlreadyInRegistry means that the resource is already in the registry.
 	ErrAlreadyInRegistry = errors.New("already in registry")
 	// ErrNotFound means that the resource was not found.
-	ErrNotFound = errors.New("not in registry")
+	ErrNotFound = errors.New("resource not found")
 	// ErrUnsupported means that the codec is unsupported.
 	ErrUnsupported = errors.New("unsupported codec")
 	// ErrBusy means that the resource is busy.

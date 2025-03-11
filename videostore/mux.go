@@ -68,7 +68,7 @@ func (m *rawSegmenterMux) init() error {
 	}
 	cam, err := registry.Global.Get(m.camName.String())
 	if err != nil {
-		return err
+		return fmt.Errorf("resource %s unable to be found in viamrtsp registry err: %s", m.camName.String(), err.Error())
 	}
 	regCtx, err := cam.RequestVideo(m, codecs)
 	if err != nil {
