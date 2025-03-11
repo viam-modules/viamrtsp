@@ -396,6 +396,10 @@ func (m *rawSegmenterMux) writeH265(au [][]byte, pts int64) error {
 		m.metadata.firstDTS = dts
 		m.metadata.firstTimeStampsSet = true
 	}
+	// we need to subtract the first pts & dts from the current one so that the
+	// first pts & dts are zero. Otherwise the ffmpeg segmenter will create an mp4 file
+	// that is a black screen for a few seconds (we believe the amount of time represented by the non zero
+	// timestamps)
 	err = m.rawSeg.WritePacket(nalu, pts-m.metadata.firstPTS, dts-m.metadata.firstDTS, isRandomAccess)
 	if err != nil {
 		m.logger.Errorf("error writing packet to segmenter: %s", err)
@@ -501,6 +505,10 @@ func (m *rawSegmenterMux) writeH264(au [][]byte, pts int64) error {
 		m.metadata.firstDTS = dts
 		m.metadata.firstTimeStampsSet = true
 	}
+	// we need to subtract the first pts & dts from the current one so that the
+	// first pts & dts are zero. Otherwise the ffmpeg segmenter will create an mp4 file
+	// that is a black screen for a few seconds (we believe the amount of time represented by the non zero
+	// timestamps)
 	err = m.rawSeg.WritePacket(packed, pts-m.metadata.firstPTS, dts-m.metadata.firstDTS, idrPresent)
 	if err != nil {
 		m.logger.Errorf("error writing packet to segmenter: %s", err)
