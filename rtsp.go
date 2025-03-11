@@ -53,11 +53,6 @@ const (
 	// defaultMPEG4ProfileLevelID is the default profile-level-id value for MPEG4 video
 	// as specified in RFC 6416 Section 7.1 https://datatracker.ietf.org/doc/html/rfc6416#section-7.1
 	defaultMPEG4ProfileLevelID = 1
-	defaultSegmentSeconds      = 30 // seconds
-	defaultUploadPath          = ".viam/capture/video-upload"
-	defaultStoragePath         = ".viam/video-storage-viamrtsp"
-	maxGRPCSize                = 1024 * 1024 * 32 // bytes
-	videoStoreInitCloseTimeout = time.Second * 10
 )
 
 var (
