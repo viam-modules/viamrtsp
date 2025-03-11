@@ -154,6 +154,9 @@ func (m *rawSegmenterMux) Start(codec videostore.CodecType, au [][]byte) error {
 	switch codec {
 	case videostore.CodecTypeH264:
 		for _, nalu := range au {
+			if len(nalu) == 0 {
+				continue
+			}
 			//nolint:mnd
 			typ := h264.NALUType(nalu[0] & 0x1F)
 			switch typ {
@@ -195,6 +198,9 @@ func (m *rawSegmenterMux) Start(codec videostore.CodecType, au [][]byte) error {
 		}
 	case videostore.CodecTypeH265:
 		for _, nalu := range au {
+			if len(nalu) == 0 {
+				continue
+			}
 			//nolint:mnd
 			typ := h265.NALUType((nalu[0] >> 1) & 0b111111)
 			switch typ {
