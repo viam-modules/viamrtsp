@@ -8,7 +8,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/edaniels/zeroconf"
+	"github.com/viamrobotics/zeroconf"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/utils"
 )
