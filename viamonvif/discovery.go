@@ -146,12 +146,11 @@ func (cam *CameraInfo) tryMDNS(mdnsServer *mdnsServer, logger logging.Logger) {
 		return
 	}
 
-	const swapIPsWithMDNS = false
 	wasIPFound := false
 	// Replace the URLs in-place such that configs generated from these objects will point to the
 	// logical dns hostname rather than a raw IP.
 	for idx := range cam.RTSPURLs {
-		if swapIPsWithMDNS && strings.Contains(cam.RTSPURLs[idx], cam.deviceIP.String()) {
+		if strings.Contains(cam.RTSPURLs[idx], cam.deviceIP.String()) {
 			cam.RTSPURLs[idx] = strings.Replace(cam.RTSPURLs[idx], cam.deviceIP.String(), cam.mdnsName, 1)
 			wasIPFound = true
 		} else {
