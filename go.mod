@@ -9,7 +9,6 @@ require (
 	github.com/bluenviron/gortsplib/v4 v4.12.2
 	github.com/bluenviron/mediacommon v1.13.3
 	github.com/edaniels/golinters v0.0.5-0.20220906153528-641155550742
-	github.com/edaniels/zeroconf v1.0.10
 	github.com/elgs/gostrgen v0.0.0-20161222160715-9d61ae07eeae
 	github.com/erh/viamupnp v0.0.0-20250225174543-39c68c119b3e
 	github.com/gofrs/uuid v4.2.0+incompatible
@@ -19,6 +18,7 @@ require (
 	github.com/rhysd/actionlint v1.6.27
 	github.com/stretchr/testify v1.10.0
 	github.com/viam-modules/video-store v0.0.5-rc4
+	github.com/viamrobotics/zeroconf v1.0.12
 	go.uber.org/zap v1.27.0
 	go.viam.com/rdk v0.65.0
 	go.viam.com/test v1.2.4
@@ -90,6 +90,7 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/edaniels/golog v0.0.0-20230215213219-28954395e8d0 // indirect
 	github.com/edaniels/lidario v0.0.0-20220607182921-5879aa7b96dd // indirect
+	github.com/edaniels/zeroconf v1.0.10 // indirect
 	github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5 // indirect
 	github.com/ettle/strcase v0.2.0 // indirect
 	github.com/fatih/camelcase v1.0.0 // indirect
