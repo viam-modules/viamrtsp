@@ -71,11 +71,27 @@ func New(_ context.Context, deps resource.Dependencies, conf resource.Config, lo
 		}
 
 		mux = newRawSegmenterMux(rtpVs.Segmenter(), c.Name(), logger)
-		if err := mux.init(); err != nil {
+		if err := mux.init(); err == nil {
+			vs = rtpVs
+		} else {
 			rtpVs.Close()
-			return nil, err
+			fVs, err := videostore.NewFramePollingVideoStore(context.Background(), videostore.Config{
+				Type:    videostore.SourceTypeFrame,
+				Storage: sc,
+				Encoder: videostore.EncoderConfig{
+					Bitrate: 1000000,
+					Preset:  "medium",
+				},
+				FramePoller: videostore.FramePollerConfig{
+					Camera:    c,
+					Framerate: 20,
+				},
+			}, logger)
+			if err != nil {
+				return nil, err
+			}
+			vs = fVs
 		}
-		vs = rtpVs
 	} else {
 		vs, err = videostore.NewReadOnlyVideoStore(videostore.Config{
 			Type:    videostore.SourceTypeReadOnly,
