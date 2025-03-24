@@ -174,13 +174,10 @@ type rtspCamera struct {
 
 	closeMu      sync.RWMutex
 	videoRequest *videoRequest
-
-	auPktMu  sync.Mutex
-	au       [][]byte
-	mjpegPkt *rtp.Packet
-
-	client     *gortsplib.Client
-	rawDecoder *decoder
+	auMu         sync.Mutex
+	au           [][]byte
+	client       *gortsplib.Client
+	rawDecoder   *decoder
 
 	cancelCtx  context.Context
 	cancelFunc context.CancelFunc
@@ -423,52 +420,9 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib
 	return nil
 }
 
-func (rc *rtspCamera) consumeLazyMJPEGPkt() {
-	rc.auPktMu.Lock()
-	defer rc.auPktMu.Unlock()
-	if rc.mjpegPkt != nil {
-		codec := videoCodec(rc.currentCodec.Load())
-		if codec == MJPEG {
-
-		} else {
-			rc.logger.Infof("consumeLazyMJPEGPkt: called with unexpected codec: %s, int: %d", codec, codec)
-		}
-		rc.mjpegPkt = nil
-	}
-	if len(rc.au) > 0 {
-		codec := videoCodec(rc.currentCodec.Load())
-		switch codec {
-		case H264:
-			rc.storeH264Frame(rc.au)
-		case H265:
-			for _, au := range rc.au {
-				// h265 AUs are already packed into a single frame
-				// before they were added to rc.au
-				rc.storeH265Frame(au)
-			}
-		case Unknown:
-		case Agnostic:
-		case MJPEG:
-		case MPEG4:
-			fallthrough
-		default:
-			rc.logger.Infof("consumeLazyAU: called with unexpected codec: %s, int: %d", codec, codec)
-		}
-
-		rc.au = nil
-	}
-}
-
-func (rc *rtspCamera) storeLazyMJPEGPkt(pkt *rtp.Packet) {
-	rc.auPktMu.Lock()
-	defer rc.auPktMu.Unlock()
-	rc.mjpegPkt = pkt
-	rc.au = nil
-}
-
 func (rc *rtspCamera) consumeLazyAU() {
-	rc.auPktMu.Lock()
-	defer rc.auPktMu.Unlock()
+	rc.auMu.Lock()
+	defer rc.auMu.Unlock()
 	if len(rc.au) > 0 {
 		codec := videoCodec(rc.currentCodec.Load())
 		switch codec {
@@ -494,17 +448,15 @@ func (rc *rtspCamera) consumeLazyAU() {
 }
 
 func (rc *rtspCamera) resetLazyAU(au [][]byte) {
-	rc.auPktMu.Lock()
-	defer rc.auPktMu.Unlock()
+	rc.auMu.Lock()
+	defer rc.auMu.Unlock()
 	rc.au = au
-	rc.mjpegPkt = nil
 }
 
 func (rc *rtspCamera) appendLazyAU(au [][]byte) {
-	rc.auPktMu.Lock()
-	defer rc.auPktMu.Unlock()
+	rc.auMu.Lock()
+	defer rc.auMu.Unlock()
 	rc.au = append(rc.au, au...)
-	rc.mjpegPkt = nil
 }
 
 // initH264 initializes the H264 decoder and sets up the client to receive H264 packets.
@@ -795,14 +747,14 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 		rc.logger.Warn("rtp_passthrough is only supported for H264 codec. rtp_passthrough features disabled due to MJPEG RTSP track")
 	}
 
-	// if rc.lazyDecode {
-	// 	rc.logger.Warn("lazy_decode is currently only supported for H264 and H265 codecs. lazy_decode features disabled due to MJPEG RTSP track")
-	// }
+	if rc.lazyDecode {
+		rc.logger.Warn("lazy_decode is currently only supported for H264 and H265 codecs. lazy_decode features disabled due to MJPEG RTSP track")
+	}
 
-	// if rc.iframeOnlyDecode {
-	// 	rc.logger.Warn("i_frame_only_decode is currently only supported for H264 and H265 codecs. " +
-	// 		"lazy_decode features disabled due to MJPEG RTSP track")
-	// }
+	if rc.iframeOnlyDecode {
+		rc.logger.Warn("i_frame_only_decode is currently only supported for H264 and H265 codecs. " +
+			"lazy_decode features disabled due to MJPEG RTSP track")
+	}
 	if rc.videoRequest.active() {
 		rc.logger.Warn("video-store is currently only supported for H264 and H265 codecs. " +
 			"unable to store video due to MJPEG RTSP track")
@@ -829,15 +781,12 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 	}
 
 	rc.client.OnPacketRTP(media, f, func(pkt *rtp.Packet) {
-		if rc.lazyDecode {
-			rc.storeLazyMJPEGPkt(pkt)
-		} else {
-			frame, err := mjpegDecoder.Decode(pkt)
-			if err != nil {
-				return
-			}
-			rc.latestMJPEGBytes.Store(&frame)
+		frame, err := mjpegDecoder.Decode(pkt)
+		if err != nil {
+			return
 		}
+
+		rc.latestMJPEGBytes.Store(&frame)
 	})
 
 	return nil
@@ -895,9 +844,9 @@ func (rc *rtspCamera) initMPEG4(session *description.Session) error {
 		rc.logger.Warn("rtp_passthrough is only supported for H264 codec. rtp_passthrough features disabled due to MPEG4 RTSP track")
 	}
 
-	// if rc.lazyDecode {
-	// 	rc.logger.Warn("lazy_decode is currently only supported for H264 and H265 codecs. lazy_decode features disabled due to MPEG4 RTSP track")
-	// }
+	if rc.lazyDecode {
+		rc.logger.Warn("lazy_decode is currently only supported for H264 and H265 codecs. lazy_decode features disabled due to MPEG4 RTSP track")
+	}
 
 	if rc.iframeOnlyDecode {
 		rc.logger.Warn("i_frame_only_decode is currently only supported for H264 and H265 codecs. " +
