@@ -62,7 +62,6 @@ func applyStorageDefaults(c Storage, name string) (videostore.StorageConfig, err
 		c.StoragePath = filepath.Join(home, defaultStoragePath, name)
 	}
 	return videostore.StorageConfig{
-		SegmentSeconds:       defaultSegmentSeconds,
 		SizeGB:               c.SizeGB,
 		OutputFileNamePrefix: name,
 		UploadPath:           c.UploadPath,

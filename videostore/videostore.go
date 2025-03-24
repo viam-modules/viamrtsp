@@ -75,7 +75,7 @@ func New(_ context.Context, deps resource.Dependencies, conf resource.Config, lo
 			vs = rtpVs
 		} else {
 			rtpVs.Close()
-			fVs, err := videostore.NewFramePollingVideoStore(context.Background(), videostore.Config{
+			fVs, err := videostore.NewFramePollingVideoStore(videostore.Config{
 				Type:    videostore.SourceTypeFrame,
 				Storage: sc,
 				Encoder: videostore.EncoderConfig{
@@ -84,6 +84,7 @@ func New(_ context.Context, deps resource.Dependencies, conf resource.Config, lo
 				},
 				FramePoller: videostore.FramePollerConfig{
 					Camera:    c,
+					YUYV:      true,
 					Framerate: 20,
 				},
 			}, logger)
