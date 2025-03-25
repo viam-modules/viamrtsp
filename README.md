@@ -25,7 +25,7 @@ Navigate to the [**CONFIGURE** tab](https://docs.viam.com/build/configure/) of y
 ```json
 {
    "rtp_passthrough": true,
-   "rtsp_address": "rtsp://tavy16d.viam.local/stream"
+   "rtsp_address": "rtsp://tavy16d.viam.local:554/stream"
 }
 ```
 
@@ -45,7 +45,7 @@ The following attributes are available for all models of `viamrtsp` cameras:
 ```json
 {
   "rtp_passthrough": true,
-  "rtsp_address": "rtsp://tavy16d.viam.local/stream"
+  "rtsp_address": "rtsp://tavy16d.viam.local:554/stream"
 }
 ```
 
