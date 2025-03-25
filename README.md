@@ -16,12 +16,16 @@ Navigate to the [**CONFIGURE** tab](https://docs.viam.com/build/configure/) of y
 
 ## Configure your `viamrtsp` camera
 
-Copy and paste the following attributes template into the JSON configuration:
+1. Add the `viamrtsp:onvif` discovery service.
+1. Use the test tab to find available cameras.
+1. Copy (one of) the returned configurations.
+1. Add the `viamrtsp` camera.
+1. Paste the copied configuration attributes into the JSON configuration:
 
 ```json
 {
    "rtp_passthrough": true,
-   "rtsp_address": "rtsp://foo:bar@192.168.10.10:554/stream"
+   "rtsp_address": "rtsp://tavy16d.viam.local/stream"
 }
 ```
 
@@ -33,15 +37,15 @@ The following attributes are available for all models of `viamrtsp` cameras:
 
 | Name    | Type   | Inclusion    | Description |
 | ------- | ------ | ------------ | ----------- |
-| `rtsp_address` | string | **Required** | The RTSP address where the camera streams. |
-| `rtp_passthrough` | bool | Optional | RTP passthrough mode (which improves video streaming efficiency) is supported with the H264 codec. It will be on by default. Set to false to disable H264 RTP passthrough. Default: `true` |
+| `rtsp_address` | string | **Required** | The RTSP address where the camera streams. While you can configure a static IP, we recommend using the `viamrtsp:onvif` discovery service to obtain a DNS address. Examples: `"rtsp://foo:bar@192.168.10.10:554/stream"`. |
+| `rtp_passthrough` | bool | Optional | RTP passthrough mode (which improves video streaming efficiency) is supported with the H264 codec. It will be on by default. Set to false to disable H264 RTP passthrough. Default: `true`. |
 
 ### Example configuration
 
 ```json
 {
   "rtp_passthrough": true,
-  "rtsp_address": "rtsp://foo:bar@192.168.10.10:554/stream"
+  "rtsp_address": "rtsp://tavy16d.viam.local/stream"
 }
 ```
 
