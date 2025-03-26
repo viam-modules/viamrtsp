@@ -19,7 +19,6 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/viam-modules/video-store v0.0.5-rc4
 	github.com/viamrobotics/zeroconf v1.0.12
-	go.uber.org/zap v1.27.0
 	go.viam.com/rdk v0.65.0
 	go.viam.com/test v1.2.4
 	go.viam.com/utils v0.1.130
@@ -309,6 +308,7 @@ require (
 	go.uber.org/automaxprocs v1.5.3 // indirect
 	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
+	go.uber.org/zap v1.27.0 // indirect
 	go.viam.com/api v0.1.396 // indirect
 	goji.io v2.0.2+incompatible // indirect
 	golang.org/x/arch v0.0.0-20210923205945-b76863e36670 // indirect
@@ -343,4 +343,6 @@ require (
 	nhooyr.io/websocket v1.8.7 // indirect
 )
 
-replace github.com/viam-modules/video-store => github.com/nicksanford/video-store v0.0.0-20250324202823-49891ac8ada2
+replace github.com/viam-modules/video-store => github.com/nicksanford/video-store v0.0.0-20250326222443-e8a59f761137
+
+// replace github.com/viam-modules/video-store => /Users/nicksanford/code/video-store/
