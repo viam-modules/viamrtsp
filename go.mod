@@ -343,6 +343,6 @@ require (
 	nhooyr.io/websocket v1.8.7 // indirect
 )
 
-replace github.com/viam-modules/video-store => github.com/nicksanford/video-store v0.0.0-20250327211029-d2fec74a84aa
+replace github.com/viam-modules/video-store => github.com/nicksanford/video-store v0.0.0-20250327214221-0cef332c38f9
 
 // replace github.com/viam-modules/video-store => /Users/nicksanford/code/video-store/
