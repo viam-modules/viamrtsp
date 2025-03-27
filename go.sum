@@ -869,8 +869,8 @@ github.com/nats-io/nuid v1.0.1/go.mod h1:19wcPz3Ph3q0Jbyiqsd0kePYG7A95tJPxeL+1OS
 github.com/nbutton23/zxcvbn-go v0.0.0-20201221231540-e56b841a3c88/go.mod h1:KSVJerMDfblTH7p5MZaTt+8zaT2iEk3AkVb9PQdZuE8=
 github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 h1:zYyBkD/k9seD2A7fsi6Oo2LfFZAehjjQMERAvZLEDnQ=
 github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646/go.mod h1:jpp1/29i3P1S/RLdc7JQKbRpFeM1dOBd8T9ki5s+AY8=
-github.com/nicksanford/video-store v0.0.0-20250326222443-e8a59f761137 h1:+L2/a7DVhAFvdUuY9/VbQBYTqJJKPKT0gAKGgSzd+LI=
-github.com/nicksanford/video-store v0.0.0-20250326222443-e8a59f761137/go.mod h1:gM2ApIceni3LazLub9srwr75rJFcF3Hcy2FsZDXTW8E=
+github.com/nicksanford/video-store v0.0.0-20250327205922-db5498d69fa5 h1:FTWHr0acLqB07iLAO+d8P1gC8TMOJLJouqZznHZceGY=
+github.com/nicksanford/video-store v0.0.0-20250327205922-db5498d69fa5/go.mod h1:gM2ApIceni3LazLub9srwr75rJFcF3Hcy2FsZDXTW8E=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=
 github.com/nishanths/exhaustive v0.1.0/go.mod h1:S1j9110vxV1ECdCudXRkeMnFQ/DQk9ajLT0Uf2MYZQQ=
 github.com/nishanths/exhaustive v0.12.0 h1:vIY9sALmw6T/yxiASewa4TQcFsVYZQQRUQJhKRf3Swg=
