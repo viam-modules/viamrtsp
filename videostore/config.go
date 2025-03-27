@@ -1,6 +1,8 @@
 package videostore
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -8,10 +10,18 @@ import (
 	"go.viam.com/utils"
 )
 
+// Video is the config for storge.
+type Video struct {
+	Bitrate int    `json:"bitrate,omitempty"`
+	Preset  string `json:"preset,omitempty"`
+}
+
 // Config is the config for videostore.
 type Config struct {
-	Camera  *string `json:"camera,omitempty"`
-	Storage Storage `json:"storage"`
+	Camera    *string `json:"camera,omitempty"`
+	Storage   Storage `json:"storage"`
+	Video     Video   `json:"video,omitempty"`
+	Framerate int     `json:"framerate,omitempty"`
 }
 
 // Storage is the storage subconfig for videostore.
@@ -19,6 +29,28 @@ type Storage struct {
 	SizeGB      int    `json:"size_gb"`
 	UploadPath  string `json:"upload_path,omitempty"`
 	StoragePath string `json:"storage_path,omitempty"`
+}
+
+func applyDefaults(cfg *Config, name string) (videostore.Config, error) {
+	fps := cfg.Framerate
+	if fps < 0 {
+		return videostore.Config{}, errors.New("framerate can't be negative")
+	}
+	if fps == 0 {
+		fps = defaultFramerate
+	}
+	sc, err := applyStorageDefaults(cfg.Storage, name)
+	if err != nil {
+		return videostore.Config{}, err
+	}
+
+	ec := applyVideoEncoderDefaults(cfg.Video)
+	return videostore.Config{
+		Storage: sc,
+		Encoder: ec,
+		FramePoller: videostore.FramePollerConfig{
+			Framerate: fps,
+		}}, nil
 }
 
 // Validate validates the config and returns the resource graph dependencies.
@@ -30,11 +62,19 @@ func (cfg *Config) Validate(path string) ([]string, error) {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "size_gb")
 	}
 
+	if cfg.Framerate < 0 {
+		return nil, fmt.Errorf("invalid framerate %d, must be greater than 0", cfg.Framerate)
+	}
+
 	sConfig, err := applyStorageDefaults(cfg.Storage, "someprefix")
 	if err != nil {
 		return nil, err
 	}
 	if err := sConfig.Validate(); err != nil {
+		return nil, err
+	}
+
+	if err := applyVideoEncoderDefaults(cfg.Video).Validate(); err != nil {
 		return nil, err
 	}
 	// This allows for an implicit camera dependency so we do not need to explicitly
@@ -43,6 +83,19 @@ func (cfg *Config) Validate(path string) ([]string, error) {
 		return []string{*cfg.Camera}, nil
 	}
 	return []string{}, nil
+}
+
+func applyVideoEncoderDefaults(c Video) videostore.EncoderConfig {
+	if c.Bitrate == 0 {
+		c.Bitrate = defaultVideoBitrate
+	}
+	if c.Preset == "" {
+		c.Preset = defaultVideoPreset
+	}
+	return videostore.EncoderConfig{
+		Bitrate: c.Bitrate,
+		Preset:  c.Preset,
+	}
 }
 
 func applyStorageDefaults(c Storage, name string) (videostore.StorageConfig, error) {

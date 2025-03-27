@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-	"time"
 
 	"github.com/viam-modules/video-store/videostore"
 	"go.viam.com/rdk/components/camera"
@@ -15,11 +14,12 @@ import (
 )
 
 const (
-	defaultSegmentSeconds      = 30 // seconds
-	defaultUploadPath          = ".viam/capture/video-upload"
-	defaultStoragePath         = ".viam/video-storage-viamrtsp"
-	maxGRPCSize                = 1024 * 1024 * 32 // bytes
-	videoStoreInitCloseTimeout = time.Second * 10
+	maxGRPCSize         = 1024 * 1024 * 32 // bytes
+	defaultFramerate    = 20               // frames per second
+	defaultStoragePath  = ".viam/video-storage"
+	defaultUploadPath   = ".viam/capture/video-upload"
+	defaultVideoBitrate = 1000000
+	defaultVideoPreset  = "medium"
 )
 
 // Model is videostore's Viam model.
@@ -46,14 +46,10 @@ func New(_ context.Context, deps resource.Dependencies, conf resource.Config, lo
 		logger.Error(err.Error())
 		return nil, err
 	}
-	sc, err := applyStorageDefaults(newConf.Storage, conf.ResourceName().Name)
+	vsConfig, err := applyDefaults(newConf, conf.ResourceName().Name)
 	if err != nil {
 		return nil, err
 	}
-	if err := sc.Validate(); err != nil {
-		return nil, err
-	}
-
 	var vs videostore.VideoStore
 	var mux *rawSegmenterMux
 	if newConf.Camera != nil {
@@ -61,10 +57,9 @@ func New(_ context.Context, deps resource.Dependencies, conf resource.Config, lo
 		if err != nil {
 			return nil, err
 		}
-
 		rtpVs, err := videostore.NewRTPVideoStore(videostore.Config{
 			Type:    videostore.SourceTypeRTP,
-			Storage: sc,
+			Storage: vsConfig.Storage,
 		}, logger)
 		if err != nil {
 			return nil, err
@@ -75,18 +70,12 @@ func New(_ context.Context, deps resource.Dependencies, conf resource.Config, lo
 			vs = rtpVs
 		} else {
 			rtpVs.Close()
+			vsConfig.FramePoller.Camera = c
 			fVs, err := videostore.NewFramePollingVideoStore(videostore.Config{
-				Type:    videostore.SourceTypeFrame,
-				Storage: sc,
-				Encoder: videostore.EncoderConfig{
-					Bitrate: 1000000,
-					Preset:  "medium",
-				},
-				FramePoller: videostore.FramePollerConfig{
-					Camera:    c,
-					YUYV:      true,
-					Framerate: 20,
-				},
+				Type:        videostore.SourceTypeFrame,
+				Storage:     vsConfig.Storage,
+				Encoder:     vsConfig.Encoder,
+				FramePoller: vsConfig.FramePoller,
 			}, logger)
 			if err != nil {
 				return nil, err
@@ -96,7 +85,7 @@ func New(_ context.Context, deps resource.Dependencies, conf resource.Config, lo
 	} else {
 		vs, err = videostore.NewReadOnlyVideoStore(videostore.Config{
 			Type:    videostore.SourceTypeReadOnly,
-			Storage: sc,
+			Storage: vsConfig.Storage,
 		}, logger)
 		if err != nil {
 			return nil, err
