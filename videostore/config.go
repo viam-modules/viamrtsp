@@ -50,7 +50,8 @@ func applyDefaults(cfg *Config, name string) (videostore.Config, error) {
 		Encoder: ec,
 		FramePoller: videostore.FramePollerConfig{
 			Framerate: fps,
-		}}, nil
+		},
+	}, nil
 }
 
 // Validate validates the config and returns the resource graph dependencies.
