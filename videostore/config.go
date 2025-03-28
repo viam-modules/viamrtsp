@@ -10,7 +10,7 @@ import (
 	"go.viam.com/utils"
 )
 
-// Video is the config for storge.
+// Video is the config for storage.
 type Video struct {
 	Bitrate int    `json:"bitrate,omitempty"`
 	Preset  string `json:"preset,omitempty"`
