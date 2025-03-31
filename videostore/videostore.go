@@ -19,7 +19,7 @@ const (
 	defaultStoragePath  = ".viam/video-storage"
 	defaultUploadPath   = ".viam/capture/video-upload"
 	defaultVideoBitrate = 1000000
-	defaultVideoPreset  = "medium"
+	defaultVideoPreset  = "ultrafast"
 )
 
 // Model is videostore's Viam model.
