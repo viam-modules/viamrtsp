@@ -31,7 +31,7 @@
     {
       "api": "rdk:component:camera",
       "model": "viam:viamrtsp:rtsp-mpeg4",
-      "markdown_link": "README.md#configure-your-viamrtsp-camera", 
+      "markdown_link": "README.md#configure-your-viamrtsp-camera",
       "short_description": "configure a rtsp camera that uses the MPEG4 codec."
     },
     {
@@ -45,6 +45,12 @@
       "model": "viam:viamrtsp:onvif",
       "markdown_link": "README.md#configure-the-viamrtsponvif-discovery-service",
       "short_description": "A discovery service to find rtsp cameras that use the onvif interface."
+    },
+    {
+      "api": "rdk:component:generic",
+      "model": "viam:viamrtsp:video-store",
+      "markdown_link": "README.md",
+      "short_description": "A video-store that will store video from a viamrtsp camera."
     }
   ],
   "entrypoint": "bin/viamrtsp"
