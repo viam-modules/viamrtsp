@@ -159,6 +159,7 @@ var getStatusCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalf("Failed to read GetStatus response body: %v", err)
 		}
+		fmt.Printf("  Raw XML: %s\n", string(body))
 
 		// Define the expected envelope structure
 		var statusEnvelope struct {
@@ -178,50 +179,29 @@ var getStatusCmd = &cobra.Command{
 
 		// Check if PTZStatus struct itself is non-zero (basic check)
 		if statusResp.PTZStatus.Position.PanTilt.X == 0 && statusResp.PTZStatus.Position.PanTilt.Y == 0 && statusResp.PTZStatus.Position.Zoom.X == 0 {
-			fmt.Println("  Status information likely unavailable (zeroed PTZStatus).")
-			return
+			fmt.Println("Warning: PTZ values are all zero. This may indicate the camera is at its default position or no movement has occurred.")
 		}
 
-		// Display Move Status (check for non-zero/empty values)
-		if fmt.Sprintf("%s", statusResp.PTZStatus.MoveStatus.PanTilt) != "IDLE" {
-			fmt.Printf("  Pan/Tilt State: %s\n", statusResp.PTZStatus.MoveStatus.PanTilt)
-		} else {
-			fmt.Println("  Pan/Tilt State: IDLE")
-		}
-		if fmt.Sprintf("%s", statusResp.PTZStatus.MoveStatus.Zoom) != "IDLE" {
-			fmt.Printf("  Zoom State:     %s\n", statusResp.PTZStatus.MoveStatus.Zoom)
-		} else {
-			fmt.Println("  Zoom State:     IDLE")
-		}
-
-		// Display Position (check PanTilt.X as indicator of validity)
-		if statusResp.PTZStatus.Position.PanTilt.X != 0 || statusResp.PTZStatus.Position.PanTilt.Y != 0 {
-			pos := statusResp.PTZStatus.Position
-			spaceInfo := "Normalized Generic Space"
-			if pos.PanTilt.Space != "" {
-				if pos.PanTilt.Space == AbsolutePanTiltPositionSphericalDegrees {
-					spaceInfo = "Spherical Degrees Space"
-				} else {
-					spaceInfo = fmt.Sprintf("Space: %s", pos.PanTilt.Space)
-				}
+		fmt.Printf("  Pan/Tilt State: %s\n", statusResp.PTZStatus.MoveStatus.PanTilt)
+		fmt.Printf("  Zoom State:     %s\n", statusResp.PTZStatus.MoveStatus.Zoom)
+		pos := statusResp.PTZStatus.Position
+		spaceInfo := "Normalized Generic Space"
+		if pos.PanTilt.Space != "" {
+			if pos.PanTilt.Space == AbsolutePanTiltPositionSphericalDegrees {
+				spaceInfo = "Spherical Degrees Space"
+			} else {
+				spaceInfo = fmt.Sprintf("Space: %s", pos.PanTilt.Space)
 			}
-			fmt.Printf("  Position (%s):\n", spaceInfo)
-			fmt.Printf("    Pan:  %.5f\n", pos.PanTilt.X)
-			fmt.Printf("    Tilt: %.5f\n", pos.PanTilt.Y)
-		} else {
-			fmt.Println("    Pan/Tilt Position: N/A or Zero")
 		}
+		fmt.Printf("  Position (%s):\n", spaceInfo)
+		fmt.Printf("    Pan:  %.5f\n", pos.PanTilt.X)
+		fmt.Printf("    Tilt: %.5f\n", pos.PanTilt.Y)
 
-		// Check Zoom.X as indicator
-		if statusResp.PTZStatus.Position.Zoom.X != 0 {
-			zoomSpaceInfo := "Normalized Generic Space"
-			if statusResp.PTZStatus.Position.Zoom.Space != "" {
-				zoomSpaceInfo = fmt.Sprintf("Space: %s", statusResp.PTZStatus.Position.Zoom.Space)
-			}
-			fmt.Printf("    Zoom: %.5f (%s, Range: 0.0 to 1.0)\n", statusResp.PTZStatus.Position.Zoom.X, zoomSpaceInfo)
-		} else {
-			fmt.Println("    Zoom Position: N/A or Zero")
+		zoomSpaceInfo := "Normalized Generic Space"
+		if pos.Zoom.Space != "" {
+			zoomSpaceInfo = fmt.Sprintf("Space: %s", pos.Zoom.Space)
 		}
+		fmt.Printf("    Zoom: %.5f (%s, Range: 0.0 to 1.0)\n", pos.Zoom.X, zoomSpaceInfo)
 
 		if statusResp.PTZStatus.Error != "" {
 			fmt.Printf("  Error Status: %s\n", statusResp.PTZStatus.Error)
