@@ -6,7 +6,9 @@ A command-line tool for controlling PTZ (Pan/Tilt/Zoom) cameras using the ONVIF 
 
 ```bash
 # From the project root
-go build -o ptz-client examples/ptz-control/client.go
+cd examples/ptz-client
+go mod tidy
+go build -o ptz-client client.go
 ```
 
 ## Configuration
