@@ -1,4 +1,4 @@
-module discovery-client
+module ptz-client
 
 go 1.23
 
@@ -17,8 +17,9 @@ require (
 	github.com/juju/errors v0.0.0-20220331221717-b38fca44723b // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
-	github.com/rs/zerolog v1.26.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	golang.org/x/net v0.30.0 // indirect
 	golang.org/x/sys v0.29.0 // indirect
 )
+
+replace github.com/use-go/onvif => github.com/hexbabe/sean-onvif v0.0.10-0.20250409154109-dc9e0fecaa93
