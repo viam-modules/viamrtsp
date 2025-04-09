@@ -109,6 +109,10 @@ Get help for a specific command:
 
 - The profile token should be "000" or "001" typically. Check your camera's documentation or ONVIF device manager tool to find the correct token.
 - Speed values range from -1.0 (full speed in negative direction) to 1.0 (full speed in positive direction).
+- Default speed values:
+  - Continuous move: 0.0 for all axes (no movement)
+  - Relative move: 0.5 for all axes (half speed)
+  - Absolute move: 0.5 for all axes (half speed)
 - For pan/tilt:
   - Positive X moves right, negative X moves left
   - Positive Y moves up, negative Y moves down
