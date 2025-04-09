@@ -62,24 +62,21 @@ Example:
   ./ptz-client --config camera.json get-status`,
 	// PersistentPreRunE ensures flags are checked before any subcommand runs.
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		// Skip validation for help commands and potentially others that don't need full auth/profile
+		// Skip validation for help commands and others that don't need full auth/profile
 		if cmd.Name() == "help" || (len(args) > 0 && args[0] == "help") || cmd.Name() == "version" {
 			return nil
 		}
 
-		// Check if config file is provided
 		if configFile == "" {
 			return fmt.Errorf("required flag --config not set")
 		}
 
-		// Load configuration
 		var err error
 		config, err = loadConfig(configFile)
 		if err != nil {
 			return fmt.Errorf("failed to load configuration: %w", err)
 		}
 
-		// Update profile for use in commands
 		profile = config.Profile
 		return nil
 	},
@@ -371,9 +368,7 @@ Optionally specify speed (normalized -1.0 to 1.0, positive usually used) for the
 			panTiltVector.Space = xsd.AnyURI(spaceURI)
 			fmt.Println("Using Spherical Degrees space for relative Pan/Tilt.")
 		} else {
-			// Optionally set the generic space or leave nil for default
-			// spaceURI := RelativePanTiltTranslationGenericSpace
-			// panTiltVector.Space = xsd.AnyURI(spaceURI)
+			// Default to Generic Normalized space for relative Pan/Tilt
 			fmt.Println("Using Generic Normalized space for relative Pan/Tilt.")
 		}
 
@@ -472,9 +467,7 @@ Optionally specify speed (normalized -1.0 to 1.0, positive usually used) for the
 			panTiltVector.Space = xsd.AnyURI(spaceURI)
 			fmt.Println("Using Spherical Degrees space for absolute Pan/Tilt.")
 		} else {
-			// Optionally set the generic space or leave nil for default
-			// spaceURI := AbsolutePanTiltPositionGenericSpace
-			// panTiltVector.Space = xsd.AnyURI(spaceURI)
+			// Default to Generic Normalized space for absolute Pan/Tilt
 			fmt.Println("Using Generic Normalized space for absolute Pan/Tilt.")
 		}
 
