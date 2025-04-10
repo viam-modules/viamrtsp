@@ -98,6 +98,7 @@ type Config struct {
 	RTPPassthrough   *bool  `json:"rtp_passthrough"`
 	LazyDecode       bool   `json:"lazy_decode,omitempty"`
 	IframeOnlyDecode bool   `json:"i_frame_only_decode,omitempty"`
+	SnapshotURI      string `json:"snapshot_uri,omitempty"`
 	// TODO: remove query & UPNP_DISCOVER logic
 	Query        viamupnp.DeviceQuery `json:"query,omitempty"`
 	VideoStore   *videoStoreConfig    `json:"video_store,omitempty"`

@@ -81,6 +81,12 @@ type GetStreamURI struct {
 	ProfileToken onvif.ReferenceToken `xml:"trt:ProfileToken"`
 }
 
+// GetSnapshotURI is a request to the GetSnapshotUri onvif endpoint.
+type GetSnapshotURI struct {
+	XMLName      string               `xml:"trt:GetSnapshotUri"`
+	ProfileToken onvif.ReferenceToken `xml:"trt:ProfileToken"`
+}
+
 // GetDeviceInformation is a request to the GetDeviceInformation onvif endpoint.
 type GetDeviceInformation struct {
 	XMLName string `xml:"tds:GetDeviceInformation"`
@@ -242,6 +248,15 @@ type getStreamURIResponse struct {
 	} `xml:"Body"`
 }
 
+type getSnapshotURIResponse struct {
+	XMLName xml.Name `xml:"Envelope"`
+	Body    struct {
+		GetSnapshotURIResponse struct {
+			MediaURI onvif.MediaUri `xml:"MediaUri"`
+		} `xml:"GetSnapshotUriResponse"`
+	} `xml:"Body"`
+}
+
 // Credentials contain an onvif device username and password.
 type Credentials struct {
 	User string `json:"user"`
@@ -283,6 +298,38 @@ func (dev *Device) GetStreamURI(ctx context.Context, profile onvif.Profile, cred
 	if creds.User != "" || creds.Pass != "" {
 		uri.User = url.UserPassword(creds.User, creds.Pass)
 	}
+	return uri, nil
+}
+
+// GetSnapshotURI is a request to the GetSnapshotURI onvif endpoint.
+func (dev *Device) GetSnapshotURI(ctx context.Context, profile onvif.Profile, creds Credentials) (*url.URL, error) {
+	dev.logger.Debugf("GetSnapshotUri token: %s, profile: %#v", profile.Token, profile)
+	body, err := dev.callMedia(ctx, GetSnapshotURI{
+		ProfileToken: profile.Token,
+	})
+	if err != nil {
+		return nil, err
+	}
+	dev.logger.Debugf("GetSnapshotUri response: %v", string(body))
+	var snapshotURI getSnapshotURIResponse
+	if err := xml.NewDecoder(bytes.NewReader(body)).Decode(&snapshotURI); err != nil {
+		return nil, fmt.Errorf("failed to get snapshot URL for profile %s: %w", profile.Token, err)
+	}
+
+	dev.logger.Debugf("GetSnapshotUriResponse decoded %v: ", profile.Token, snapshotURI)
+	uriStr := string(snapshotURI.Body.GetSnapshotURIResponse.MediaURI.Uri)
+	if uriStr == "" {
+		return nil, fmt.Errorf("got empty uri for profile %s", profile.Token)
+	}
+	uri, err := url.Parse(uriStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse URI %s: %w", uriStr, err)
+	}
+	if creds.User != "" || creds.Pass != "" {
+		uri.User = url.UserPassword(creds.User, creds.Pass)
+	}
+	dev.logger.Debugf("GetSnapshotUriResponse parsed %v: ", profile.Token, uri)
+
 	return uri, nil
 }
 

@@ -25,6 +25,7 @@ type OnvifDevice interface {
 	GetDeviceInformation(ctx context.Context) (device.GetDeviceInformationResponse, error)
 	GetProfiles(ctx context.Context) (device.GetProfilesResponse, error)
 	GetStreamURI(ctx context.Context, profile onvif.Profile, creds device.Credentials) (*url.URL, error)
+	GetSnapshotURI(ctx context.Context, profile onvif.Profile, creds device.Credentials) (*url.URL, error)
 }
 
 // DiscoverCameras performs WS-Discovery
@@ -105,6 +106,7 @@ func discoverOnAllInterfaces(ctx context.Context, manualXAddrs []*url.URL, logge
 type CameraInfo struct {
 	Host            string   `json:"host"`
 	RTSPURLs        []string `json:"rtsp_urls"`
+	SnapshotURIs    []string `json:"snapshot_uris"`
 	Manufacturer    string   `json:"manufacturer"`
 	Model           string   `json:"model"`
 	SerialNumber    string   `json:"serial_number"`
@@ -258,9 +260,15 @@ func GetCameraInfo(
 		return zero, fmt.Errorf("failed to get RTSP URLs: %w", err)
 	}
 
+	snapshotURIs, err := GetSnapshotURIsFromProfiles(ctx, dev, creds, logger)
+	if err != nil {
+		return zero, fmt.Errorf("failed to get snapshot URLs: %w", err)
+	}
+
 	cameraInfo := CameraInfo{
 		Host:            xaddr.Host,
 		RTSPURLs:        rtspURLs,
+		SnapshotURIs:    snapshotURIs,
 		Manufacturer:    resp.Manufacturer,
 		Model:           resp.Model,
 		SerialNumber:    resp.SerialNumber,
@@ -301,4 +309,28 @@ func GetRTSPStreamURIsFromProfiles(
 	}
 
 	return rtspUris, nil
+}
+
+// GetSnapshotURIFromProfiles uses the ONVIF Media service to get the snapshot URLs for all available profiles.
+func GetSnapshotURIsFromProfiles(
+	ctx context.Context,
+	dev OnvifDevice,
+	creds device.Credentials,
+	logger logging.Logger,
+) ([]string, error) {
+	resp, err := dev.GetProfiles(ctx)
+	if err != nil {
+		return nil, err
+	}
+	// Resultant slice of Snapshot URIs
+	var snapshotUris []string
+	for _, profile := range resp.Profiles {
+		uri, err := dev.GetSnapshotURI(ctx, profile, creds)
+		if err != nil {
+			logger.Warn(err.Error())
+			continue
+		}
+		snapshotUris = append(snapshotUris, uri.String())
+	}
+	return snapshotUris, nil
 }
