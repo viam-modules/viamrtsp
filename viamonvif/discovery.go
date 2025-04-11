@@ -24,8 +24,8 @@ import (
 type OnvifDevice interface {
 	GetDeviceInformation(ctx context.Context) (device.GetDeviceInformationResponse, error)
 	GetProfiles(ctx context.Context) (device.GetProfilesResponse, error)
-	GetStreamURI(ctx context.Context, profile onvif.Profile, creds device.Credentials) (*url.URL, error)
-	GetSnapshotURI(ctx context.Context, profile onvif.Profile, creds device.Credentials) (*url.URL, error)
+	GetStreamURI(ctx context.Context, token onvif.ReferenceToken, creds device.Credentials) (*url.URL, error)
+	GetSnapshotURI(ctx context.Context, token onvif.ReferenceToken, creds device.Credentials) (*url.URL, error)
 }
 
 // DiscoverCameras performs WS-Discovery
@@ -299,7 +299,7 @@ func GetRTSPStreamURIsFromProfiles(
 
 	// Iterate over all profiles and get the RTSP stream URI for each one
 	for _, profile := range resp.Profiles {
-		uri, err := dev.GetStreamURI(ctx, profile, creds)
+		uri, err := dev.GetStreamURI(ctx, profile.Token, creds)
 		if err != nil {
 			logger.Warn(err.Error())
 			continue
@@ -325,7 +325,7 @@ func GetSnapshotURIsFromProfiles(
 	// Resultant slice of Snapshot URIs
 	var snapshotUris []string
 	for _, profile := range resp.Profiles {
-		uri, err := dev.GetSnapshotURI(ctx, profile, creds)
+		uri, err := dev.GetSnapshotURI(ctx, profile.Token, creds)
 		if err != nil {
 			logger.Warn(err.Error())
 			continue

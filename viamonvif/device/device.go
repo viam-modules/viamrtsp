@@ -264,14 +264,14 @@ type Credentials struct {
 }
 
 // GetStreamURI returns a device's stream URI for a given profile.
-func (dev *Device) GetStreamURI(ctx context.Context, profile onvif.Profile, creds Credentials) (*url.URL, error) {
-	dev.logger.Debugf("GetStreamUri token: %s, profile: %#v", profile.Token, profile)
+func (dev *Device) GetStreamURI(ctx context.Context, token onvif.ReferenceToken, creds Credentials) (*url.URL, error) {
+	dev.logger.Debugf("GetStreamUri token: %s", token)
 	body, err := dev.callMedia(ctx, GetStreamURI{
 		StreamSetup: onvif.StreamSetup{
 			Stream:    onvif.StreamType(streamTypeRTPUnicast),
 			Transport: onvif.Transport{Protocol: streamSetupProtocol},
 		},
-		ProfileToken: profile.Token,
+		ProfileToken: token,
 	})
 	if err != nil {
 		return nil, err
@@ -280,14 +280,14 @@ func (dev *Device) GetStreamURI(ctx context.Context, profile onvif.Profile, cred
 
 	var streamURI getStreamURIResponse
 	if err := xml.NewDecoder(bytes.NewReader(body)).Decode(&streamURI); err != nil {
-		return nil, fmt.Errorf("failed to get RTSP URL for profile %s: %w", profile.Token, err)
+		return nil, fmt.Errorf("failed to get RTSP URL for profile %s: %w", token, err)
 	}
 
-	dev.logger.Debugf("GetStreamUriResponse decoded %v: ", profile.Token, streamURI)
+	dev.logger.Debugf("GetStreamUriResponse decoded %v: ", token, streamURI)
 
 	uriStr := string(streamURI.Body.GetStreamURIResponse.MediaURI.Uri)
 	if uriStr == "" {
-		return nil, fmt.Errorf("got empty uri for profile %s", profile.Token)
+		return nil, fmt.Errorf("got empty uri for profile %s", token)
 	}
 
 	uri, err := url.Parse(uriStr)
@@ -302,10 +302,10 @@ func (dev *Device) GetStreamURI(ctx context.Context, profile onvif.Profile, cred
 }
 
 // GetSnapshotURI is a request to the GetSnapshotURI onvif endpoint.
-func (dev *Device) GetSnapshotURI(ctx context.Context, profile onvif.Profile, creds Credentials) (*url.URL, error) {
-	dev.logger.Debugf("GetSnapshotUri token: %s, profile: %#v", profile.Token, profile)
+func (dev *Device) GetSnapshotURI(ctx context.Context, token onvif.ReferenceToken, creds Credentials) (*url.URL, error) {
+	dev.logger.Debugf("GetSnapshotUri token: %s", token)
 	body, err := dev.callMedia(ctx, GetSnapshotURI{
-		ProfileToken: profile.Token,
+		ProfileToken: token,
 	})
 	if err != nil {
 		return nil, err
@@ -313,13 +313,13 @@ func (dev *Device) GetSnapshotURI(ctx context.Context, profile onvif.Profile, cr
 	dev.logger.Debugf("GetSnapshotUri response: %v", string(body))
 	var snapshotURI getSnapshotURIResponse
 	if err := xml.NewDecoder(bytes.NewReader(body)).Decode(&snapshotURI); err != nil {
-		return nil, fmt.Errorf("failed to get snapshot URL for profile %s: %w", profile.Token, err)
+		return nil, fmt.Errorf("failed to get snapshot URL for profile %s: %w", token, err)
 	}
 
-	dev.logger.Debugf("GetSnapshotUriResponse decoded %v: ", profile.Token, snapshotURI)
+	dev.logger.Debugf("GetSnapshotUriResponse decoded %v: ", token, snapshotURI)
 	uriStr := string(snapshotURI.Body.GetSnapshotURIResponse.MediaURI.Uri)
 	if uriStr == "" {
-		return nil, fmt.Errorf("got empty uri for profile %s", profile.Token)
+		return nil, fmt.Errorf("got empty uri for profile %s", token)
 	}
 	uri, err := url.Parse(uriStr)
 	if err != nil {
@@ -328,7 +328,7 @@ func (dev *Device) GetSnapshotURI(ctx context.Context, profile onvif.Profile, cr
 	if creds.User != "" || creds.Pass != "" {
 		uri.User = url.UserPassword(creds.User, creds.Pass)
 	}
-	dev.logger.Debugf("GetSnapshotUriResponse parsed %v: ", profile.Token, uri)
+	dev.logger.Debugf("GetSnapshotUriResponse parsed %v: ", token, uri)
 
 	return uri, nil
 }
