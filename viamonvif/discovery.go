@@ -102,6 +102,7 @@ func discoverOnAllInterfaces(ctx context.Context, manualXAddrs []*url.URL, logge
 	return slices.Collect(maps.Values(discovered)), nil
 }
 
+// URI is a struct that holds the RTSP stream and snapshot URIs.
 type URI struct {
 	StreamURI   string `json:"stream_uri"`
 	SnapshotURI string `json:"snapshot_uri"`
@@ -178,7 +179,6 @@ func (cam *CameraInfo) tryMDNS(mdnsServer *mdnsServer, logger logging.Logger) {
 
 func (cam *CameraInfo) urlDependsOnMDNS(idx int) bool {
 	return strings.Contains(cam.URIs[idx].StreamURI, cam.mdnsName)
-
 }
 
 // CameraInfoList is a struct containing a list of CameraInfo structs.
@@ -282,14 +282,13 @@ func GetCameraInfo(
 	return cameraInfo, nil
 }
 
-// GetRTSPStreamURIsFromProfiles uses the ONVIF Media service to get the RTSP stream URLs for all available profiles.
+// GetRTSPStreamInfoFromProfiles uses the ONVIF Media service to get the RTSP stream URLs for all available profiles.
 func GetRTSPStreamInfoFromProfiles(
 	ctx context.Context,
 	dev OnvifDevice,
 	creds device.Credentials,
 	logger logging.Logger,
 ) ([]URI, error) {
-
 	resp, err := dev.GetProfiles(ctx)
 	if err != nil {
 		return nil, err
@@ -298,32 +297,31 @@ func GetRTSPStreamInfoFromProfiles(
 	uris := make([]URI, 0)
 	// Iterate over all profiles and get the RTSP stream URI for each one
 	for _, profile := range resp.Profiles {
-		stream_uri, err := dev.GetStreamURI(ctx, profile.Token, creds)
+		streamURI, err := dev.GetStreamURI(ctx, profile.Token, creds)
 		if err != nil {
 			logger.Warn(err.Error())
 			continue
 		}
 
-		snapshot_uri, err := dev.GetSnapshotURI(ctx, profile.Token, creds)
+		snapshotURI, err := dev.GetSnapshotURI(ctx, profile.Token, creds)
 		if err != nil {
 			logger.Warn(err.Error())
 			continue
 		}
 		// Check if the stream URI is empty
-		if stream_uri == nil || stream_uri.String() == "" {
+		if streamURI == nil || streamURI.String() == "" {
 			logger.Warnf("Stream URI is empty for profile %s", profile.Name)
 			continue
 		}
 
 		// Add to map only if both URIs are valid
 		// TODO(seanp): Handle case where streaming URI is valid  and snapshot invalid
-		if snapshot_uri != nil && snapshot_uri.String() != "" {
+		if snapshotURI != nil && snapshotURI.String() != "" {
 			uris = append(uris, URI{
-				StreamURI:   stream_uri.String(),
-				SnapshotURI: snapshot_uri.String(),
+				StreamURI:   streamURI.String(),
+				SnapshotURI: snapshotURI.String(),
 			})
 		}
-
 	}
 
 	return uris, nil
