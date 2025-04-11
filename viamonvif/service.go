@@ -3,12 +3,21 @@ package viamonvif
 
 import (
 	"context"
+	"crypto/md5" //nolint:gosec
+	"crypto/rand"
+	"crypto/tls"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/viam-modules/viamrtsp"
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
@@ -54,6 +63,7 @@ type rtspDiscovery struct {
 	resource.Named
 	resource.AlwaysRebuild
 	Credentials []device.Credentials
+	URIs        []URI
 	mdnsServer  *mdnsServer
 	logger      logging.Logger
 }
@@ -103,15 +113,17 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 	if len(list.Cameras) == 0 {
 		return nil, errors.New("no cameras found, ensure cameras are working or check credentials")
 	}
-
+	// clear dis.URIs list
+	dis.URIs = []URI{}
 	for _, camInfo := range list.Cameras {
 		dis.logger.Debugf("%s %s %s", camInfo.Manufacturer, camInfo.Model, camInfo.SerialNumber)
 		// some cameras return with no urls. explicitly skipping those so the behavior is clear in the service.
-		if len(camInfo.RTSPURLs) == 0 {
+		if len(camInfo.URIs) == 0 {
 			dis.logger.Errorf("No urls found for camera, skipping. %s %s %s",
 				camInfo.Manufacturer, camInfo.Model, camInfo.SerialNumber)
 			continue
 		}
+		dis.URIs = append(dis.URIs, camInfo.URIs...)
 
 		// tryMDNS will attempt to register an mdns entry for the camera. If successfully
 		// registered, `tryMDNS` will additionally mutate the `camInfo.RTSPURLs` to use the dns
@@ -131,14 +143,195 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 	return cams, nil
 }
 
+func (dis *rtspDiscovery) DoCommand(ctx context.Context, command map[string]interface{}) (map[string]interface{}, error) {
+	cmd, ok := command["command"].(string)
+	if !ok {
+		return nil, errors.New("invalid command type")
+	}
+
+	switch cmd {
+	case "preview":
+		dis.logger.Debugf("snapshot command received")
+		snapshotReq, err := toSnapshotCommand(command)
+		if err != nil {
+			return nil, err
+		}
+
+		// look up the snapshot uri by the snapshotReq.rtspURL in the list of URIs
+		var found bool
+		var snapshotURI string
+		for _, uri := range dis.URIs {
+			if uri.StreamURI == snapshotReq.rtspURL {
+				snapshotURI = uri.SnapshotURI
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("snapshot URI not found for %s", snapshotReq.rtspURL)
+		}
+
+		// Parse the URL to extract credentials
+		parsedURL, err := url.Parse(snapshotURI)
+		if err != nil {
+			return nil, fmt.Errorf("invalid snapshot URI: %w", err)
+		}
+
+		// Extract credentials
+		var username, password string
+		if parsedURL.User != nil {
+			username = parsedURL.User.Username()
+			password, _ = parsedURL.User.Password()
+			dis.logger.Debugf("Using credentials: username=%s", username)
+		}
+
+		// Create HTTP client
+		client := &http.Client{
+			Timeout: 20 * time.Second, //nolint:mnd
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+			},
+		}
+
+		// Make initial request to get auth challenge
+		initialReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, snapshotURI, nil)
+		resp, err := client.Do(initialReq)
+		if err != nil {
+			return nil, fmt.Errorf("failed to make initial request: %w", err)
+		}
+
+		// If we get 401 with WWW-Authenticate header, handle digest auth
+		if resp.StatusCode == http.StatusUnauthorized {
+			dis.logger.Debugf("Got 401, handling digest authentication")
+			authHeader := resp.Header.Get("WWW-Authenticate")
+			// Close the response body in prep for new request
+			err := resp.Body.Close()
+			if err != nil {
+				return nil, fmt.Errorf("failed to close response body: %w", err)
+			}
+
+			digestParts := digestAuthParams(authHeader)
+
+			// Calculate digest response
+			ha1 := md5hex(username + ":" + digestParts["realm"] + ":" + password)
+			ha2 := md5hex("GET" + ":" + parsedURL.RequestURI())
+			nonceCount := "00000001"
+			cnonce := randHex(16) //nolint:mnd
+
+			response := md5hex(ha1 + ":" + digestParts["nonce"] + ":" +
+				nonceCount + ":" + cnonce + ":" + digestParts["qop"] + ":" + ha2)
+
+			// Build authorization header
+			// authValue := fmt.Sprintf(`Digest username="%s", realm="%s", nonce="%s", uri="%s",
+			// algorithm=%s, qop=%s, nc=%s, cnonce="%s", response="%s"`,
+			// 	username, digestParts["realm"], digestParts["nonce"], parsedURL.RequestURI(),
+			// 	digestParts["algorithm"], digestParts["qop"], nonceCount, cnonce, response)
+
+			authValue := fmt.Sprintf(
+				`Digest username="%s", realm="%s", nonce="%s", uri="%s", algorithm=%s, qop=%s, nc=%s, cnonce="%s", response="%s"`,
+				username, digestParts["realm"], digestParts["nonce"], parsedURL.RequestURI(),
+				digestParts["algorithm"], digestParts["qop"], nonceCount, cnonce, response)
+
+			authReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, snapshotURI, nil)
+			authReq.Header.Set("Authorization", authValue)
+
+			resp, err = client.Do(authReq)
+			if err != nil {
+				return nil, fmt.Errorf("failed to make authenticated request: %w", err)
+			}
+			defer resp.Body.Close()
+		}
+		if resp.StatusCode != http.StatusOK {
+			bodyBytes, _ := io.ReadAll(resp.Body)
+			return nil, fmt.Errorf("unexpected status: %d, body: %s", resp.StatusCode, string(bodyBytes))
+		}
+
+		imageBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read image data: %w", err)
+		}
+
+		base64Image := base64.StdEncoding.EncodeToString(imageBytes)
+		contentType := resp.Header.Get("Content-Type")
+		dataURL := fmt.Sprintf("data:%s;base64,%s", contentType, base64Image)
+
+		return map[string]interface{}{
+			"preview": dataURL,
+		}, nil
+
+	default:
+		return nil, fmt.Errorf("unknown command: %s", cmd)
+	}
+}
+
 func (dis *rtspDiscovery) Close(_ context.Context) error {
 	dis.mdnsServer.Shutdown()
 	return nil
 }
 
+func digestAuthParams(header string) map[string]string {
+	parts := strings.Split(header, " ")
+	if len(parts) < 2 || !strings.EqualFold(parts[0], "digest") {
+		return nil
+	}
+
+	result := make(map[string]string)
+	headerVal := strings.Join(parts[1:], " ")
+
+	for _, part := range strings.Split(headerVal, ",") {
+		part = strings.TrimSpace(part)
+		subparts := strings.SplitN(part, "=", 2) //nolint:mnd
+		if len(subparts) != 2 {                  //nolint:mnd
+			continue
+		}
+
+		key := subparts[0]
+		value := strings.Trim(subparts[1], "\"")
+		result[key] = value
+	}
+
+	if _, ok := result["algorithm"]; !ok {
+		result["algorithm"] = "MD5" // Default algorithm
+	}
+
+	return result
+}
+
+func md5hex(data string) string {
+	h := md5.New() //nolint:gosec
+	h.Write([]byte(data))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func randHex(n int) string {
+	bytes := make([]byte, n/2) //nolint:mnd
+	_, err := rand.Read(bytes)
+	if err != nil {
+		return ""
+	}
+	return hex.EncodeToString(bytes)
+}
+
+type snapshotRequest struct {
+	rtspURL string
+}
+
+func toSnapshotCommand(command map[string]interface{}) (*snapshotRequest, error) {
+	// First, check if attributes exists and is a map
+	attributes, ok := command["attributes"].(map[string]interface{})
+	if !ok {
+		return nil, errors.New("attributes is missing or not a map")
+	}
+	rtspURL, ok := attributes["rtsp_address"].(string)
+	if !ok {
+		return nil, errors.New("invalid snapshot URI")
+	}
+	return &snapshotRequest{rtspURL: rtspURL}, nil
+}
+
 func createCamerasFromURLs(l CameraInfo, discoveryDependencyName string, logger logging.Logger) ([]resource.Config, error) {
 	cams := []resource.Config{}
-	for index, u := range l.RTSPURLs {
+	for index, u := range l.URIs {
 		logger.Debugf("camera URL:\t%s", u)
 
 		// Some URLs may contain a hostname that is served by the DiscoveryService's mDNS
@@ -149,7 +342,7 @@ func createCamerasFromURLs(l CameraInfo, discoveryDependencyName string, logger 
 			discDep = discoveryDependencyName
 		}
 
-		cfg, err := createCameraConfig(l.Name(index), u, discDep)
+		cfg, err := createCameraConfig(l.Name(index), u.StreamURI, discDep)
 		if err != nil {
 			return nil, err
 		}
