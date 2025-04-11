@@ -43,8 +43,9 @@ func (m *MockDevice) GetProfiles(_ context.Context) (device.GetProfilesResponse,
 	}, nil
 }
 
-func (m *MockDevice) GetStreamURI(_ context.Context, profile onvif.Profile, creds device.Credentials) (*url.URL, error) {
-	if profile.Token != "profile1" || profile.Name != "Main Profile" {
+// func (m *MockDevice) GetStreamURI(_ context.Context, profile onvif.Profile, creds device.Credentials) (*url.URL, error) {
+func (m *MockDevice) GetStreamURI(_ context.Context, token onvif.ReferenceToken, creds device.Credentials) (*url.URL, error) {
+	if token != "profile1" {
 		return nil, errors.New("invalid mock profile")
 	}
 	u, err := url.Parse("rtsp://192.168.1.100/stream")
