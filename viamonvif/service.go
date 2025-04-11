@@ -242,10 +242,11 @@ func (rc *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inter
 		}
 
 		base64Image := base64.StdEncoding.EncodeToString(imageBytes)
+		contentType := resp.Header.Get("Content-Type")
+		dataURL := fmt.Sprintf("data:%s;base64,%s", contentType, base64Image)
 
 		return map[string]interface{}{
-			"snapshot":     base64Image,
-			"content_type": resp.Header.Get("Content-Type"),
+			"preview": dataURL,
 		}, nil
 
 	default:
