@@ -63,6 +63,7 @@ type rtspDiscovery struct {
 	resource.Named
 	resource.AlwaysRebuild
 	Credentials []device.Credentials
+	URIs        []URI
 	mdnsServer  *mdnsServer
 	logger      logging.Logger
 }
@@ -112,7 +113,8 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 	if len(list.Cameras) == 0 {
 		return nil, errors.New("no cameras found, ensure cameras are working or check credentials")
 	}
-
+	// clear dis.URIs list
+	dis.URIs = []URI{}
 	for _, camInfo := range list.Cameras {
 		dis.logger.Debugf("%s %s %s", camInfo.Manufacturer, camInfo.Model, camInfo.SerialNumber)
 		// some cameras return with no urls. explicitly skipping those so the behavior is clear in the service.
@@ -121,6 +123,7 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 				camInfo.Manufacturer, camInfo.Model, camInfo.SerialNumber)
 			continue
 		}
+		dis.URIs = append(dis.URIs, camInfo.URIs...)
 
 		// tryMDNS will attempt to register an mdns entry for the camera. If successfully
 		// registered, `tryMDNS` will additionally mutate the `camInfo.RTSPURLs` to use the dns
@@ -147,15 +150,29 @@ func (rc *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inter
 	}
 
 	switch cmd {
-	case "snapshot":
+	case "preview":
 		rc.logger.Debugf("snapshot command received")
 		snapshotReq, err := toSnapshotCommand(command)
 		if err != nil {
 			return nil, err
 		}
 
+		// look up the snapshot uri by the snapshotReq.rtspURL in the list of URIs
+		var found bool
+		var snapshotURI string
+		for _, uri := range rc.URIs {
+			if uri.StreamURI == snapshotReq.rtspURL {
+				snapshotURI = uri.SnapshotURI
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("snapshot URI not found for %s", snapshotReq.rtspURL)
+		}
+
 		// Parse the URL to extract credentials
-		parsedURL, err := url.Parse(snapshotReq.snapshotURI)
+		parsedURL, err := url.Parse(snapshotURI)
 		if err != nil {
 			return nil, fmt.Errorf("invalid snapshot URI: %w", err)
 		}
@@ -177,7 +194,7 @@ func (rc *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inter
 		}
 
 		// Make initial request to get auth challenge
-		initialReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, snapshotReq.snapshotURI, nil)
+		initialReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, snapshotURI, nil)
 		resp, err := client.Do(initialReq)
 		if err != nil {
 			return nil, fmt.Errorf("failed to make initial request: %w", err)
@@ -205,7 +222,7 @@ func (rc *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inter
 				username, digestParts["realm"], digestParts["nonce"], parsedURL.RequestURI(),
 				digestParts["algorithm"], digestParts["qop"], nonceCount, cnonce, response)
 
-			authReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, snapshotReq.snapshotURI, nil)
+			authReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, snapshotURI, nil)
 			authReq.Header.Set("Authorization", authValue)
 
 			resp, err = client.Do(authReq)
@@ -277,15 +294,21 @@ func randHex(n int) string {
 }
 
 type snapshotRequest struct {
-	snapshotURI string
+	rtspURL string
 }
 
 func toSnapshotCommand(command map[string]interface{}) (*snapshotRequest, error) {
-	snapshotURI, ok := command["snapshot_uri"].(string)
+	// First, check if attributes exists and is a map
+	attributes, ok := command["attributes"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("attributes is missing or not a map")
+	}
+	rtspURL, ok := attributes["rtsp_address"].(string)
 	if !ok {
 		return nil, errors.New("invalid snapshot URI")
 	}
-	return &snapshotRequest{snapshotURI: snapshotURI}, nil
+	return &snapshotRequest{rtspURL: rtspURL}, nil
+
 }
 
 func (dis *rtspDiscovery) Close(_ context.Context) error {
