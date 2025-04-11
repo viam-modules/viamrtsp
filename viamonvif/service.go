@@ -116,7 +116,7 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 	for _, camInfo := range list.Cameras {
 		dis.logger.Debugf("%s %s %s", camInfo.Manufacturer, camInfo.Model, camInfo.SerialNumber)
 		// some cameras return with no urls. explicitly skipping those so the behavior is clear in the service.
-		if len(camInfo.RTSPURLs) == 0 {
+		if len(camInfo.URIs) == 0 {
 			dis.logger.Errorf("No urls found for camera, skipping. %s %s %s",
 				camInfo.Manufacturer, camInfo.Model, camInfo.SerialNumber)
 			continue
@@ -294,13 +294,8 @@ func (dis *rtspDiscovery) Close(_ context.Context) error {
 }
 
 func createCamerasFromURLs(l CameraInfo, discoveryDependencyName string, logger logging.Logger) ([]resource.Config, error) {
-	if len(l.RTSPURLs) != len(l.SnapshotURIs) {
-		logger.Warnf("mismatched lengths: %d RTSP URLs and %d Snapshot URIs, some cameras may not have snapshot URIs",
-			len(l.RTSPURLs), len(l.SnapshotURIs))
-	}
-
 	cams := []resource.Config{}
-	for index, u := range l.RTSPURLs {
+	for index, u := range l.URIs {
 		logger.Debugf("camera URL:\t%s", u)
 
 		// Some URLs may contain a hostname that is served by the DiscoveryService's mDNS
@@ -311,12 +306,7 @@ func createCamerasFromURLs(l CameraInfo, discoveryDependencyName string, logger 
 			discDep = discoveryDependencyName
 		}
 
-		snapshotURI := ""
-		if index < len(l.SnapshotURIs) {
-			snapshotURI = l.SnapshotURIs[index]
-		}
-
-		cfg, err := createCameraConfig(l.Name(index), u, snapshotURI, discDep)
+		cfg, err := createCameraConfig(l.Name(index), u.StreamURI, u.SnapshotURI, discDep)
 		if err != nil {
 			return nil, err
 		}
@@ -331,7 +321,6 @@ func createCameraConfig(name, address, uri, discoveryDependency string) (resourc
 	attributes := viamrtsp.Config{
 		Address:        address,
 		RTPPassthrough: &_true,
-		SnapshotURI:    uri,
 		DiscoveryDep:   discoveryDependency,
 	}
 	var result map[string]interface{}
