@@ -104,9 +104,31 @@ The DiscoverResources API also can take a credential as `extra`s fields. To disc
 }
 ```
 
+### Preview DoCommand
+The `Preview` DoCommand is used to get a preview image of the camera stream. You can copy over the attributes section generated from `DiscoverResources` into the `Preview` DoCommand. The `rtsp_address` is the only required field.
+
+```json
+{
+  "command": "preview",
+  "attributes": {
+    "rtsp_address": "rtsp://tavy16d.viam.local:554/stream"
+  }
+}
+```
+
+The response will be preview image in the [DataURL](https://developer.mozilla.org/en-US/docs/Web/URI/Reference/Schemes/data) format. The data URL will look like this:
+
+```json
+{
+  "preview": "data:image/jpeg;base64,<base64_encoded_image>"
+}
+```
+
 ### Next steps
 
-Use the `DiscoverResources` API by adding a `viam:viamrtsp:onvif` `discovery` model to retrieve a list of cameras discovered by the service and their configuration. Some cameras will output multiple channels, so review the `rtsp_address` of the cameras to determine which camera streams you wish to add.
+Use the `DiscoverResources` API by adding a `viam:viamrtsp:onvif` `discovery` model to retrieve a list of cameras discovered by the service and their configuration. You can then retrieve a preview image from a camera using the `Preview` `DoCommand`. 
+
+Some cameras will output multiple channels, so review the `rtsp_address` and the image preview of the cameras to determine which camera streams you wish to add.
 
 ### Common RTSP discovery pitfalls
 #### DHCP

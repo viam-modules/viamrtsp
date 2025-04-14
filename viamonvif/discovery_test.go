@@ -96,7 +96,6 @@ func TestGetCameraInfo(t *testing.T) {
 			test.That(t, len(cameraInfo.URIs), test.ShouldEqual, 1)
 			test.That(t, cameraInfo.URIs[0].StreamURI, test.ShouldEqual, "rtsp://192.168.1.100/stream")
 			test.That(t, cameraInfo.URIs[0].SnapshotURI, test.ShouldEqual, "http://example.com/snapshot.jpg")
-
 		})
 	})
 }
