@@ -170,6 +170,7 @@ func (dis *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inte
 		if !found {
 			return nil, fmt.Errorf("snapshot URI not found for %s", snapshotReq.rtspURL)
 		}
+		dis.logger.Infof("snapshot URI: %s", snapshotURI)
 
 		// Parse the URL to extract credentials
 		parsedURL, err := url.Parse(snapshotURI)
@@ -185,9 +186,10 @@ func (dis *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inte
 			dis.logger.Debugf("Using credentials: username=%s", username)
 		}
 
-		// Create HTTP client
 		client := &http.Client{
-			Timeout: 20 * time.Second, //nolint:mnd
+			// Setting upper bound timeout in case the ctx never times out
+			Timeout: 5 * time.Second, //nolint:mnd
+			// Skipping verification in case we get a https uri with self-signed cert
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
 			},
@@ -195,6 +197,9 @@ func (dis *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inte
 
 		// Make initial request to get auth challenge
 		initialReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, snapshotURI, nil)
+		if username != "" && password != "" {
+			initialReq.SetBasicAuth(username, password)
+		}
 		resp, err := client.Do(initialReq)
 		if err != nil {
 			return nil, fmt.Errorf("failed to make initial request: %w", err)
@@ -203,6 +208,7 @@ func (dis *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inte
 		// If we get 401 with WWW-Authenticate header, handle digest auth
 		if resp.StatusCode == http.StatusUnauthorized {
 			dis.logger.Debugf("Got 401, handling digest authentication")
+			dis.logger.Infof("Got 401, handling digest authentication")
 			authHeader := resp.Header.Get("WWW-Authenticate")
 			// Close the response body in prep for new request
 			err := resp.Body.Close()
@@ -217,16 +223,10 @@ func (dis *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inte
 			ha2 := md5hex("GET" + ":" + parsedURL.RequestURI())
 			nonceCount := "00000001"
 			cnonce := randHex(16) //nolint:mnd
-
 			response := md5hex(ha1 + ":" + digestParts["nonce"] + ":" +
 				nonceCount + ":" + cnonce + ":" + digestParts["qop"] + ":" + ha2)
 
 			// Build authorization header
-			// authValue := fmt.Sprintf(`Digest username="%s", realm="%s", nonce="%s", uri="%s",
-			// algorithm=%s, qop=%s, nc=%s, cnonce="%s", response="%s"`,
-			// 	username, digestParts["realm"], digestParts["nonce"], parsedURL.RequestURI(),
-			// 	digestParts["algorithm"], digestParts["qop"], nonceCount, cnonce, response)
-
 			authValue := fmt.Sprintf(
 				`Digest username="%s", realm="%s", nonce="%s", uri="%s", algorithm=%s, qop=%s, nc=%s, cnonce="%s", response="%s"`,
 				username, digestParts["realm"], digestParts["nonce"], parsedURL.RequestURI(),
@@ -291,7 +291,7 @@ func digestAuthParams(header string) map[string]string {
 	}
 
 	if _, ok := result["algorithm"]; !ok {
-		result["algorithm"] = "MD5" // Default algorithm
+		result["algorithm"] = "MD5"
 	}
 
 	return result
