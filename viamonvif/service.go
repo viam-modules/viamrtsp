@@ -2,12 +2,9 @@
 package viamonvif
 
 import (
-	"context"
-	"crypto/md5" //nolint:gosec
-	"crypto/rand"
+	"context" //nolint:gosec
 	"crypto/tls"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/icholy/digest"
 	"github.com/viam-modules/viamrtsp"
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"go.viam.com/rdk/components/camera"
@@ -57,6 +55,10 @@ func (cfg *Config) Validate(_ string) ([]string, error) {
 		}
 	}
 	return []string{}, nil
+}
+
+type snapshotRequest struct {
+	rtspURL string
 }
 
 type rtspDiscovery struct {
@@ -186,61 +188,30 @@ func (dis *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inte
 			dis.logger.Debugf("Using credentials: username=%s", username)
 		}
 
+		transport := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+		}
 		client := &http.Client{
 			// Setting upper bound timeout in case the ctx never times out
 			Timeout: 5 * time.Second, //nolint:mnd
-			// Skipping verification in case we get a https uri with self-signed cert
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+			Transport: &digest.Transport{
+				Username:  username,
+				Password:  password,
+				Transport: transport,
 			},
 		}
 
 		// Make initial request to get auth challenge
-		initialReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, snapshotURI, nil)
-		if username != "" && password != "" {
-			initialReq.SetBasicAuth(username, password)
+		initialReq, err := http.NewRequestWithContext(ctx, http.MethodGet, snapshotURI, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create initial request: %w", err)
 		}
+
 		resp, err := client.Do(initialReq)
 		if err != nil {
 			return nil, fmt.Errorf("failed to make initial request: %w", err)
 		}
 
-		// If we get 401 with WWW-Authenticate header, handle digest auth
-		if resp.StatusCode == http.StatusUnauthorized {
-			dis.logger.Debugf("Got 401, handling digest authentication")
-			dis.logger.Infof("Got 401, handling digest authentication")
-			authHeader := resp.Header.Get("WWW-Authenticate")
-			// Close the response body in prep for new request
-			err := resp.Body.Close()
-			if err != nil {
-				return nil, fmt.Errorf("failed to close response body: %w", err)
-			}
-
-			digestParts := digestAuthParams(authHeader)
-
-			// Calculate digest response
-			ha1 := md5hex(username + ":" + digestParts["realm"] + ":" + password)
-			ha2 := md5hex("GET" + ":" + parsedURL.RequestURI())
-			nonceCount := "00000001"
-			cnonce := randHex(16) //nolint:mnd
-			response := md5hex(ha1 + ":" + digestParts["nonce"] + ":" +
-				nonceCount + ":" + cnonce + ":" + digestParts["qop"] + ":" + ha2)
-
-			// Build authorization header
-			authValue := fmt.Sprintf(
-				`Digest username="%s", realm="%s", nonce="%s", uri="%s", algorithm=%s, qop=%s, nc=%s, cnonce="%s", response="%s"`,
-				username, digestParts["realm"], digestParts["nonce"], parsedURL.RequestURI(),
-				digestParts["algorithm"], digestParts["qop"], nonceCount, cnonce, response)
-
-			authReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, snapshotURI, nil)
-			authReq.Header.Set("Authorization", authValue)
-
-			resp, err = client.Do(authReq)
-			if err != nil {
-				return nil, fmt.Errorf("failed to make authenticated request: %w", err)
-			}
-			defer resp.Body.Close()
-		}
 		if resp.StatusCode != http.StatusOK {
 			bodyBytes, _ := io.ReadAll(resp.Body)
 			return nil, fmt.Errorf("unexpected status: %d, body: %s", resp.StatusCode, string(bodyBytes))
@@ -267,53 +238,6 @@ func (dis *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inte
 func (dis *rtspDiscovery) Close(_ context.Context) error {
 	dis.mdnsServer.Shutdown()
 	return nil
-}
-
-func digestAuthParams(header string) map[string]string {
-	parts := strings.Split(header, " ")
-	if len(parts) < 2 || !strings.EqualFold(parts[0], "digest") {
-		return nil
-	}
-
-	result := make(map[string]string)
-	headerVal := strings.Join(parts[1:], " ")
-
-	for _, part := range strings.Split(headerVal, ",") {
-		part = strings.TrimSpace(part)
-		subparts := strings.SplitN(part, "=", 2) //nolint:mnd
-		if len(subparts) != 2 {                  //nolint:mnd
-			continue
-		}
-
-		key := subparts[0]
-		value := strings.Trim(subparts[1], "\"")
-		result[key] = value
-	}
-
-	if _, ok := result["algorithm"]; !ok {
-		result["algorithm"] = "MD5"
-	}
-
-	return result
-}
-
-func md5hex(data string) string {
-	h := md5.New() //nolint:gosec
-	h.Write([]byte(data))
-	return hex.EncodeToString(h.Sum(nil))
-}
-
-func randHex(n int) string {
-	bytes := make([]byte, n/2) //nolint:mnd
-	_, err := rand.Read(bytes)
-	if err != nil {
-		return ""
-	}
-	return hex.EncodeToString(bytes)
-}
-
-type snapshotRequest struct {
-	rtspURL string
 }
 
 func toSnapshotCommand(command map[string]interface{}) (*snapshotRequest, error) {
