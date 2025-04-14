@@ -303,25 +303,31 @@ func GetRTSPStreamInfoFromProfiles(
 			continue
 		}
 
-		snapshotURI, err := dev.GetSnapshotURI(ctx, profile.Token, creds)
-		if err != nil {
-			logger.Warn(err.Error())
-			continue
-		}
 		// Check if the stream URI is empty
 		if streamURI == nil || streamURI.String() == "" {
 			logger.Warnf("Stream URI is empty for profile %s", profile.Name)
 			continue
 		}
 
-		// Add to map only if both URIs are valid
-		// TODO(seanp): Handle case where streaming URI is valid  and snapshot invalid
-		if snapshotURI != nil && snapshotURI.String() != "" {
-			uris = append(uris, URI{
-				StreamURI:   streamURI.String(),
-				SnapshotURI: snapshotURI.String(),
-			})
+		snapshotURI, err := dev.GetSnapshotURI(ctx, profile.Token, creds)
+		if err != nil {
+			logger.Warn(err.Error())
+			continue
 		}
+
+		// Always add the URI as long as stream URI is valid
+		// Set snapshot URI to empty string if it's nil or empty
+		snapshotURIString := ""
+		if snapshotURI != nil {
+			snapshotURIString = snapshotURI.String()
+		} else {
+			logger.Warnf("Snapshot URI is empty for profile %s: %s, adding URI with empty snapshot", profile.Name, streamURI.String())
+		}
+
+		uris = append(uris, URI{
+			StreamURI:   streamURI.String(),
+			SnapshotURI: snapshotURIString,
+		})
 	}
 
 	return uris, nil
