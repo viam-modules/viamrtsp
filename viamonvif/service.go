@@ -174,58 +174,10 @@ func (dis *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inte
 		}
 		dis.logger.Infof("snapshot URI: %s", snapshotURI)
 
-		// Parse the URL to extract credentials
-		parsedURL, err := url.Parse(snapshotURI)
+		dataURL, err := downloadPreviewImage(ctx, dis.logger, snapshotURI)
 		if err != nil {
-			return nil, fmt.Errorf("invalid snapshot URI: %w", err)
+			return nil, fmt.Errorf("failed to download preview image: %w", err)
 		}
-
-		// Extract credentials
-		var username, password string
-		if parsedURL.User != nil {
-			username = parsedURL.User.Username()
-			password, _ = parsedURL.User.Password()
-			dis.logger.Debugf("Using credentials: username=%s", username)
-		}
-
-		transport := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
-		}
-		client := &http.Client{
-			// Setting upper bound timeout in case the ctx never times out
-			Timeout: 5 * time.Second, //nolint:mnd
-			Transport: &digest.Transport{
-				Username:  username,
-				Password:  password,
-				Transport: transport,
-			},
-		}
-
-		// Make initial request to get auth challenge
-		initialReq, err := http.NewRequestWithContext(ctx, http.MethodGet, snapshotURI, nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create initial request: %w", err)
-		}
-
-		resp, err := client.Do(initialReq)
-		if err != nil {
-			return nil, fmt.Errorf("failed to make initial request: %w", err)
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			bodyBytes, _ := io.ReadAll(resp.Body)
-			return nil, fmt.Errorf("unexpected status: %d, body: %s", resp.StatusCode, string(bodyBytes))
-		}
-
-		imageBytes, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read image data: %w", err)
-		}
-
-		base64Image := base64.StdEncoding.EncodeToString(imageBytes)
-		contentType := resp.Header.Get("Content-Type")
-		dataURL := fmt.Sprintf("data:%s;base64,%s", contentType, base64Image)
-
 		return map[string]interface{}{
 			"preview": dataURL,
 		}, nil
@@ -251,6 +203,80 @@ func toSnapshotCommand(command map[string]interface{}) (*snapshotRequest, error)
 		return nil, errors.New("invalid snapshot URI")
 	}
 	return &snapshotRequest{rtspURL: rtspURL}, nil
+}
+
+// downloadPreviewImage downloads the preview image from the snapshot uri and returns it as a data URL
+func downloadPreviewImage(ctx context.Context, logger logging.Logger, snapshotURI string) (string, error) {
+	parsedURL, err := url.Parse(snapshotURI)
+	if err != nil {
+		return "", fmt.Errorf("found an invalid snapshot URI: %w", err)
+	}
+
+	var username, password string
+	if parsedURL.User != nil {
+		username = parsedURL.User.Username()
+		password, _ = parsedURL.User.Password()
+		logger.Debugf("using credentials: username=%s", username)
+	}
+
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+	}
+	client := &http.Client{
+		// Setting upper bound timeout in case the ctx never times out
+		Timeout: 5 * time.Second, //nolint:mnd
+		Transport: &digest.Transport{
+			Username:  username,
+			Password:  password,
+			Transport: transport,
+		},
+	}
+
+	initialReq, err := http.NewRequestWithContext(ctx, http.MethodGet, snapshotURI, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create http request: %w", err)
+	}
+
+	resp, err := client.Do(initialReq)
+	if err != nil {
+		return "", fmt.Errorf("failed to execute http request: %w", err)
+	}
+	defer resp.Body.Close()
+	logger.Debugf("snapshot response status: %s", resp.Status)
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, readErr := io.ReadAll(resp.Body)
+		bodyText := "<failed to read response body>"
+		if readErr != nil {
+			logger.Warnf("Failed to read error response body: %v", readErr)
+		} else {
+			bodyText = string(bodyBytes)
+		}
+		switch resp.StatusCode {
+		case http.StatusUnauthorized:
+			return "", fmt.Errorf("authentication failed (401): %s", bodyText)
+		case http.StatusForbidden:
+			return "", fmt.Errorf("access forbidden (403): %s", bodyText)
+		case http.StatusNotFound:
+			return "", fmt.Errorf("snapshot resource not found (404): %s", bodyText)
+		default:
+			return "", fmt.Errorf("unexpected HTTP status %d (%s): %s",
+				resp.StatusCode, resp.Status, bodyText)
+		}
+	}
+
+	contentType := resp.Header.Get("Content-Type")
+	imageBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read image data from http response: %w", err)
+	}
+	logger.Debugf("Retrieved image data: %d bytes and content type: %s", len(imageBytes), contentType)
+
+	base64Image := base64.StdEncoding.EncodeToString(imageBytes)
+	dataURL := fmt.Sprintf("data:%s;base64,%s", contentType, base64Image)
+	logger.Debugf("dataURL: %s", dataURL)
+
+	return dataURL, nil
 }
 
 func createCamerasFromURLs(l CameraInfo, discoveryDependencyName string, logger logging.Logger) ([]resource.Config, error) {
