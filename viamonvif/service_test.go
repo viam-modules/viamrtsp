@@ -3,6 +3,8 @@ package viamonvif
 
 import (
 	"context"
+	"net"
+	"net/http"
 	"testing"
 
 	"github.com/viam-modules/viamrtsp"
@@ -116,4 +118,136 @@ func TestGetCredFromExtra(t *testing.T) {
 		test.That(t, cred.Pass, test.ShouldEqual, "")
 		test.That(t, ok, test.ShouldBeFalse)
 	})
+}
+
+func TestDoCommandSnapshot(t *testing.T) {
+	ctx := context.Background()
+	logger := logging.NewTestLogger(t)
+
+	t.Run("Test snapshot command with valid RTSP URL", func(t *testing.T) {
+		// Start a test HTTP server
+		server := startTestHTTPServer(t, "/snapshot", "image/jpeg", "mockImageData")
+		defer server.Close()
+
+		serverURL := "http://" + server.Addr
+
+		dis := &rtspDiscovery{
+			URIs: []URI{
+				{StreamURI: "rtsp://camera1/stream", SnapshotURI: serverURL + "/snapshot"},
+			},
+			logger: logger,
+		}
+
+		command := map[string]interface{}{
+			"command": "preview",
+			"attributes": map[string]interface{}{
+				"rtsp_address": "rtsp://camera1/stream",
+			},
+		}
+
+		result, err := dis.DoCommand(ctx, command)
+		test.That(t, err, test.ShouldBeNil)
+		test.That(t, result["preview"], test.ShouldEqual, "data:image/jpeg;base64,bW9ja0ltYWdlRGF0YQ==")
+	})
+
+	t.Run("Test snapshot command with invalid RTSP URL", func(t *testing.T) {
+		dis := &rtspDiscovery{
+			URIs: []URI{
+				{StreamURI: "rtsp://camera1/stream", SnapshotURI: "http://invalid/snapshot"},
+			},
+			logger: logger,
+		}
+
+		command := map[string]interface{}{
+			"command": "preview",
+			"attributes": map[string]interface{}{
+				"rtsp_address": "rtsp://invalid/stream",
+			},
+		}
+
+		result, err := dis.DoCommand(ctx, command)
+		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "snapshot URI not found")
+		test.That(t, result, test.ShouldBeNil)
+	})
+
+	t.Run("Test snapshot command with download error", func(t *testing.T) {
+		// Start a test HTTP server that returns an error
+		server := startTestHTTPServerWithError(t, "/snapshot", http.StatusInternalServerError, "Internal Server Error")
+		defer server.Close()
+
+		serverURL := "http://" + server.Addr
+
+		dis := &rtspDiscovery{
+			URIs: []URI{
+				{StreamURI: "rtsp://camera1/stream", SnapshotURI: serverURL + "/snapshot"},
+			},
+			logger: logger,
+		}
+
+		command := map[string]interface{}{
+			"command": "preview",
+			"attributes": map[string]interface{}{
+				"rtsp_address": "rtsp://camera1/stream",
+			},
+		}
+
+		result, err := dis.DoCommand(ctx, command)
+		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "failed to execute http request")
+		test.That(t, result, test.ShouldBeNil)
+	})
+}
+
+func startTestHTTPServer(t *testing.T, path, contentType, responseBody string) *http.Server {
+	handler := http.NewServeMux()
+	handler.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", contentType)
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write([]byte(responseBody))
+		if err != nil {
+			t.Fatalf("failed to write response: %v", err)
+		}
+	})
+
+	server := &http.Server{Addr: "127.0.0.1:0", Handler: handler}
+	listener, err := net.Listen("tcp", server.Addr)
+	if err != nil {
+		t.Fatalf("failed to start test HTTP server: %v", err)
+	}
+
+	go func() {
+		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
+			t.Fatalf("test HTTP server error: %v", err)
+		}
+	}()
+
+	server.Addr = listener.Addr().String()
+	return server
+}
+
+func startTestHTTPServerWithError(t *testing.T, path string, statusCode int, responseBody string) *http.Server {
+	handler := http.NewServeMux()
+	handler.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(statusCode)
+		_, err := w.Write([]byte(responseBody))
+		if err != nil {
+			t.Fatalf("failed to write error response: %v", err)
+		}
+	})
+
+	server := &http.Server{Addr: "127.0.0.1:0", Handler: handler}
+	listener, err := net.Listen("tcp", server.Addr)
+	if err != nil {
+		t.Fatalf("failed to start test HTTP server: %v", err)
+	}
+
+	go func() {
+		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
+			t.Fatalf("test HTTP server error: %v", err)
+		}
+	}()
+
+	server.Addr = listener.Addr().String()
+	return server
 }
