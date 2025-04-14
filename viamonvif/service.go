@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/icholy/digest"
@@ -67,6 +68,7 @@ type rtspDiscovery struct {
 	Credentials []device.Credentials
 	URIs        []URI
 	mdnsServer  *mdnsServer
+	mu          sync.RWMutex
 	logger      logging.Logger
 }
 
@@ -100,6 +102,9 @@ func newDiscovery(_ context.Context, _ resource.Dependencies,
 
 // DiscoverResources discovers different rtsp cameras that use onvif.
 func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[string]any) ([]resource.Config, error) {
+	dis.mu.Lock()
+	defer dis.mu.Unlock()
+
 	cams := []resource.Config{}
 
 	discoverCreds := dis.Credentials
@@ -115,7 +120,7 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 	if len(list.Cameras) == 0 {
 		return nil, errors.New("no cameras found, ensure cameras are working or check credentials")
 	}
-	// clear dis.URIs list
+	// Clear the URIs slice before filling with new cameras.
 	dis.URIs = []URI{}
 	for _, camInfo := range list.Cameras {
 		dis.logger.Debugf("%s %s %s", camInfo.Manufacturer, camInfo.Model, camInfo.SerialNumber)
@@ -160,6 +165,7 @@ func (dis *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inte
 		}
 
 		// look up the snapshot uri by the snapshotReq.rtspURL in the list of URIs
+		dis.mu.RLock()
 		var found bool
 		var snapshotURI string
 		for _, uri := range dis.URIs {
@@ -169,6 +175,7 @@ func (dis *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inte
 				break
 			}
 		}
+		dis.mu.RUnlock()
 		if !found {
 			return nil, fmt.Errorf("snapshot URI not found for %s", snapshotReq.rtspURL)
 		}
@@ -193,7 +200,6 @@ func (dis *rtspDiscovery) Close(_ context.Context) error {
 }
 
 func toSnapshotCommand(command map[string]interface{}) (*snapshotRequest, error) {
-	// First, check if attributes exists and is a map
 	attributes, ok := command["attributes"].(map[string]interface{})
 	if !ok {
 		return nil, errors.New("attributes is missing or not a map")
