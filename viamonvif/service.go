@@ -250,25 +250,10 @@ func downloadPreviewImage(ctx context.Context, logger logging.Logger, snapshotUR
 	defer resp.Body.Close()
 	logger.Debugf("snapshot response status: %s", resp.Status)
 
+	// TODO(seanp): Should we log body text in err case?
 	if resp.StatusCode != http.StatusOK {
-		bodyBytes, readErr := io.ReadAll(resp.Body)
-		bodyText := "<failed to read response body>"
-		if readErr != nil {
-			logger.Warnf("Failed to read error response body: %v", readErr)
-		} else {
-			bodyText = string(bodyBytes)
-		}
-		switch resp.StatusCode {
-		case http.StatusUnauthorized:
-			return "", fmt.Errorf("authentication failed (401): %s", bodyText)
-		case http.StatusForbidden:
-			return "", fmt.Errorf("access forbidden (403): %s", bodyText)
-		case http.StatusNotFound:
-			return "", fmt.Errorf("snapshot resource not found (404): %s", bodyText)
-		default:
-			return "", fmt.Errorf("unexpected HTTP status %d (%s): %s",
-				resp.StatusCode, resp.Status, bodyText)
-		}
+		statusText := http.StatusText(resp.StatusCode)
+		return "", fmt.Errorf("failed to get snapshot image, status %d: %s", resp.StatusCode, statusText)
 	}
 
 	contentType := resp.Header.Get("Content-Type")
