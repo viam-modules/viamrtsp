@@ -13,6 +13,7 @@ require (
 	github.com/erh/viamupnp v0.0.0-20250225174543-39c68c119b3e
 	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/golangci/golangci-lint v1.61.0
+	github.com/icholy/digest v1.1.0
 	github.com/koron/go-ssdp v0.0.4
 	github.com/pion/rtp v1.8.11
 	github.com/rhysd/actionlint v1.6.27
@@ -159,7 +160,6 @@ require (
 	github.com/hashicorp/go-version v1.7.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/hexops/gotextdiff v1.0.3 // indirect
-	github.com/icholy/digest v1.1.0 // indirect
 	github.com/improbable-eng/grpc-web v0.15.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jedib0t/go-pretty/v6 v6.4.6 // indirect

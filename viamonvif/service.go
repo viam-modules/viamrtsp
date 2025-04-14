@@ -2,7 +2,7 @@
 package viamonvif
 
 import (
-	"context" //nolint:gosec
+	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -211,7 +211,7 @@ func formatDataURL(contentType string, imageBytes []byte) string {
 	return fmt.Sprintf("data:%s;base64,%s", contentType, base64Image)
 }
 
-// downloadPreviewImage downloads the preview image from the snapshot uri and returns it as a data URL
+// downloadPreviewImage downloads the preview image from the snapshot uri and returns it as a data URL.
 func downloadPreviewImage(ctx context.Context, logger logging.Logger, snapshotURI string) (string, error) {
 	parsedURL, err := url.Parse(snapshotURI)
 	if err != nil {

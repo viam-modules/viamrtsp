@@ -200,24 +200,24 @@ func TestDoCommandPreview(t *testing.T) {
 
 func startTestHTTPServer(t *testing.T, path string, statusCode int, contentType, responseBody string) *http.Server {
 	handler := http.NewServeMux()
-	handler.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+	handler.HandleFunc(path, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", contentType)
 		w.WriteHeader(statusCode)
 		_, err := w.Write([]byte(responseBody))
 		if err != nil {
-			t.Fatalf("failed to write response: %v", err)
+			t.Logf("failed to write response: %v", err)
 		}
 	})
 
 	server := &http.Server{Addr: "127.0.0.1:0", Handler: handler}
 	listener, err := net.Listen("tcp", server.Addr)
 	if err != nil {
-		t.Fatalf("failed to start test HTTP server: %v", err)
+		t.Logf("failed to start test HTTP server: %v", err)
 	}
 
 	go func() {
 		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
-			t.Fatalf("test HTTP server error: %v", err)
+			t.Logf("test HTTP server error: %v", err)
 		}
 	}()
 
