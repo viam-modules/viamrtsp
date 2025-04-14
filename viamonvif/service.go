@@ -205,6 +205,12 @@ func toSnapshotCommand(command map[string]interface{}) (*snapshotRequest, error)
 	return &snapshotRequest{rtspURL: rtspURL}, nil
 }
 
+// formatDataURL formats the image data and content type into a data URL.
+func formatDataURL(contentType string, imageBytes []byte) string {
+	base64Image := base64.StdEncoding.EncodeToString(imageBytes)
+	return fmt.Sprintf("data:%s;base64,%s", contentType, base64Image)
+}
+
 // downloadPreviewImage downloads the preview image from the snapshot uri and returns it as a data URL
 func downloadPreviewImage(ctx context.Context, logger logging.Logger, snapshotURI string) (string, error) {
 	parsedURL, err := url.Parse(snapshotURI)
@@ -272,8 +278,7 @@ func downloadPreviewImage(ctx context.Context, logger logging.Logger, snapshotUR
 	}
 	logger.Debugf("Retrieved image data: %d bytes and content type: %s", len(imageBytes), contentType)
 
-	base64Image := base64.StdEncoding.EncodeToString(imageBytes)
-	dataURL := fmt.Sprintf("data:%s;base64,%s", contentType, base64Image)
+	dataURL := formatDataURL(contentType, imageBytes)
 	logger.Debugf("dataURL: %s", dataURL)
 
 	return dataURL, nil
