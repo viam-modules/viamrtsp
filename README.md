@@ -105,7 +105,7 @@ The DiscoverResources API also can take a credential as `extra`s fields. To disc
 ```
 
 ### Preview DoCommand
-The `Preview` DoCommand is used to get a preview image of the camera stream. You can copy over the attributes section generated from `DiscoverResources` into the `Preview` DoCommand. The `rtsp_address` is the only required field.
+The `Preview` DoCommand is used to get a preview image of the camera stream. You can copy over the attributes section generated from `DiscoverResources` into the command. The `rtsp_address` is the only required field.
 
 ```json
 {
@@ -116,7 +116,7 @@ The `Preview` DoCommand is used to get a preview image of the camera stream. You
 }
 ```
 
-The response will be preview image in the [DataURL](https://developer.mozilla.org/en-US/docs/Web/URI/Reference/Schemes/data) format. The data URL will look like this:
+The response will be preview image in the [DataURL](https://developer.mozilla.org/en-US/docs/Web/URI/Reference/Schemes/data) format.
 
 ```json
 {
