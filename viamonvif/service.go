@@ -130,7 +130,6 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 				camInfo.Manufacturer, camInfo.Model, camInfo.SerialNumber)
 			continue
 		}
-		dis.URIs = append(dis.URIs, camInfo.URIs...)
 
 		// tryMDNS will attempt to register an mdns entry for the camera. If successfully
 		// registered, `tryMDNS` will additionally mutate the `camInfo.RTSPURLs` to use the dns
@@ -142,6 +141,8 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 		if err != nil {
 			return nil, err
 		}
+		// If available, we will use mdns rtsp address instead of the original rtsp address
+		dis.URIs = append(dis.URIs, camInfo.URIs...)
 		cams = append(cams, camConfigs...)
 	}
 
