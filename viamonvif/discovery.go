@@ -156,7 +156,6 @@ func (cam *CameraInfo) tryMDNS(mdnsServer *mdnsServer, logger logging.Logger) {
 	wasIPFound := false
 	// Replace the URLs in-place such that configs generated from these objects will point to the
 	// logical dns hostname rather than a raw IP.
-	// TODO(seanp): Do we need mdns for snapshot uris?
 	for idx := range cam.MediaEndpoints {
 		if strings.Contains(cam.MediaEndpoints[idx].StreamURI, cam.deviceIP.String()) {
 			cam.MediaEndpoints[idx].StreamURI = strings.Replace(cam.MediaEndpoints[idx].StreamURI, cam.deviceIP.String(), cam.mdnsName, 1)

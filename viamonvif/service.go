@@ -250,7 +250,6 @@ func downloadPreviewImage(ctx context.Context, logger logging.Logger, snapshotUR
 	defer resp.Body.Close()
 	logger.Debugf("snapshot response status: %s", resp.Status)
 
-	// TODO(seanp): Should we log body text in err case?
 	if resp.StatusCode != http.StatusOK {
 		statusText := http.StatusText(resp.StatusCode)
 		return "", fmt.Errorf("failed to get snapshot image, status %d: %s", resp.StatusCode, statusText)
