@@ -66,7 +66,7 @@ type rtspDiscovery struct {
 	resource.Named
 	resource.AlwaysRebuild
 	Credentials []device.Credentials
-	URIs        []URI
+	URIs        []MediaInfo
 	mdnsServer  *mdnsServer
 	mu          sync.RWMutex
 	logger      logging.Logger
@@ -121,11 +121,11 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 		return nil, errors.New("no cameras found, ensure cameras are working or check credentials")
 	}
 	// Clear the URIs slice before filling with new cameras.
-	dis.URIs = []URI{}
+	dis.URIs = []MediaInfo{}
 	for _, camInfo := range list.Cameras {
 		dis.logger.Debugf("%s %s %s", camInfo.Manufacturer, camInfo.Model, camInfo.SerialNumber)
 		// some cameras return with no urls. explicitly skipping those so the behavior is clear in the service.
-		if len(camInfo.URIs) == 0 {
+		if len(camInfo.MediaEndpoints) == 0 {
 			dis.logger.Errorf("No urls found for camera, skipping. %s %s %s",
 				camInfo.Manufacturer, camInfo.Model, camInfo.SerialNumber)
 			continue
@@ -142,7 +142,7 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 			return nil, err
 		}
 		// If available, we will use mdns rtsp address instead of the original rtsp address
-		dis.URIs = append(dis.URIs, camInfo.URIs...)
+		dis.URIs = append(dis.URIs, camInfo.MediaEndpoints...)
 		cams = append(cams, camConfigs...)
 	}
 
@@ -278,7 +278,7 @@ func downloadPreviewImage(ctx context.Context, logger logging.Logger, snapshotUR
 
 func createCamerasFromURLs(l CameraInfo, discoveryDependencyName string, logger logging.Logger) ([]resource.Config, error) {
 	cams := []resource.Config{}
-	for index, u := range l.URIs {
+	for index, u := range l.MediaEndpoints {
 		logger.Debugf("camera URL:\t%s", u)
 
 		// Some URLs may contain a hostname that is served by the DiscoveryService's mDNS

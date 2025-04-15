@@ -102,21 +102,21 @@ func discoverOnAllInterfaces(ctx context.Context, manualXAddrs []*url.URL, logge
 	return slices.Collect(maps.Values(discovered)), nil
 }
 
-// URI is a struct that holds the RTSP stream and snapshot URIs.
-type URI struct {
+// MediaInfo is a struct that holds the RTSP stream and snapshot URIs.
+type MediaInfo struct {
 	StreamURI   string `json:"stream_uri"`
 	SnapshotURI string `json:"snapshot_uri"`
 }
 
 // CameraInfo holds both the RTSP URLs and supplementary camera details.
 type CameraInfo struct {
-	Host            string `json:"host"`
-	URIs            []URI  `json:"rtsp_uris"`
-	Manufacturer    string `json:"manufacturer"`
-	Model           string `json:"model"`
-	SerialNumber    string `json:"serial_number"`
-	FirmwareVersion string `json:"firmware_version"`
-	HardwareID      string `json:"hardware_id"`
+	Host            string      `json:"host"`
+	MediaEndpoints  []MediaInfo `json:"media_endpoints"`
+	Manufacturer    string      `json:"manufacturer"`
+	Model           string      `json:"model"`
+	SerialNumber    string      `json:"serial_number"`
+	FirmwareVersion string      `json:"firmware_version"`
+	HardwareID      string      `json:"hardware_id"`
 
 	deviceIP net.IP
 	mdnsName string
@@ -157,13 +157,13 @@ func (cam *CameraInfo) tryMDNS(mdnsServer *mdnsServer, logger logging.Logger) {
 	// Replace the URLs in-place such that configs generated from these objects will point to the
 	// logical dns hostname rather than a raw IP.
 	// TODO(seanp): Do we need mdns for snapshot uris?
-	for idx := range cam.URIs {
-		if strings.Contains(cam.URIs[idx].StreamURI, cam.deviceIP.String()) {
-			cam.URIs[idx].StreamURI = strings.Replace(cam.URIs[idx].StreamURI, cam.deviceIP.String(), cam.mdnsName, 1)
+	for idx := range cam.MediaEndpoints {
+		if strings.Contains(cam.MediaEndpoints[idx].StreamURI, cam.deviceIP.String()) {
+			cam.MediaEndpoints[idx].StreamURI = strings.Replace(cam.MediaEndpoints[idx].StreamURI, cam.deviceIP.String(), cam.mdnsName, 1)
 			wasIPFound = true
 		} else {
 			logger.Debugf("RTSP URL did not contain expected hostname. URL: %v HostName: %v",
-				cam.URIs[idx].StreamURI, cam.deviceIP.String())
+				cam.MediaEndpoints[idx].StreamURI, cam.deviceIP.String())
 		}
 	}
 
@@ -178,7 +178,7 @@ func (cam *CameraInfo) tryMDNS(mdnsServer *mdnsServer, logger logging.Logger) {
 }
 
 func (cam *CameraInfo) urlDependsOnMDNS(idx int) bool {
-	return strings.Contains(cam.URIs[idx].StreamURI, cam.mdnsName)
+	return strings.Contains(cam.MediaEndpoints[idx].StreamURI, cam.mdnsName)
 }
 
 // CameraInfoList is a struct containing a list of CameraInfo structs.
@@ -261,14 +261,14 @@ func GetCameraInfo(
 	logger.Debugf("ip: %s GetCapabilities: DeviceInfo: %#v", xaddr, dev)
 
 	// Call the ONVIF Media service to get the available media profiles using the same device instance
-	uris, err := GetRTSPStreamInfoFromProfiles(ctx, dev, creds, logger)
+	mes, err := GetMediaInfoFromProfiles(ctx, dev, creds, logger)
 	if err != nil {
 		return zero, fmt.Errorf("failed to get stream info: %w", err)
 	}
 
 	cameraInfo := CameraInfo{
 		Host:            xaddr.Host,
-		URIs:            uris,
+		MediaEndpoints:  mes,
 		Manufacturer:    resp.Manufacturer,
 		Model:           resp.Model,
 		SerialNumber:    resp.SerialNumber,
@@ -282,19 +282,20 @@ func GetCameraInfo(
 	return cameraInfo, nil
 }
 
-// GetRTSPStreamInfoFromProfiles uses the ONVIF Media service to get the RTSP stream URLs for all available profiles.
-func GetRTSPStreamInfoFromProfiles(
+// GetMediaInfoFromProfiles uses the ONVIF Media service to get the RTSP stream URLs
+// and Snapshot URIs for all available profiles.
+func GetMediaInfoFromProfiles(
 	ctx context.Context,
 	dev OnvifDevice,
 	creds device.Credentials,
 	logger logging.Logger,
-) ([]URI, error) {
+) ([]MediaInfo, error) {
 	resp, err := dev.GetProfiles(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	uris := make([]URI, 0)
+	var mes []MediaInfo
 	// Iterate over all profiles and get the RTSP stream URI for each one
 	for _, profile := range resp.Profiles {
 		streamURI, err := dev.GetStreamURI(ctx, profile.Token, creds)
@@ -324,11 +325,11 @@ func GetRTSPStreamInfoFromProfiles(
 			logger.Warnf("Snapshot URI is empty for profile %s: %s, adding URI with empty snapshot", profile.Name, streamURI.String())
 		}
 
-		uris = append(uris, URI{
+		mes = append(mes, MediaInfo{
 			StreamURI:   streamURI.String(),
 			SnapshotURI: snapshotURIString,
 		})
 	}
 
-	return uris, nil
+	return mes, nil
 }
