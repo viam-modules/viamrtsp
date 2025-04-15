@@ -316,7 +316,7 @@ func (dev *Device) GetSnapshotURI(ctx context.Context, token onvif.ReferenceToke
 		return nil, fmt.Errorf("failed to get snapshot URL for profile %s: %w", token, err)
 	}
 
-	dev.logger.Debugf("GetSnapshotUriResponse decoded %v: ", token, snapshotURI)
+	dev.logger.Debugf("GetSnapshotUriResponse decoded token: %v, snapshotURI: %v", token, snapshotURI)
 	uriStr := string(snapshotURI.Body.GetSnapshotURIResponse.MediaURI.Uri)
 	if uriStr == "" {
 		return nil, fmt.Errorf("got empty uri for profile %s", token)

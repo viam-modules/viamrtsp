@@ -200,7 +200,7 @@ func toPreviewCommand(command map[string]interface{}) (*previewRequest, error) {
 	}
 	rtspURL, ok := attributes["rtsp_address"].(string)
 	if !ok {
-		return nil, errors.New("invalid snapshot URI")
+		return nil, errors.New("rtsp_address cannot be empty")
 	}
 	return &previewRequest{rtspURL: rtspURL}, nil
 }
