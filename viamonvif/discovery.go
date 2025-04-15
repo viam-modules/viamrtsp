@@ -316,8 +316,7 @@ func GetMediaInfoFromProfiles(
 			continue
 		}
 
-		// Always add the URI as long as stream URI is valid
-		// Set snapshot URI to empty string if it's nil or empty
+		// Always add the MediaInfo if the stream URI is valid
 		snapshotURIString := ""
 		if snapshotURI != nil {
 			snapshotURIString = snapshotURI.String()
