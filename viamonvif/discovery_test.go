@@ -43,12 +43,10 @@ func (m *MockDevice) GetProfiles(_ context.Context) (device.GetProfilesResponse,
 	}, nil
 }
 
-// Add this method to your MockDevice struct.
 func (m *MockDevice) GetSnapshotURI(_ context.Context, _ onvif.ReferenceToken, _ device.Credentials) (*url.URL, error) {
 	return url.Parse("http://example.com/snapshot.jpg")
 }
 
-// func (m *MockDevice) GetStreamURI(_ context.Context, profile onvif.Profile, creds device.Credentials) (*url.URL, error) {.
 func (m *MockDevice) GetStreamURI(_ context.Context, token onvif.ReferenceToken, creds device.Credentials) (*url.URL, error) {
 	if token != "profile1" {
 		return nil, errors.New("invalid mock profile")
