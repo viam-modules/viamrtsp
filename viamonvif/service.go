@@ -65,11 +65,11 @@ type snapshotRequest struct {
 type rtspDiscovery struct {
 	resource.Named
 	resource.AlwaysRebuild
-	Credentials []device.Credentials
-	URIs        []MediaInfo
-	mdnsServer  *mdnsServer
-	mu          sync.RWMutex
-	logger      logging.Logger
+	Credentials        []device.Credentials
+	RTSPToSnapshotURIs map[string]string
+	mdnsServer         *mdnsServer
+	mu                 sync.RWMutex
+	logger             logging.Logger
 }
 
 func newDiscovery(_ context.Context, _ resource.Dependencies,
@@ -120,8 +120,8 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 	if len(list.Cameras) == 0 {
 		return nil, errors.New("no cameras found, ensure cameras are working or check credentials")
 	}
-	// Clear the URIs slice before filling with new cameras.
-	dis.URIs = []MediaInfo{}
+	// Clear the URI lookup map before filling with new cameras.
+	dis.RTSPToSnapshotURIs = map[string]string{}
 	for _, camInfo := range list.Cameras {
 		dis.logger.Debugf("%s %s %s", camInfo.Manufacturer, camInfo.Model, camInfo.SerialNumber)
 		// some cameras return with no urls. explicitly skipping those so the behavior is clear in the service.
@@ -141,8 +141,11 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 		if err != nil {
 			return nil, err
 		}
-		// If available, we will use mdns rtsp address instead of the original rtsp address
-		dis.URIs = append(dis.URIs, camInfo.MediaEndpoints...)
+		for _, endpoint := range camInfo.MediaEndpoints {
+			// If available, we will use mdns rtsp address as the key instead of the original rtsp address
+			dis.RTSPToSnapshotURIs[endpoint.StreamURI] = endpoint.SnapshotURI
+			dis.logger.Debugf("Added mapping: %s → %s", endpoint.StreamURI, endpoint.SnapshotURI)
+		}
 		cams = append(cams, camConfigs...)
 	}
 
@@ -164,18 +167,8 @@ func (dis *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inte
 		if err != nil {
 			return nil, err
 		}
-
-		// look up the snapshot uri by the snapshotReq.rtspURL in the list of URIs
 		dis.mu.RLock()
-		var found bool
-		var snapshotURI string
-		for _, uri := range dis.URIs {
-			if uri.StreamURI == snapshotReq.rtspURL {
-				snapshotURI = uri.SnapshotURI
-				found = true
-				break
-			}
-		}
+		snapshotURI, found := dis.RTSPToSnapshotURIs[snapshotReq.rtspURL]
 		dis.mu.RUnlock()
 		if !found {
 			return nil, fmt.Errorf("snapshot URI not found for %s", snapshotReq.rtspURL)
