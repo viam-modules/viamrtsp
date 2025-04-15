@@ -280,7 +280,7 @@ func (dev *Device) GetStreamURI(ctx context.Context, token onvif.ReferenceToken,
 
 	var streamURI getStreamURIResponse
 	if err := xml.NewDecoder(bytes.NewReader(body)).Decode(&streamURI); err != nil {
-		return nil, fmt.Errorf("failed to get RTSP URL for profile %s: %w", token, err)
+		return nil, fmt.Errorf("failed to get RTSP URL for token %s: %w", token, err)
 	}
 
 	dev.logger.Debugf("GetStreamUriResponse decoded %v: ", token, streamURI)
@@ -313,10 +313,10 @@ func (dev *Device) GetSnapshotURI(ctx context.Context, token onvif.ReferenceToke
 	dev.logger.Debugf("GetSnapshotUri response: %v", string(body))
 	var snapshotURI getSnapshotURIResponse
 	if err := xml.NewDecoder(bytes.NewReader(body)).Decode(&snapshotURI); err != nil {
-		return nil, fmt.Errorf("failed to get snapshot URL for profile %s: %w", token, err)
+		return nil, fmt.Errorf("failed to get snapshot URL for token %s: %w", token, err)
 	}
 
-	dev.logger.Debugf("GetSnapshotUriResponse decoded token: %v, snapshotURI: %v", token, snapshotURI)
+	dev.logger.Debugf("getSnapshotUriResponse decoded: token %v, snapshotURI: %v", token, snapshotURI)
 	uriStr := string(snapshotURI.Body.GetSnapshotURIResponse.MediaURI.Uri)
 	if uriStr == "" {
 		return nil, fmt.Errorf("got empty uri for profile %s", token)

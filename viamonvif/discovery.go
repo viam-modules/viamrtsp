@@ -102,7 +102,7 @@ func discoverOnAllInterfaces(ctx context.Context, manualXAddrs []*url.URL, logge
 	return slices.Collect(maps.Values(discovered)), nil
 }
 
-// MediaInfo is a struct that holds the RTSP stream and snapshot URIs.
+// MediaInfo is a struct that holds the RTSP stream and snapshot URI.
 type MediaInfo struct {
 	StreamURI   string `json:"stream_uri"`
 	SnapshotURI string `json:"snapshot_uri"`
@@ -297,6 +297,7 @@ func GetMediaInfoFromProfiles(
 	var mes []MediaInfo
 	// Iterate over all profiles and get the RTSP stream URI for each one
 	for _, profile := range resp.Profiles {
+		logger.Debugf("Looking up media info for profile: %s (token: %s)", profile.Name, profile.Token)
 		streamURI, err := dev.GetStreamURI(ctx, profile.Token, creds)
 		if err != nil {
 			logger.Warn(err.Error())
