@@ -131,8 +131,8 @@ func TestDoCommandPreview(t *testing.T) {
 		serverURL := "http://" + server.Addr
 
 		dis := &rtspDiscovery{
-			URIs: []MediaInfo{
-				{StreamURI: "rtsp://camera1/stream", SnapshotURI: serverURL + "/snapshot"},
+			RTSPToSnapshotURIs: map[string]string{
+				"rtsp://camera1/stream": serverURL + "/snapshot",
 			},
 			logger: logger,
 		}
@@ -151,8 +151,8 @@ func TestDoCommandPreview(t *testing.T) {
 
 	t.Run("Test preview command with invalid RTSP URL", func(t *testing.T) {
 		dis := &rtspDiscovery{
-			URIs: []MediaInfo{
-				{StreamURI: "rtsp://camera1/stream", SnapshotURI: "http://invalid/snapshot"},
+			RTSPToSnapshotURIs: map[string]string{
+				"rtsp://camera1/stream": "http://invalid/snapshot",
 			},
 			logger: logger,
 		}
@@ -178,8 +178,8 @@ func TestDoCommandPreview(t *testing.T) {
 		serverURL := "http://" + server.Addr
 
 		dis := &rtspDiscovery{
-			URIs: []MediaInfo{
-				{StreamURI: "rtsp://camera1/stream", SnapshotURI: serverURL + "/snapshot"},
+			RTSPToSnapshotURIs: map[string]string{
+				"rtsp://camera1/stream": serverURL + "/snapshot",
 			},
 			logger: logger,
 		}

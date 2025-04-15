@@ -58,7 +58,7 @@ func (cfg *Config) Validate(_ string) ([]string, error) {
 	return []string{}, nil
 }
 
-type snapshotRequest struct {
+type previewRequest struct {
 	rtspURL string
 }
 
@@ -163,15 +163,15 @@ func (dis *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inte
 	switch cmd {
 	case "preview":
 		dis.logger.Debugf("snapshot command received")
-		snapshotReq, err := toSnapshotCommand(command)
+		previewReq, err := toPreviewCommand(command)
 		if err != nil {
 			return nil, err
 		}
 		dis.mu.RLock()
-		snapshotURI, found := dis.RTSPToSnapshotURIs[snapshotReq.rtspURL]
+		snapshotURI, found := dis.RTSPToSnapshotURIs[previewReq.rtspURL]
 		dis.mu.RUnlock()
 		if !found {
-			return nil, fmt.Errorf("snapshot URI not found for %s", snapshotReq.rtspURL)
+			return nil, fmt.Errorf("snapshot URI not found for %s", previewReq.rtspURL)
 		}
 		dis.logger.Infof("snapshot URI: %s", snapshotURI)
 
@@ -193,7 +193,7 @@ func (dis *rtspDiscovery) Close(_ context.Context) error {
 	return nil
 }
 
-func toSnapshotCommand(command map[string]interface{}) (*snapshotRequest, error) {
+func toPreviewCommand(command map[string]interface{}) (*previewRequest, error) {
 	attributes, ok := command["attributes"].(map[string]interface{})
 	if !ok {
 		return nil, errors.New("attributes is missing or not a map")
@@ -202,7 +202,7 @@ func toSnapshotCommand(command map[string]interface{}) (*snapshotRequest, error)
 	if !ok {
 		return nil, errors.New("invalid snapshot URI")
 	}
-	return &snapshotRequest{rtspURL: rtspURL}, nil
+	return &previewRequest{rtspURL: rtspURL}, nil
 }
 
 // formatDataURL formats the image data and content type into a data URL.
