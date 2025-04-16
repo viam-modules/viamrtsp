@@ -316,7 +316,7 @@ func GetMediaInfoFromProfiles(
 			snapshotURIString = snapshotURI.String()
 		}
 		if snapshotURIString == "" {
-			logger.Warnf("Snapshot URI is empty for profile %s: %s, adding URI with empty snapshot", profile.Name, streamURI.String())
+			logger.Warnf("Snapshot URI is empty for profile %s: %s, adding media info with empty snapshot", profile.Name, streamURI.String())
 		}
 
 		// Always add the MediaInfo if the stream URI is valid
