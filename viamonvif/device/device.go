@@ -263,7 +263,7 @@ type Credentials struct {
 	Pass string `json:"pass"`
 }
 
-// GetStreamURI returns a device's stream URI for a given profile.
+// GetStreamURI returns a device's stream URI for a given profile token.
 func (dev *Device) GetStreamURI(ctx context.Context, token onvif.ReferenceToken, creds Credentials) (*url.URL, error) {
 	dev.logger.Debugf("GetStreamUri token: %s", token)
 	body, err := dev.callMedia(ctx, GetStreamURI{
@@ -302,7 +302,7 @@ func (dev *Device) GetStreamURI(ctx context.Context, token onvif.ReferenceToken,
 	return uri, nil
 }
 
-// GetSnapshotURI is a request to the GetSnapshotURI onvif endpoint.
+// GetSnapshotURI returns a device's snapshot URI for a given profile token.
 func (dev *Device) GetSnapshotURI(ctx context.Context, token onvif.ReferenceToken, creds Credentials) (*url.URL, error) {
 	dev.logger.Debugf("GetSnapshotUri token: %s", token)
 	body, err := dev.callMedia(ctx, GetSnapshotURI{
