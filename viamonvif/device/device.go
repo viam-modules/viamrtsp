@@ -276,18 +276,17 @@ func (dev *Device) GetStreamURI(ctx context.Context, token onvif.ReferenceToken,
 	if err != nil {
 		return nil, err
 	}
-	dev.logger.Debugf("GetStreamUri response: %v", string(body))
+	dev.logger.Debugf("GetStreamUri response: %s", string(body))
 
 	var streamURI getStreamURIResponse
 	if err := xml.NewDecoder(bytes.NewReader(body)).Decode(&streamURI); err != nil {
 		return nil, fmt.Errorf("failed to get RTSP URL for token %s: %w", token, err)
 	}
-
-	dev.logger.Debugf("GetStreamUriResponse decoded %v: ", token, streamURI)
+	dev.logger.Debugf("GetStreamUriResponse decoded for token %s, streamURI: %v ", token, streamURI)
 
 	uriStr := string(streamURI.Body.GetStreamURIResponse.MediaURI.Uri)
 	if uriStr == "" {
-		return nil, fmt.Errorf("got empty uri for profile %s", token)
+		return nil, fmt.Errorf("got empty stream uri for token %s", token)
 	}
 
 	uri, err := url.Parse(uriStr)
@@ -298,6 +297,8 @@ func (dev *Device) GetStreamURI(ctx context.Context, token onvif.ReferenceToken,
 	if creds.User != "" || creds.Pass != "" {
 		uri.User = url.UserPassword(creds.User, creds.Pass)
 	}
+	dev.logger.Debugf("GetStreamUriResponse parsed for token %s: %s", token, uri.String())
+
 	return uri, nil
 }
 
@@ -315,11 +316,11 @@ func (dev *Device) GetSnapshotURI(ctx context.Context, token onvif.ReferenceToke
 	if err := xml.NewDecoder(bytes.NewReader(body)).Decode(&snapshotURI); err != nil {
 		return nil, fmt.Errorf("failed to get snapshot URL for token %s: %w", token, err)
 	}
+	dev.logger.Debugf("getSnapshotUriResponse decoded for token %s, snapshotURI: %v", token, snapshotURI)
 
-	dev.logger.Debugf("getSnapshotUriResponse decoded: token %v, snapshotURI: %v", token, snapshotURI)
 	uriStr := string(snapshotURI.Body.GetSnapshotURIResponse.MediaURI.Uri)
 	if uriStr == "" {
-		return nil, fmt.Errorf("got empty uri for profile %s", token)
+		return nil, fmt.Errorf("got empty snapshot uri for token %s", token)
 	}
 	uri, err := url.Parse(uriStr)
 	if err != nil {
@@ -328,7 +329,7 @@ func (dev *Device) GetSnapshotURI(ctx context.Context, token onvif.ReferenceToke
 	if creds.User != "" || creds.Pass != "" {
 		uri.User = url.UserPassword(creds.User, creds.Pass)
 	}
-	dev.logger.Debugf("GetSnapshotUriResponse parsed %v: ", token, uri)
+	dev.logger.Debugf("GetSnapshotUriResponse parsed for token %s: %s", token, uri.String())
 
 	return uri, nil
 }
