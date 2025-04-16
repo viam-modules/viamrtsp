@@ -225,8 +225,13 @@ func downloadPreviewImage(ctx context.Context, logger logging.Logger, snapshotUR
 	var username, password string
 	if parsedURL.User != nil {
 		username = parsedURL.User.Username()
-		password, _ = parsedURL.User.Password()
-		logger.Debugf("using credentials: username=%s", username)
+		if pwd, hasPassword := parsedURL.User.Password(); hasPassword {
+			password = pwd
+		}
+		if password == "" {
+			logger.Warnf("found a snapshot URI with no password: %s", snapshotURI)
+		}
+		logger.Debugf("creating snapshot request using credentials: username=%s", username)
 	}
 
 	transport := &http.Transport{
