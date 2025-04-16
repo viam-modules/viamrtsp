@@ -303,7 +303,6 @@ func GetMediaInfoFromProfiles(
 			logger.Warn(err.Error())
 			continue
 		}
-
 		if streamURI.String() == "" {
 			logger.Warnf("Stream URI is empty for profile %s", profile.Name)
 			continue

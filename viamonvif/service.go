@@ -35,6 +35,7 @@ var (
 
 const (
 	maxBodyStringSize = 500
+	httpClientTimeout = 5 * time.Second
 )
 
 func init() {
@@ -239,7 +240,7 @@ func downloadPreviewImage(ctx context.Context, logger logging.Logger, snapshotUR
 	}
 	client := &http.Client{
 		// Setting upper bound timeout in case the ctx never times out
-		Timeout: 5 * time.Second, //nolint:mnd
+		Timeout: httpClientTimeout,
 		Transport: &digest.Transport{
 			Username:  username,
 			Password:  password,
