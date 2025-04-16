@@ -149,7 +149,7 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 		for _, endpoint := range camInfo.MediaEndpoints {
 			// If available, we will use mdns rtsp address as the key instead of the original rtsp address
 			dis.RTSPToSnapshotURIs[endpoint.StreamURI] = endpoint.SnapshotURI
-			dis.logger.Debugf("Added mapping: %s → %s", endpoint.StreamURI, endpoint.SnapshotURI)
+			dis.logger.Debugf("Added snapshot mapping: %s - %s", endpoint.StreamURI, endpoint.SnapshotURI)
 		}
 		cams = append(cams, camConfigs...)
 	}
