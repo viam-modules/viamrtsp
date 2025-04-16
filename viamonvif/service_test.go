@@ -3,8 +3,8 @@ package viamonvif
 
 import (
 	"context"
-	"net"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/viam-modules/viamrtsp"
@@ -125,14 +125,12 @@ func TestDoCommandPreview(t *testing.T) {
 	logger := logging.NewTestLogger(t)
 
 	t.Run("Test preview command with valid RTSP URL", func(t *testing.T) {
-		server := startTestHTTPServer(t, "/snapshot", http.StatusOK, "image/jpeg", "mockImageData")
+		server := startTestHTTPServer(t, "/snapshot", http.StatusOK, "image/jpeg", "mockImageData", false)
 		defer server.Close()
-
-		serverURL := "http://" + server.Addr
 
 		dis := &rtspDiscovery{
 			RTSPToSnapshotURIs: map[string]string{
-				"rtsp://camera1/stream": serverURL + "/snapshot",
+				"rtsp://camera1/stream": server.URL + "/snapshot",
 			},
 			logger: logger,
 		}
@@ -144,6 +142,28 @@ func TestDoCommandPreview(t *testing.T) {
 			},
 		}
 
+		result, err := dis.DoCommand(ctx, command)
+		test.That(t, err, test.ShouldBeNil)
+		test.That(t, result["preview"], test.ShouldEqual, "data:image/jpeg;base64,bW9ja0ltYWdlRGF0YQ==")
+	})
+
+	t.Run("Test preview command with valid RTSP URL and https stream uri", func(t *testing.T) {
+		server := startTestHTTPServer(t, "/snapshot", http.StatusOK, "image/jpeg", "mockImageData", true)
+		defer server.Close()
+
+		dis := &rtspDiscovery{
+			RTSPToSnapshotURIs: map[string]string{
+				"rtsp://camera1/stream": server.URL + "/snapshot",
+			},
+			logger: logger,
+		}
+
+		command := map[string]interface{}{
+			"command": "preview",
+			"attributes": map[string]interface{}{
+				"rtsp_address": "rtsp://camera1/stream",
+			},
+		}
 		result, err := dis.DoCommand(ctx, command)
 		test.That(t, err, test.ShouldBeNil)
 		test.That(t, result["preview"], test.ShouldEqual, "data:image/jpeg;base64,bW9ja0ltYWdlRGF0YQ==")
@@ -171,15 +191,12 @@ func TestDoCommandPreview(t *testing.T) {
 	})
 
 	t.Run("Test preview command with download error", func(t *testing.T) {
-		// Start a test HTTP server that returns an error
-		server := startTestHTTPServer(t, "/snapshot", http.StatusInternalServerError, "text/plain", "Internal Server Error")
+		server := startTestHTTPServer(t, "/snapshot", http.StatusInternalServerError, "text/plain", "Internal Server Error", false)
 		defer server.Close()
-
-		serverURL := "http://" + server.Addr
 
 		dis := &rtspDiscovery{
 			RTSPToSnapshotURIs: map[string]string{
-				"rtsp://camera1/stream": serverURL + "/snapshot",
+				"rtsp://camera1/stream": server.URL + "/snapshot",
 			},
 			logger: logger,
 		}
@@ -198,7 +215,7 @@ func TestDoCommandPreview(t *testing.T) {
 	})
 }
 
-func startTestHTTPServer(t *testing.T, path string, statusCode int, contentType, responseBody string) *http.Server {
+func startTestHTTPServer(t *testing.T, path string, statusCode int, contentType, responseBody string, useTLS bool) *httptest.Server {
 	handler := http.NewServeMux()
 	handler.HandleFunc(path, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", contentType)
@@ -209,18 +226,8 @@ func startTestHTTPServer(t *testing.T, path string, statusCode int, contentType,
 		}
 	})
 
-	server := &http.Server{Addr: "127.0.0.1:0", Handler: handler}
-	listener, err := net.Listen("tcp", server.Addr)
-	if err != nil {
-		t.Logf("failed to start test HTTP server: %v", err)
+	if useTLS {
+		return httptest.NewTLSServer(handler)
 	}
-
-	go func() {
-		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
-			t.Logf("test HTTP server error: %v", err)
-		}
-	}()
-
-	server.Addr = listener.Addr().String()
-	return server
+	return httptest.NewServer(handler)
 }
