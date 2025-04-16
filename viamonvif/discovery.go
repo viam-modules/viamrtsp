@@ -295,7 +295,7 @@ func GetMediaInfoFromProfiles(
 	}
 
 	var mes []MediaInfo
-	// Iterate over all profiles and get the RTSP stream URI for each one
+	// Iterate over all profiles and get the RTSP stream and snapshot URI for each one
 	for _, profile := range resp.Profiles {
 		logger.Debugf("Looking up media info for profile: %s (token: %s)", profile.Name, profile.Token)
 		streamURI, err := dev.GetStreamURI(ctx, profile.Token, creds)
@@ -313,7 +313,6 @@ func GetMediaInfoFromProfiles(
 		snapshotURI, err := dev.GetSnapshotURI(ctx, profile.Token, creds)
 		if err != nil {
 			logger.Warn(err.Error())
-			continue
 		}
 
 		// Always add the MediaInfo if the stream URI is valid
