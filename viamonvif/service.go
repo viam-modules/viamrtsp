@@ -263,7 +263,6 @@ func downloadPreviewImage(ctx context.Context, logger logging.Logger, snapshotUR
 	logger.Debugf("Retrieved image data: %d bytes and content type: %s", len(imageBytes), contentType)
 
 	dataURL := formatDataURL(contentType, imageBytes)
-	logger.Debugf("dataURL: %s", dataURL)
 
 	return dataURL, nil
 }
