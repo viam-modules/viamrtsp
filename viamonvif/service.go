@@ -33,6 +33,10 @@ var (
 	emptyCred         = device.Credentials{}
 )
 
+const (
+	maxBodyStringSize = 500
+)
+
 func init() {
 	resource.RegisterService(
 		discovery.API,
@@ -252,7 +256,18 @@ func downloadPreviewImage(ctx context.Context, logger logging.Logger, snapshotUR
 
 	if resp.StatusCode != http.StatusOK {
 		statusText := http.StatusText(resp.StatusCode)
-		return "", fmt.Errorf("failed to get snapshot image, status %d: %s", resp.StatusCode, statusText)
+		bodyPreview := "<could not read response body>"
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			bodyPreview = string(bodyBytes)
+			// Truncate body preview if it's too long
+			if len(bodyPreview) > maxBodyStringSize {
+				bodyPreview = bodyPreview[:maxBodyStringSize] + "... [truncated]"
+			}
+		} else {
+			logger.Warnf("Failed to read error response body: %v", err)
+		}
+		return "", fmt.Errorf("failed to get snapshot image, status %d: %s, body: %s", resp.StatusCode, statusText, bodyPreview)
 	}
 
 	contentType := resp.Header.Get("Content-Type")
