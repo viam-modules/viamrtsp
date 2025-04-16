@@ -264,14 +264,14 @@ func downloadPreviewImage(ctx context.Context, logger logging.Logger, snapshotUR
 		statusText := http.StatusText(resp.StatusCode)
 		bodyPreview := "<could not read response body>"
 		bodyBytes, err := io.ReadAll(resp.Body)
-		if err != nil {
+		if err == nil {
 			bodyPreview = string(bodyBytes)
 			// Truncate body preview if it's too long
 			if len(bodyPreview) > maxBodyStringSize {
 				bodyPreview = bodyPreview[:maxBodyStringSize] + "... [truncated]"
 			}
 		} else {
-			logger.Warnf("Failed to read error response body: %v", err)
+			logger.Warnf("failed to read error response body: %v", err)
 		}
 		return "", fmt.Errorf("failed to get snapshot image, status %d: %s, body: %s", resp.StatusCode, statusText, bodyPreview)
 	}
@@ -281,7 +281,7 @@ func downloadPreviewImage(ctx context.Context, logger logging.Logger, snapshotUR
 	if err != nil {
 		return "", fmt.Errorf("failed to read image data from http response: %w", err)
 	}
-	logger.Debugf("Retrieved image data: %d bytes and content type: %s", len(imageBytes), contentType)
+	logger.Debugf("retrieved image data: %d bytes and content type: %s", len(imageBytes), contentType)
 
 	dataURL := formatDataURL(contentType, imageBytes)
 
