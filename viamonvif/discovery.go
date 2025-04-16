@@ -310,19 +310,18 @@ func GetMediaInfoFromProfiles(
 			continue
 		}
 
+		snapshotURIString := ""
 		snapshotURI, err := dev.GetSnapshotURI(ctx, profile.Token, creds)
 		if err != nil {
 			logger.Warn(err.Error())
-		}
-
-		// Always add the MediaInfo if the stream URI is valid
-		snapshotURIString := ""
-		if snapshotURI != nil {
-			snapshotURIString = snapshotURI.String()
 		} else {
+			snapshotURIString = snapshotURI.String()
+		}
+		if snapshotURIString == "" {
 			logger.Warnf("Snapshot URI is empty for profile %s: %s, adding URI with empty snapshot", profile.Name, streamURI.String())
 		}
 
+		// Always add the MediaInfo if the stream URI is valid
 		mes = append(mes, MediaInfo{
 			StreamURI:   streamURI.String(),
 			SnapshotURI: snapshotURIString,
