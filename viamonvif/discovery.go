@@ -307,7 +307,7 @@ func GetMediaInfoFromProfiles(
 		snapshotURIString := ""
 		snapshotURI, err := dev.GetSnapshotURI(ctx, profile.Token, creds)
 		if err != nil {
-		        logger.Warnf("Unable to determine onvif snapshot URI  profile %s: %s, err: %s", profile.Name, streamURI.String(), err.Error())
+			logger.Warnf("Unable to determine onvif snapshot URI  profile %s: %s, err: %s", profile.Name, streamURI.String(), err.Error())
 		} else {
 			snapshotURIString = snapshotURI.String()
 		}
