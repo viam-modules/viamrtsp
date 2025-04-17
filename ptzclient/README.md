@@ -76,7 +76,7 @@ Halts specified movements (default: stop both pan/tilt and zoom).
 ```
 Continuous motion at specified speeds (-1.0 to 1.0).
 
-#### Relative Move
+#### Relative Move (Normalized)
 ```json
 {
   "command": "relative-move",
@@ -89,7 +89,22 @@ Continuous motion at specified speeds (-1.0 to 1.0).
   "zoom_speed": 0.5
 }
 ```
-Relative position move. Speed parameters are optional. If any speed parameter (`pan_speed`, `tilt_speed`, `zoom_speed`) is provided, the `Speed` element is sent in the request (using 0.5 default for any missing components). If no speed parameters are provided, the camera's default speed is used.
+Relative move using normalized coordinates. Speed parameters are optional.
+
+#### Relative Move (Degrees)
+```json
+{
+  "command": "relative-move",
+  "pan": 10,
+  "tilt": -5,
+  "zoom": 0.0,
+  "degrees": true,
+  "pan_speed": 0.2,
+  "tilt_speed": 0.2,
+  "zoom_speed": 0.5
+}
+```
+Relative move using degree-based coordinates for pan/tilt. Speed parameters are optional.
 
 #### Absolute Move
 ```json
@@ -103,7 +118,7 @@ Relative position move. Speed parameters are optional. If any speed parameter (`
   "zoom_speed": 1.0
 }
 ```
-Absolute position move. Speed parameters are optional. If any speed parameter (`pan_speed`, `tilt_speed`, `zoom_speed`) is provided, the `Speed` element is sent in the request (using 1.0 default for any missing components). If no speed parameters are provided, the camera's default speed is used.
+Absolute position move. Speed parameters are optional.
 
 ## Notes
 
@@ -114,7 +129,7 @@ Absolute position move. Speed parameters are optional. If any speed parameter (`
    - Degrees: -180° to 180° (pan), -90° to 90° (tilt)
    - Absolute Moves: Use normalized coordinates (-1.0 to 1.0 for pan/tilt, 0.0 to 1.0 for zoom).
    - Relative Moves:
-     - Normalized (default): -1.0 to 1.0 (pan/tilt/zoom).
+     - Normalized (`degrees: false`): -1.0 to 1.0 (pan/tilt/zoom).
      - Degrees (`degrees: true`): -180° to 180° (pan), -90° to 90° (tilt). Zoom remains normalized.
 3. **Movement Speeds**:
    - Continuous: -1.0 (full reverse) to 1.0 (full forward).
