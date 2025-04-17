@@ -11,7 +11,6 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"time"
 	"unicode"
 
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
@@ -306,10 +305,7 @@ func GetMediaInfoFromProfiles(
 		}
 
 		snapshotURIString := ""
-		startTime := time.Now()
 		snapshotURI, err := dev.GetSnapshotURI(ctx, profile.Token, creds)
-		elapsed := time.Since(startTime)
-		logger.Infof("GetSnapshotURI took %s", elapsed)
 		if err != nil {
 			logger.Warn(err.Error())
 		} else {
