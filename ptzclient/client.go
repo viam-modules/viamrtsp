@@ -9,7 +9,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/hexbabe/sean-onvif"
+	onvif "github.com/hexbabe/sean-onvif"
 	"github.com/hexbabe/sean-onvif/media"
 	"github.com/hexbabe/sean-onvif/ptz"
 	"github.com/hexbabe/sean-onvif/xsd"
@@ -230,7 +230,6 @@ func (s *onvifPtzClient) handleStop(cmd map[string]interface{}) (map[string]inte
 	if err != nil {
 		return nil, fmt.Errorf("failed to call Stop: %w", err)
 	}
-	s.logger.Infof("Stop command sent successfully for profile %s.", profileToken)
 	return map[string]interface{}{"success": true}, nil
 }
 
@@ -273,7 +272,6 @@ func (s *onvifPtzClient) handleContinuousMove(cmd map[string]interface{}) (map[s
 		return nil, fmt.Errorf("failed to call ContinuousMove: %w", err)
 	}
 
-	s.logger.Infof("ContinuousMove command sent successfully for profile %s. Send 'stop' command to halt.", profileToken)
 	return map[string]interface{}{"success": true}, nil
 }
 
@@ -356,7 +354,6 @@ func (s *onvifPtzClient) handleRelativeMove(cmd map[string]interface{}) (map[str
 	if err != nil {
 		return nil, fmt.Errorf("failed to call RelativeMove: %w", err)
 	}
-	s.logger.Infof("RelativeMove command sent successfully for profile %s.", profileToken)
 	return map[string]interface{}{"success": true}, nil
 }
 
@@ -417,11 +414,20 @@ func (s *onvifPtzClient) handleAbsoluteMove(cmd map[string]interface{}) (map[str
 	s.logger.Debugf("Sending AbsoluteMove (Pan: %.3f, Tilt: %.3f, Zoom: %.3f) with Speed (X: %.2f, Y: %.2f, Z: %.2f) for profile %s...",
 		panPos, tiltPos, zoomPos, panSpeed, tiltSpeed, zoomSpeed, profileToken)
 
-	_, err = s.dev.CallMethod(req)
+	res, err := s.dev.CallMethod(req)
+	s.logger.Debugf("AbsoluteMove response: %+v", res)
 	if err != nil {
+		// this is an HTTP or connection level error
 		return nil, fmt.Errorf("failed to call AbsoluteMove: %w", err)
 	}
-	s.logger.Infof("AbsoluteMove command sent successfully for profile %s.", profileToken)
+
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read AbsoluteMove response body: %w", err)
+	}
+
+	// this could contain a response body error from the camera
+	s.logger.Debugf("AbsoluteMove raw response body: %s", string(bodyBytes))
 	return map[string]interface{}{"success": true}, nil
 }
 
