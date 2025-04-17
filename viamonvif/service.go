@@ -70,11 +70,13 @@ type previewRequest struct {
 type rtspDiscovery struct {
 	resource.Named
 	resource.AlwaysRebuild
-	Credentials        []device.Credentials
-	RTSPToSnapshotURIs map[string]string
-	mdnsServer         *mdnsServer
+
+	Credentials []device.Credentials
+	mdnsServer  *mdnsServer
+	logger      logging.Logger
+
 	mu                 sync.RWMutex
-	logger             logging.Logger
+	rtspToSnapshotURIs map[string]string
 }
 
 func newDiscovery(_ context.Context, _ resource.Dependencies,
@@ -126,7 +128,7 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 		return nil, errors.New("no cameras found, ensure cameras are working or check credentials")
 	}
 	// Clear the URI lookup map before filling with new cameras.
-	dis.RTSPToSnapshotURIs = map[string]string{}
+	dis.rtspToSnapshotURIs = map[string]string{}
 	for _, camInfo := range list.Cameras {
 		dis.logger.Debugf("%s %s %s", camInfo.Manufacturer, camInfo.Model, camInfo.SerialNumber)
 		// some cameras return with no urls. explicitly skipping those so the behavior is clear in the service.
@@ -148,7 +150,7 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 		}
 		for _, endpoint := range camInfo.MediaEndpoints {
 			// If available, we will use mdns rtsp address as the key instead of the original rtsp address
-			dis.RTSPToSnapshotURIs[endpoint.StreamURI] = endpoint.SnapshotURI
+			dis.rtspToSnapshotURIs[endpoint.StreamURI] = endpoint.SnapshotURI
 			dis.logger.Debugf("Added snapshot mapping: %s - %s", endpoint.StreamURI, endpoint.SnapshotURI)
 		}
 		cams = append(cams, camConfigs...)
@@ -173,7 +175,7 @@ func (dis *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inte
 			return nil, err
 		}
 		dis.mu.RLock()
-		snapshotURI, found := dis.RTSPToSnapshotURIs[previewReq.rtspURL]
+		snapshotURI, found := dis.rtspToSnapshotURIs[previewReq.rtspURL]
 		dis.mu.RUnlock()
 		if !found {
 			return nil, fmt.Errorf("snapshot URI not found for %s", previewReq.rtspURL)
