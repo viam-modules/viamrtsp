@@ -29,12 +29,14 @@ This model implements the [`"rdk:component:generic"` API](https://docs.viam.com/
 
 ```json
 {
-  "model": "viam:viamrtsp:onvif-ptz-client",
-  "attributes": {
-    "address": "192.168.1.100:80",
-    "username": "admin",
-    "password": "yourpassword",
-    "profile_token": "001"
+    "name": "ptz-1",
+    "api": "rdk:component:generic",
+    "model": "viam:viamrtsp:onvif-ptz-client",
+    "attributes": {
+    "username": "your_username",
+      "password": "your_password",
+      "profile_token": "your_profile_token",
+      "address": "your_camera_ip:port",
   }
 }
 ```
@@ -84,11 +86,10 @@ Continuous motion at specified speeds (-1.0 to 1.0).
   "degrees": false,
   "pan_speed": 0.5,
   "tilt_speed": 0.5,
-  "zoom_speed": 0.5,
-  "use_speed": true
+  "zoom_speed": 0.5
 }
 ```
-Relative position move with optional degree space conversion and optional speed control.
+Relative position move. Speed parameters are optional. If any speed parameter (`pan_speed`, `tilt_speed`, `zoom_speed`) is provided, the `Speed` element is sent in the request (using 0.5 default for any missing components). If no speed parameters are provided, the camera's default speed is used.
 
 #### Absolute Move
 ```json
@@ -102,7 +103,7 @@ Relative position move with optional degree space conversion and optional speed 
   "zoom_speed": 1.0
 }
 ```
-Absolute position move to specified normalized coordinates, with optional speed control.
+Absolute position move. Speed parameters are optional. If any speed parameter (`pan_speed`, `tilt_speed`, `zoom_speed`) is provided, the `Speed` element is sent in the request (using 1.0 default for any missing components). If no speed parameters are provided, the camera's default speed is used.
 
 ## Notes
 
@@ -115,9 +116,9 @@ Absolute position move to specified normalized coordinates, with optional speed 
    - Relative Moves:
      - Normalized (default): -1.0 to 1.0 (pan/tilt/zoom).
      - Degrees (`degrees: true`): -180° to 180° (pan), -90° to 90° (tilt). Zoom remains normalized.
-3. **Movement Speeds**: 
-   - Continuous: -1.0 (full reverse) to 1.0 (full forward)
-   - Relative/Absolute: Specify speeds between 0.0 and 1.0 using `pan_speed`, `tilt_speed`, `zoom_speed`. Default speeds apply if not provided or if `use_speed: false` for relative moves.
+3. **Movement Speeds**:
+   - Continuous: -1.0 (full reverse) to 1.0 (full forward).
+   - Relative/Absolute: Speed parameters (`pan_speed`, `tilt_speed`, `zoom_speed` between 0.0 and 1.0) are optional. If **no** speed parameters are provided, the camera uses its default speed. If **any** speed parameter is provided, the `Speed` element is included in the request (using defaults of 0.5 for Relative or 1.0 for Absolute for any *unspecified* speed components).
 
 ## Troubleshooting
 

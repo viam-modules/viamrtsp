@@ -108,7 +108,7 @@ func NewClient(
 		cancelFunc()
 		return nil, fmt.Errorf("failed to create ONVIF device for %s: %w", conf.Address, err)
 	}
-	logger.Info("Successfully connected to ONVIF device.")
+	logger.Info("successfully connected to ONVIF device.")
 
 	s := &onvifPtzClient{
 		name:       name,
@@ -133,7 +133,7 @@ func (s *onvifPtzClient) Name() resource.Name {
 func (s *onvifPtzClient) handleGetProfiles() (map[string]interface{}, error) {
 	s.logger.Debug("Fetching media profiles...")
 	req := media.GetProfiles{}
-	res, err := s.dev.CallMethod(req)
+	res, err := s.dev.CallMethod(req, s.logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call GetProfiles: %w", err)
 	}
@@ -169,7 +169,7 @@ func (s *onvifPtzClient) handleGetStatus() (map[string]interface{}, error) {
 	req := ptz.GetStatus{ProfileToken: profileToken}
 	s.logger.Debugf("Sending GetStatus request for profile: %s", profileToken)
 
-	res, err := s.dev.CallMethod(req)
+	res, err := s.dev.CallMethod(req, s.logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call GetStatus: %w", err)
 	}
@@ -179,6 +179,7 @@ func (s *onvifPtzClient) handleGetStatus() (map[string]interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read GetStatus response body: %w", err)
 	}
+	s.logger.Debugf("GetStatus raw response body: %s", string(bodyBytes))
 
 	var statusEnvelope CustomGetStatusEnvelope
 	err = xml.Unmarshal(bodyBytes, &statusEnvelope)
@@ -226,11 +227,20 @@ func (s *onvifPtzClient) handleStop(cmd map[string]interface{}) (map[string]inte
 	}
 
 	s.logger.Debugf("Sending Stop command (PanTilt: %v, Zoom: %v) for profile %s...", stopPanTilt, stopZoom, profileToken)
-	_, err := s.dev.CallMethod(req)
+	res, err := s.dev.CallMethod(req, s.logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call Stop: %w", err)
 	}
-	return map[string]interface{}{"success": true}, nil
+	defer res.Body.Close()
+
+	bodyBytes, readErr := io.ReadAll(res.Body)
+	if readErr != nil {
+		return nil, fmt.Errorf("failed to read Stop response body: %w", readErr)
+	}
+	response := string(bodyBytes)
+	s.logger.Debugf("Stop raw response body: %s", response)
+
+	return map[string]interface{}{"response": response}, nil
 }
 
 // handleContinuousMove implements the continuous-move command logic.
@@ -267,12 +277,20 @@ func (s *onvifPtzClient) handleContinuousMove(cmd map[string]interface{}) (map[s
 		"Sending ContinuousMove (PanSpeed: %.2f, TiltSpeed: %.2f, ZoomSpeed: %.2f) for profile %s...",
 		panSpeed, tiltSpeed, zoomSpeed, profileToken,
 	)
-	_, err := s.dev.CallMethod(req)
+	res, err := s.dev.CallMethod(req, s.logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call ContinuousMove: %w", err)
 	}
+	defer res.Body.Close()
 
-	return map[string]interface{}{"success": true}, nil
+	bodyBytes, readErr := io.ReadAll(res.Body)
+	if readErr != nil {
+		return nil, fmt.Errorf("failed to read ContinuousMove response body: %w", readErr)
+	}
+	response := string(bodyBytes)
+	s.logger.Debugf("ContinuousMove raw response body: %s", response)
+
+	return map[string]interface{}{"response": response}, nil
 }
 
 // handleRelativeMove implements the relative-move command logic.
@@ -287,29 +305,9 @@ func (s *onvifPtzClient) handleRelativeMove(cmd map[string]interface{}) (map[str
 	zoomRelative := getOptionalFloat64(cmd, "zoom", 0.0)
 	useDegrees := getOptionalBool(cmd, "degrees", false)
 
-	speedX := getOptionalFloat64(cmd, "speed_pan", defaultPanSpeed)
-	speedY := getOptionalFloat64(cmd, "speed_tilt", defaultTiltSpeed)
-	speedZ := getOptionalFloat64(cmd, "speed_zoom", defaultZoomSpeed)
-	useSpeed := getOptionalBool(cmd, "use_speed", false)
-
-	// Input validation based on degrees input
-	if useDegrees {
-		if panRelative < -180.0 || panRelative > 180.0 {
-			return nil, errors.New("relative pan must be between -180.0 and 180.0 when using degrees")
-		}
-		if tiltRelative < -90.0 || tiltRelative > 90.0 {
-			return nil, errors.New("relative tilt must be between -90.0 and 90.0 when using degrees")
-		}
-	} else {
-		if panRelative < -1.0 || panRelative > 1.0 {
-			return nil, errors.New("relative pan must be between -1.0 and 1.0 (use degrees=true for degrees)")
-		}
-		if tiltRelative < -1.0 || tiltRelative > 1.0 {
-			return nil, errors.New("relative tilt must be between -1.0 and 1.0 (use degrees=true for degrees)")
-		}
-	}
-	if zoomRelative < -1.0 || zoomRelative > 1.0 {
-		return nil, errors.New("relative zoom must be between -1.0 and 1.0")
+	zoomTranslation, err := getFloat64(cmd, "zoom_translation")
+	if err != nil {
+		return nil, err
 	}
 
 	panTiltVector := onvifxsd.Vector2D{
@@ -324,37 +322,68 @@ func (s *onvifPtzClient) handleRelativeMove(cmd map[string]interface{}) (map[str
 		s.logger.Debug("Using Generic Normalized space for relative Pan/Tilt.")
 	}
 
+	// Check if any speed parameters were provided by the user
+	_, panSpeedProvided := cmd["pan_speed"]
+	_, tiltSpeedProvided := cmd["tilt_speed"]
+	_, zoomSpeedProvided := cmd["zoom_speed"]
+	sendSpeed := panSpeedProvided || tiltSpeedProvided || zoomSpeedProvided
+
+	// Get speed values only if we intend to send them, using defaults if necessary
+	var panSpeed, tiltSpeed, zoomSpeed float64
+	if sendSpeed {
+		panSpeed = getOptionalFloat64(cmd, "pan_speed", defaultPanSpeed)
+		tiltSpeed = getOptionalFloat64(cmd, "tilt_speed", defaultTiltSpeed)
+		zoomSpeed = getOptionalFloat64(cmd, "zoom_speed", defaultZoomSpeed)
+	}
+
 	req := ptz.RelativeMove{
 		ProfileToken: profileToken,
 		Translation: onvifxsd.PTZVector{
 			PanTilt: panTiltVector,
 			Zoom: onvifxsd.Vector1D{
-				X:     zoomRelative,
-				Space: RelativeZoomTranslationGenericSpace, // zoom always generic space for relative
+				X:     zoomTranslation,
+				Space: RelativeZoomTranslationGenericSpace,
 			},
 		},
 	}
 
-	if useSpeed {
-		if speedX < -1.0 || speedX > 1.0 || speedY < -1.0 || speedY > 1.0 || speedZ < -1.0 || speedZ > 1.0 {
-			return nil, errors.New("speed values must be between -1.0 and 1.0")
+	if sendSpeed {
+		// Validate speeds if they are being sent
+		if panSpeed < 0.0 || panSpeed > 1.0 || tiltSpeed < 0.0 || tiltSpeed > 1.0 || zoomSpeed < 0.0 || zoomSpeed > 1.0 {
+			return nil, errors.New("speed values (pan_speed, tilt_speed, zoom_speed) must be between 0.0 and 1.0 for relative move")
 		}
 		req.Speed = onvifxsd.PTZSpeed{
-			PanTilt: onvifxsd.Vector2D{X: speedX, Y: speedY},
-			Zoom:    onvifxsd.Vector1D{X: speedZ},
+			PanTilt: onvifxsd.Vector2D{
+				X:     panSpeed,
+				Y:     tiltSpeed,
+				Space: panTiltVector.Space,
+			},
+			Zoom: onvifxsd.Vector1D{
+				X:     zoomSpeed,
+				Space: RelativeZoomTranslationGenericSpace,
+			},
 		}
 		s.logger.Debugf("Sending RelativeMove (P: %.3f, T: %.3f, Z: %.3f) with Speed (X: %.2f, Y: %.2f, Z: %.2f) for profile %s...",
-			panRelative, tiltRelative, zoomRelative, speedX, speedY, speedZ, profileToken)
+			panRelative, tiltRelative, zoomRelative, panSpeed, tiltSpeed, zoomSpeed, profileToken)
 	} else {
-		s.logger.Debugf("Sending RelativeMove (P: %.3f, T: %.3f, Z: %.3f) with default speed for profile %s...",
+		s.logger.Debugf("Sending RelativeMove (P: %.3f, T: %.3f, Z: %.3f) using camera default speed for profile %s...",
 			panRelative, tiltRelative, zoomRelative, profileToken)
 	}
 
-	_, err := s.dev.CallMethod(req)
+	res, err := s.dev.CallMethod(req, s.logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call RelativeMove: %w", err)
 	}
-	return map[string]interface{}{"success": true}, nil
+	defer res.Body.Close()
+
+	bodyBytes, readErr := io.ReadAll(res.Body)
+	if readErr != nil {
+		return nil, fmt.Errorf("failed to read RelativeMove response body: %w", readErr)
+	}
+	response := string(bodyBytes)
+	s.logger.Debugf("RelativeMove raw response body: %s", response)
+
+	return map[string]interface{}{"response": response}, nil
 }
 
 // handleAbsoluteMove implements the absolute-move command logic.
@@ -376,13 +405,24 @@ func (s *onvifPtzClient) handleAbsoluteMove(cmd map[string]interface{}) (map[str
 	if err != nil {
 		return nil, err
 	}
-	panSpeed := getOptionalFloat64(cmd, "pan_speed", 1.0)
-	tiltSpeed := getOptionalFloat64(cmd, "tilt_speed", 1.0)
-	zoomSpeed := getOptionalFloat64(cmd, "zoom_speed", 1.0)
 
-	// Validate speed ranges
-	if panSpeed < 0 || panSpeed > 1.0 || tiltSpeed < 0 || tiltSpeed > 1.0 || zoomSpeed < 0 || zoomSpeed > 1.0 {
-		return nil, errors.New("speed values (pan_speed, tilt_speed, zoom_speed) must be between 0.0 and 1.0 for absolute move")
+	// Check if any speed parameters were provided
+	_, panSpeedProvided := cmd["pan_speed"]
+	_, tiltSpeedProvided := cmd["tilt_speed"]
+	_, zoomSpeedProvided := cmd["zoom_speed"]
+	sendSpeed := panSpeedProvided || tiltSpeedProvided || zoomSpeedProvided
+
+	// Get speed values only if sending them (default 1.0)
+	var panSpeed, tiltSpeed, zoomSpeed float64
+	if sendSpeed {
+		panSpeed = getOptionalFloat64(cmd, "pan_speed", defaultPanSpeed)
+		tiltSpeed = getOptionalFloat64(cmd, "tilt_speed", defaultTiltSpeed)
+		zoomSpeed = getOptionalFloat64(cmd, "zoom_speed", defaultZoomSpeed)
+	}
+
+	// Validate position ranges (-1.0 to 1.0 for pan/tilt, 0.0 to 1.0 for zoom)
+	if panPos < -1.0 || panPos > 1.0 || tiltPos < -1.0 || tiltPos > 1.0 || zoomPos < 0.0 || zoomPos > 1.0 {
+		return nil, errors.New("position values must be within normalized range (-1 to 1 for pan/tilt, 0 to 1 for zoom)")
 	}
 
 	req := ptz.AbsoluteMove{
@@ -398,7 +438,14 @@ func (s *onvifPtzClient) handleAbsoluteMove(cmd map[string]interface{}) (map[str
 				Space: AbsoluteZoomPositionGenericSpace,
 			},
 		},
-		Speed: onvifxsd.PTZSpeed{
+	}
+
+	if sendSpeed {
+		// Validate speeds if they are being sent
+		if panSpeed < 0.0 || panSpeed > 1.0 || tiltSpeed < 0.0 || tiltSpeed > 1.0 || zoomSpeed < 0.0 || zoomSpeed > 1.0 {
+			return nil, errors.New("speed values (pan_speed, tilt_speed, zoom_speed) must be between 0.0 and 1.0 for absolute move")
+		}
+		req.Speed = onvifxsd.PTZSpeed{
 			PanTilt: onvifxsd.Vector2D{
 				X:     panSpeed,
 				Y:     tiltSpeed,
@@ -408,16 +455,17 @@ func (s *onvifPtzClient) handleAbsoluteMove(cmd map[string]interface{}) (map[str
 				X:     zoomSpeed,
 				Space: AbsoluteZoomPositionGenericSpace,
 			},
-		},
+		}
+		s.logger.Debugf("Sending AbsoluteMove (P: %.3f, T: %.3f, Z: %.3f) with Speed (X: %.2f, Y: %.2f, Z: %.2f) for profile %s...",
+			panPos, tiltPos, zoomPos, panSpeed, tiltSpeed, zoomSpeed, profileToken)
+	} else {
+		s.logger.Debugf("Sending AbsoluteMove (P: %.3f, T: %.3f, Z: %.3f) using camera default speed for profile %s...",
+			panPos, tiltPos, zoomPos, profileToken)
 	}
 
-	s.logger.Debugf("Sending AbsoluteMove (Pan: %.3f, Tilt: %.3f, Zoom: %.3f) with Speed (X: %.2f, Y: %.2f, Z: %.2f) for profile %s...",
-		panPos, tiltPos, zoomPos, panSpeed, tiltSpeed, zoomSpeed, profileToken)
-
-	res, err := s.dev.CallMethod(req)
-	s.logger.Debugf("AbsoluteMove response: %+v", res)
+	res, err := s.dev.CallMethod(req, s.logger)
 	if err != nil {
-		// this is an HTTP or connection level error
+		// This is an HTTP or connection level error
 		return nil, fmt.Errorf("failed to call AbsoluteMove: %w", err)
 	}
 
@@ -427,8 +475,9 @@ func (s *onvifPtzClient) handleAbsoluteMove(cmd map[string]interface{}) (map[str
 	}
 
 	// this could contain a response body error from the camera
-	s.logger.Debugf("AbsoluteMove raw response body: %s", string(bodyBytes))
-	return map[string]interface{}{"success": true}, nil
+	response := string(bodyBytes)
+	s.logger.Debugf("AbsoluteMove raw response body: %s", response)
+	return map[string]interface{}{"response": response}, nil
 }
 
 // DoCommand maps incoming commands to the appropriate ONVIF PTZ action.
