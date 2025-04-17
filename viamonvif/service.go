@@ -109,9 +109,6 @@ func newDiscovery(_ context.Context, _ resource.Dependencies,
 
 // DiscoverResources discovers different rtsp cameras that use onvif.
 func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[string]any) ([]resource.Config, error) {
-	dis.mu.Lock()
-	defer dis.mu.Unlock()
-
 	localRTSPToSnapshotURIs := make(map[string]string)
 	cams := []resource.Config{}
 
