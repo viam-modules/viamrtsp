@@ -81,22 +81,28 @@ Continuous motion at specified speeds (-1.0 to 1.0).
   "pan": 0.1,
   "tilt": -0.05,
   "zoom": 0.0,
-  "degrees": true
+  "degrees": false,
+  "pan_speed": 0.5,
+  "tilt_speed": 0.5,
+  "zoom_speed": 0.5,
+  "use_speed": true
 }
 ```
-Relative position move with optional degree space conversion.
+Relative position move with optional degree space conversion and optional speed control.
 
 #### Absolute Move
 ```json
 {
-  "command": "absolute-move", 
-  "pan": 0.0,
-  "tilt": 0.0,
-  "zoom": 0.5,
-  "degrees": false
+  "command": "absolute-move",
+  "pan_position": 0.0,
+  "tilt_position": 0.0,
+  "zoom_position": 0.5,
+  "pan_speed": 1.0,
+  "tilt_speed": 1.0,
+  "zoom_speed": 1.0
 }
 ```
-Absolute position move in normalized or degree space.
+Absolute position move to specified normalized coordinates, with optional speed control.
 
 ## Notes
 
@@ -105,9 +111,13 @@ Absolute position move in normalized or degree space.
 2. **Coordinate Spaces**:
    - Normalized: -1.0 to 1.0 (pan/tilt), 0.0-1.0 (zoom)
    - Degrees: -180° to 180° (pan), -90° to 90° (tilt)
+   - Absolute Moves: Use normalized coordinates (-1.0 to 1.0 for pan/tilt, 0.0 to 1.0 for zoom).
+   - Relative Moves:
+     - Normalized (default): -1.0 to 1.0 (pan/tilt/zoom).
+     - Degrees (`degrees: true`): -180° to 180° (pan), -90° to 90° (tilt). Zoom remains normalized.
 3. **Movement Speeds**: 
    - Continuous: -1.0 (full reverse) to 1.0 (full forward)
-   - Relative/Absolute: 0.5 default speed (override with `speed_*` params)
+   - Relative/Absolute: Specify speeds between 0.0 and 1.0 using `pan_speed`, `tilt_speed`, `zoom_speed`. Default speeds apply if not provided or if `use_speed: false` for relative moves.
 
 ## Troubleshooting
 
