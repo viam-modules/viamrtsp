@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 	"unicode"
 
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
@@ -303,13 +304,12 @@ func GetMediaInfoFromProfiles(
 			logger.Warn(err.Error())
 			continue
 		}
-		if streamURI.String() == "" {
-			logger.Warnf("Stream URI is empty for profile %s", profile.Name)
-			continue
-		}
 
 		snapshotURIString := ""
+		startTime := time.Now()
 		snapshotURI, err := dev.GetSnapshotURI(ctx, profile.Token, creds)
+		elapsed := time.Since(startTime)
+		logger.Infof("GetSnapshotURI took %s", elapsed)
 		if err != nil {
 			logger.Warn(err.Error())
 		} else {
@@ -319,7 +319,7 @@ func GetMediaInfoFromProfiles(
 			logger.Warnf("Snapshot URI is empty for profile %s: %s, adding media info with empty snapshot", profile.Name, streamURI.String())
 		}
 
-		// Always add the MediaInfo if the stream URI is valid
+		// Always add the MediaInfo if we get a stream URI, even if the snapshot URI fails.
 		mes = append(mes, MediaInfo{
 			StreamURI:   streamURI.String(),
 			SnapshotURI: snapshotURIString,
