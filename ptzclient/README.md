@@ -71,7 +71,7 @@ Halts specified movements (default: stop both pan/tilt and zoom).
   "command": "continuous-move",
   "pan_speed": 0.5,
   "tilt_speed": -0.2,
-  "zoom_speed": 0.0
+  "zoom_speed": 0.1
 }
 ```
 Continuous motion at specified speeds (-1.0 to 1.0).
@@ -82,7 +82,7 @@ Continuous motion at specified speeds (-1.0 to 1.0).
   "command": "relative-move",
   "pan": 0.1,
   "tilt": -0.05,
-  "zoom": 0.0,
+  "zoom": 0.1,
   "degrees": false,
   "pan_speed": 0.5,
   "tilt_speed": 0.5,
@@ -97,7 +97,7 @@ Relative move using normalized coordinates. Speed parameters are optional.
   "command": "relative-move",
   "pan": 10,
   "tilt": -5,
-  "zoom": 0.0,
+  "zoom": 1,
   "degrees": true,
   "pan_speed": 0.2,
   "tilt_speed": 0.2,
