@@ -252,12 +252,12 @@ func downloadPreviewImage(ctx context.Context, logger logging.Logger, snapshotUR
 		},
 	}
 
-	initialReq, err := http.NewRequestWithContext(ctx, http.MethodGet, snapshotURI, nil)
+	getReq, err := http.NewRequestWithContext(ctx, http.MethodGet, snapshotURI, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create http request: %w", err)
 	}
 
-	resp, err := client.Do(initialReq)
+	resp, err := client.Do(getReq)
 	if err != nil {
 		return "", fmt.Errorf("failed to execute http request: %w", err)
 	}
