@@ -43,8 +43,12 @@ func (m *MockDevice) GetProfiles(_ context.Context) (device.GetProfilesResponse,
 	}, nil
 }
 
-func (m *MockDevice) GetStreamURI(_ context.Context, profile onvif.Profile, creds device.Credentials) (*url.URL, error) {
-	if profile.Token != "profile1" || profile.Name != "Main Profile" {
+func (m *MockDevice) GetSnapshotURI(_ context.Context, _ onvif.ReferenceToken, _ device.Credentials) (*url.URL, error) {
+	return url.Parse("http://example.com/snapshot.jpg")
+}
+
+func (m *MockDevice) GetStreamURI(_ context.Context, token onvif.ReferenceToken, creds device.Credentials) (*url.URL, error) {
+	if token != "profile1" {
 		return nil, errors.New("invalid mock profile")
 	}
 	u, err := url.Parse("rtsp://192.168.1.100/stream")
@@ -69,25 +73,27 @@ func TestGetCameraInfo(t *testing.T) {
 		test.That(t, cameraInfo.Manufacturer, test.ShouldEqual, "Evil Inc.")
 		test.That(t, cameraInfo.Model, test.ShouldEqual, "Doom Ray Camera of Certain Annihilation")
 		test.That(t, cameraInfo.SerialNumber, test.ShouldEqual, "44444444")
-		test.That(t, len(cameraInfo.RTSPURLs), test.ShouldEqual, 1)
-		test.That(t, cameraInfo.RTSPURLs[0], test.ShouldEqual, "rtsp://username:password@192.168.1.100/stream")
+		test.That(t, len(cameraInfo.MediaEndpoints), test.ShouldEqual, 1)
+		test.That(t, cameraInfo.MediaEndpoints[0].StreamURI, test.ShouldEqual, "rtsp://username:password@192.168.1.100/stream")
 		test.That(t, cameraInfo.Name(0), test.ShouldEqual, "EvilInc-DoomRayCameraofCertainAnnihilation-44444444-url0")
 
-		t.Run("GetRTSPStreamURLs with credentials", func(t *testing.T) {
+		t.Run("GetCameraInfo with credentials", func(t *testing.T) {
 			uri, err := url.Parse("192.168.1.100")
 			test.That(t, err, test.ShouldBeNil)
 			cameraInfo, err := GetCameraInfo(context.Background(), mockDevice, uri, device.Credentials{User: "username", Pass: "password"}, logger)
 			test.That(t, err, test.ShouldBeNil)
-			test.That(t, len(cameraInfo.RTSPURLs), test.ShouldEqual, 1)
-			test.That(t, cameraInfo.RTSPURLs[0], test.ShouldEqual, "rtsp://username:password@192.168.1.100/stream")
+			test.That(t, len(cameraInfo.MediaEndpoints), test.ShouldEqual, 1)
+			test.That(t, cameraInfo.MediaEndpoints[0].StreamURI, test.ShouldEqual, "rtsp://username:password@192.168.1.100/stream")
+			test.That(t, cameraInfo.MediaEndpoints[0].SnapshotURI, test.ShouldEqual, "http://example.com/snapshot.jpg")
 		})
-		t.Run("GetRTSPStreamURLs without credentials", func(t *testing.T) {
+		t.Run("GetCameraInfo without credentials", func(t *testing.T) {
 			uri, err := url.Parse("192.168.1.100")
 			test.That(t, err, test.ShouldBeNil)
 			cameraInfo, err := GetCameraInfo(context.Background(), mockDevice, uri, device.Credentials{}, logger)
 			test.That(t, err, test.ShouldBeNil)
-			test.That(t, len(cameraInfo.RTSPURLs), test.ShouldEqual, 1)
-			test.That(t, cameraInfo.RTSPURLs[0], test.ShouldEqual, "rtsp://192.168.1.100/stream")
+			test.That(t, len(cameraInfo.MediaEndpoints), test.ShouldEqual, 1)
+			test.That(t, cameraInfo.MediaEndpoints[0].StreamURI, test.ShouldEqual, "rtsp://192.168.1.100/stream")
+			test.That(t, cameraInfo.MediaEndpoints[0].SnapshotURI, test.ShouldEqual, "http://example.com/snapshot.jpg")
 		})
 	})
 }
