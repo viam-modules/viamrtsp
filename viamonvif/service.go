@@ -34,8 +34,7 @@ var (
 )
 
 const (
-	maxBodyStringSize = 500
-	httpClientTimeout = 5 * time.Second
+	snapshotClientTimeout = 5 * time.Second
 )
 
 func init() {
@@ -71,8 +70,8 @@ type rtspDiscovery struct {
 	resource.Named
 	resource.AlwaysRebuild
 
-	mu                 sync.Mutex
-	rtspToSnapshotURIs map[string]string
+	rtspToSnapshotURIsMu sync.Mutex
+	rtspToSnapshotURIs   map[string]string
 
 	Credentials []device.Credentials
 	mdnsServer  *mdnsServer
@@ -154,9 +153,9 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 	}
 
 	// Only lock when updating the shared URI map
-	dis.mu.Lock()
+	dis.rtspToSnapshotURIsMu.Lock()
 	dis.rtspToSnapshotURIs = localRTSPToSnapshotURIs
-	dis.mu.Unlock()
+	dis.rtspToSnapshotURIsMu.Unlock()
 
 	dis.mdnsServer.UpdateCacheFile()
 
@@ -176,9 +175,9 @@ func (dis *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inte
 		if err != nil {
 			return nil, err
 		}
-		dis.mu.Lock()
+		dis.rtspToSnapshotURIsMu.Lock()
 		snapshotURI, found := dis.rtspToSnapshotURIs[previewReq.rtspURL]
-		dis.mu.Unlock()
+		dis.rtspToSnapshotURIsMu.Unlock()
 		if !found {
 			return nil, fmt.Errorf("snapshot URI not found for %s", previewReq.rtspURL)
 		}
@@ -244,7 +243,7 @@ func downloadPreviewImage(ctx context.Context, logger logging.Logger, snapshotUR
 	}
 	client := &http.Client{
 		// Setting upper bound timeout in case the ctx never times out
-		Timeout: httpClientTimeout,
+		Timeout: snapshotClientTimeout,
 		Transport: &digest.Transport{
 			Username:  username,
 			Password:  password,
