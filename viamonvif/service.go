@@ -123,7 +123,7 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 		return nil, err
 	}
 	if len(list.Cameras) == 0 {
-		return nil, errors.New("no cameras found, ensure cameras are working or check credentials")
+		return nil, errNoCamerasFound
 	}
 
 	for _, camInfo := range list.Cameras {
