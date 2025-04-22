@@ -320,15 +320,6 @@ func GetMediaInfoFromProfiles(
 			snapshotURIString = snapshotURI.String()
 		}
 
-		// Add debug logging for media information
-		logger.Infof("Profile %s media details: FrameRate=%d, Resolution=%s, Codec=%s",
-			profile.Name,
-			int(profile.VideoEncoderConfiguration.RateControl.FrameRateLimit),
-			fmt.Sprintf("%dx%d",
-				profile.VideoEncoderConfiguration.Resolution.Width,
-				profile.VideoEncoderConfiguration.Resolution.Height),
-			string(profile.VideoEncoderConfiguration.Encoding))
-
 		// Always add the MediaInfo if we get a stream URI, even if the snapshot URI fails.
 		mes = append(mes, MediaInfo{
 			StreamURI:   streamURI.String(),

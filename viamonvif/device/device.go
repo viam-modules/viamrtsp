@@ -233,9 +233,6 @@ func (dev *Device) GetProfiles(ctx context.Context) (GetProfilesResponse, error)
 	dev.logger.Debugf("Found %d media profiles", len(resp.Body.GetProfilesResponse.Profiles))
 	for i, profile := range resp.Body.GetProfilesResponse.Profiles {
 		dev.logger.Debugf("Profile %d: Token=%s, Name=%s", i, profile.Token, profile.Name)
-		dev.logger.Infof("Rate control: %+v", profile.VideoEncoderConfiguration.RateControl)
-		dev.logger.Infof("Resolution: %+v", profile.VideoEncoderConfiguration.Resolution)
-		dev.logger.Infof("Encoding: %v", profile.VideoEncoderConfiguration.Encoding)
 		dev.logger.Infof("Profile %s media details: FrameRate=%d, Resolution=%s, Codec=%s",
 			profile.Name,
 			int(profile.VideoEncoderConfiguration.RateControl.FrameRateLimit),
@@ -243,7 +240,6 @@ func (dev *Device) GetProfiles(ctx context.Context) (GetProfilesResponse, error)
 				profile.VideoEncoderConfiguration.Resolution.Width,
 				profile.VideoEncoderConfiguration.Resolution.Height),
 			string(profile.VideoEncoderConfiguration.Encoding))
-
 	}
 
 	dev.logger.Debugf("GetProfiles decoded: %#v", resp.Body.GetProfilesResponse)
