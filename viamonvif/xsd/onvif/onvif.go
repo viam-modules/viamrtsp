@@ -118,8 +118,8 @@ type VideoSource struct {
 }
 
 type VideoResolution struct {
-	Width  xsd.Int `xml:"onvif:Width"`
-	Height xsd.Int `xml:"onvif:Height"`
+	Width  xsd.Int `xml:"Width"`
+	Height xsd.Int `xml:"Height"`
 }
 
 type ImagingSettings struct {
@@ -407,45 +407,69 @@ type AudioSourceConfiguration struct {
 	SourceToken ReferenceToken `xml:"onvif:SourceToken"`
 }
 
+// type VideoEncoderConfiguration struct {
+// 	ConfigurationEntity
+// 	Encoding       VideoEncoding          `xml:"onvif:Encoding"`
+// 	Resolution     VideoResolution        `xml:"onvif:Resolution"`
+// 	Quality        float64                `xml:"onvif:Quality"`
+// 	RateControl    VideoRateControl       `xml:"onvif:RateControl"`
+// 	MPEG4          Mpeg4Configuration     `xml:"onvif:MPEG4"`
+// 	H264           H264Configuration      `xml:"onvif:H264"`
+// 	Multicast      MulticastConfiguration `xml:"onvif:Multicast"`
+// 	SessionTimeout xsd.Duration           `xml:"onvif:SessionTimeout"`
+// }
+
+// type VideoEncoderConfiguration struct {
+// 	ConfigurationEntity
+// 	Encoding       VideoEncoding          `xml:tt:Encoding"`
+// 	Resolution     VideoResolution        `xml:tt:Resolution"`
+// 	Quality        float64                `xml:"onvif:Quality"`
+// 	RateControl    VideoRateControl       `xml:"onvif:RateControl"`
+// 	MPEG4          Mpeg4Configuration     `xml:"onvif:MPEG4"`
+// 	H264           H264Configuration      `xml:"onvif:H264"`
+// 	Multicast      MulticastConfiguration `xml:"onvif:Multicast"`
+// 	SessionTimeout xsd.Duration           `xml:"onvif:SessionTimeout"`
+// }
+
 type VideoEncoderConfiguration struct {
 	ConfigurationEntity
-	Encoding       VideoEncoding          `xml:"onvif:Encoding"`
-	Resolution     VideoResolution        `xml:"onvif:Resolution"`
-	Quality        float64                `xml:"onvif:Quality"`
-	RateControl    VideoRateControl       `xml:"onvif:RateControl"`
-	MPEG4          Mpeg4Configuration     `xml:"onvif:MPEG4"`
-	H264           H264Configuration      `xml:"onvif:H264"`
-	Multicast      MulticastConfiguration `xml:"onvif:Multicast"`
-	SessionTimeout xsd.Duration           `xml:"onvif:SessionTimeout"`
+	Encoding       VideoEncoding          `xml:"Encoding"`
+	Resolution     VideoResolution        `xml:"Resolution"`
+	Quality        float64                `xml:"Quality"`
+	RateControl    VideoRateControl       `xml:"RateControl"`
+	MPEG4          Mpeg4Configuration     `xml:"MPEG4"`
+	H264           H264Configuration      `xml:"H264"`
+	Multicast      MulticastConfiguration `xml:"Multicast"`
+	SessionTimeout xsd.Duration           `xml:"SessionTimeout"`
 }
 
 type VideoEncoding xsd.String
 
 type VideoRateControl struct {
-	FrameRateLimit   xsd.Int `xml:"onvif:FrameRateLimit"`
-	EncodingInterval xsd.Int `xml:"onvif:EncodingInterval"`
-	BitrateLimit     xsd.Int `xml:"onvif:BitrateLimit"`
+	FrameRateLimit   xsd.Int `xml:"FrameRateLimit"`
+	EncodingInterval xsd.Int `xml:"EncodingInterval"`
+	BitrateLimit     xsd.Int `xml:"BitrateLimit"`
 }
 
 type Mpeg4Configuration struct {
-	GovLength    xsd.Int      `xml:"onvif:GovLength"`
-	Mpeg4Profile Mpeg4Profile `xml:"onvif:Mpeg4Profile"`
+	GovLength    xsd.Int      `xml:"GovLength"`
+	Mpeg4Profile Mpeg4Profile `xml:"Mpeg4Profile"`
 }
 
 type Mpeg4Profile xsd.String
 
 type H264Configuration struct {
-	GovLength   xsd.Int     `xml:"onvif:GovLength"`
-	H264Profile H264Profile `xml:"onvif:H264Profile"`
+	GovLength   xsd.Int     `xml:"GovLength"`
+	H264Profile H264Profile `xml:"H264Profile"`
 }
 
 type H264Profile xsd.String
 
 type MulticastConfiguration struct {
-	Address   IPAddress   `xml:"onvif:Address"`
-	Port      int         `xml:"onvif:Port"`
-	TTL       int         `xml:"onvif:TTL"`
-	AutoStart xsd.Boolean `xml:"onvif:AutoStart"`
+	Address   IPAddress   `xml:"Address"`
+	Port      int         `xml:"Port"`
+	TTL       int         `xml:"TTL"`
+	AutoStart xsd.Boolean `xml:"AutoStart"`
 }
 
 type IPAddress struct {

@@ -92,12 +92,22 @@ type videoStoreConfig struct {
 	Storage videoStoreStorageConfig `json:"storage"`
 }
 
+type Resolution struct {
+	Width  int `json:"width"`
+	Height int `json:"height"`
+}
+
 // Config are the config attributes for an RTSP camera model.
 type Config struct {
 	Address          string `json:"rtsp_address"`
 	RTPPassthrough   *bool  `json:"rtp_passthrough"`
 	LazyDecode       bool   `json:"lazy_decode,omitempty"`
 	IframeOnlyDecode bool   `json:"i_frame_only_decode,omitempty"`
+
+	FrameRate  int        `json:"frame_rate,omitempty"`
+	Resolution Resolution `json:"resolution,omitempty"`
+	Codec      string     `json:"codec,omitempty"`
+
 	// TODO: remove query & UPNP_DISCOVER logic
 	Query        viamupnp.DeviceQuery `json:"query,omitempty"`
 	VideoStore   *videoStoreConfig    `json:"video_store,omitempty"`

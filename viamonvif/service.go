@@ -300,7 +300,7 @@ func createCamerasFromURLs(l CameraInfo, discoveryDependencyName string, logger 
 			discDep = discoveryDependencyName
 		}
 
-		cfg, err := createCameraConfig(l.Name(index), u.StreamURI, discDep)
+		cfg, err := createCameraConfig(l.Name(index), u.StreamURI, discDep, u.Codec, u.FrameRate, u.Resolution.Width, u.Resolution.Height)
 		if err != nil {
 			return nil, err
 		}
@@ -309,13 +309,19 @@ func createCamerasFromURLs(l CameraInfo, discoveryDependencyName string, logger 
 	return cams, nil
 }
 
-func createCameraConfig(name, address, discoveryDependency string) (resource.Config, error) {
+func createCameraConfig(name, address, discoveryDependency, codec string, frameRate, width, height int) (resource.Config, error) {
 	// using the camera's Config struct in case a breaking change occurs
 	_true := true
 	attributes := viamrtsp.Config{
 		Address:        address,
 		RTPPassthrough: &_true,
 		DiscoveryDep:   discoveryDependency,
+		Codec:          codec,
+		FrameRate:      frameRate,
+		Resolution: viamrtsp.Resolution{
+			Width:  width,
+			Height: height,
+		},
 	}
 	var result map[string]interface{}
 

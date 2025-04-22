@@ -104,8 +104,16 @@ func discoverOnAllInterfaces(ctx context.Context, manualXAddrs []*url.URL, logge
 
 // MediaInfo is a struct that holds the RTSP stream and snapshot URI.
 type MediaInfo struct {
-	StreamURI   string `json:"stream_uri"`
-	SnapshotURI string `json:"snapshot_uri"`
+	StreamURI   string     `json:"stream_uri"`
+	SnapshotURI string     `json:"snapshot_uri"`
+	FrameRate   int        `json:"frame_rate"`
+	Resolution  Resolution `json:"resolution"`
+	Codec       string     `json:"codec"`
+}
+
+type Resolution struct {
+	Width  int `json:"width"`
+	Height int `json:"height"`
 }
 
 // CameraInfo holds both the RTSP URLs and supplementary camera details.
@@ -312,10 +320,22 @@ func GetMediaInfoFromProfiles(
 			snapshotURIString = snapshotURI.String()
 		}
 
+		// Add debug logging for media information
+		logger.Infof("Profile %s media details: FrameRate=%d, Resolution=%s, Codec=%s",
+			profile.Name,
+			int(profile.VideoEncoderConfiguration.RateControl.FrameRateLimit),
+			fmt.Sprintf("%dx%d",
+				profile.VideoEncoderConfiguration.Resolution.Width,
+				profile.VideoEncoderConfiguration.Resolution.Height),
+			string(profile.VideoEncoderConfiguration.Encoding))
+
 		// Always add the MediaInfo if we get a stream URI, even if the snapshot URI fails.
 		mes = append(mes, MediaInfo{
 			StreamURI:   streamURI.String(),
 			SnapshotURI: snapshotURIString,
+			FrameRate:   int(profile.VideoEncoderConfiguration.RateControl.FrameRateLimit),
+			Resolution:  Resolution{Width: int(profile.VideoEncoderConfiguration.Resolution.Width), Height: int(profile.VideoEncoderConfiguration.Resolution.Height)},
+			Codec:       string(profile.VideoEncoderConfiguration.Encoding),
 		})
 	}
 
