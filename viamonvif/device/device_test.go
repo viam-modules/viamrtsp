@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -258,4 +260,51 @@ func TestDeviceFlowWithTLSServer(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetProfiles(t *testing.T) {
+	logger := logging.NewTestLogger(t)
+
+	t.Run("Test GetProfiles parses XML response correctly", func(t *testing.T) {
+		filePath := filepath.Join("..", "xsd", "onvif", "body_response.xml")
+		bodyResponse, err := os.ReadFile(filePath)
+		test.That(t, err, test.ShouldBeNil)
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			body, err := readBody(r)
+			test.That(t, err, test.ShouldBeNil)
+
+			if strings.Contains(r.Header.Get("Content-Type"), "soap") &&
+				strings.Contains(body, "GetProfiles") {
+				w.Write(bodyResponse)
+			}
+		}))
+		defer server.Close()
+
+		serverURL, err := url.Parse(server.URL)
+		test.That(t, err, test.ShouldBeNil)
+
+		dev, err := NewDevice(context.Background(), Params{
+			Xaddr:      serverURL,
+			HTTPClient: &http.Client{},
+		}, logger)
+		test.That(t, err, test.ShouldBeNil)
+
+		// Hardcode the media endpoint to point to mock server
+		dev.endpoints["media"] = server.URL
+
+		resp, err := dev.GetProfiles(context.Background())
+		test.That(t, err, test.ShouldBeNil)
+
+		test.That(t, len(resp.Profiles), test.ShouldBeGreaterThan, 0)
+		for _, profile := range resp.Profiles {
+			t.Logf("Profile Token: %s, Name: %s", profile.Token, profile.Name)
+			test.That(t, profile.VideoEncoderConfiguration, test.ShouldNotBeNil)
+			test.That(t, profile.VideoEncoderConfiguration.Resolution, test.ShouldNotBeNil)
+			test.That(t, profile.VideoEncoderConfiguration.Resolution.Width, test.ShouldBeGreaterThan, 0)
+			test.That(t, profile.VideoEncoderConfiguration.Resolution.Height, test.ShouldBeGreaterThan, 0)
+			test.That(t, profile.VideoEncoderConfiguration.RateControl, test.ShouldNotBeNil)
+			test.That(t, profile.VideoEncoderConfiguration.RateControl.FrameRateLimit, test.ShouldBeGreaterThan, 0)
+		}
+	})
 }
