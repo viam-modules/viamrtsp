@@ -92,6 +92,7 @@ type videoStoreConfig struct {
 	Storage videoStoreStorageConfig `json:"storage"`
 }
 
+// Resolution is the frame size of the video stream.
 type Resolution struct {
 	Width  int `json:"width"`
 	Height int `json:"height"`
