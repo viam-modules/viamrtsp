@@ -232,13 +232,13 @@ func (dev *Device) GetProfiles(ctx context.Context) (GetProfilesResponse, error)
 
 	dev.logger.Debugf("Found %d media profiles", len(resp.Body.GetProfilesResponse.Profiles))
 	for i, profile := range resp.Body.GetProfilesResponse.Profiles {
-		dev.logger.Debugf("Profile %d: Token=%s, Name=%s", i, profile.Token, profile.Name)
-		dev.logger.Infof("Profile %s media details: FrameRate=%d, Resolution=%s, Codec=%s",
+		dev.logger.Debugf("Profile %d: Token=%s, Name=%s, FrameRate=%d, Resolution=%dx%d, Codec=%s",
+			i,
+			profile.Token,
 			profile.Name,
 			int(profile.VideoEncoderConfiguration.RateControl.FrameRateLimit),
-			fmt.Sprintf("%dx%d",
-				profile.VideoEncoderConfiguration.Resolution.Width,
-				profile.VideoEncoderConfiguration.Resolution.Height),
+			profile.VideoEncoderConfiguration.Resolution.Width,
+			profile.VideoEncoderConfiguration.Resolution.Height,
 			string(profile.VideoEncoderConfiguration.Encoding))
 	}
 
