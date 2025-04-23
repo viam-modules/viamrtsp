@@ -337,6 +337,14 @@ func createCameraConfig(name string, attributes viamrtsp.Config) (resource.Confi
 		return resource.Config{}, err
 	}
 
+	// Remove resolution if width or height is 0. We need to do this because the
+	// Resolution struct omitempty does not work through json marshalling
+	if resolution, exists := result["resolution"].(map[string]interface{}); exists {
+		if resolution["width"] == float64(0) || resolution["height"] == float64(0) {
+			delete(result, "resolution")
+		}
+	}
+
 	return resource.Config{
 		Name: name, API: camera.API, Model: viamrtsp.ModelAgnostic,
 		Attributes: result, ConvertedAttributes: &attributes,
