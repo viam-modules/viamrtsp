@@ -36,7 +36,12 @@ func TestDiscoveryService(t *testing.T) {
 func TestCamConfig(t *testing.T) {
 	camName := "my-cam"
 	camURL := "my-cam-url"
-	conf, err := createCameraConfig(camName, camURL, "")
+	_true := true
+	attrs := viamrtsp.Config{
+		Address:        camURL,
+		RTPPassthrough: &_true,
+	}
+	conf, err := createCameraConfig(camName, attrs)
 	test.That(t, err, test.ShouldBeNil)
 	test.That(t, conf.Name, test.ShouldEqual, camName)
 	cfg, err := resource.NativeConfig[*viamrtsp.Config](conf)
@@ -46,7 +51,7 @@ func TestCamConfig(t *testing.T) {
 	test.That(t, cfg.DiscoveryDep, test.ShouldEqual, "")
 
 	discSvcDep := "discovery-service-dependency"
-	conf, err = createCameraConfig(camName, camURL, discSvcDep)
+	conf, err = createCameraConfig(camName, attrs)
 	test.That(t, err, test.ShouldBeNil)
 	test.That(t, conf.Name, test.ShouldEqual, camName)
 	cfg, err = resource.NativeConfig[*viamrtsp.Config](conf)
