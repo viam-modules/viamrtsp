@@ -103,7 +103,8 @@ func discoverOnAllInterfaces(ctx context.Context, manualXAddrs []*url.URL, logge
 	return slices.Collect(maps.Values(discovered)), nil
 }
 
-// MediaInfo is a struct that holds the RTSP stream and snapshot URI.
+// MediaInfo holds detailed information about a camera's media capabilities, including
+// the stream URI, snapshot URI, frame rate, resolution, and codec.
 type MediaInfo struct {
 	StreamURI   string              `json:"stream_uri"`
 	SnapshotURI string              `json:"snapshot_uri"`
