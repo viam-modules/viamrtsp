@@ -1390,12 +1390,12 @@ func (rc *rtspCamera) Name() resource.Name {
 func (rc *rtspCamera) Images(_ context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
 	rc.latestFrameMu.Lock()
 	defer rc.latestFrameMu.Unlock()
-       if rc.latestFrame == nil {
-               return nil, resource.ResponseMetadata{}, errors.New("no frame yet")
-       }
-       return []camera.NamedImage{
-               {Image: rc.latestFrame.toImage()},
-       }, resource.ResponseMetadata{CapturedAt: time.Now()}, nil
+	if rc.latestFrame == nil {
+		return nil, resource.ResponseMetadata{}, errors.New("no frame yet")
+	}
+	return []camera.NamedImage{
+		{Image: rc.latestFrame.toImage()},
+	}, resource.ResponseMetadata{CapturedAt: time.Now()}, nil
 }
 
 func (rc *rtspCamera) NextPointCloud(_ context.Context) (pointcloud.PointCloud, error) {
