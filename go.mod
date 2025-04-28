@@ -11,6 +11,7 @@ require (
 	github.com/erh/viamupnp v0.0.0-20250225174543-39c68c119b3e
 	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/golangci/golangci-lint v1.61.0
+	github.com/hexbabe/sean-onvif v0.0.10-0.20250417162035-97e81b8c0ba9
 	github.com/icholy/digest v1.1.0
 	github.com/koron/go-ssdp v0.0.4
 	github.com/pion/rtp v1.8.11
@@ -115,7 +116,6 @@ require (
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-pdf/fpdf v0.6.0 // indirect
-	github.com/go-playground/validator/v10 v10.4.1 // indirect
 	github.com/go-toolsmith/astcast v1.1.0 // indirect
 	github.com/go-toolsmith/astcopy v1.1.0 // indirect
 	github.com/go-toolsmith/astequal v1.2.0 // indirect
@@ -167,12 +167,13 @@ require (
 	github.com/jingyugao/rowserrcheck v1.1.1 // indirect
 	github.com/jirfag/go-printf-func-name v0.0.0-20200119135958-7558a9eaa5af // indirect
 	github.com/jjti/go-spancheck v0.6.2 // indirect
+	github.com/juju/errors v0.0.0-20220331221717-b38fca44723b // indirect
 	github.com/julz/importas v0.1.0 // indirect
 	github.com/karamaru-alpha/copyloopvar v1.1.0 // indirect
 	github.com/kellydunn/golang-geo v0.7.0 // indirect
 	github.com/kisielk/errcheck v1.7.0 // indirect
 	github.com/kkHAIKE/contextcheck v1.1.5 // indirect
-	github.com/klauspost/compress v1.17.7 // indirect
+	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/kulti/thelper v0.6.3 // indirect
 	github.com/kunwardeep/paralleltest v1.0.10 // indirect
 	github.com/kylelemons/go-gypsy v1.0.0 // indirect
@@ -279,7 +280,6 @@ require (
 	github.com/timonwong/loggercheck v0.9.4 // indirect
 	github.com/tomarrell/wrapcheck/v2 v2.9.0 // indirect
 	github.com/tommy-muehle/go-mnd/v2 v2.5.1 // indirect
-	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ultraware/funlen v0.1.0 // indirect
 	github.com/ultraware/whitespace v0.1.1 // indirect
 	github.com/uudashr/gocognit v1.1.3 // indirect
@@ -314,7 +314,6 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.viam.com/api v0.1.430 // indirect
 	goji.io v2.0.2+incompatible // indirect
-	golang.org/x/arch v0.0.0-20210923205945-b76863e36670 // indirect
 	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/exp v0.0.0-20240904232852-e7e105dedf7e // indirect
 	golang.org/x/exp/typeparams v0.0.0-20240314144324-c7f7c6466f7f // indirect
