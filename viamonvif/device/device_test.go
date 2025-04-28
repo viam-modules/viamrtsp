@@ -305,6 +305,8 @@ func TestGetProfiles(t *testing.T) {
 			test.That(t, profile.VideoEncoderConfiguration.Resolution.Height, test.ShouldBeGreaterThan, 0)
 			test.That(t, profile.VideoEncoderConfiguration.RateControl, test.ShouldNotBeNil)
 			test.That(t, profile.VideoEncoderConfiguration.RateControl.FrameRateLimit, test.ShouldBeGreaterThan, 0)
+			test.That(t, profile.VideoEncoderConfiguration.RateControl.FrameRateLimit, test.ShouldBeGreaterThan, 0)
+			test.That(t, string(profile.VideoEncoderConfiguration.Encoding), test.ShouldNotBeEmpty)
 		}
 	})
 }
