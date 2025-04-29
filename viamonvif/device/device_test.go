@@ -296,17 +296,22 @@ func TestGetProfiles(t *testing.T) {
 		resp, err := dev.GetProfiles(context.Background())
 		test.That(t, err, test.ShouldBeNil)
 
-		test.That(t, len(resp.Profiles), test.ShouldBeGreaterThan, 0)
-		for _, profile := range resp.Profiles {
-			t.Logf("Profile Token: %s, Name: %s", profile.Token, profile.Name)
-			test.That(t, profile.VideoEncoderConfiguration, test.ShouldNotBeNil)
-			test.That(t, profile.VideoEncoderConfiguration.Resolution, test.ShouldNotBeNil)
-			test.That(t, profile.VideoEncoderConfiguration.Resolution.Width, test.ShouldBeGreaterThan, 0)
-			test.That(t, profile.VideoEncoderConfiguration.Resolution.Height, test.ShouldBeGreaterThan, 0)
-			test.That(t, profile.VideoEncoderConfiguration.RateControl, test.ShouldNotBeNil)
-			test.That(t, profile.VideoEncoderConfiguration.RateControl.FrameRateLimit, test.ShouldBeGreaterThan, 0)
-			test.That(t, profile.VideoEncoderConfiguration.RateControl.FrameRateLimit, test.ShouldBeGreaterThan, 0)
-			test.That(t, string(profile.VideoEncoderConfiguration.Encoding), test.ShouldNotBeEmpty)
-		}
+		test.That(t, len(resp.Profiles), test.ShouldEqual, 2)
+
+		mainStream := resp.Profiles[0]
+		test.That(t, mainStream.Token, test.ShouldEqual, "MainStream")
+		test.That(t, mainStream.Name, test.ShouldEqual, "MainStream")
+		test.That(t, mainStream.VideoEncoderConfiguration.Resolution.Width, test.ShouldEqual, 2560)
+		test.That(t, mainStream.VideoEncoderConfiguration.Resolution.Height, test.ShouldEqual, 1440)
+		test.That(t, mainStream.VideoEncoderConfiguration.RateControl.FrameRateLimit, test.ShouldEqual, 20)
+		test.That(t, string(mainStream.VideoEncoderConfiguration.Encoding), test.ShouldEqual, "H264")
+
+		subStream := resp.Profiles[1]
+		test.That(t, subStream.Token, test.ShouldEqual, "SubStream")
+		test.That(t, subStream.Name, test.ShouldEqual, "SubStream")
+		test.That(t, subStream.VideoEncoderConfiguration.Resolution.Width, test.ShouldEqual, 640)
+		test.That(t, subStream.VideoEncoderConfiguration.Resolution.Height, test.ShouldEqual, 360)
+		test.That(t, subStream.VideoEncoderConfiguration.RateControl.FrameRateLimit, test.ShouldEqual, 25)
+		test.That(t, string(subStream.VideoEncoderConfiguration.Encoding), test.ShouldEqual, "H264")
 	})
 }
