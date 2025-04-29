@@ -13,6 +13,7 @@ import (
 	"sync"
 	"unicode"
 
+	"github.com/viam-modules/viamrtsp"
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"github.com/viam-modules/viamrtsp/viamonvif/xsd/onvif"
 	"go.viam.com/rdk/logging"
@@ -102,10 +103,14 @@ func discoverOnAllInterfaces(ctx context.Context, manualXAddrs []*url.URL, logge
 	return slices.Collect(maps.Values(discovered)), nil
 }
 
-// MediaInfo is a struct that holds the RTSP stream and snapshot URI.
+// MediaInfo holds detailed information about a camera's media capabilities, including
+// the stream URI, snapshot URI, frame rate, resolution, and codec.
 type MediaInfo struct {
-	StreamURI   string `json:"stream_uri"`
-	SnapshotURI string `json:"snapshot_uri"`
+	StreamURI   string              `json:"stream_uri"`
+	SnapshotURI string              `json:"snapshot_uri"`
+	FrameRate   int                 `json:"frame_rate"`
+	Resolution  viamrtsp.Resolution `json:"resolution"`
+	Codec       string              `json:"codec"`
 }
 
 // CameraInfo holds both the RTSP URLs and supplementary camera details.
@@ -316,6 +321,12 @@ func GetMediaInfoFromProfiles(
 		mes = append(mes, MediaInfo{
 			StreamURI:   streamURI.String(),
 			SnapshotURI: snapshotURIString,
+			FrameRate:   int(profile.VideoEncoderConfiguration.RateControl.FrameRateLimit),
+			Resolution: viamrtsp.Resolution{
+				Width:  int(profile.VideoEncoderConfiguration.Resolution.Width),
+				Height: int(profile.VideoEncoderConfiguration.Resolution.Height),
+			},
+			Codec: string(profile.VideoEncoderConfiguration.Encoding),
 		})
 	}
 

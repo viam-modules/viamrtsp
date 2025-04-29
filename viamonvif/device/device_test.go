@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -258,4 +260,58 @@ func TestDeviceFlowWithTLSServer(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetProfiles(t *testing.T) {
+	logger := logging.NewTestLogger(t)
+
+	t.Run("Test GetProfiles parses XML response correctly", func(t *testing.T) {
+		filePath := filepath.Join("..", "xsd", "onvif", "body_response.xml")
+		bodyResponse, err := os.ReadFile(filePath)
+		test.That(t, err, test.ShouldBeNil)
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			body, err := readBody(r)
+			test.That(t, err, test.ShouldBeNil)
+
+			if strings.Contains(r.Header.Get("Content-Type"), "soap") &&
+				strings.Contains(body, "GetProfiles") {
+				w.Write(bodyResponse)
+			}
+		}))
+		defer server.Close()
+
+		serverURL, err := url.Parse(server.URL)
+		test.That(t, err, test.ShouldBeNil)
+
+		dev, err := NewDevice(context.Background(), Params{
+			Xaddr:      serverURL,
+			HTTPClient: &http.Client{},
+		}, logger)
+		test.That(t, err, test.ShouldBeNil)
+
+		// Hardcode the media endpoint to point to mock server
+		dev.endpoints["media"] = server.URL
+
+		resp, err := dev.GetProfiles(context.Background())
+		test.That(t, err, test.ShouldBeNil)
+
+		test.That(t, len(resp.Profiles), test.ShouldEqual, 2)
+
+		mainStream := resp.Profiles[0]
+		test.That(t, mainStream.Token, test.ShouldEqual, "MainStream")
+		test.That(t, mainStream.Name, test.ShouldEqual, "MainStream")
+		test.That(t, mainStream.VideoEncoderConfiguration.Resolution.Width, test.ShouldEqual, 2560)
+		test.That(t, mainStream.VideoEncoderConfiguration.Resolution.Height, test.ShouldEqual, 1440)
+		test.That(t, mainStream.VideoEncoderConfiguration.RateControl.FrameRateLimit, test.ShouldEqual, 20)
+		test.That(t, string(mainStream.VideoEncoderConfiguration.Encoding), test.ShouldEqual, "H264")
+
+		subStream := resp.Profiles[1]
+		test.That(t, subStream.Token, test.ShouldEqual, "SubStream")
+		test.That(t, subStream.Name, test.ShouldEqual, "SubStream")
+		test.That(t, subStream.VideoEncoderConfiguration.Resolution.Width, test.ShouldEqual, 640)
+		test.That(t, subStream.VideoEncoderConfiguration.Resolution.Height, test.ShouldEqual, 360)
+		test.That(t, subStream.VideoEncoderConfiguration.RateControl.FrameRateLimit, test.ShouldEqual, 25)
+		test.That(t, string(subStream.VideoEncoderConfiguration.Encoding), test.ShouldEqual, "H264")
+	})
 }
