@@ -53,7 +53,9 @@ func TestCamConfig(t *testing.T) {
 	test.That(t, err, test.ShouldBeNil)
 	test.That(t, cfg.Address, test.ShouldEqual, camURL)
 	test.That(t, *cfg.RTPPassthrough, test.ShouldBeTrue)
+	test.That(t, cfg.Resolution, test.ShouldNotBeNil)
 	test.That(t, cfg.Resolution.Width, test.ShouldEqual, resolution.Width)
+	test.That(t, cfg.Resolution.Height, test.ShouldEqual, resolution.Height)
 	test.That(t, cfg.DiscoveryDep, test.ShouldEqual, "")
 
 	discSvcDep := "discovery-service-dependency"
