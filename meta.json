@@ -51,7 +51,7 @@
       "model": "viam:viamrtsp:video-store",
       "markdown_link": "README.md",
       "short_description": "A video-store that will store video from a viamrtsp camera."
-    }
+    },
     {
       "api": "rdk:component:generic",
       "model": "viam:viamrtsp:onvif-ptz-client",
