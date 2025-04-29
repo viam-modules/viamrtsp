@@ -52,6 +52,12 @@
       "markdown_link": "README.md",
       "short_description": "A video-store that will store video from a viamrtsp camera."
     }
+    {
+      "api": "rdk:component:generic",
+      "model": "viam:viamrtsp:onvif-ptz-client",
+      "markdown_link": "README.md#experimental-ptz-model",
+      "short_description": "An experimental generic component that lets you control an Onvif PTZ camera"
+    }
   ],
   "entrypoint": "bin/viamrtsp"
 }
