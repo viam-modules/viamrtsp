@@ -321,10 +321,15 @@ func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL s
 	// Example: image, err := camera.Image(ctx)
 
 	retryInterval := 100 * time.Millisecond
-	timeout := 3 * time.Second
+	timeout := 5 * time.Second
 
 	ticker := time.NewTicker(retryInterval)
 	defer ticker.Stop()
+	defer func() {
+		if closeErr := camera.Close(ctx); closeErr != nil {
+			logger.Errorf("failed to close camera: %v", closeErr)
+		}
+	}()
 
 	timeoutChan := time.After(timeout)
 	for {
