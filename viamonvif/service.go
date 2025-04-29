@@ -300,7 +300,7 @@ func createCamerasFromURLs(l CameraInfo, discoveryDependencyName string, logger 
 			discDep = discoveryDependencyName
 		}
 
-		// using the camera's Config struct in case a breaking change occurs
+		// Using the camera's Config struct in case a breaking change occurs
 		_true := true
 		config := viamrtsp.Config{
 			Address:        u.StreamURI,
@@ -308,10 +308,12 @@ func createCamerasFromURLs(l CameraInfo, discoveryDependencyName string, logger 
 			DiscoveryDep:   discDep,
 			Codec:          u.Codec,
 			FrameRate:      u.FrameRate,
-			Resolution: viamrtsp.Resolution{
+		}
+		if u.Resolution.Width != 0 && u.Resolution.Height != 0 {
+			config.Resolution = &viamrtsp.Resolution{
 				Width:  u.Resolution.Width,
 				Height: u.Resolution.Height,
-			},
+			}
 		}
 
 		cfg, err := createCameraConfig(l.Name(index), config)
@@ -335,14 +337,6 @@ func createCameraConfig(name string, attributes viamrtsp.Config) (resource.Confi
 	// convert to map to be used as attributes in resource.Config
 	if err = json.Unmarshal(jsonBytes, &result); err != nil {
 		return resource.Config{}, err
-	}
-
-	// Remove resolution if width or height is 0. We need to do this because the
-	// Resolution struct omitempty does not work through json marshalling
-	if resolution, exists := result["resolution"].(map[string]interface{}); exists {
-		if resolution["width"] == float64(0) || resolution["height"] == float64(0) {
-			delete(result, "resolution")
-		}
 	}
 
 	return resource.Config{

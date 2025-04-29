@@ -44,7 +44,7 @@ func TestCamConfig(t *testing.T) {
 	attrs := viamrtsp.Config{
 		Address:        camURL,
 		RTPPassthrough: &_true,
-		Resolution:     resolution,
+		Resolution:     &resolution,
 	}
 	conf, err := createCameraConfig(camName, attrs)
 	test.That(t, err, test.ShouldBeNil)

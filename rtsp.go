@@ -94,8 +94,8 @@ type videoStoreConfig struct {
 
 // Resolution is the frame size of the video stream.
 type Resolution struct {
-	Width  int `json:"width"`
-	Height int `json:"height"`
+	Width  int `json:"width,omitempty"`
+	Height int `json:"height,omitempty"`
 }
 
 // Config are the config attributes for an RTSP camera model.
@@ -105,14 +105,13 @@ type Config struct {
 	LazyDecode       bool   `json:"lazy_decode,omitempty"`
 	IframeOnlyDecode bool   `json:"i_frame_only_decode,omitempty"`
 
-	FrameRate  int        `json:"frame_rate,omitempty"`
-	Resolution Resolution `json:"resolution,omitempty"`
-	Codec      string     `json:"codec,omitempty"`
-
-	// TODO: remove query & UPNP_DISCOVER logic
+	FrameRate    int                  `json:"frame_rate,omitempty"`
+	Resolution   *Resolution          `json:"resolution,omitempty"` // Use a pointer here
+	Codec        string               `json:"codec,omitempty"`
 	Query        viamupnp.DeviceQuery `json:"query,omitempty"`
-	VideoStore   *videoStoreConfig    `json:"video_store,omitempty"`
 	DiscoveryDep string               `json:"discovery_dep,omitempty"`
+
+	VideoStore *videoStoreConfig `json:"video_store,omitempty"`
 }
 
 // CodecFormat contains a pointer to a format and the corresponding FFmpeg codec.
