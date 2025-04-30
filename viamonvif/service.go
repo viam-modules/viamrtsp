@@ -3,21 +3,16 @@ package viamonvif
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/icholy/digest"
 	"github.com/viam-modules/viamrtsp"
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"go.viam.com/rdk/components/camera"
@@ -35,6 +30,8 @@ var (
 
 const (
 	snapshotClientTimeout = 5 * time.Second
+	rtspPollTimeout       = 5 * time.Second
+	rtspImageInterval     = 100 * time.Millisecond
 )
 
 func init() {
@@ -227,83 +224,81 @@ func formatDataURL(contentType string, imageBytes []byte) string {
 }
 
 // downloadPreviewImage downloads the preview image from the snapshot uri and returns it as a data URL.
-func downloadPreviewImage(ctx context.Context, logger logging.Logger, snapshotURI string) (string, error) {
-	parsedURL, err := url.Parse(snapshotURI)
-	if err != nil {
-		return "", fmt.Errorf("found an invalid snapshot URI: %w", err)
-	}
+// func downloadPreviewImage(ctx context.Context, logger logging.Logger, snapshotURI string) (string, error) {
+// 	parsedURL, err := url.Parse(snapshotURI)
+// 	if err != nil {
+// 		return "", fmt.Errorf("found an invalid snapshot URI: %w", err)
+// 	}
 
-	var username, password string
-	if parsedURL.User != nil {
-		username = parsedURL.User.Username()
-		if pwd, hasPassword := parsedURL.User.Password(); hasPassword {
-			password = pwd
-		}
-		if password == "" {
-			logger.Warnf("found a snapshot URI with no password: %s", snapshotURI)
-		}
-		logger.Debugf("creating snapshot request using credentials: username=%s", username)
-	}
+// 	var username, password string
+// 	if parsedURL.User != nil {
+// 		username = parsedURL.User.Username()
+// 		if pwd, hasPassword := parsedURL.User.Password(); hasPassword {
+// 			password = pwd
+// 		}
+// 		if password == "" {
+// 			logger.Warnf("found a snapshot URI with no password: %s", snapshotURI)
+// 		}
+// 		logger.Debugf("creating snapshot request using credentials: username=%s", username)
+// 	}
 
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
-	}
-	client := &http.Client{
-		// Setting upper bound timeout in case the ctx never times out
-		Timeout: snapshotClientTimeout,
-		Transport: &digest.Transport{
-			Username:  username,
-			Password:  password,
-			Transport: transport,
-		},
-	}
+// 	transport := &http.Transport{
+// 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+// 	}
+// 	client := &http.Client{
+// 		// Setting upper bound timeout in case the ctx never times out
+// 		Timeout: snapshotClientTimeout,
+// 		Transport: &digest.Transport{
+// 			Username:  username,
+// 			Password:  password,
+// 			Transport: transport,
+// 		},
+// 	}
 
-	getReq, err := http.NewRequestWithContext(ctx, http.MethodGet, snapshotURI, nil)
-	if err != nil {
-		return "", fmt.Errorf("failed to create http request: %w", err)
-	}
+// 	getReq, err := http.NewRequestWithContext(ctx, http.MethodGet, snapshotURI, nil)
+// 	if err != nil {
+// 		return "", fmt.Errorf("failed to create http request: %w", err)
+// 	}
 
-	resp, err := client.Do(getReq)
-	if err != nil {
-		return "", fmt.Errorf("failed to execute http request: %w", err)
-	}
-	defer resp.Body.Close()
-	logger.Debugf("snapshot response status: %s", resp.Status)
+// 	resp, err := client.Do(getReq)
+// 	if err != nil {
+// 		return "", fmt.Errorf("failed to execute http request: %w", err)
+// 	}
+// 	defer resp.Body.Close()
+// 	logger.Debugf("snapshot response status: %s", resp.Status)
 
-	if resp.StatusCode != http.StatusOK {
-		statusText := http.StatusText(resp.StatusCode)
-		bodyText := "<could not read response body>"
-		bodyBytes, err := io.ReadAll(resp.Body)
-		if err == nil {
-			bodyText = string(bodyBytes)
-		} else {
-			logger.Warnf("failed to read error response body: %v", err)
-		}
-		return "", fmt.Errorf("failed to get snapshot image, status %d: %s, body: %s", resp.StatusCode, statusText, bodyText)
-	}
+// 	if resp.StatusCode != http.StatusOK {
+// 		statusText := http.StatusText(resp.StatusCode)
+// 		bodyText := "<could not read response body>"
+// 		bodyBytes, err := io.ReadAll(resp.Body)
+// 		if err == nil {
+// 			bodyText = string(bodyBytes)
+// 		} else {
+// 			logger.Warnf("failed to read error response body: %v", err)
+// 		}
+// 		return "", fmt.Errorf("failed to get snapshot image, status %d: %s, body: %s", resp.StatusCode, statusText, bodyText)
+// 	}
 
-	contentType := resp.Header.Get("Content-Type")
-	imageBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read image data from http response: %w", err)
-	}
-	logger.Debugf("retrieved image data: %d bytes and content type: %s", len(imageBytes), contentType)
+// 	contentType := resp.Header.Get("Content-Type")
+// 	imageBytes, err := io.ReadAll(resp.Body)
+// 	if err != nil {
+// 		return "", fmt.Errorf("failed to read image data from http response: %w", err)
+// 	}
+// 	logger.Debugf("retrieved image data: %d bytes and content type: %s", len(imageBytes), contentType)
 
-	dataURL := formatDataURL(contentType, imageBytes)
+// 	dataURL := formatDataURL(contentType, imageBytes)
 
-	return dataURL, nil
-}
+// 	return dataURL, nil
+// }
 
 // fetchImageFromRTSPURL fetches the image from the rtsp URL and returns it as a data URL.
 func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL string) (string, error) {
 	logger.Info("fetching image from RTSP URL", rtspURL)
 
-	// Create a viamrtsp.Config instance
+	// Wrap viamrtsp.Config in a resource.Config
 	rtspConfig := viamrtsp.Config{
 		Address: rtspURL,
 	}
-
-	// Wrap viamrtsp.Config in a resource.Config
 	resourceConfig := resource.Config{
 		Name:                "camera_name", // Replace with the actual camera name
 		API:                 camera.API,
@@ -316,21 +311,16 @@ func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL s
 	if err != nil {
 		return "", fmt.Errorf("failed to create RTSP camera: %w", err)
 	}
-
-	// Add logic to fetch and return the image
-	// Example: image, err := camera.Image(ctx)
-
-	retryInterval := 100 * time.Millisecond
-	timeout := 5 * time.Second
-
-	ticker := time.NewTicker(retryInterval)
-	defer ticker.Stop()
 	defer func() {
 		if closeErr := camera.Close(ctx); closeErr != nil {
 			logger.Errorf("failed to close camera: %v", closeErr)
 		}
 	}()
 
+	retryInterval := rtspImageInterval
+	timeout := rtspPollTimeout
+	ticker := time.NewTicker(retryInterval)
+	defer ticker.Stop()
 	timeoutChan := time.After(timeout)
 	for {
 		select {
@@ -339,31 +329,16 @@ func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL s
 			img, metadata, err := camera.Image(ctx, "image/jpeg", nil)
 			if err == nil {
 				logger.Infof("Received image with metadata: %v", metadata)
-				// Convert the image to a data URL
 				dataURL := formatDataURL("image/jpeg", img)
 				logger.Infof("Formatted image data URL: %s", dataURL)
-				// Return the data URL
 				return dataURL, nil
 			}
 			logger.Errorf("Failed to get image from RTSP camera: %v", err)
-			// Check if the error is a timeout error
 		case <-timeoutChan:
 			logger.Errorf("Timeout while trying to get image from RTSP camera")
-			return "", fmt.Errorf("timeout while trying to get image from RTSP camera")
+			return "", fmt.Errorf("timeout while trying to get image from RTSP camera %s", rtspURL)
 		}
 	}
-
-	// img, metadata, err := camera.Image(ctx, "image/jpeg", nil)
-	// if err != nil {
-	// 	return "", fmt.Errorf("failed to get image from RTSP camera: %w", err)
-	// }
-	// logger.Infof("Received image with metadata: %v", metadata)
-
-	// // Convert the image to a data URL
-	// dataURL := formatDataURL("image/jpeg", img)
-	// logger.Infof("Formatted image data URL: %s", dataURL)
-	// // Return the data URL
-	// return dataURL, nil
 }
 
 func createCamerasFromURLs(l CameraInfo, discoveryDependencyName string, logger logging.Logger) ([]resource.Config, error) {
