@@ -164,7 +164,7 @@ type cache struct {
 }
 
 // rtspCamera contains the rtsp client, and the reader function that fulfills the camera interface.
-type RtspCamera struct {
+type rtspCamera struct {
 	resource.AlwaysRebuild
 	model resource.Model
 	gostream.VideoReader
@@ -214,7 +214,7 @@ type RtspCamera struct {
 }
 
 // Close closes the camera. It always returns nil, but because of Close() interface, it needs to return an error.
-func (rc *RtspCamera) Close(_ context.Context) error {
+func (rc *rtspCamera) Close(_ context.Context) error {
 	if err := registry.Global.Remove(rc.Name().String()); err != nil {
 		rc.logger.Errorf("error removing camera from global registry: %s", err.Error())
 	}
@@ -242,7 +242,7 @@ func (rc *RtspCamera) Close(_ context.Context) error {
 
 // clientReconnectBackgroundWorker checks every reconnectIntervalSeconds to see if the client is connected to the server,
 // and reconnects if not.
-func (rc *RtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
+func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 	rc.activeBackgroundWorkers.Add(1)
 	utils.ManagedGo(func() {
 		for utils.SelectContextOrWait(rc.cancelCtx, reconnectIntervalSeconds*time.Second) {
@@ -277,7 +277,7 @@ func (rc *RtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 	}, rc.activeBackgroundWorkers.Done)
 }
 
-func (rc *RtspCamera) closeConnection() {
+func (rc *rtspCamera) closeConnection() {
 	if rc.client != nil {
 		rc.client.Close()
 		rc.client = nil
@@ -294,7 +294,7 @@ func (rc *RtspCamera) closeConnection() {
 // reconnectClientWithFallbackTransports attempts to setup the RTSP client with the given codec
 // using the transports in the order of TCP, UDP, and UDP Multicast. This overrides gortsplib's
 // default behavior of trying UDP first.
-func (rc *RtspCamera) reconnectClientWithFallbackTransports(codecInfo videoCodec) error {
+func (rc *rtspCamera) reconnectClientWithFallbackTransports(codecInfo videoCodec) error {
 	// Define the transport preferences in order.
 	transportTCP := gortsplib.TransportTCP
 	transportUDP := gortsplib.TransportUDP
@@ -320,7 +320,7 @@ func (rc *RtspCamera) reconnectClientWithFallbackTransports(codecInfo videoCodec
 }
 
 // reconnectClient reconnects the RTSP client to the streaming server by closing the old one and starting a new one.
-func (rc *RtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib.Transport) error {
+func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib.Transport) error {
 	rc.logger.Warnf("reconnectClient called with codec: %s and transport: %s", codecInfo, transport.String())
 
 	rc.closeConnection()
@@ -420,7 +420,7 @@ func (rc *RtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib
 	return nil
 }
 
-func (rc *RtspCamera) consumeLazyAU() {
+func (rc *rtspCamera) consumeLazyAU() {
 	rc.auMu.Lock()
 	defer rc.auMu.Unlock()
 	if len(rc.au) > 0 {
@@ -447,20 +447,20 @@ func (rc *RtspCamera) consumeLazyAU() {
 	}
 }
 
-func (rc *RtspCamera) resetLazyAU(au [][]byte) {
+func (rc *rtspCamera) resetLazyAU(au [][]byte) {
 	rc.auMu.Lock()
 	defer rc.auMu.Unlock()
 	rc.au = au
 }
 
-func (rc *RtspCamera) appendLazyAU(au [][]byte) {
+func (rc *rtspCamera) appendLazyAU(au [][]byte) {
 	rc.auMu.Lock()
 	defer rc.auMu.Unlock()
 	rc.au = append(rc.au, au...)
 }
 
 // initH264 initializes the H264 decoder and sets up the client to receive H264 packets.
-func (rc *RtspCamera) initH264(session *description.Session) (err error) {
+func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 	// setup RTP/H264 -> H264 decoder
 	var f *format.H264
 	media := session.FindFormat(&f)
@@ -591,7 +591,7 @@ var codecToCodecType = map[videoCodec]videostore.CodecType{
 	H265: videostore.CodecTypeH264,
 }
 
-func (rc *RtspCamera) RequestVideo(mux registry.Mux, codecCandiates []videostore.CodecType) (context.Context, error) {
+func (rc *rtspCamera) RequestVideo(mux registry.Mux, codecCandiates []videostore.CodecType) (context.Context, error) {
 	currentCodec := codecToCodecType[videoCodec(rc.currentCodec.Load())]
 	if !slices.Contains(codecCandiates, currentCodec) {
 		return nil, registry.ErrUnsupported
@@ -599,12 +599,12 @@ func (rc *RtspCamera) RequestVideo(mux registry.Mux, codecCandiates []videostore
 	return rc.videoRequest.newRequest(mux)
 }
 
-func (rc *RtspCamera) CancelRequest(mux registry.Mux) error {
+func (rc *rtspCamera) CancelRequest(mux registry.Mux) error {
 	return rc.videoRequest.cancelRequest(mux)
 }
 
 // initH265 initializes the H265 decoder and sets up the client to receive H265 packets.
-func (rc *RtspCamera) initH265(session *description.Session) (err error) {
+func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 	if rc.rtpPassthrough {
 		rc.logger.Warn("rtp_passthrough is only supported for H264 codec. rtp_passthrough features disabled due to H265 RTSP track")
 	}
@@ -724,7 +724,7 @@ func packH265AUIntoNALU(au [][]byte, logger logging.Logger) []byte {
 	return packedNALU
 }
 
-func (rc *RtspCamera) storeH265Frame(nalu []byte) {
+func (rc *rtspCamera) storeH265Frame(nalu []byte) {
 	if len(nalu) == 0 {
 		rc.logger.Warn("no NALUs found in H265 AU, skipping packet")
 		return
@@ -742,7 +742,7 @@ func (rc *RtspCamera) storeH265Frame(nalu []byte) {
 }
 
 // initMJPEG initializes the MJPEG decoder and sets up the client to receive JPEG frames.
-func (rc *RtspCamera) initMJPEG(session *description.Session) error {
+func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 	if rc.rtpPassthrough {
 		rc.logger.Warn("rtp_passthrough is only supported for H264 codec. rtp_passthrough features disabled due to MJPEG RTSP track")
 	}
@@ -839,7 +839,7 @@ func getMPEG4FromGeneric(session *description.Session) (*format.MPEG4Video, *des
 }
 
 // initMPEG4 initializes the MPEG4 decoder and sets up the client to receive MPEG4 packets.
-func (rc *RtspCamera) initMPEG4(session *description.Session) error {
+func (rc *rtspCamera) initMPEG4(session *description.Session) error {
 	if rc.rtpPassthrough {
 		rc.logger.Warn("rtp_passthrough is only supported for H264 codec. rtp_passthrough features disabled due to MPEG4 RTSP track")
 	}
@@ -923,7 +923,7 @@ func (rc *RtspCamera) initMPEG4(session *description.Session) error {
 // SubscribeRTP registers the PacketCallback which will be called when there are new packets.
 // NOTE: Packets may be dropped before calling packetsCB if the rate new packets are received by
 // the rtppassthrough.Source is greater than the rate the subscriber consumes them.
-func (rc *RtspCamera) SubscribeRTP(
+func (rc *rtspCamera) SubscribeRTP(
 	_ context.Context,
 	bufferSize int,
 	packetsCB rtppassthrough.PacketCallback,
@@ -1031,7 +1031,7 @@ func (rc *RtspCamera) SubscribeRTP(
 }
 
 // Unsubscribe deregisters the Subscription's callback.
-func (rc *RtspCamera) Unsubscribe(_ context.Context, id rtppassthrough.SubscriptionID) error {
+func (rc *rtspCamera) Unsubscribe(_ context.Context, id rtppassthrough.SubscriptionID) error {
 	rc.subsMu.Lock()
 	defer rc.subsMu.Unlock()
 	bufAndCB, ok := rc.bufAndCBByID[id]
@@ -1083,7 +1083,7 @@ func NewRTSPCamera(ctx context.Context, deps resource.Dependencies, conf resourc
 
 	rtpPassthroughCtx, rtpPassthroughCancelCauseFn := context.WithCancelCause(context.Background())
 	cancelCtx, cancel := context.WithCancel(context.Background())
-	rc := &RtspCamera{
+	rc := &rtspCamera{
 		model:                       conf.Model,
 		lazyDecode:                  newConf.LazyDecode,
 		iframeOnlyDecode:            newConf.IframeOnlyDecode,
@@ -1128,7 +1128,7 @@ func NewRTSPCamera(ctx context.Context, deps resource.Dependencies, conf resourc
 	return rc, nil
 }
 
-func (rc *RtspCamera) unsubscribeAll() {
+func (rc *rtspCamera) unsubscribeAll() {
 	rc.subsMu.Lock()
 	defer rc.subsMu.Unlock()
 	for id, bufAndCB := range rc.bufAndCBByID {
@@ -1137,7 +1137,7 @@ func (rc *RtspCamera) unsubscribeAll() {
 	}
 }
 
-func (rc *RtspCamera) validateSupportsPassthrough() error {
+func (rc *rtspCamera) validateSupportsPassthrough() error {
 	if !rc.rtpPassthrough {
 		return errors.New("rtp_passthrough not enabled in config")
 	}
@@ -1177,7 +1177,7 @@ func modelToCodec(model resource.Model) (videoCodec, error) {
 
 // getAvailableCodec determines the first supported codec from a session's SDP data
 // returning Unknown if none are found.
-func (rc *RtspCamera) getAvailableCodec(session *description.Session) videoCodec {
+func (rc *rtspCamera) getAvailableCodec(session *description.Session) videoCodec {
 	var h264 *format.H264
 	var h265 *format.H265
 	var mjpeg *format.MJPEG
@@ -1215,7 +1215,7 @@ func (rc *RtspCamera) getAvailableCodec(session *description.Session) videoCodec
 	return Unknown
 }
 
-func (rc *RtspCamera) storeH264Frame(au [][]byte) {
+func (rc *rtspCamera) storeH264Frame(au [][]byte) {
 	naluIndex := 0
 	for naluIndex < len(au) {
 		nalu := au[naluIndex]
@@ -1266,7 +1266,7 @@ func H2645StartCode() []byte {
 	return []uint8{0x00, 0x00, 0x00, 0x01}
 }
 
-func (rc *RtspCamera) decodeAndStore(nalu []byte) error {
+func (rc *rtspCamera) decodeAndStore(nalu []byte) error {
 	frame, err := rc.rawDecoder.decode(nalu)
 	recoverableErr := &recoverableError{}
 	if errors.As(err, &recoverableErr) {
@@ -1284,7 +1284,7 @@ func (rc *RtspCamera) decodeAndStore(nalu []byte) error {
 // handleLatestFrame sets the new latest frame, and cleans up
 // the previous frame by trying to put it back in the pool. It might not make
 // it back into the pool immediately or at all depending on its state.
-func (rc *RtspCamera) handleLatestFrame(newFrame *avFrameWrapper) {
+func (rc *rtspCamera) handleLatestFrame(newFrame *avFrameWrapper) {
 	rc.latestFrameMu.Lock()
 	defer rc.latestFrameMu.Unlock()
 
@@ -1309,7 +1309,7 @@ func isCompactableH264(nalu []byte) bool {
 }
 
 // Image returns the latest frame as JPEG bytes.
-func (rc *RtspCamera) Image(_ context.Context, mimeType string, _ map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
+func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
 	rc.closeMu.RLock()
 	defer rc.closeMu.RUnlock()
 	start := time.Now()
@@ -1332,7 +1332,7 @@ func (rc *RtspCamera) Image(_ context.Context, mimeType string, _ map[string]int
 	return rc.getAndConvertFrame(mimeType)
 }
 
-func (rc *RtspCamera) getAndConvertFrame(mimeType string) ([]byte, camera.ImageMetadata, error) {
+func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, camera.ImageMetadata, error) {
 	rc.consumeLazyAU()
 	rc.latestFrameMu.Lock()
 	defer rc.latestFrameMu.Unlock()
@@ -1376,18 +1376,18 @@ func (rc *RtspCamera) getAndConvertFrame(mimeType string) ([]byte, camera.ImageM
 	return bytes, metadata, err
 }
 
-func (rc *RtspCamera) Properties(_ context.Context) (camera.Properties, error) {
+func (rc *rtspCamera) Properties(_ context.Context) (camera.Properties, error) {
 	return camera.Properties{
 		SupportsPCD: false,
 		MimeTypes:   []string{rutils.MimeTypeJPEG},
 	}, nil
 }
 
-func (rc *RtspCamera) Name() resource.Name {
+func (rc *rtspCamera) Name() resource.Name {
 	return rc.name
 }
 
-func (rc *RtspCamera) Images(_ context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
+func (rc *rtspCamera) Images(_ context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
 	rc.latestFrameMu.Lock()
 	defer rc.latestFrameMu.Unlock()
 	if rc.latestFrame == nil {
@@ -1398,10 +1398,10 @@ func (rc *RtspCamera) Images(_ context.Context) ([]camera.NamedImage, resource.R
 	}, resource.ResponseMetadata{CapturedAt: time.Now()}, nil
 }
 
-func (rc *RtspCamera) NextPointCloud(_ context.Context) (pointcloud.PointCloud, error) {
+func (rc *rtspCamera) NextPointCloud(_ context.Context) (pointcloud.PointCloud, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (rc *RtspCamera) DoCommand(_ context.Context, _ map[string]interface{}) (map[string]interface{}, error) {
+func (rc *rtspCamera) DoCommand(_ context.Context, _ map[string]interface{}) (map[string]interface{}, error) {
 	return nil, errors.New("not implemented")
 }
