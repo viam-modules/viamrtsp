@@ -186,7 +186,7 @@ func (dis *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inte
 		dis.rtspToSnapshotURIsMu.Unlock()
 
 		if found {
-			dis.logger.Infof("attempting to fetch image from snapshot URI: %s", snapshotURI)
+			dis.logger.Debugf("attempting to fetch image from snapshot URI: %s", snapshotURI)
 			dataURL, err := downloadPreviewImage(ctx, dis.logger, snapshotURI)
 			if err == nil {
 				dis.logger.Debugf("Successfully fetched image from snapshot URI: %s", snapshotURI)
@@ -210,7 +210,7 @@ func (dis *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inte
 				"preview": dataURL,
 			}, nil
 		}
-		dis.logger.Errorf("failed to fetch image via RTSP for URL: %s, error: %v", previewReq.rtspURL, err)
+		dis.logger.Warnf("failed to fetch image via RTSP for URL: %s, error: %v", previewReq.rtspURL, err)
 		rtspErr = fmt.Errorf("RTSP error: %w", err)
 
 		return nil, fmt.Errorf("both snapshot and RTSP fetch failed: %w; %w", snapshotErr, rtspErr)
@@ -326,7 +326,6 @@ func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL s
 		ConvertedAttributes: &rtspConfig,
 	}
 
-	// Pass the wrapped resource.Config to NewRTSPCamera
 	camera, err := viamrtsp.NewRTSPCamera(ctx, nil, resourceConfig, logger)
 	if err != nil {
 		return "", fmt.Errorf("failed to create RTSP camera: %w", err)
