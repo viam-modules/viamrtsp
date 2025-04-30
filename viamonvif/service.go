@@ -293,7 +293,7 @@ func formatDataURL(contentType string, imageBytes []byte) string {
 
 // fetchImageFromRTSPURL fetches the image from the rtsp URL and returns it as a data URL.
 func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL string) (string, error) {
-	logger.Info("fetching image from RTSP URL", rtspURL)
+	logger.Debug("attempting to fetch image from RTSP URL", rtspURL)
 
 	// Wrap viamrtsp.Config in a resource.Config
 	rtspConfig := viamrtsp.Config{
@@ -313,7 +313,7 @@ func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL s
 	}
 	defer func() {
 		if closeErr := camera.Close(ctx); closeErr != nil {
-			logger.Errorf("failed to close camera: %v", closeErr)
+			logger.Warnf("failed to close camera: %v", closeErr)
 		}
 	}()
 
@@ -322,21 +322,20 @@ func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL s
 	ticker := time.NewTicker(retryInterval)
 	defer ticker.Stop()
 	timeoutChan := time.After(timeout)
+
 	for {
 		select {
 		case <-ticker.C:
-			// Attempt to get the image
+			// Attempt to get an image from the RTSP camera
 			img, metadata, err := camera.Image(ctx, "image/jpeg", nil)
 			if err == nil {
 				logger.Infof("Received image with metadata: %v", metadata)
-				dataURL := formatDataURL("image/jpeg", img)
-				logger.Infof("Formatted image data URL: %s", dataURL)
+				dataURL := formatDataURL(metadata.MimeType, img)
 				return dataURL, nil
 			}
-			logger.Errorf("Failed to get image from RTSP camera: %v", err)
+			logger.Debugf("Failed to get image from RTSP camera: %v", err)
 		case <-timeoutChan:
-			logger.Errorf("Timeout while trying to get image from RTSP camera")
-			return "", fmt.Errorf("timeout while trying to get image from RTSP camera %s", rtspURL)
+			return "", errors.New("timeout while trying to get image from RTSP camera")
 		}
 	}
 }
