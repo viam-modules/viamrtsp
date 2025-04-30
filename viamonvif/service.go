@@ -3,16 +3,21 @@ package viamonvif
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/icholy/digest"
 	"github.com/viam-modules/viamrtsp"
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"go.viam.com/rdk/components/camera"
@@ -172,28 +177,37 @@ func (dis *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inte
 		if err != nil {
 			return nil, err
 		}
+
+		// Attempt to fetch the image from the snapshot URI
+		dis.rtspToSnapshotURIsMu.Lock()
+		snapshotURI, found := dis.rtspToSnapshotURIs[previewReq.rtspURL]
+		dis.rtspToSnapshotURIsMu.Unlock()
+
+		if found {
+			dis.logger.Infof("attempting to fetch image from snapshot URI: %s", snapshotURI)
+			dataURL, err := downloadPreviewImage(ctx, dis.logger, snapshotURI)
+			if err == nil {
+				dis.logger.Debugf("Successfully fetched image from snapshot URI: %s", snapshotURI)
+				return map[string]interface{}{
+					"preview": dataURL,
+				}, nil
+			}
+			dis.logger.Warnf("failed to fetch image from snapshot URI: %s, error: %v", snapshotURI, err)
+		} else {
+			dis.logger.Warnf("snapshot URI not found for RTSP URL: %s", previewReq.rtspURL)
+		}
+
+		// Fallback to fetching the image via RTSP
+		dis.logger.Debugf("attempting to fetch image via RTSP for URL: %s", previewReq.rtspURL)
 		dataURL, err := fetchImageFromRTSPURL(ctx, dis.logger, previewReq.rtspURL)
 		if err != nil {
+			dis.logger.Errorf("failed to fetch image via RTSP for URL: %s, error: %v", previewReq.rtspURL, err)
 			return nil, fmt.Errorf("failed to fetch image from RTSP URL: %w", err)
 		}
+		dis.logger.Debugf("successfully fetched image via RTSP for URL: %s", previewReq.rtspURL)
 		return map[string]interface{}{
 			"preview": dataURL,
 		}, nil
-		// dis.rtspToSnapshotURIsMu.Lock()
-		// snapshotURI, found := dis.rtspToSnapshotURIs[previewReq.rtspURL]
-		// dis.rtspToSnapshotURIsMu.Unlock()
-		// if !found {
-		// 	return nil, fmt.Errorf("snapshot URI not found for %s", previewReq.rtspURL)
-		// }
-		// dis.logger.Infof("snapshot URI: %s", snapshotURI)
-
-		// dataURL, err := downloadPreviewImage(ctx, dis.logger, snapshotURI)
-		// if err != nil {
-		// return nil, fmt.Errorf("failed to download preview image: %w", err)
-		// }
-		// return map[string]interface{}{
-		// 	"preview": dataURL,
-		// }, nil
 
 	default:
 		return nil, fmt.Errorf("unknown command: %s", cmd)
@@ -224,72 +238,72 @@ func formatDataURL(contentType string, imageBytes []byte) string {
 }
 
 // downloadPreviewImage downloads the preview image from the snapshot uri and returns it as a data URL.
-// func downloadPreviewImage(ctx context.Context, logger logging.Logger, snapshotURI string) (string, error) {
-// 	parsedURL, err := url.Parse(snapshotURI)
-// 	if err != nil {
-// 		return "", fmt.Errorf("found an invalid snapshot URI: %w", err)
-// 	}
+func downloadPreviewImage(ctx context.Context, logger logging.Logger, snapshotURI string) (string, error) {
+	parsedURL, err := url.Parse(snapshotURI)
+	if err != nil {
+		return "", fmt.Errorf("found an invalid snapshot URI: %w", err)
+	}
 
-// 	var username, password string
-// 	if parsedURL.User != nil {
-// 		username = parsedURL.User.Username()
-// 		if pwd, hasPassword := parsedURL.User.Password(); hasPassword {
-// 			password = pwd
-// 		}
-// 		if password == "" {
-// 			logger.Warnf("found a snapshot URI with no password: %s", snapshotURI)
-// 		}
-// 		logger.Debugf("creating snapshot request using credentials: username=%s", username)
-// 	}
+	var username, password string
+	if parsedURL.User != nil {
+		username = parsedURL.User.Username()
+		if pwd, hasPassword := parsedURL.User.Password(); hasPassword {
+			password = pwd
+		}
+		if password == "" {
+			logger.Warnf("found a snapshot URI with no password: %s", snapshotURI)
+		}
+		logger.Debugf("creating snapshot request using credentials: username=%s", username)
+	}
 
-// 	transport := &http.Transport{
-// 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
-// 	}
-// 	client := &http.Client{
-// 		// Setting upper bound timeout in case the ctx never times out
-// 		Timeout: snapshotClientTimeout,
-// 		Transport: &digest.Transport{
-// 			Username:  username,
-// 			Password:  password,
-// 			Transport: transport,
-// 		},
-// 	}
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+	}
+	client := &http.Client{
+		// Setting upper bound timeout in case the ctx never times out
+		Timeout: snapshotClientTimeout,
+		Transport: &digest.Transport{
+			Username:  username,
+			Password:  password,
+			Transport: transport,
+		},
+	}
 
-// 	getReq, err := http.NewRequestWithContext(ctx, http.MethodGet, snapshotURI, nil)
-// 	if err != nil {
-// 		return "", fmt.Errorf("failed to create http request: %w", err)
-// 	}
+	getReq, err := http.NewRequestWithContext(ctx, http.MethodGet, snapshotURI, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create http request: %w", err)
+	}
 
-// 	resp, err := client.Do(getReq)
-// 	if err != nil {
-// 		return "", fmt.Errorf("failed to execute http request: %w", err)
-// 	}
-// 	defer resp.Body.Close()
-// 	logger.Debugf("snapshot response status: %s", resp.Status)
+	resp, err := client.Do(getReq)
+	if err != nil {
+		return "", fmt.Errorf("failed to execute http request: %w", err)
+	}
+	defer resp.Body.Close()
+	logger.Debugf("snapshot response status: %s", resp.Status)
 
-// 	if resp.StatusCode != http.StatusOK {
-// 		statusText := http.StatusText(resp.StatusCode)
-// 		bodyText := "<could not read response body>"
-// 		bodyBytes, err := io.ReadAll(resp.Body)
-// 		if err == nil {
-// 			bodyText = string(bodyBytes)
-// 		} else {
-// 			logger.Warnf("failed to read error response body: %v", err)
-// 		}
-// 		return "", fmt.Errorf("failed to get snapshot image, status %d: %s, body: %s", resp.StatusCode, statusText, bodyText)
-// 	}
+	if resp.StatusCode != http.StatusOK {
+		statusText := http.StatusText(resp.StatusCode)
+		bodyText := "<could not read response body>"
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err == nil {
+			bodyText = string(bodyBytes)
+		} else {
+			logger.Warnf("failed to read error response body: %v", err)
+		}
+		return "", fmt.Errorf("failed to get snapshot image, status %d: %s, body: %s", resp.StatusCode, statusText, bodyText)
+	}
 
-// 	contentType := resp.Header.Get("Content-Type")
-// 	imageBytes, err := io.ReadAll(resp.Body)
-// 	if err != nil {
-// 		return "", fmt.Errorf("failed to read image data from http response: %w", err)
-// 	}
-// 	logger.Debugf("retrieved image data: %d bytes and content type: %s", len(imageBytes), contentType)
+	contentType := resp.Header.Get("Content-Type")
+	imageBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read image data from http response: %w", err)
+	}
+	logger.Debugf("retrieved image data: %d bytes and content type: %s", len(imageBytes), contentType)
 
-// 	dataURL := formatDataURL(contentType, imageBytes)
+	dataURL := formatDataURL(contentType, imageBytes)
 
-// 	return dataURL, nil
-// }
+	return dataURL, nil
+}
 
 // fetchImageFromRTSPURL fetches the image from the rtsp URL and returns it as a data URL.
 func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL string) (string, error) {
