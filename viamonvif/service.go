@@ -342,7 +342,7 @@ func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL s
 	ticker := time.NewTicker(retryInterval)
 	defer ticker.Stop()
 	timeoutChan := time.After(timeout)
-
+	var imageErr error
 	for {
 		select {
 		case <-ticker.C:
@@ -353,9 +353,10 @@ func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL s
 				dataURL := formatDataURL(metadata.MimeType, img)
 				return dataURL, nil
 			}
-			logger.Debugf("Failed to get image from RTSP camera: %v", err)
+			imageErr = err
+			logger.Debugf("Failed to get image from RTSP camera: %v", imageErr)
 		case <-timeoutChan:
-			return "", errors.New("timeout while trying to get image from RTSP camera")
+			return "", fmt.Errorf("timeout while trying to get image from RTSP camera: %w", imageErr)
 		}
 	}
 }
