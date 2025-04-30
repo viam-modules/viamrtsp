@@ -37,6 +37,7 @@ const (
 	snapshotClientTimeout = 5 * time.Second
 	rtspPollTimeout       = 5 * time.Second
 	rtspImageInterval     = 100 * time.Millisecond
+	imageReqMimeType      = "image/jpeg"
 )
 
 func init() {
@@ -346,7 +347,7 @@ func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL s
 		select {
 		case <-ticker.C:
 			// Attempt to get an image from the RTSP camera
-			img, metadata, err := camera.Image(ctx, "image/jpeg", nil)
+			img, metadata, err := camera.Image(ctx, imageReqMimeType, nil)
 			if err == nil {
 				logger.Infof("Received image with metadata: %v", metadata)
 				dataURL := formatDataURL(metadata.MimeType, img)
