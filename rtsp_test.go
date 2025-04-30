@@ -39,11 +39,11 @@ func TestRTSPCamera(t *testing.T) {
 		}
 		t.Run("init", func(t *testing.T) {
 			h, closeFunc := NewH264ServerHandler(t, forma, bURL, logger)
-			test.That(t, h.s.Start(), test.ShouldBeNil)
+			test.That(t, h.S.Start(), test.ShouldBeNil)
 			timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
 			defer timeoutCancel()
 			config := resource.NewEmptyConfig(camera.Named("foo"), ModelAgnostic)
-			config.ConvertedAttributes = &Config{Address: "rtsp://" + h.s.RTSPAddress + "/stream1"}
+			config.ConvertedAttributes = &Config{Address: "rtsp://" + h.S.RTSPAddress + "/stream1"}
 			rtspCam, err := NewRTSPCamera(timeoutCtx, nil, config, logger)
 			test.That(t, err, test.ShouldBeNil)
 			defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
@@ -54,11 +54,11 @@ func TestRTSPCamera(t *testing.T) {
 		t.Run("GetImage", func(t *testing.T) {
 			h, closeFunc := NewH264ServerHandler(t, forma, bURL, logger)
 			defer closeFunc()
-			test.That(t, h.s.Start(), test.ShouldBeNil)
+			test.That(t, h.S.Start(), test.ShouldBeNil)
 			timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
 			defer timeoutCancel()
 			config := resource.NewEmptyConfig(camera.Named("foo"), ModelAgnostic)
-			config.ConvertedAttributes = &Config{Address: "rtsp://" + h.s.RTSPAddress + "/stream1"}
+			config.ConvertedAttributes = &Config{Address: "rtsp://" + h.S.RTSPAddress + "/stream1"}
 			rtspCam, err := NewRTSPCamera(timeoutCtx, nil, config, logger)
 			test.That(t, err, test.ShouldBeNil)
 			defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
@@ -82,11 +82,11 @@ func TestRTSPCamera(t *testing.T) {
 		t.Run("AvFramePool", func(t *testing.T) {
 			h, closeFunc := NewH264ServerHandler(t, forma, bURL, logger)
 			defer closeFunc()
-			test.That(t, h.s.Start(), test.ShouldBeNil)
+			test.That(t, h.S.Start(), test.ShouldBeNil)
 			timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
 			defer timeoutCancel()
 			config := resource.NewEmptyConfig(camera.Named("foo"), ModelAgnostic)
-			config.ConvertedAttributes = &Config{Address: "rtsp://" + h.s.RTSPAddress + "/stream1"}
+			config.ConvertedAttributes = &Config{Address: "rtsp://" + h.S.RTSPAddress + "/stream1"}
 			rtspCam, err := NewRTSPCamera(timeoutCtx, nil, config, logger)
 			test.That(t, err, test.ShouldBeNil)
 			imageTimeoutCtx, imageTimeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
@@ -130,14 +130,14 @@ func TestRTSPCamera(t *testing.T) {
 						// Server and camera setup
 						h, closeFunc := NewH264ServerHandler(t, forma, bURL, logger)
 						defer closeFunc()
-						test.That(t, h.s.Start(), test.ShouldBeNil)
+						test.That(t, h.S.Start(), test.ShouldBeNil)
 
 						timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), 10*time.Second)
 						defer timeoutCancel()
 
 						config := resource.NewEmptyConfig(camera.Named("foo"), ModelAgnostic)
 						config.ConvertedAttributes = &Config{
-							Address:        "rtsp://" + h.s.RTSPAddress + "/stream1",
+							Address:        "rtsp://" + h.S.RTSPAddress + "/stream1",
 							RTPPassthrough: tc.rtpPassthrough,
 						}
 
@@ -223,12 +223,12 @@ func TestRTSPCameraPerformance(t *testing.T) {
 
 		h, closeFunc := NewH264ServerHandler(t, forma, bURL, logger)
 		defer closeFunc()
-		test.That(t, h.s.Start(), test.ShouldBeNil)
+		test.That(t, h.S.Start(), test.ShouldBeNil)
 
 		timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
 		defer timeoutCancel()
 		config := resource.NewEmptyConfig(camera.Named("foo"), ModelAgnostic)
-		config.ConvertedAttributes = &Config{Address: "rtsp://" + h.s.RTSPAddress + "/stream1"}
+		config.ConvertedAttributes = &Config{Address: "rtsp://" + h.S.RTSPAddress + "/stream1"}
 		rtspCam, err := NewRTSPCamera(timeoutCtx, nil, config, logger)
 		test.That(t, err, test.ShouldBeNil)
 		defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()

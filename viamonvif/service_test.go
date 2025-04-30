@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/bluenviron/gortsplib/v4/pkg/base"
+	"github.com/bluenviron/gortsplib/v4/pkg/format"
 	"github.com/viam-modules/viamrtsp"
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"go.viam.com/rdk/logging"
@@ -212,6 +214,47 @@ func TestDoCommandPreview(t *testing.T) {
 		test.That(t, err, test.ShouldNotBeNil)
 		test.That(t, err.Error(), test.ShouldContainSubstring, "500: Internal Server Error")
 		test.That(t, result, test.ShouldBeNil)
+	})
+
+	t.Run("Test rtsp lookup image with broken snapshot URI", func(t *testing.T) {
+		logger := logging.NewTestLogger(t)
+
+		bURL, err := base.ParseURL("rtsp://127.0.0.1:32512")
+		test.That(t, err, test.ShouldBeNil)
+		forma := &format.H264{
+			PayloadTyp:        96,
+			PacketizationMode: 1,
+			SPS: []uint8{
+				0x67, 0x64, 0x00, 0x15, 0xac, 0xb2, 0x03, 0xc1,
+				0x1f, 0xd6, 0x02, 0xdc, 0x08, 0x08, 0x16, 0x94,
+				0x00, 0x00, 0x03, 0x00, 0x04, 0x00, 0x00, 0x03,
+				0x00, 0xf0, 0x3c, 0x58, 0xb9, 0x20,
+			},
+			PPS: []uint8{0x68, 0xeb, 0xc3, 0xcb, 0x22, 0xc0},
+		}
+		h, closeFunc := viamrtsp.NewH264ServerHandler(t, forma, bURL, logger)
+
+		// Start rtsp feed for rtsp://camera1/streamj
+		test.That(t, h.S.Start(), test.ShouldBeNil)
+
+		rtspAddr := "rtsp://" + h.S.RTSPAddress + "/stream1"
+		dis := &rtspDiscovery{
+			rtspToSnapshotURIs: map[string]string{
+				rtspAddr: "http://invalid/snapshot",
+			},
+			logger: logger,
+		}
+
+		command := map[string]interface{}{
+			"command": "preview",
+			"attributes": map[string]interface{}{
+				"rtsp_address": rtspAddr,
+			},
+		}
+		_, err = dis.DoCommand(ctx, command)
+		test.That(t, err, test.ShouldBeNil)
+		// test.That(t, len(result["preview"].(string)), test.ShouldBeGreaterThan, 0)
+		closeFunc()
 	})
 }
 

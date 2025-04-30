@@ -49,7 +49,7 @@ func NewH264ServerHandler(
 				Title:   "123456",
 				Medias:  []*description.Media{sh.media},
 			}
-			sh.stream = gortsplib.NewServerStream(sh.s, d)
+			sh.stream = gortsplib.NewServerStream(sh.S, d)
 			logger.Debug("sh.stream.Description().Medias[0].Formats[0]: %#v ", sh.stream.Description().Medias[0].Formats[0])
 			return &base.Response{StatusCode: base.StatusOK}, sh.stream, nil
 		},
@@ -128,21 +128,21 @@ func NewH264ServerHandler(
 		},
 	}
 
-	h.s = &gortsplib.Server{
+	h.S = &gortsplib.Server{
 		Handler:     h,
 		RTSPAddress: "127.0.0.1:32512",
 	}
 	return h, func() {
 		stopFunc()
-		h.s.Close()
-		test.That(t, h.s.Wait(), test.ShouldBeError, errors.New("terminated"))
+		h.S.Close()
+		test.That(t, h.S.Wait(), test.ShouldBeError, errors.New("terminated"))
 		h.wg.Wait()
 	}
 }
 
 // ServerHandler is a handler for a fake RTSP server.
 type ServerHandler struct {
-	s                  *gortsplib.Server
+	S                  *gortsplib.Server
 	wg                 sync.WaitGroup
 	media              *description.Media
 	OnConnOpenFunc     func(*gortsplib.ServerHandlerOnConnOpenCtx, *ServerHandler)
