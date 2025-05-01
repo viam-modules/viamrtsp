@@ -68,6 +68,13 @@ func main() {
 	// Duration after which we consider the key "released"
 	releaseDelay := 100 * time.Millisecond
 
+	fmt.Println("Keyboard Controls:")
+	fmt.Println("W/w: Tilt up")
+	fmt.Println("S/s: Tilt down")
+	fmt.Println("A/a: Pan left")
+	fmt.Println("D/d: Pan right")
+	fmt.Println("Esc or Ctrl+C: Exit")
+
 	keyboard.Listen(func(key keys.Key) (stop bool, err error) {
 		mu.Lock()
 		defer mu.Unlock()
