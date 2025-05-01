@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/components/generic"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/robot/client"
@@ -40,19 +39,6 @@ func main() {
 	logger.Info("Resources:")
 	logger.Info(machine.ResourceNames())
 
-	// rtsp-cam-1
-	rtspCam1, err := camera.FromRobot(machine, "rtsp-cam-1")
-	if err != nil {
-		logger.Error(err)
-		return
-	}
-	rtspCam1ReturnValue, err := rtspCam1.Properties(context.Background())
-	if err != nil {
-		logger.Error(err)
-		return
-	}
-	logger.Infof("rtsp-cam-1 Properties return value: %+v", rtspCam1ReturnValue)
-
 	ptz, err := generic.FromRobot(machine, "ptz-1")
 	if err != nil {
 		logger.Error(err)
@@ -60,7 +46,6 @@ func main() {
 	}
 
 	// Stop any ongoing pan/tilt/zoom commands
-	time.Sleep(1 * time.Second)
 	ptzReturnValue, err := ptz.DoCommand(
 		context.Background(),
 		map[string]interface{}{
@@ -73,9 +58,11 @@ func main() {
 		logger.Error(err)
 		return
 	}
-	logger.Infof("ptz-1 DoCommand return value: %+v", ptzReturnValue)
+	logger.Infof("stopped ongoing ptz controls: %+v", ptzReturnValue)
+	time.Sleep(1 * time.Second)
 
-	pressed := make(map[string]*time.Timer) // Use string as the key type
+	// Map of keys to release timers
+	pressed := make(map[string]*time.Timer)
 	var mu sync.Mutex
 
 	// Duration after which we consider the key "released"
@@ -100,7 +87,7 @@ func main() {
 				_, err := ptz.DoCommand(context.Background(), map[string]interface{}{
 					"command":    "continuous-move",
 					"pan_speed":  0.0,
-					"tilt_speed": 0.5,
+					"tilt_speed": 0.2,
 				})
 				if err != nil {
 					logger.Error(err)
@@ -111,7 +98,7 @@ func main() {
 				_, err := ptz.DoCommand(context.Background(), map[string]interface{}{
 					"command":    "continuous-move",
 					"pan_speed":  0.0,
-					"tilt_speed": -0.5,
+					"tilt_speed": -0.2,
 				})
 				if err != nil {
 					logger.Error(err)
@@ -121,7 +108,7 @@ func main() {
 			go func() {
 				_, err := ptz.DoCommand(context.Background(), map[string]interface{}{
 					"command":    "continuous-move",
-					"pan_speed":  -0.5,
+					"pan_speed":  -0.2,
 					"tilt_speed": 0.0,
 				})
 				if err != nil {
@@ -132,7 +119,7 @@ func main() {
 			go func() {
 				_, err := ptz.DoCommand(context.Background(), map[string]interface{}{
 					"command":    "continuous-move",
-					"pan_speed":  0.5,
+					"pan_speed":  0.2,
 					"tilt_speed": 0.0,
 				})
 				if err != nil {
@@ -148,7 +135,6 @@ func main() {
 		pressed[keyStr] = time.AfterFunc(releaseDelay, func() {
 			mu.Lock()
 			defer mu.Unlock()
-			fmt.Printf("Key released: %s\n", keyStr)
 			delete(pressed, keyStr)
 
 			// Send stop command after key release
@@ -161,10 +147,10 @@ func main() {
 				if err != nil {
 					logger.Error(err)
 				}
+				logger.Infof("Key released: %s", keyStr)
 			}()
 		})
 
-		// Stop on Escape or Ctrl+C
 		if key.Code == 27 || key.Code == 3 { // ASCII values for Escape and Ctrl+C
 			os.Exit(0)
 		}
