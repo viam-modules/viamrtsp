@@ -95,7 +95,7 @@ The following attributes are available for all models of `viamrtsp` discovery se
 
 ### DiscoverResources Extras
 
-The DiscoverResources API also can take a credential as `extra`s fields. To discover cameras using this method, add the following to the extras field of the request:
+The `DiscoverResources` API also can take a credential as `extra`s fields. To discover cameras using this method, add the following to the extras field of the request:
 
 ```json
 {
@@ -103,6 +103,31 @@ The DiscoverResources API also can take a credential as `extra`s fields. To disc
   "Pass": "<password>"
 }
 ```
+
+
+### Camera Metadata
+
+The `DiscoverResources` API will return a list of cameras discovered by the service and their component configuration. Note that the metadata fields `resolution`, `codec`, and `frame_rate` are descriptive and will not change the behavior of the camera.
+
+```
+{
+  "api": "rdk:component:camera",
+  "attributes": {
+    "discovery_dep": "discovery-1",
+    "rtp_passthrough": true,
+    "rtsp_address": "tavy16d.viam.local:554/streamh264Preview_01_sub",
+    "resolution": {
+      "width": 640,
+      "height": 480
+    },
+    "codec": "H264",
+    "frame_rate": 30,
+  },
+  "model": "viam:viamrtsp:rtsp",
+  "name": "VIAM-1014255-url1"
+}
+```
+
 
 ### Preview DoCommand
 The `Preview` DoCommand is used to get a preview image of the camera stream. You can copy over the attributes section generated from `DiscoverResources` into the command. The `rtsp_address` is the only required field.
@@ -128,7 +153,7 @@ The response will be preview image in the [DataURL](https://developer.mozilla.or
 
 Use the `DiscoverResources` API by adding a `viam:viamrtsp:onvif` `discovery` model to retrieve a list of cameras discovered by the service and their configuration. You can then retrieve a preview image from a camera using the `Preview` `DoCommand`. 
 
-Some cameras will output multiple channels, so review the `rtsp_address` and the image preview of the cameras to determine which camera streams you wish to add.
+Some cameras will output multiple channels, so review the `rtsp_address`, the image preview, and the metadata of the cameras to determine which camera streams you wish to add.
 
 ### Common RTSP discovery pitfalls
 #### DHCP
