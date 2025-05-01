@@ -251,16 +251,16 @@ func TestDoCommandPreview(t *testing.T) {
 				"rtsp_address": rtspAddr,
 			},
 		}
-		_, err = dis.DoCommand(ctx, command)
+		result, err := dis.DoCommand(ctx, command)
 		test.That(t, err, test.ShouldBeNil)
-		// test.That(t, len(result["preview"].(string)), test.ShouldBeGreaterThan, 0)
+		test.That(t, len(result["preview"].(string)), test.ShouldBeGreaterThan, 0)
 		closeFunc()
 	})
 
 	t.Run("Test preview command where both rtsp and snapshot URI fail", func(t *testing.T) {
 		dis := &rtspDiscovery{
 			rtspToSnapshotURIs: map[string]string{
-				"rtsp://camera1/stream": "http://localhost:1234/snapshot",
+				"rtsp://invalid/stream": "http://invalid/snapshot",
 			},
 			logger: logger,
 		}
@@ -268,7 +268,7 @@ func TestDoCommandPreview(t *testing.T) {
 		command := map[string]interface{}{
 			"command": "preview",
 			"attributes": map[string]interface{}{
-				"rtsp_address": "rtsp://camera1/stream",
+				"rtsp_address": "rtsp://invalid/stream",
 			},
 		}
 
