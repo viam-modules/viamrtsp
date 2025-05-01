@@ -37,3 +37,6 @@ bin
 
 # Ignore android build files
 *.zip
+
+# Env files
+*.env

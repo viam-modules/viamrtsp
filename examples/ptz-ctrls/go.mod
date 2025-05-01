@@ -5,12 +5,13 @@ go 1.23
 toolchain go1.23.2
 
 require (
+	atomicgo.dev/keyboard v0.2.9
+	github.com/joho/godotenv v1.5.1
 	go.viam.com/rdk v0.62.0
 	go.viam.com/utils v0.1.130
 )
 
 require (
-	atomicgo.dev/keyboard v0.2.9 // indirect
 	cloud.google.com/go v0.115.1 // indirect
 	cloud.google.com/go/auth v0.9.3 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.4 // indirect

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/joho/godotenv"
 	"go.viam.com/rdk/components/generic"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/robot/client"
@@ -18,23 +19,42 @@ import (
 
 func main() {
 	logger := logging.NewDebugLogger("client")
+
+	if err := godotenv.Load(); err != nil {
+		logger.Errorf("No .env file found: %v", err)
+		logger.Info("Make sure to set VIAM_API_KEY, VIAM_API_KEY_ID, and VIAM_MACHINE_ADDRESS environment variables.")
+	}
+	// Get credentials from environment variables with fallbacks
+	apiKeyID, exists := os.LookupEnv("VIAM_API_KEY_ID")
+	if !exists {
+		logger.Error("VIAM_API_KEY_ID not set")
+		os.Exit(1)
+	}
+	apiKey, exists := os.LookupEnv("VIAM_API_KEY")
+	if !exists {
+		logger.Error("VIAM_API_KEY not set")
+		os.Exit(1)
+	}
+	machineAddress, exists := os.LookupEnv("VIAM_MACHINE_ADDRESS")
+	if !exists {
+		logger.Error("VIAM_MACHINE_ADDRESS not set")
+		os.Exit(1)
+	}
+
 	machine, err := client.New(
 		context.Background(),
-		"av-orin-nano-4-main.8xyo135y7o.viam.cloud",
+		machineAddress,
 		logger,
 		client.WithDialOptions(rpc.WithEntityCredentials(
-			/* Replace "<API-KEY-ID>" (including brackets) with your machine's API key ID */
-			"<API-KEY-ID>",
+			apiKeyID,
 			rpc.Credentials{
-				Type: rpc.CredentialsTypeAPIKey,
-				/* Replace "<API-KEY>" (including brackets) with your machine's API key */
-				Payload: "<API-KEY>",
+				Type:    rpc.CredentialsTypeAPIKey,
+				Payload: apiKey,
 			})),
 	)
 	if err != nil {
 		logger.Fatal(err)
 	}
-
 	defer machine.Close(context.Background())
 	logger.Info("Resources:")
 	logger.Info(machine.ResourceNames())
