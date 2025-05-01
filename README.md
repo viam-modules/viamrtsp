@@ -107,7 +107,7 @@ The `DiscoverResources` API also can take a credential as `extra`s fields. To di
 
 ### Camera Metadata
 
-The `DiscoverResources` API will return a list of cameras discovered by the service and their component configuration. Note that the metadata fields `resolution`, `codec`, and `frame_rate` are descriptive and will not change the behavior of the camera.
+The `DiscoverResources` API will return a list of cameras discovered by the service and their component configurations. Note that the metadata fields `resolution`, `codec`, and `frame_rate` are descriptive and will not change the behavior of the camera.
 
 ```json
 {
@@ -127,7 +127,6 @@ The `DiscoverResources` API will return a list of cameras discovered by the serv
   "name": "VIAM-1014255-url1"
 }
 ```
-
 
 ### Preview DoCommand
 The `Preview` DoCommand is used to get a preview image of the camera stream. You can copy over the attributes section generated from `DiscoverResources` into the command. The `rtsp_address` is the only required field.
