@@ -275,6 +275,8 @@ func TestDoCommandPreview(t *testing.T) {
 		result, err := dis.DoCommand(ctx, command)
 		test.That(t, err, test.ShouldNotBeNil)
 		test.That(t, result, test.ShouldBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "snapshot error")
+		test.That(t, err.Error(), test.ShouldContainSubstring, "both snapshot and RTSP fetch failed")
 	})
 }
 
