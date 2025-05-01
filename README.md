@@ -121,7 +121,7 @@ The `DiscoverResources` API will return a list of cameras discovered by the serv
       "height": 480
     },
     "codec": "H264",
-    "frame_rate": 30,
+    "frame_rate": 30
   },
   "model": "viam:viamrtsp:rtsp",
   "name": "VIAM-1014255-url1"
