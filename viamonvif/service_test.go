@@ -192,7 +192,7 @@ func TestDoCommandPreview(t *testing.T) {
 		test.That(t, result, test.ShouldBeNil)
 	})
 
-	t.Run("Test preview command with snapshot download http serror", func(t *testing.T) {
+	t.Run("Test preview command with snapshot download HTTP error", func(t *testing.T) {
 		server := startTestHTTPServer(t, "/snapshot", http.StatusInternalServerError, "text/plain", "Internal Server Error", false)
 		defer server.Close()
 

@@ -203,7 +203,7 @@ func (dis *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inte
 		}
 
 		// Fallback to fetching the image via RTSP
-		dis.logger.Debugf("attempting to fetch image via RTSP for URL: %s", previewReq.rtspURL)
+		dis.logger.Debugf("attempting to fetch image via RTSP URL: %s", previewReq.rtspURL)
 		dataURL, err := fetchImageFromRTSPURL(ctx, dis.logger, previewReq.rtspURL)
 		if err == nil {
 			dis.logger.Debugf("successfully fetched image via RTSP for URL: %s", previewReq.rtspURL)
@@ -314,8 +314,6 @@ func downloadPreviewImage(ctx context.Context, logger logging.Logger, snapshotUR
 
 // fetchImageFromRTSPURL fetches the image from the rtsp URL and returns it as a data URL.
 func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL string) (string, error) {
-	logger.Debug("attempting to fetch image from RTSP URL", rtspURL)
-
 	// Wrap viamrtsp.Config in a resource.Config
 	rtspConfig := viamrtsp.Config{
 		Address: rtspURL,
