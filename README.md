@@ -109,13 +109,13 @@ The `DiscoverResources` API also can take a credential as `extra`s fields. To di
 
 The `DiscoverResources` API will return a list of cameras discovered by the service and their component configuration. Note that the metadata fields `resolution`, `codec`, and `frame_rate` are descriptive and will not change the behavior of the camera.
 
-```
+```json
 {
   "api": "rdk:component:camera",
   "attributes": {
     "discovery_dep": "discovery-1",
     "rtp_passthrough": true,
-    "rtsp_address": "tavy16d.viam.local:554/streamh264Preview_01_sub",
+    "rtsp_address": "rtsp://tavy16d.viam.local:554/stream",
     "resolution": {
       "width": 640,
       "height": 480
