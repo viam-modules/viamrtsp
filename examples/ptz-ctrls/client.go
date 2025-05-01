@@ -110,7 +110,7 @@ func main() {
 		}
 
 		// Handle pan and tilt commands for WASD keys
-		// TDO: Handle multiple concurrent key->speed controls
+		// TODO: Handle multiple concurrent key->speed controls
 		switch keyStr {
 		case "W", "w":
 			go func() {
@@ -166,7 +166,7 @@ func main() {
 			}()
 		case "R", "r":
 			go func() {
-				// zooom in
+				// zoom in
 				_, err := ptz.DoCommand(context.Background(), map[string]interface{}{
 					"command":    "continuous-move",
 					"pan_speed":  0.0,
