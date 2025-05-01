@@ -20,7 +20,7 @@ func main() {
 	logger := logging.NewDebugLogger("client")
 	machine, err := client.New(
 		context.Background(),
-		"<MACHINE_ADDRESS>",
+		"av-orin-nano-4-main.8xyo135y7o.viam.cloud",
 		logger,
 		client.WithDialOptions(rpc.WithEntityCredentials(
 			/* Replace "<API-KEY-ID>" (including brackets) with your machine's API key ID */
@@ -73,6 +73,8 @@ func main() {
 	fmt.Println("S/s: Tilt down")
 	fmt.Println("A/a: Pan left")
 	fmt.Println("D/d: Pan right")
+	fmt.Println("R/r: Zoom in")
+	fmt.Println("F/f: Zoom out")
 	fmt.Println("Esc or Ctrl+C: Exit")
 
 	keyboard.Listen(func(key keys.Key) (stop bool, err error) {
@@ -88,13 +90,16 @@ func main() {
 		}
 
 		// Handle pan and tilt commands for WASD keys
+		// TDO: Handle multiple concurrent key->speed controls
 		switch keyStr {
 		case "W", "w":
 			go func() {
+				// up
 				_, err := ptz.DoCommand(context.Background(), map[string]interface{}{
 					"command":    "continuous-move",
 					"pan_speed":  0.0,
 					"tilt_speed": 0.2,
+					"zoom_speed": 0.0,
 				})
 				if err != nil {
 					logger.Error(err)
@@ -102,10 +107,12 @@ func main() {
 			}()
 		case "S", "s":
 			go func() {
+				// down
 				_, err := ptz.DoCommand(context.Background(), map[string]interface{}{
 					"command":    "continuous-move",
 					"pan_speed":  0.0,
 					"tilt_speed": -0.2,
+					"zoom_speed": 0.0,
 				})
 				if err != nil {
 					logger.Error(err)
@@ -113,10 +120,12 @@ func main() {
 			}()
 		case "A", "a":
 			go func() {
+				// left
 				_, err := ptz.DoCommand(context.Background(), map[string]interface{}{
 					"command":    "continuous-move",
 					"pan_speed":  -0.2,
 					"tilt_speed": 0.0,
+					"zoom_speed": 0.0,
 				})
 				if err != nil {
 					logger.Error(err)
@@ -124,16 +133,43 @@ func main() {
 			}()
 		case "D", "d":
 			go func() {
+				// right
 				_, err := ptz.DoCommand(context.Background(), map[string]interface{}{
 					"command":    "continuous-move",
 					"pan_speed":  0.2,
 					"tilt_speed": 0.0,
+					"zoom_speed": 0.0,
 				})
 				if err != nil {
 					logger.Error(err)
 				}
 			}()
-
+		case "R", "r":
+			go func() {
+				// zooom in
+				_, err := ptz.DoCommand(context.Background(), map[string]interface{}{
+					"command":    "continuous-move",
+					"pan_speed":  0.0,
+					"tilt_speed": 0.0,
+					"zoom_speed": 0.2,
+				})
+				if err != nil {
+					logger.Error(err)
+				}
+			}()
+		case "F", "f":
+			go func() {
+				// zoom out
+				_, err := ptz.DoCommand(context.Background(), map[string]interface{}{
+					"command":    "continuous-move",
+					"pan_speed":  0.0,
+					"tilt_speed": 0.0,
+					"zoom_speed": -0.2,
+				})
+				if err != nil {
+					logger.Error(err)
+				}
+			}()
 		default:
 			fmt.Printf("Key pressed: %s\n", keyStr)
 		}
