@@ -171,7 +171,7 @@ func TestDoCommandPreview(t *testing.T) {
 		test.That(t, result["preview"], test.ShouldEqual, "data:image/jpeg;base64,bW9ja0ltYWdlRGF0YQ==")
 	})
 
-	t.Run("Test preview command with invalid RTSP URL", func(t *testing.T) {
+	t.Run("Test preview command snapshot download with missing cache mapping", func(t *testing.T) {
 		dis := &rtspDiscovery{
 			rtspToSnapshotURIs: map[string]string{
 				"rtsp://camera1/stream": "http://invalid/snapshot",
@@ -192,7 +192,7 @@ func TestDoCommandPreview(t *testing.T) {
 		test.That(t, result, test.ShouldBeNil)
 	})
 
-	t.Run("Test preview command with download error", func(t *testing.T) {
+	t.Run("Test preview command with snapshot download http serror", func(t *testing.T) {
 		server := startTestHTTPServer(t, "/snapshot", http.StatusInternalServerError, "text/plain", "Internal Server Error", false)
 		defer server.Close()
 
@@ -216,7 +216,7 @@ func TestDoCommandPreview(t *testing.T) {
 		test.That(t, result, test.ShouldBeNil)
 	})
 
-	t.Run("Test rtsp lookup image with broken snapshot URI", func(t *testing.T) {
+	t.Run("Test successful preview command with broken snapshot URI and valid streaming URI", func(t *testing.T) {
 		logger := logging.NewTestLogger(t)
 
 		bURL, err := base.ParseURL("rtsp://127.0.0.1:32512")
@@ -234,7 +234,7 @@ func TestDoCommandPreview(t *testing.T) {
 		}
 		h, closeFunc := viamrtsp.NewH264ServerHandler(t, forma, bURL, logger)
 
-		// Start rtsp feed for rtsp://camera1/streamj
+		// Start rtsp feed
 		test.That(t, h.S.Start(), test.ShouldBeNil)
 
 		rtspAddr := "rtsp://" + h.S.RTSPAddress + "/stream1"
@@ -255,6 +255,26 @@ func TestDoCommandPreview(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 		// test.That(t, len(result["preview"].(string)), test.ShouldBeGreaterThan, 0)
 		closeFunc()
+	})
+
+	t.Run("Test preview command where both rtsp and snapshot URI fail", func(t *testing.T) {
+		dis := &rtspDiscovery{
+			rtspToSnapshotURIs: map[string]string{
+				"rtsp://camera1/stream": "http://localhost:1234/snapshot",
+			},
+			logger: logger,
+		}
+
+		command := map[string]interface{}{
+			"command": "preview",
+			"attributes": map[string]interface{}{
+				"rtsp_address": "rtsp://camera1/stream",
+			},
+		}
+
+		result, err := dis.DoCommand(ctx, command)
+		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, result, test.ShouldBeNil)
 	})
 }
 
