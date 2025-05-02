@@ -95,12 +95,36 @@ The following attributes are available for all models of `viamrtsp` discovery se
 
 ### DiscoverResources Extras
 
-The DiscoverResources API also can take a credential as `extra`s fields. To discover cameras using this method, add the following to the extras field of the request:
+The `DiscoverResources` API can also take a credential as `extra`s fields. To discover cameras using this method, add the following to the extras field of the request:
 
 ```json
 {
   "User": "<username>",
   "Pass": "<password>"
+}
+```
+
+
+### Camera Metadata
+
+The `DiscoverResources` API will return a list of cameras discovered by the service and their component configurations. Note that the metadata fields `resolution`, `codec`, and `frame_rate` are descriptive and will not change the behavior of the camera.
+
+```json
+{
+  "api": "rdk:component:camera",
+  "attributes": {
+    "discovery_dep": "discovery-1",
+    "rtp_passthrough": true,
+    "rtsp_address": "rtsp://tavy16d.viam.local:554/stream",
+    "resolution": {
+      "width": 640,
+      "height": 480
+    },
+    "codec": "H264",
+    "frame_rate": 30
+  },
+  "model": "viam:viamrtsp:rtsp",
+  "name": "VIAM-1014255-url1"
 }
 ```
 
@@ -128,7 +152,7 @@ The response will be preview image in the [DataURL](https://developer.mozilla.or
 
 Use the `DiscoverResources` API by adding a `viam:viamrtsp:onvif` `discovery` model to retrieve a list of cameras discovered by the service and their configuration. You can then retrieve a preview image from a camera using the `Preview` `DoCommand`. 
 
-Some cameras will output multiple channels, so review the `rtsp_address` and the image preview of the cameras to determine which camera streams you wish to add.
+Some cameras will output multiple channels, so review the `rtsp_address`, the image preview, and the metadata of the cameras to determine which camera streams you wish to add.
 
 ### Common RTSP discovery pitfalls
 #### DHCP
