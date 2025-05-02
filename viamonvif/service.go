@@ -341,6 +341,9 @@ func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL s
 	defer ticker.Stop()
 	timeoutChan := time.After(timeout)
 	var imageErr error
+	if err := ctx.Err(); err != nil {
+		return "", fmt.Errorf("context already canceled before fetching image: %w", err)
+	}
 	for {
 		select {
 		case <-ticker.C:
@@ -355,6 +358,8 @@ func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL s
 			logger.Debugf("Failed to get image from RTSP camera: %v", imageErr)
 		case <-timeoutChan:
 			return "", fmt.Errorf("timeout while trying to get image from RTSP camera: %w", imageErr)
+		case <-ctx.Done():
+			return "", fmt.Errorf("context canceled while fetching image from RTSP camera: %w", ctx.Err())
 		}
 	}
 }
