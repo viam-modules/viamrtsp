@@ -326,7 +326,7 @@ func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL s
 		Address: rtspURL,
 	}
 	resourceConfig := resource.Config{
-		Name:                "camera_name", // Replace with the actual camera name
+		Name:                "tmp-camera",
 		API:                 camera.API,
 		Model:               viamrtsp.ModelAgnostic,
 		ConvertedAttributes: &rtspConfig,
