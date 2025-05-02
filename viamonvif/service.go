@@ -196,10 +196,10 @@ func (dis *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inte
 				}, nil
 			}
 			dis.logger.Warnf("failed to fetch image from snapshot URI: %s, error: %v", snapshotURI, err)
-			snapshotErr = fmt.Errorf("snapshot error: %w", err)
+			snapshotErr = fmt.Errorf("snapshot error for snapshot URI %s: %w", snapshotURI, err)
 		} else {
 			dis.logger.Warnf("snapshot URI not found for RTSP URL: %s", previewReq.rtspURL)
-			snapshotErr = errors.New("snapshot URI not found")
+			snapshotErr = fmt.Errorf("snapshot URI not found for RTSP URL: %s", previewReq.rtspURL)
 		}
 
 		// Fallback to fetching the image via RTSP
