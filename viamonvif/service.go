@@ -179,46 +179,53 @@ func (dis *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inte
 			return nil, err
 		}
 
-		var snapshotErr, rtspErr error
-
-		// Attempt to fetch the image from the snapshot URI
-		dis.rtspToSnapshotURIsMu.Lock()
-		snapshotURI, found := dis.rtspToSnapshotURIs[previewReq.rtspURL]
-		dis.rtspToSnapshotURIsMu.Unlock()
-
-		if found {
-			dis.logger.Debugf("attempting to fetch image from snapshot URI: %s", snapshotURI)
-			dataURL, err := downloadPreviewImage(ctx, dis.logger, snapshotURI)
-			if err == nil {
-				dis.logger.Debugf("Successfully fetched image from snapshot URI: %s", snapshotURI)
-				return map[string]interface{}{
-					"preview": dataURL,
-				}, nil
-			}
-			dis.logger.Debugf("failed to fetch image from snapshot URI: %s, error: %v", snapshotURI, err)
-			snapshotErr = fmt.Errorf("snapshot error for snapshot URI %s: %w", snapshotURI, err)
-		} else {
-			dis.logger.Debugf("snapshot URI not found for RTSP URL: %s", previewReq.rtspURL)
-			snapshotErr = fmt.Errorf("snapshot URI not found for RTSP URL: %s", previewReq.rtspURL)
+		dataURL, err := dis.preview(ctx, previewReq.rtspURL)
+		if err != nil {
+			return nil, err
 		}
 
-		// Fallback to fetching the image via RTSP
-		dis.logger.Debugf("attempting to fetch image via RTSP URL: %s", previewReq.rtspURL)
-		dataURL, err := fetchImageFromRTSPURL(ctx, dis.logger, previewReq.rtspURL)
-		if err == nil {
-			dis.logger.Debugf("successfully fetched image via RTSP for URL: %s", previewReq.rtspURL)
-			return map[string]interface{}{
-				"preview": dataURL,
-			}, nil
-		}
-		dis.logger.Warnf("failed to fetch image via RTSP for URL: %s, error: %v", previewReq.rtspURL, err)
-		rtspErr = fmt.Errorf("RTSP error: %w", err)
-
-		return nil, fmt.Errorf("both snapshot and RTSP fetch failed: %w", errors.Join(snapshotErr, rtspErr))
-
+		return map[string]interface{}{
+			"preview": dataURL,
+		}, nil
 	default:
 		return nil, fmt.Errorf("unknown command: %s", cmd)
 	}
+}
+
+// preview fetches a camera image from the given RTSP URL.
+func (dis *rtspDiscovery) preview(ctx context.Context, rtspURL string) (string, error) {
+	var snapshotErr, rtspErr error
+
+	// Attempt to fetch the image from the snapshot URI
+	dis.rtspToSnapshotURIsMu.Lock()
+	snapshotURI, ok := dis.rtspToSnapshotURIs[rtspURL]
+	dis.rtspToSnapshotURIsMu.Unlock()
+
+	if ok {
+		dis.logger.Debugf("attempting to fetch image from snapshot URI: %s", snapshotURI)
+		dataURL, err := downloadPreviewImage(ctx, dis.logger, snapshotURI)
+		if err == nil {
+			dis.logger.Debugf("Successfully fetched image from snapshot URI: %s", snapshotURI)
+			return dataURL, nil
+		}
+		dis.logger.Debugf("failed to fetch image from snapshot URI: %s, error: %v", snapshotURI, err)
+		snapshotErr = fmt.Errorf("snapshot error for snapshot URI %s: %w", snapshotURI, err)
+	} else {
+		dis.logger.Debugf("snapshot URI not found for RTSP URL: %s", rtspURL)
+		snapshotErr = fmt.Errorf("snapshot URI not found for RTSP URL: %s", rtspURL)
+	}
+
+	// Fallback to fetching the image via RTSP
+	dis.logger.Debugf("attempting to fetch image via RTSP URL: %s", rtspURL)
+	dataURL, err := fetchImageFromRTSPURL(ctx, dis.logger, rtspURL)
+	if err == nil {
+		dis.logger.Debugf("successfully fetched image via RTSP for URL: %s", rtspURL)
+		return dataURL, nil
+	}
+	dis.logger.Warnf("failed to fetch image via RTSP for URL: %s, error: %v", rtspURL, err)
+	rtspErr = fmt.Errorf("RTSP error: %w", err)
+
+	return "", fmt.Errorf("both snapshot and RTSP fetch failed: %w", errors.Join(snapshotErr, rtspErr))
 }
 
 func (dis *rtspDiscovery) Close(_ context.Context) error {
