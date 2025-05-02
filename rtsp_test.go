@@ -38,7 +38,7 @@ func TestRTSPCamera(t *testing.T) {
 			PPS: []uint8{0x68, 0xeb, 0xc3, 0xcb, 0x22, 0xc0},
 		}
 		t.Run("init", func(t *testing.T) {
-			h, closeFunc := NewH264ServerHandler(t, forma, bURL, logger)
+			h, closeFunc := NewMockH264ServerHandler(t, forma, bURL, logger)
 			test.That(t, h.S.Start(), test.ShouldBeNil)
 			timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
 			defer timeoutCancel()
@@ -52,7 +52,7 @@ func TestRTSPCamera(t *testing.T) {
 		})
 
 		t.Run("GetImage", func(t *testing.T) {
-			h, closeFunc := NewH264ServerHandler(t, forma, bURL, logger)
+			h, closeFunc := NewMockH264ServerHandler(t, forma, bURL, logger)
 			defer closeFunc()
 			test.That(t, h.S.Start(), test.ShouldBeNil)
 			timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
@@ -80,7 +80,7 @@ func TestRTSPCamera(t *testing.T) {
 		})
 
 		t.Run("AvFramePool", func(t *testing.T) {
-			h, closeFunc := NewH264ServerHandler(t, forma, bURL, logger)
+			h, closeFunc := NewMockH264ServerHandler(t, forma, bURL, logger)
 			defer closeFunc()
 			test.That(t, h.S.Start(), test.ShouldBeNil)
 			timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
@@ -128,7 +128,7 @@ func TestRTSPCamera(t *testing.T) {
 				for _, tc := range cases {
 					t.Run(tc.name, func(t *testing.T) {
 						// Server and camera setup
-						h, closeFunc := NewH264ServerHandler(t, forma, bURL, logger)
+						h, closeFunc := NewMockH264ServerHandler(t, forma, bURL, logger)
 						defer closeFunc()
 						test.That(t, h.S.Start(), test.ShouldBeNil)
 
@@ -221,7 +221,7 @@ func TestRTSPCameraPerformance(t *testing.T) {
 			PPS: []uint8{0x68, 0xeb, 0xc3, 0xcb, 0x22, 0xc0},
 		}
 
-		h, closeFunc := NewH264ServerHandler(t, forma, bURL, logger)
+		h, closeFunc := NewMockH264ServerHandler(t, forma, bURL, logger)
 		defer closeFunc()
 		test.That(t, h.S.Start(), test.ShouldBeNil)
 

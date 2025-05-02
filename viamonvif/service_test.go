@@ -232,7 +232,7 @@ func TestDoCommandPreview(t *testing.T) {
 			},
 			PPS: []uint8{0x68, 0xeb, 0xc3, 0xcb, 0x22, 0xc0},
 		}
-		h, closeFunc := viamrtsp.NewH264ServerHandler(t, forma, bURL, logger)
+		h, closeFunc := viamrtsp.NewMockH264ServerHandler(t, forma, bURL, logger)
 
 		// Start rtsp feed
 		test.That(t, h.S.Start(), test.ShouldBeNil)

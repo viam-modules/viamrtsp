@@ -18,8 +18,8 @@ import (
 	"go.viam.com/utils"
 )
 
-// NewH264ServerHandler creates a new H264 server handler for testing.
-func NewH264ServerHandler(
+// NewMockH264ServerHandler creates a new H264 server handler for testing.
+func NewMockH264ServerHandler(
 	t *testing.T,
 	forma *format.H264,
 	bURL *base.URL,
