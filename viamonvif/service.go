@@ -357,7 +357,7 @@ func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL s
 			// Attempt to get an image from the RTSP camera
 			img, metadata, err := camera.Image(ctx, imageReqMimeType, nil)
 			if err == nil {
-				logger.Infof("Received image with metadata: %v", metadata)
+				logger.Debugf("Received image with metadata: %v, size: %d bytes", metadata, len(img))
 				dataURL := formatDataURL(metadata.MimeType, img)
 				return dataURL, nil
 			}

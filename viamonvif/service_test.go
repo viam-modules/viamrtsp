@@ -233,6 +233,7 @@ func TestDoCommandPreview(t *testing.T) {
 			PPS: []uint8{0x68, 0xeb, 0xc3, 0xcb, 0x22, 0xc0},
 		}
 		h, closeFunc := viamrtsp.NewMockH264ServerHandler(t, forma, bURL, logger)
+		defer closeFunc()
 
 		// Start rtsp feed
 		test.That(t, h.S.Start(), test.ShouldBeNil)
@@ -253,8 +254,7 @@ func TestDoCommandPreview(t *testing.T) {
 		}
 		result, err := dis.DoCommand(ctx, command)
 		test.That(t, err, test.ShouldBeNil)
-		test.That(t, len(result["preview"].(string)), test.ShouldBeGreaterThan, 0)
-		closeFunc()
+		test.That(t, len(result["preview"].(string)), test.ShouldEqual, 7435)
 	})
 
 	t.Run("Test preview command where both rtsp and snapshot URI fail", func(t *testing.T) {
