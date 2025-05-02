@@ -214,7 +214,7 @@ func (dis *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inte
 		dis.logger.Warnf("failed to fetch image via RTSP for URL: %s, error: %v", previewReq.rtspURL, err)
 		rtspErr = fmt.Errorf("RTSP error: %w", err)
 
-		return nil, fmt.Errorf("both snapshot and RTSP fetch failed: %w; %w", snapshotErr, rtspErr)
+		return nil, fmt.Errorf("both snapshot and RTSP fetch failed: %w", errors.Join(snapshotErr, rtspErr))
 
 	default:
 		return nil, fmt.Errorf("unknown command: %s", cmd)
