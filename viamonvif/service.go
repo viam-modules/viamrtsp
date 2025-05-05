@@ -205,7 +205,7 @@ func (dis *rtspDiscovery) preview(ctx context.Context, rtspURL string) (string, 
 		dis.logger.Debugf("attempting to fetch image from snapshot URI: %s", snapshotURI)
 		dataURL, err := downloadPreviewImage(ctx, dis.logger, snapshotURI)
 		if err == nil {
-			dis.logger.Debugf("Successfully fetched image from snapshot URI: %s", snapshotURI)
+			dis.logger.Debugf("successfully fetched image from snapshot URI: %s", snapshotURI)
 			return dataURL, nil
 		}
 		dis.logger.Debugf("failed to fetch image from snapshot URI: %s, error: %v", snapshotURI, err)
