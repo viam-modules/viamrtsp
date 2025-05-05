@@ -171,7 +171,7 @@ func TestDoCommandPreview(t *testing.T) {
 		test.That(t, result["preview"], test.ShouldEqual, "data:image/jpeg;base64,bW9ja0ltYWdlRGF0YQ==")
 	})
 
-	t.Run("Test preview command snapshot download with missing cache mapping", func(t *testing.T) {
+	t.Run("Test preview command when streaming to snapshot mapping does not exist", func(t *testing.T) {
 		dis := &rtspDiscovery{
 			rtspToSnapshotURIs: map[string]string{
 				"rtsp://camera1/stream": "http://invalid/snapshot",
