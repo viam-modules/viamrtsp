@@ -2,7 +2,10 @@
 package viamonvif
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
+	"image/jpeg"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -255,6 +258,13 @@ func TestDoCommandPreview(t *testing.T) {
 		result, err := dis.DoCommand(ctx, command)
 		test.That(t, err, test.ShouldBeNil)
 		test.That(t, len(result["preview"].(string)), test.ShouldEqual, 7435)
+		imgData, err := base64.StdEncoding.DecodeString(result["preview"].(string)[len("data:image/jpeg;base64,"):])
+		test.That(t, err, test.ShouldBeNil)
+		jpegImg, err := jpeg.Decode(bytes.NewReader(imgData))
+		test.That(t, err, test.ShouldBeNil)
+		test.That(t, jpegImg, test.ShouldNotBeNil)
+		test.That(t, jpegImg.Bounds().Dx(), test.ShouldEqual, 480)
+		test.That(t, jpegImg.Bounds().Dy(), test.ShouldEqual, 270)
 	})
 
 	t.Run("Test preview command where both rtsp and snapshot URI fail", func(t *testing.T) {
