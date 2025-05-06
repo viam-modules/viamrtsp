@@ -348,9 +348,6 @@ func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL s
 	defer ticker.Stop()
 	timeoutChan := time.After(timeout)
 	var imageErr error
-	if err := ctx.Err(); err != nil {
-		return "", fmt.Errorf("context already canceled before fetching image: %w", err)
-	}
 	for {
 		select {
 		case <-ticker.C:
