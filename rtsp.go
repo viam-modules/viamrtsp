@@ -329,6 +329,22 @@ func (rc *rtspCamera) reconnectClientWithFallbackTransports(codecInfo videoCodec
 	return fmt.Errorf("all attempts to reconnect to rtsp server failed: %w", lastErr)
 }
 
+func discoverResourcesExtra(u *base.URL) map[string]any {
+	if u == nil {
+		return nil
+	}
+	if u.User == nil {
+		return nil
+	}
+
+	extra := map[string]any{"User": u.User.Username()}
+	password, ok := u.User.Password()
+	if ok {
+		extra["Pass"] = password
+	}
+	return extra
+}
+
 // reconnectClient reconnects the RTSP client to the streaming server by closing the old one and starting a new one.
 func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib.Transport) error {
 	rc.logger.Warnf("reconnectClient called with codec: %s and transport: %s", codecInfo, transport.String())
@@ -358,7 +374,8 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib
 		if !clientSuccessful {
 			if rc.discoverySvc != nil {
 				rc.logger.Debug("Running discovery to update IP addresses.")
-				if _, err := rc.discoverySvc.DiscoverResources(rc.cancelCtx, nil); err != nil {
+				extra := discoverResourcesExtra(rc.u)
+				if _, err := rc.discoverySvc.DiscoverResources(rc.cancelCtx, extra); err != nil {
 					rc.logger.Debug("Error discovering resources to update IP addresses:", err)
 				}
 			}
