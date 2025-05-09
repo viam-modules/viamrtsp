@@ -2,11 +2,16 @@
 package viamonvif
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
+	"image/jpeg"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/bluenviron/gortsplib/v4/pkg/base"
+	"github.com/bluenviron/gortsplib/v4/pkg/format"
 	"github.com/viam-modules/viamrtsp"
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"go.viam.com/rdk/logging"
@@ -183,7 +188,7 @@ func TestDoCommandPreview(t *testing.T) {
 		test.That(t, result["preview"], test.ShouldEqual, "data:image/jpeg;base64,bW9ja0ltYWdlRGF0YQ==")
 	})
 
-	t.Run("Test preview command with invalid RTSP URL", func(t *testing.T) {
+	t.Run("Test preview command when streaming to snapshot mapping does not exist", func(t *testing.T) {
 		dis := &rtspDiscovery{
 			rtspToSnapshotURIs: map[string]string{
 				"rtsp://camera1/stream": "http://invalid/snapshot",
@@ -204,7 +209,7 @@ func TestDoCommandPreview(t *testing.T) {
 		test.That(t, result, test.ShouldBeNil)
 	})
 
-	t.Run("Test preview command with download error", func(t *testing.T) {
+	t.Run("Test preview command with snapshot download HTTP error", func(t *testing.T) {
 		server := startTestHTTPServer(t, "/snapshot", http.StatusInternalServerError, "text/plain", "Internal Server Error", false)
 		defer server.Close()
 
@@ -226,6 +231,76 @@ func TestDoCommandPreview(t *testing.T) {
 		test.That(t, err, test.ShouldNotBeNil)
 		test.That(t, err.Error(), test.ShouldContainSubstring, "500: Internal Server Error")
 		test.That(t, result, test.ShouldBeNil)
+	})
+
+	t.Run("Test successful preview command with broken snapshot URI and valid streaming URI", func(t *testing.T) {
+		logger := logging.NewTestLogger(t)
+
+		bURL, err := base.ParseURL("rtsp://127.0.0.1:32512")
+		test.That(t, err, test.ShouldBeNil)
+		forma := &format.H264{
+			PayloadTyp:        96,
+			PacketizationMode: 1,
+			SPS: []uint8{
+				0x67, 0x64, 0x00, 0x15, 0xac, 0xb2, 0x03, 0xc1,
+				0x1f, 0xd6, 0x02, 0xdc, 0x08, 0x08, 0x16, 0x94,
+				0x00, 0x00, 0x03, 0x00, 0x04, 0x00, 0x00, 0x03,
+				0x00, 0xf0, 0x3c, 0x58, 0xb9, 0x20,
+			},
+			PPS: []uint8{0x68, 0xeb, 0xc3, 0xcb, 0x22, 0xc0},
+		}
+		h, closeFunc := viamrtsp.NewMockH264ServerHandler(t, forma, bURL, logger)
+		defer closeFunc()
+
+		// Start rtsp feed
+		test.That(t, h.S.Start(), test.ShouldBeNil)
+
+		rtspAddr := "rtsp://" + h.S.RTSPAddress + "/stream1"
+		dis := &rtspDiscovery{
+			rtspToSnapshotURIs: map[string]string{
+				rtspAddr: "http://invalid/snapshot",
+			},
+			logger: logger,
+		}
+
+		command := map[string]interface{}{
+			"command": "preview",
+			"attributes": map[string]interface{}{
+				"rtsp_address": rtspAddr,
+			},
+		}
+		result, err := dis.DoCommand(ctx, command)
+		test.That(t, err, test.ShouldBeNil)
+		test.That(t, len(result["preview"].(string)), test.ShouldEqual, 7435)
+		imgData, err := base64.StdEncoding.DecodeString(result["preview"].(string)[len("data:image/jpeg;base64,"):])
+		test.That(t, err, test.ShouldBeNil)
+		jpegImg, err := jpeg.Decode(bytes.NewReader(imgData))
+		test.That(t, err, test.ShouldBeNil)
+		test.That(t, jpegImg, test.ShouldNotBeNil)
+		test.That(t, jpegImg.Bounds().Dx(), test.ShouldEqual, 480)
+		test.That(t, jpegImg.Bounds().Dy(), test.ShouldEqual, 270)
+	})
+
+	t.Run("Test preview command where both rtsp and snapshot URI fail", func(t *testing.T) {
+		dis := &rtspDiscovery{
+			rtspToSnapshotURIs: map[string]string{
+				"rtsp://invalid/stream": "http://invalid/snapshot",
+			},
+			logger: logger,
+		}
+
+		command := map[string]interface{}{
+			"command": "preview",
+			"attributes": map[string]interface{}{
+				"rtsp_address": "rtsp://invalid/stream",
+			},
+		}
+
+		result, err := dis.DoCommand(ctx, command)
+		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, result, test.ShouldBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "snapshot error")
+		test.That(t, err.Error(), test.ShouldContainSubstring, "both snapshot and RTSP fetch failed")
 	})
 }
 

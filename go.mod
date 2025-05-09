@@ -20,7 +20,7 @@ require (
 	github.com/viam-modules/video-store v0.0.7
 	github.com/viamrobotics/zeroconf v1.0.12
 	go.uber.org/zap v1.27.0
-	go.viam.com/rdk v0.72.1
+	go.viam.com/rdk v0.73.0
 	go.viam.com/test v1.2.4
 	go.viam.com/utils v0.1.141
 	golang.org/x/net v0.37.0
@@ -312,7 +312,7 @@ require (
 	go.uber.org/automaxprocs v1.5.3 // indirect
 	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.viam.com/api v0.1.430 // indirect
+	go.viam.com/api v0.1.432 // indirect
 	goji.io v2.0.2+incompatible // indirect
 	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/exp v0.0.0-20240904232852-e7e105dedf7e // indirect

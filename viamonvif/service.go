@@ -35,6 +35,9 @@ var (
 
 const (
 	snapshotClientTimeout = 5 * time.Second
+	rtspPollTimeout       = 5 * time.Second
+	rtspImageInterval     = 100 * time.Millisecond
+	imageReqMimeType      = "image/jpeg"
 )
 
 func init() {
@@ -175,25 +178,54 @@ func (dis *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inte
 		if err != nil {
 			return nil, err
 		}
-		dis.rtspToSnapshotURIsMu.Lock()
-		snapshotURI, found := dis.rtspToSnapshotURIs[previewReq.rtspURL]
-		dis.rtspToSnapshotURIsMu.Unlock()
-		if !found {
-			return nil, fmt.Errorf("snapshot URI not found for %s", previewReq.rtspURL)
-		}
-		dis.logger.Infof("snapshot URI: %s", snapshotURI)
 
-		dataURL, err := downloadPreviewImage(ctx, dis.logger, snapshotURI)
+		dataURL, err := dis.preview(ctx, previewReq.rtspURL)
 		if err != nil {
-			return nil, fmt.Errorf("failed to download preview image: %w", err)
+			return nil, err
 		}
+
 		return map[string]interface{}{
 			"preview": dataURL,
 		}, nil
-
 	default:
 		return nil, fmt.Errorf("unknown command: %s", cmd)
 	}
+}
+
+// preview fetches a camera image from the given RTSP URL.
+func (dis *rtspDiscovery) preview(ctx context.Context, rtspURL string) (string, error) {
+	var snapshotErr, rtspErr error
+
+	// Attempt to fetch the image from the snapshot URI
+	dis.rtspToSnapshotURIsMu.Lock()
+	snapshotURI, ok := dis.rtspToSnapshotURIs[rtspURL]
+	dis.rtspToSnapshotURIsMu.Unlock()
+
+	if ok {
+		dis.logger.Debugf("attempting to fetch image from snapshot URI: %s", snapshotURI)
+		dataURL, err := downloadPreviewImage(ctx, dis.logger, snapshotURI)
+		if err == nil {
+			dis.logger.Debugf("successfully fetched image from snapshot URI: %s", snapshotURI)
+			return dataURL, nil
+		}
+		dis.logger.Debugf("failed to fetch image from snapshot URI: %s, error: %v", snapshotURI, err)
+		snapshotErr = fmt.Errorf("snapshot error for snapshot URI %s: %w", snapshotURI, err)
+	} else {
+		dis.logger.Debugf("snapshot URI not found for RTSP URL: %s", rtspURL)
+		snapshotErr = fmt.Errorf("snapshot URI not found for RTSP URL: %s", rtspURL)
+	}
+
+	// Fallback to fetching the image via RTSP
+	dis.logger.Debugf("attempting to fetch image via RTSP URL: %s", rtspURL)
+	dataURL, err := fetchImageFromRTSPURL(ctx, dis.logger, rtspURL)
+	if err == nil {
+		dis.logger.Debugf("successfully fetched image via RTSP for URL: %s", rtspURL)
+		return dataURL, nil
+	}
+	dis.logger.Warnf("failed to fetch image via RTSP for URL: %s, error: %v", rtspURL, err)
+	rtspErr = fmt.Errorf("RTSP error: %w", err)
+
+	return "", fmt.Errorf("both snapshot and RTSP fetch failed: %w", errors.Join(snapshotErr, rtspErr))
 }
 
 func (dis *rtspDiscovery) Close(_ context.Context) error {
@@ -285,6 +317,55 @@ func downloadPreviewImage(ctx context.Context, logger logging.Logger, snapshotUR
 	dataURL := formatDataURL(contentType, imageBytes)
 
 	return dataURL, nil
+}
+
+// fetchImageFromRTSPURL fetches the image from the rtsp URL and returns it as a data URL.
+func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL string) (string, error) {
+	// Wrap viamrtsp.Config in a resource.Config
+	rtspConfig := viamrtsp.Config{
+		Address: rtspURL,
+	}
+	resourceConfig := resource.Config{
+		Name:                "tmp-camera",
+		API:                 camera.API,
+		Model:               viamrtsp.ModelAgnostic,
+		ConvertedAttributes: &rtspConfig,
+	}
+
+	camera, err := viamrtsp.NewRTSPCamera(ctx, nil, resourceConfig, logger)
+	if err != nil {
+		return "", fmt.Errorf("failed to create RTSP camera: %w", err)
+	}
+	defer func() {
+		if closeErr := camera.Close(ctx); closeErr != nil {
+			logger.Warnf("failed to close camera: %v", closeErr)
+		}
+	}()
+
+	retryInterval := rtspImageInterval
+	timeout := rtspPollTimeout
+	ticker := time.NewTicker(retryInterval)
+	defer ticker.Stop()
+	timeoutChan := time.After(timeout)
+	var imageErr error
+	for {
+		select {
+		case <-ticker.C:
+			// Attempt to get an image from the RTSP camera
+			img, metadata, err := camera.Image(ctx, imageReqMimeType, nil)
+			if err == nil {
+				logger.Debugf("Received image with metadata: %v, size: %d bytes", metadata, len(img))
+				dataURL := formatDataURL(metadata.MimeType, img)
+				return dataURL, nil
+			}
+			imageErr = err
+			logger.Debugf("Failed to get image from RTSP camera: %v", imageErr)
+		case <-timeoutChan:
+			return "", fmt.Errorf("timeout while trying to get image from RTSP camera: %w", imageErr)
+		case <-ctx.Done():
+			return "", fmt.Errorf("context canceled while fetching image from RTSP camera: %w", ctx.Err())
+		}
+	}
 }
 
 func createCamerasFromURLs(l CameraInfo, discoveryDependencyName string, logger logging.Logger) ([]resource.Config, error) {
