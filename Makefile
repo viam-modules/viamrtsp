@@ -13,7 +13,8 @@ SUPPORTED_COMBINATIONS := \
     linux-amd64-linux-amd64 \
     linux-amd64-android-arm64 \
     darwin-arm64-darwin-arm64 \
-    darwin-arm64-android-arm64
+    darwin-arm64-android-arm64 \
+    linux-amd64-windows-amd64
 CURRENT_COMBINATION := $(SOURCE_OS)-$(SOURCE_ARCH)-$(TARGET_OS)-$(TARGET_ARCH)
 ifneq (,$(filter $(CURRENT_COMBINATION),$(SUPPORTED_COMBINATIONS)))
     $(info Supported combination: $(CURRENT_COMBINATION))
@@ -52,23 +53,8 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
 --enable-decoder=h264 \
 --enable-decoder=hevc \
 --enable-decoder=mjpeg \
---enable-demuxer=concat \
---enable-demuxer=mov \
---enable-demuxer=mp4 \
---enable-demuxer=segment \
---enable-encoder=libx264 \
 --enable-encoder=mjpeg \
---enable-encoder=mpeg4 \
---enable-gpl \
---enable-libx264 \
---enable-muxer=mp4 \
---enable-muxer=segment \
---enable-network \
---enable-parser=h264 \
---enable-parser=hevc \
---enable-protocol=concat \
---enable-protocol=crypto \
---enable-protocol=file \
+--enable-network
 
 # Add linker flag -checklinkname=0 for anet https://github.com/wlynxg/anet?tab=readme-ov-file#how-to-build-with-go-1230-or-later.
 PKG_CONFIG_PATH = $(FFMPEG_BUILD)/lib/pkgconfig
@@ -80,6 +66,10 @@ ifeq ($(SOURCE_OS),darwin)
 	SUBST = $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a
 endif
 CGO_LDFLAGS = $(subst -lx264, $(SUBST),$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS))) 
+# if windows add  -lpthread
+ifeq ($(TARGET_OS),windows)
+	CGO_LDFLAGS += -lpthread -static -static-libgcc -static-libstdc++
+endif
 ifeq ($(SOURCE_OS),darwin)
 ifeq ($(shell brew list | grep -w x264 > /dev/null; echo $$?), 1)
 	brew update && brew install x264
@@ -109,6 +99,34 @@ ifeq ($(TARGET_ARCH),arm64)
                    --cpu=armv8-a \
                    --enable-cross-compile \
                    --cc=$(CC)
+endif
+endif
+
+ifeq ($(TARGET_OS),windows)
+ifeq ($(SOURCE_OS),linux)
+    ifeq ($(shell which x86_64-w64-mingw32-gcc > /dev/null; echo $$?), 1)
+        $(info MinGW cross compiler not found, installing...)
+        $(shell sudo apt-get update && sudo apt-get install -y mingw-w64)
+    endif
+endif
+ifeq ($(TARGET_ARCH),amd64)
+    GO_TAGS ?= -tags no_cgo
+    # We need the go build command to think it's in cgo mode
+    export CGO_ENABLED = 1
+    export CXXFLAGS := -pthread
+    export CGO_CXXFLAGS := -pthread
+    export CC=/usr/bin/x86_64-w64-mingw32-gcc
+    export CXX=/usr/bin/x86_64-w64-mingw32-g++
+    export AS=x86_64-w64-mingw32-as
+    export AR=x86_64-w64-mingw32-ar
+    export RANLIB=x86_64-w64-mingw32-ranlib
+    export LD=x86_64-w64-mingw32-ld
+    export STRIP=x86_64-w64-mingw32-strip
+    FFMPEG_OPTS += --target-os=mingw32 \
+                   --arch=x86 \
+                   --cpu=x86-64 \
+                   --cross-prefix=x86_64-w64-mingw32- \
+                   --enable-cross-compile
 endif
 endif
 
@@ -177,7 +195,7 @@ ifeq ($(shell brew list | grep -w x264 > /dev/null; echo $$?), 1)
 	brew update && brew install x264
 endif
 endif
-	cd $(FFMPEG_VERSION_PLATFORM) && ./configure $(FFMPEG_OPTS) && $(MAKE) -j$(NPROC) && $(MAKE) install
+	cd $(FFMPEG_VERSION_PLATFORM) && ./configure $(FFMPEG_OPTS) --logfile=myconfig.log && $(MAKE) -j$(NPROC) && $(MAKE) install
 
 build-ffmpeg: $(NDK_ROOT)
 # Only need nasm to build assembly kernels for amd64 targets.
