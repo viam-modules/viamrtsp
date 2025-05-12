@@ -20,9 +20,9 @@ require (
 	github.com/viam-modules/video-store v0.0.7
 	github.com/viamrobotics/zeroconf v1.0.12
 	go.uber.org/zap v1.27.0
-	go.viam.com/rdk v0.73.0
+	go.viam.com/rdk v0.74.0
 	go.viam.com/test v1.2.4
-	go.viam.com/utils v0.1.141
+	go.viam.com/utils v0.1.142
 	golang.org/x/net v0.37.0
 )
 
@@ -343,3 +343,7 @@ require (
 	mvdan.cc/unparam v0.0.0-20240528143540-8a5130ca722f // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 )
+
+replace github.com/viam-modules/video-store => ./video-store
+
+replace github.com/pion/mediadevices => ./mediadevices

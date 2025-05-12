@@ -54,18 +54,7 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
 --enable-decoder=hevc \
 --enable-decoder=mjpeg \
 --enable-encoder=mjpeg \
---enable-network \
-# --enable-encoder=libx264 \
-# --enable-encoder=mpeg4 \
-# --enable-gpl \
-# --enable-libx264 \
-# --enable-muxer=mp4 \
-# --enable-muxer=segment \
-# --enable-parser=h264 \
-# --enable-parser=hevc \
-# --enable-protocol=concat \
-# --enable-protocol=crypto \
-# --enable-protocol=file \
+--enable-network
 
 # Add linker flag -checklinkname=0 for anet https://github.com/wlynxg/anet?tab=readme-ov-file#how-to-build-with-go-1230-or-later.
 PKG_CONFIG_PATH = $(FFMPEG_BUILD)/lib/pkgconfig
@@ -77,6 +66,10 @@ ifeq ($(SOURCE_OS),darwin)
 	SUBST = $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a
 endif
 CGO_LDFLAGS = $(subst -lx264, $(SUBST),$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS))) 
+# if windows add  -lpthread
+ifeq ($(TARGET_OS),windows)
+	CGO_LDFLAGS += -lpthread
+endif
 ifeq ($(SOURCE_OS),darwin)
 ifeq ($(shell brew list | grep -w x264 > /dev/null; echo $$?), 1)
 	brew update && brew install x264
@@ -119,10 +112,9 @@ ifeq ($(TARGET_ARCH),amd64)
     export CXXFLAGS := -pthread
     export CGO_CXXFLAGS := -pthread
 
-    # We do not need to handle source arch for toolchain paths.
-    # MINGW_ROOT ?= $(shell pwd)/mingw
     CC = /usr/bin/x86_64-w64-mingw32-gcc
     export CC
+    export CXX=/usr/bin/x86_64-w64-mingw32-g++
     FFMPEG_OPTS += --target-os=mingw32 \
                    --arch=x86 \
                    --cpu=x86-64 \
