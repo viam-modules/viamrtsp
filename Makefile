@@ -68,7 +68,7 @@ endif
 CGO_LDFLAGS = $(subst -lx264, $(SUBST),$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS))) 
 # if windows add  -lpthread
 ifeq ($(TARGET_OS),windows)
-	CGO_LDFLAGS += -lpthread
+	CGO_LDFLAGS += -lpthread -static -static-libgcc -static-libstdc++
 endif
 ifeq ($(SOURCE_OS),darwin)
 ifeq ($(shell brew list | grep -w x264 > /dev/null; echo $$?), 1)
