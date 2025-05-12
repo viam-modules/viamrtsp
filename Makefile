@@ -102,29 +102,31 @@ ifeq ($(TARGET_ARCH),arm64)
 endif
 endif
 
-# If windows target os
 ifeq ($(TARGET_OS),windows)
-# If amd64 target arch
+ifeq ($(SOURCE_OS),linux)
+    ifeq ($(shell which x86_64-w64-mingw32-gcc > /dev/null; echo $$?), 1)
+        $(info MinGW cross compiler not found, installing...)
+        $(shell sudo apt-get update && sudo apt-get install -y mingw-w64)
+    endif
+endif
 ifeq ($(TARGET_ARCH),amd64)
     GO_TAGS ?= -tags no_cgo
     # We need the go build command to think it's in cgo mode
     export CGO_ENABLED = 1
     export CXXFLAGS := -pthread
     export CGO_CXXFLAGS := -pthread
-
-    CC = /usr/bin/x86_64-w64-mingw32-gcc
-    export CC
+    export CC=/usr/bin/x86_64-w64-mingw32-gcc
     export CXX=/usr/bin/x86_64-w64-mingw32-g++
-    FFMPEG_OPTS += --target-os=mingw32 \
-                   --arch=x86 \
-                   --cpu=x86-64 \
-                   --cross-prefix=x86_64-w64-mingw32- \
-                   --enable-cross-compile
     export AS=x86_64-w64-mingw32-as
     export AR=x86_64-w64-mingw32-ar
     export RANLIB=x86_64-w64-mingw32-ranlib
     export LD=x86_64-w64-mingw32-ld
     export STRIP=x86_64-w64-mingw32-strip
+    FFMPEG_OPTS += --target-os=mingw32 \
+                   --arch=x86 \
+                   --cpu=x86-64 \
+                   --cross-prefix=x86_64-w64-mingw32- \
+                   --enable-cross-compile
 endif
 endif
 
