@@ -53,8 +53,22 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
 --enable-decoder=h264 \
 --enable-decoder=hevc \
 --enable-decoder=mjpeg \
+--enable-demuxer=concat \
+--enable-demuxer=mov \
+--enable-demuxer=mp4 \
+--enable-demuxer=segment \
+--enable-encoder=libx264 \
 --enable-encoder=mjpeg \
---enable-network
+--enable-encoder=mpeg4 \
+--enable-gpl \
+--enable-muxer=mp4 \
+--enable-muxer=segment \
+--enable-network \
+--enable-parser=h264 \
+--enable-parser=hevc \
+--enable-protocol=concat \
+--enable-protocol=crypto \
+--enable-protocol=file \
 
 # Add linker flag -checklinkname=0 for anet https://github.com/wlynxg/anet?tab=readme-ov-file#how-to-build-with-go-1230-or-later.
 PKG_CONFIG_PATH = $(FFMPEG_BUILD)/lib/pkgconfig
@@ -66,7 +80,6 @@ ifeq ($(SOURCE_OS),darwin)
 	SUBST = $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a
 endif
 CGO_LDFLAGS = $(subst -lx264, $(SUBST),$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS))) 
-# if windows add  -lpthread
 ifeq ($(TARGET_OS),windows)
 	CGO_LDFLAGS += -lpthread -static -static-libgcc -static-libstdc++
 endif
@@ -110,7 +123,7 @@ ifeq ($(SOURCE_OS),linux)
     endif
 endif
 ifeq ($(TARGET_ARCH),amd64)
-    GO_TAGS ?= -tags no_cgo
+    # GO_TAGS ?= -tags no_cgo
     # We need the go build command to think it's in cgo mode
     export CGO_ENABLED = 1
     export CXXFLAGS := -pthread

@@ -22,7 +22,7 @@ require (
 	go.uber.org/zap v1.27.0
 	go.viam.com/rdk v0.73.0
 	go.viam.com/test v1.2.4
-	go.viam.com/utils v0.1.141
+	go.viam.com/utils v0.1.142
 	golang.org/x/net v0.37.0
 )
 
@@ -60,7 +60,6 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/bkielbasa/cyclop v1.2.1 // indirect
-	github.com/blackjack/webcam v0.6.1 // indirect
 	github.com/blizzy78/varnamelen v0.8.0 // indirect
 	github.com/bombsimon/wsl/v4 v4.4.1 // indirect
 	github.com/breml/bidichk v0.2.7 // indirect
@@ -344,5 +343,5 @@ require (
 	nhooyr.io/websocket v1.8.7 // indirect
 )
 
+replace go.viam.com/rdk => ./rdk
 replace github.com/viam-modules/video-store => ./video-store
-replace github.com/pion/mediadevices => ./mediadevices
