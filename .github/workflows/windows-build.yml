@@ -9,7 +9,7 @@ on:
       - 'README.md' 
 
 jobs:
-  build-android:
+  build-windows:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
@@ -19,4 +19,4 @@ jobs:
       with:
         target_os: windows
         target_arch: amd64
-        docker_image: ghcr.io/viamrobotics/antique2:amd64-cache
+        docker_image: ghcr.io/viamrobotics/rdk-devenv:amd64-cache
