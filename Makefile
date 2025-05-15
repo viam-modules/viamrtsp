@@ -83,7 +83,7 @@ ifeq ($(SOURCE_OS),darwin)
 endif
 CGO_LDFLAGS = $(subst -lx264, $(SUBST),$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS))) 
 ifeq ($(TARGET_OS),windows)
-	CGO_LDFLAGS += -lpthread -static -static-libgcc -static-libstdc++
+	CGO_LDFLAGS += -static -static-libgcc -static-libstdc++
 endif
 ifeq ($(SOURCE_OS),darwin)
 ifeq ($(shell brew list | grep -w x264 > /dev/null; echo $$?), 1)
@@ -126,12 +126,11 @@ ifeq ($(SOURCE_OS),linux)
 endif
 ifeq ($(TARGET_ARCH),amd64)
     GO_TAGS ?= -tags no_cgo
-    X264_BUILD_DIR ?= $(shell pwd)/x264/windows-amd64/build
     X264_ROOT ?= $(shell pwd)/x264/windows-amd64
+    X264_BUILD_DIR ?= $(X264_ROOT)/build
     # We need the go build command to think it's in cgo mode
     export CGO_ENABLED = 1
-    export CXXFLAGS := -pthread
-    export CGO_CXXFLAGS := -pthread
+    # mingw32 flags refer to 64 bit windows target
     export CC=/usr/bin/x86_64-w64-mingw32-gcc
     export CXX=/usr/bin/x86_64-w64-mingw32-g++
     export AS=x86_64-w64-mingw32-as
@@ -148,7 +147,7 @@ ifeq ($(TARGET_ARCH),amd64)
 endif
 endif
 
-.PHONY: build-ffmpeg tool-install gofmt lint test profile-cpu profile-memory update-rdk module clean clean-all
+.PHONY: build-ffmpeg tool-install gofmt lint test profile-cpu profile-memory update-rdk module clean clean-all.sh.sh
 
 all: $(BIN_OUTPUT_PATH)/viamrtsp $(BIN_OUTPUT_PATH)/discovery
 
