@@ -7,7 +7,7 @@ normalize_arch = $(if $(filter aarch64,$(1)),arm64,$(if $(filter x86_64,$(1)),am
 SOURCE_ARCH := $(call normalize_arch,$(SOURCE_ARCH))
 TARGET_ARCH := $(call normalize_arch,$(TARGET_ARCH))
 
-X264_BUILD_DIR := x264/windows-amd64/build
+X264_BUILD_DIR ?= $(shell pwd)/x264/windows-amd64/build
 
 # Here we will handle error cases where the host/target combinations are not supported.
 SUPPORTED_COMBINATIONS := \
@@ -133,6 +133,7 @@ ifeq ($(SOURCE_OS),linux)
 endif
 ifeq ($(TARGET_ARCH),amd64)
     GO_TAGS ?= -tags no_cgo
+	X264_ROOT ?= $(shell pwd)/x264/windows-amd64
     # We need the go build command to think it's in cgo mode
     export CGO_ENABLED = 1
     export CXXFLAGS := -pthread
@@ -206,9 +207,11 @@ $(FFMPEG_VERSION_PLATFORM):
 $(FFMPEG_BUILD): $(FFMPEG_VERSION_PLATFORM)
 # Only need nasm to build assembly kernels for amd64 targets.
 ifeq ($(SOURCE_OS),linux)
-# ifeq ($(shell dpkg -l | grep -w x264 > /dev/null; echo $$?), 1)
-# 	sudo apt update && sudo apt install -y libx264-dev
-# endif
+ifeq ($(TARGET_OS),linux)
+ifeq ($(shell dpkg -l | grep -w x264 > /dev/null; echo $$?), 1)
+	sudo apt update && sudo apt install -y libx264-dev
+endif
+endif
 ifeq ($(SOURCE_ARCH),amd64)
 	which nasm || (sudo apt update && sudo apt install -y nasm)
 endif
@@ -220,7 +223,7 @@ endif
 endif
 	cd $(FFMPEG_VERSION_PLATFORM) && ./configure $(FFMPEG_OPTS) --logfile=myconfig.log && $(MAKE) -j$(NPROC) && $(MAKE) install
 
-build-ffmpeg: $(NDK_ROOT)
+build-ffmpeg: $(NDK_ROOT) $(X264_BUILD_DIR)
 # Only need nasm to build assembly kernels for amd64 targets.
 ifeq ($(SOURCE_OS),linux)
 ifeq ($(SOURCE_ARCH),amd64)
@@ -252,6 +255,27 @@ endif
 endif
 endif
 
+$(X264_ROOT):
+ifeq ($(TARGET_OS),windows)
+ifeq ($(SOURCE_OS),linux)
+ifeq ($(TARGET_ARCH),amd64)
+	git clone https://code.videolan.org/videolan/x264.git $(X264_ROOT)
+endif
+endif
+endif
+
+$(X264_BUILD_DIR): $(X264_ROOT)
+ifeq ($(TARGET_OS),windows)
+ifeq ($(SOURCE_OS),linux)
+ifeq ($(TARGET_ARCH),amd64)
+	cd $(X264_ROOT) && \
+	./configure --host=x86_64-w64-mingw32 --cross-prefix=x86_64-w64-mingw32- --prefix=$(X264_BUILD_DIR) --enable-static --disable-opencl --disable-asm && \
+	make -j$(NPROC) && \
+	make install
+endif
+endif
+endif
+
 module: $(BIN_OUTPUT_PATH)/viamrtsp
 	cp $(BIN_OUTPUT_PATH)/viamrtsp bin/viamrtsp
 	tar czf module.tar.gz bin/viamrtsp
@@ -262,4 +286,5 @@ clean:
 
 clean-all:
 	rm -rf FFmpeg
+	rm -rf x264
 	git clean -fxd
