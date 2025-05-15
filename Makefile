@@ -118,11 +118,6 @@ endif
 
 ifeq ($(TARGET_OS),windows)
 ifeq ($(SOURCE_OS),linux)
-    ifeq ($(shell which x86_64-w64-mingw32-gcc > /dev/null; echo $$?), 1)
-        $(info MinGW cross compiler not found, installing...)
-        sudo apt-get update && sudo apt-get install -y mingw-w64
-    endif
-endif
 ifeq ($(TARGET_ARCH),amd64)
     GO_TAGS ?= -tags no_cgo
     X264_ROOT ?= $(shell pwd)/x264/windows-amd64
@@ -143,6 +138,7 @@ ifeq ($(TARGET_ARCH),amd64)
                    --cross-prefix=x86_64-w64-mingw32- \
                    --enable-cross-compile \
                    --pkg-config=$(shell pwd)/etc/pkg-config-wrapper.sh
+endif
 endif
 endif
 
@@ -260,6 +256,10 @@ $(X264_BUILD_DIR): $(X264_ROOT)
 ifeq ($(TARGET_OS),windows)
 ifeq ($(SOURCE_OS),linux)
 ifeq ($(TARGET_ARCH),amd64)
+ifeq ($(shell which x86_64-w64-mingw32-gcc > /dev/null; echo $$?), 1)
+	$(info MinGW cross compiler not found, installing...)
+	sudo apt-get update && sudo apt-get install -y mingw-w64
+endif
 	cd $(X264_ROOT) && \
 	./configure --host=x86_64-w64-mingw32 --cross-prefix=x86_64-w64-mingw32- --prefix=$(X264_BUILD_DIR) --enable-static --disable-opencl --disable-asm && \
 	make -j$(NPROC) && \
