@@ -209,7 +209,7 @@ ifeq ($(shell brew list | grep -w x264 > /dev/null; echo $$?), 1)
 	brew update && brew install x264
 endif
 endif
-	cd $(FFMPEG_VERSION_PLATFORM) && ./configure $(FFMPEG_OPTS) --logfile=myconfig.log && $(MAKE) -j$(NPROC) && $(MAKE) install
+	cd $(FFMPEG_VERSION_PLATFORM) && ./configure $(FFMPEG_OPTS) && $(MAKE) -j$(NPROC) && $(MAKE) install
 
 build-ffmpeg: $(NDK_ROOT) $(X264_BUILD_DIR)
 # Only need nasm to build assembly kernels for amd64 targets.
