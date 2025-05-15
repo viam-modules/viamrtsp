@@ -116,11 +116,11 @@ ifeq ($(TARGET_ARCH),arm64)
 endif
 endif
 
-ifeq ($(TARGET_OS),windows)
 ifeq ($(SOURCE_OS),linux)
-    ifeq ($(shell which x86_64-w64-mingw32-gcc > /dev/null; echo $$?), 1)
+    MINGW_INSTALLED := $(shell which x86_64-w64-mingw32-gcc > /dev/null 2>&1; echo $$?)
+    ifeq ($(MINGW_INSTALLED), 1)
         $(info MinGW cross compiler not found, installing...)
-        $(shell sudo apt-get update && sudo apt-get install -y mingw-w64)
+        INSTALL_COMMAND := $(shell sudo apt-get update && sudo apt-get install -y mingw-w64)
     endif
 endif
 ifeq ($(TARGET_ARCH),amd64)
