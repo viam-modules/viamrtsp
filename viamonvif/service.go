@@ -55,14 +55,14 @@ type Config struct {
 }
 
 // Validate validates the discovery service.
-func (cfg *Config) Validate(_ string) ([]string, error) {
+func (cfg *Config) Validate(_ string) ([]string, []string, error) {
 	// check that all creds have usernames set. Note a credential can have both fields empty
 	for _, cred := range cfg.Credentials {
 		if cred.Pass != "" && cred.User == "" {
-			return nil, fmt.Errorf("credential missing username, has password %v", cred.Pass)
+			return nil, nil, fmt.Errorf("credential missing username, has password %v", cred.Pass)
 		}
 	}
-	return []string{}, nil
+	return []string{}, nil, nil
 }
 
 type previewRequest struct {
