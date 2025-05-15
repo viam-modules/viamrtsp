@@ -7,7 +7,6 @@ normalize_arch = $(if $(filter aarch64,$(1)),arm64,$(if $(filter x86_64,$(1)),am
 SOURCE_ARCH := $(call normalize_arch,$(SOURCE_ARCH))
 TARGET_ARCH := $(call normalize_arch,$(TARGET_ARCH))
 
-X264_BUILD_DIR ?= $(shell pwd)/x264/windows-amd64/build
 
 # Here we will handle error cases where the host/target combinations are not supported.
 SUPPORTED_COMBINATIONS := \
@@ -39,10 +38,10 @@ FFMPEG_TAG ?= n6.1
 FFMPEG_VERSION ?= $(shell pwd)/FFmpeg/$(FFMPEG_TAG)
 FFMPEG_VERSION_PLATFORM ?= $(FFMPEG_VERSION)/$(TARGET_OS)-$(TARGET_ARCH)
 FFMPEG_BUILD ?= $(FFMPEG_VERSION_PLATFORM)/build
-FFMPEG_LIBS=    libavformat                        \
-                libavcodec                         \
-                libavutil                          \
-					libswscale                          \
+FFMPEG_LIBS=    libavformat \
+                libavcodec  \
+                libavutil   \
+                libswscale  \
 
 FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
 --enable-static \
@@ -72,9 +71,6 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
 --enable-protocol=concat \
 --enable-protocol=crypto \
 --enable-protocol=file \
-# --extra-cflags="-I/host/x264/windows-amd64/build/include" \
-# --extra-ldflags="-L/host/x264/windows-amd64/build/lib" \
-# --extra-libs="-lx264" \
 
 # Add linker flag -checklinkname=0 for anet https://github.com/wlynxg/anet?tab=readme-ov-file#how-to-build-with-go-1230-or-later.
 PKG_CONFIG_PATH = $(FFMPEG_BUILD)/lib/pkgconfig
@@ -85,9 +81,6 @@ endif
 ifeq ($(SOURCE_OS),darwin)
 	SUBST = $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a
 endif
-# ifeq ($(SOURCE_OS),windows)
-# 	SUBST = -l:libx264.a
-# endif
 CGO_LDFLAGS = $(subst -lx264, $(SUBST),$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS))) 
 ifeq ($(TARGET_OS),windows)
 	CGO_LDFLAGS += -lpthread -static -static-libgcc -static-libstdc++
@@ -133,7 +126,8 @@ ifeq ($(SOURCE_OS),linux)
 endif
 ifeq ($(TARGET_ARCH),amd64)
     GO_TAGS ?= -tags no_cgo
-	X264_ROOT ?= $(shell pwd)/x264/windows-amd64
+    X264_BUILD_DIR ?= $(shell pwd)/x264/windows-amd64/build
+    X264_ROOT ?= $(shell pwd)/x264/windows-amd64
     # We need the go build command to think it's in cgo mode
     export CGO_ENABLED = 1
     export CXXFLAGS := -pthread
@@ -150,7 +144,7 @@ ifeq ($(TARGET_ARCH),amd64)
                    --cpu=x86-64 \
                    --cross-prefix=x86_64-w64-mingw32- \
                    --enable-cross-compile \
-				   --pkg-config=/host/pkg-config-wrapper
+				   --pkg-config=$(shell pwd)/etc/pkg-config-wrapper.sh
 endif
 endif
 
