@@ -7,7 +7,6 @@ normalize_arch = $(if $(filter aarch64,$(1)),arm64,$(if $(filter x86_64,$(1)),am
 SOURCE_ARCH := $(call normalize_arch,$(SOURCE_ARCH))
 TARGET_ARCH := $(call normalize_arch,$(TARGET_ARCH))
 
-
 # Here we will handle error cases where the host/target combinations are not supported.
 SUPPORTED_COMBINATIONS := \
     linux-arm64-linux-arm64 \
@@ -143,7 +142,7 @@ ifeq ($(TARGET_ARCH),amd64)
                    --cpu=x86-64 \
                    --cross-prefix=x86_64-w64-mingw32- \
                    --enable-cross-compile \
-				   --pkg-config=$(shell pwd)/etc/pkg-config-wrapper.sh
+                   --pkg-config=$(shell pwd)/etc/pkg-config-wrapper.sh
 endif
 endif
 

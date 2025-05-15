@@ -71,7 +71,6 @@ func New(_ context.Context, deps resource.Dependencies, conf resource.Config, lo
 
 		mux = newRawSegmenterMux(rtpVs.Segmenter(), c.Name(), logger)
 		if err := mux.init(); err == nil {
-			logger.Info("raw segmenter mux initialized")
 			vs = rtpVs
 		} else {
 			rtpVs.Close()
