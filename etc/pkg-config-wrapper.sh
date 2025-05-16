@@ -1,12 +1,9 @@
 #!/bin/sh
 
-# force pkg-config to look in your x264 build’s pkgconfig dir
+# force pkg-config to look at x264 build pkgconfig dir
 # ffmpeg configure overrides PKG_CONFIG_PATH and PKG_CONFIG_LIBDIR
-# so we need to add wrapper to inject our path
-# SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-# PARENT_DIR="$(dirname "$SCRIPT_DIR")"
+# so we need to add a wrapper to inject the path
 script_path="$0"
-# Handle relative path
 case "$script_path" in
     /*) ;; # Absolute path, do nothing
     *) script_path="$(pwd)/$script_path" ;; # Relative path, make absolute
