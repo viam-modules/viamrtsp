@@ -49,21 +49,21 @@ func TestCamConfig(t *testing.T) {
 func TestDiscoveryConfig(t *testing.T) {
 	t.Run("Test Empty Config", func(t *testing.T) {
 		cfg := Config{}
-		deps, err := cfg.Validate("")
+		deps, _, err := cfg.Validate("")
 		test.That(t, err, test.ShouldBeError, errNoQueries)
 		test.That(t, deps, test.ShouldBeEmpty)
 	})
 	t.Run("Test Valid config", func(t *testing.T) {
 		cfg := Config{Queries: []queryConfig{{ModelName: "good"}}}
 
-		deps, err := cfg.Validate("")
+		deps, _, err := cfg.Validate("")
 		test.That(t, err, test.ShouldBeNil)
 		test.That(t, deps, test.ShouldBeEmpty)
 	})
 	t.Run("Test Invalid Config", func(t *testing.T) {
 		// config needs a ModelName, Manufacturer, or SerialNumber
 		cfg := Config{Queries: []queryConfig{{Network: "bad"}}}
-		deps, err := cfg.Validate("")
+		deps, _, err := cfg.Validate("")
 		test.That(t, err, test.ShouldBeError, errEmptyQuery)
 		test.That(t, deps, test.ShouldBeEmpty)
 	})
