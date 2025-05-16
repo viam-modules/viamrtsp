@@ -50,16 +50,16 @@ type queryConfig struct {
 }
 
 // Validate validates the discovery service.
-func (cfg *Config) Validate(_ string) ([]string, error) {
+func (cfg *Config) Validate(_ string) ([]string, []string, error) {
 	if len(cfg.Queries) == 0 {
-		return []string{}, errNoQueries
+		return []string{}, nil, errNoQueries
 	}
 	for _, query := range cfg.Queries {
 		if query.ModelName == "" && query.Manufacturer == "" && query.SerialNumber == "" {
-			return []string{}, errEmptyQuery
+			return []string{}, nil, errEmptyQuery
 		}
 	}
-	return []string{}, nil
+	return []string{}, nil, nil
 }
 
 type upnpDiscovery struct {

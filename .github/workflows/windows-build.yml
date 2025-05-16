@@ -1,0 +1,22 @@
+name: Build viamrtsp for Windows
+
+on:
+  push:
+    paths-ignore:
+      - 'README.md'
+  pull_request:
+    paths-ignore:
+      - 'README.md' 
+
+jobs:
+  build-windows:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Build module
+      uses: ./.github/actions/build-module
+      with:
+        target_os: windows
+        target_arch: amd64
+        docker_image: ghcr.io/viamrobotics/rdk-devenv:amd64-cache
