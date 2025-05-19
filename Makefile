@@ -266,7 +266,12 @@ ifeq ($(shell which x86_64-w64-mingw32-gcc > /dev/null; echo $$?), 1)
 	sudo apt-get update && sudo apt-get install -y mingw-w64
 endif
 	cd $(X264_ROOT) && \
-	./configure --host=x86_64-w64-mingw32 --cross-prefix=x86_64-w64-mingw32- --prefix=$(X264_BUILD_DIR) --enable-static --disable-opencl --disable-asm && \
+	./configure \
+		--host=x86_64-w64-mingw32 \
+		--cross-prefix=x86_64-w64-mingw32- \
+		--prefix=$(X264_BUILD_DIR) \
+		--enable-static --disable-opencl \
+		--disable-asm && \
 	make -j$(NPROC) && \
 	make install
 endif
