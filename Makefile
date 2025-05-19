@@ -31,6 +31,11 @@ else
 endif
 
 BIN_OUTPUT_PATH = bin/$(TARGET_OS)-$(TARGET_ARCH)
+ifeq ($(TARGET_OS),windows)
+	BIN_SUFFIX := .exe
+endif
+BIN_VIAMRTSP := $(BIN_OUTPUT_PATH)/viamrtsp$(BIN_SUFFIX)
+BIN_DISCOVERY := $(BIN_OUTPUT_PATH)/discovery$(BIN_SUFFIX)
 TOOL_BIN = bin/gotools/$(shell uname -s)-$(shell uname -m)
 
 FFMPEG_TAG ?= n6.1
@@ -144,21 +149,21 @@ endif
 
 .PHONY: build-ffmpeg tool-install gofmt lint test profile-cpu profile-memory update-rdk module clean clean-all
 
-all: $(BIN_OUTPUT_PATH)/viamrtsp $(BIN_OUTPUT_PATH)/discovery
+all: $(BIN_VIAMRTSP) $(BIN_DISCOVERY)
 
 # We set GOOS, GOARCH, GO_TAGS, and GO_LDFLAGS to support cross-compilation for android targets.
-$(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
+$(BIN_VIAMRTSP): build-ffmpeg *.go cmd/module/*.go
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" \
 	CGO_CFLAGS="$(CGO_CFLAGS)" \
 	GOOS=$(TARGET_OS) \
 	GOARCH=$(TARGET_ARCH) \
-	go build $(GO_TAGS) -ldflags="-checklinkname=0" -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
+	go build $(GO_TAGS) -ldflags="-checklinkname=0" -o $(BIN_VIAMRTSP) cmd/module/cmd.go
 
-$(BIN_OUTPUT_PATH)/discovery: build-ffmpeg *.go cmd/discovery/*.go
+$(BIN_DISCOVERY): build-ffmpeg *.go cmd/discovery/*.go
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" \
 	CGO_CFLAGS="$(CGO_CFLAGS)" \
 	GOOS=$(TARGET_OS) \
-	GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) -ldflags="-checklinkname=0" -o $(BIN_OUTPUT_PATH)/discovery cmd/discovery/cmd.go
+	GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) -ldflags="-checklinkname=0" -o $(BIN_DISCOVERY) cmd/discovery/cmd.go
 
 tool-install:
 	GOBIN=`pwd`/$(TOOL_BIN) go install \
@@ -268,13 +273,13 @@ endif
 endif
 endif
 
-module: $(BIN_OUTPUT_PATH)/viamrtsp
-	cp $(BIN_OUTPUT_PATH)/viamrtsp bin/viamrtsp
-	tar czf module.tar.gz bin/viamrtsp
-	rm bin/viamrtsp
+module: $(BIN_VIAMRTSP)
+	cp $(BIN_VIAMRTSP) bin/viamrtsp$(BIN_SUFFIX)
+	tar czf module.tar.gz bin/viamrtsp$(BIN_SUFFIX)
+	rm bin/viamrtsp$(BIN_SUFFIX)
 
 clean:
-	rm -rf $(BIN_OUTPUT_PATH)/viamrtsp module.tar.gz
+	rm -rf $(BIN_VIAMRTSP) $(BIN_DISCOVERY) module.tar.gz
 
 clean-all:
 	rm -rf FFmpeg
