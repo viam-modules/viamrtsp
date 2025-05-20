@@ -1,24 +1,37 @@
 name: Build & publish module to registry
 
+# on:
+#   release:
+#     types: [published]
+
 on:
-  release:
-    types: [published]
+  push:
+    paths-ignore:
+      - 'README.md'
+  pull_request:
+    paths-ignore:
+      - 'README.md'
 
 jobs:
   publish:
     strategy:
       matrix:
         include:
-          - platform: linux/amd64
+          # - platform: linux/amd64
+          #   runner: ubuntu-latest
+          #   target_os: linux
+          #   target_arch: amd64
+          #   docker_image: ghcr.io/viamrobotics/antique2:amd64-cache
+          # - platform: linux/arm64
+          #   runner: buildjet-8vcpu-ubuntu-2204-arm
+          #   target_os: linux
+          #   target_arch: arm64
+          #   docker_image: ghcr.io/viamrobotics/antique2:arm64-cache
+          - platform: windows/amd64
             runner: ubuntu-latest
-            target_os: linux
+            target_os: windows
             target_arch: amd64
             docker_image: ghcr.io/viamrobotics/antique2:amd64-cache
-          - platform: linux/arm64
-            runner: buildjet-8vcpu-ubuntu-2204-arm
-            target_os: linux
-            target_arch: arm64
-            docker_image: ghcr.io/viamrobotics/antique2:arm64-cache
           # - platform: android/arm64
           #   runner: ubuntu-latest
           #   target_os: android
@@ -43,6 +56,7 @@ jobs:
         meta-path: meta.json
         module-path: module.tar.gz
         platform: ${{ matrix.platform }}
-        version: ${{ github.ref_name }}
+        # version: ${{ github.ref_name }}
+        version: 0.4.7-rc23-windows
         key-id: ${{ secrets.VIAM_DEV_API_KEY_ID }}
         key-value: ${{ secrets.VIAM_DEV_API_KEY }}
