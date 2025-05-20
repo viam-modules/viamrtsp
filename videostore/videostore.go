@@ -7,7 +7,9 @@ import (
 	"errors"
 	"path/filepath"
 
+	vscamera "github.com/viam-modules/video-store/model/camera"
 	"github.com/viam-modules/video-store/videostore"
+	vsutils "github.com/viam-modules/video-store/videostore/utils"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/components/generic"
 	"go.viam.com/rdk/logging"
@@ -44,7 +46,7 @@ type service struct {
 }
 
 // New creates a new videostore.
-func New(_ context.Context, deps resource.Dependencies, conf resource.Config, logger logging.Logger) (resource.Resource, error) {
+func New(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger logging.Logger) (resource.Resource, error) {
 	newConf, err := resource.NativeConfig[*Config](conf)
 	if err != nil {
 		logger.Error(err.Error())
@@ -61,7 +63,7 @@ func New(_ context.Context, deps resource.Dependencies, conf resource.Config, lo
 		if err != nil {
 			return nil, err
 		}
-		rtpVs, err := videostore.NewRTPVideoStore(videostore.Config{
+		rtpVs, err := videostore.NewRTPVideoStore(ctx, videostore.Config{
 			Name:    conf.ResourceName().Name,
 			Type:    videostore.SourceTypeRTP,
 			Storage: vsConfig.Storage,
@@ -76,7 +78,7 @@ func New(_ context.Context, deps resource.Dependencies, conf resource.Config, lo
 		} else {
 			rtpVs.Close()
 			vsConfig.FramePoller.Camera = c
-			fVs, err := videostore.NewFramePollingVideoStore(videostore.Config{
+			fVs, err := videostore.NewFramePollingVideoStore(ctx, videostore.Config{
 				Name:        conf.ResourceName().Name,
 				Type:        videostore.SourceTypeFrame,
 				Storage:     vsConfig.Storage,
@@ -89,7 +91,7 @@ func New(_ context.Context, deps resource.Dependencies, conf resource.Config, lo
 			vs = fVs
 		}
 	} else {
-		vs, err = videostore.NewReadOnlyVideoStore(videostore.Config{
+		vs, err = videostore.NewReadOnlyVideoStore(ctx, videostore.Config{
 			Name:    conf.ResourceName().Name,
 			Type:    videostore.SourceTypeReadOnly,
 			Storage: vsConfig.Storage,
@@ -170,6 +172,13 @@ func (s *service) DoCommand(ctx context.Context, command map[string]interface{})
 			"command": "fetch",
 			"video":   videoBytesBase64,
 		}, nil
+	case "get-storage-state":
+		s.logger.Debug("get-storage-state command received")
+		state, err := s.vs.GetStorageState(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return vscamera.GetStorageStateDoCommandResponse(state), nil
 	default:
 		return nil, errors.New("invalid command")
 	}
@@ -180,7 +189,7 @@ func toSaveCommand(command map[string]interface{}) (*videostore.SaveRequest, err
 	if !ok {
 		return nil, errors.New("from timestamp not found")
 	}
-	from, err := videostore.ParseDateTimeString(fromStr)
+	from, err := vsutils.ParseDateTimeString(fromStr)
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +197,7 @@ func toSaveCommand(command map[string]interface{}) (*videostore.SaveRequest, err
 	if !ok {
 		return nil, errors.New("to timestamp not found")
 	}
-	to, err := videostore.ParseDateTimeString(toStr)
+	to, err := vsutils.ParseDateTimeString(toStr)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +222,7 @@ func toFetchCommand(command map[string]interface{}) (*videostore.FetchRequest, e
 	if !ok {
 		return nil, errors.New("from timestamp not found")
 	}
-	from, err := videostore.ParseDateTimeString(fromStr)
+	from, err := vsutils.ParseDateTimeString(fromStr)
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +230,7 @@ func toFetchCommand(command map[string]interface{}) (*videostore.FetchRequest, e
 	if !ok {
 		return nil, errors.New("to timestamp not found")
 	}
-	to, err := videostore.ParseDateTimeString(toStr)
+	to, err := vsutils.ParseDateTimeString(toStr)
 	if err != nil {
 		return nil, err
 	}
