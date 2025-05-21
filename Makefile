@@ -270,7 +270,8 @@ endif
 		--host=x86_64-w64-mingw32 \
 		--cross-prefix=x86_64-w64-mingw32- \
 		--prefix=$(X264_BUILD_DIR) \
-		--enable-static --disable-opencl \
+		--enable-static \
+		--disable-opencl \
 		--disable-asm && \
 	make -j$(NPROC) && \
 	make install
