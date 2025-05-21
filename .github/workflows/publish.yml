@@ -19,6 +19,11 @@ jobs:
             target_os: linux
             target_arch: arm64
             docker_image: ghcr.io/viamrobotics/antique2:arm64-cache
+          - platform: windows/amd64
+            runner: ubuntu-latest
+            target_os: windows
+            target_arch: amd64
+            docker_image: ghcr.io/viamrobotics/antique2:amd64-cache
           # - platform: android/arm64
           #   runner: ubuntu-latest
           #   target_os: android

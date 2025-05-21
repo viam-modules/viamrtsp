@@ -13,7 +13,8 @@ SUPPORTED_COMBINATIONS := \
     linux-amd64-linux-amd64 \
     linux-amd64-android-arm64 \
     darwin-arm64-darwin-arm64 \
-    darwin-arm64-android-arm64
+    darwin-arm64-android-arm64 \
+    linux-amd64-windows-amd64
 CURRENT_COMBINATION := $(SOURCE_OS)-$(SOURCE_ARCH)-$(TARGET_OS)-$(TARGET_ARCH)
 ifneq (,$(filter $(CURRENT_COMBINATION),$(SUPPORTED_COMBINATIONS)))
     $(info Supported combination: $(CURRENT_COMBINATION))
@@ -30,16 +31,21 @@ else
 endif
 
 BIN_OUTPUT_PATH = bin/$(TARGET_OS)-$(TARGET_ARCH)
+ifeq ($(TARGET_OS),windows)
+	BIN_SUFFIX := .exe
+endif
+BIN_VIAMRTSP := $(BIN_OUTPUT_PATH)/viamrtsp$(BIN_SUFFIX)
+BIN_DISCOVERY := $(BIN_OUTPUT_PATH)/discovery$(BIN_SUFFIX)
 TOOL_BIN = bin/gotools/$(shell uname -s)-$(shell uname -m)
 
 FFMPEG_TAG ?= n6.1
 FFMPEG_VERSION ?= $(shell pwd)/FFmpeg/$(FFMPEG_TAG)
 FFMPEG_VERSION_PLATFORM ?= $(FFMPEG_VERSION)/$(TARGET_OS)-$(TARGET_ARCH)
 FFMPEG_BUILD ?= $(FFMPEG_VERSION_PLATFORM)/build
-FFMPEG_LIBS=    libavformat                        \
-                libavcodec                         \
-                libavutil                          \
-                libswscale                          \
+FFMPEG_LIBS=    libavformat \
+                libavcodec  \
+                libavutil   \
+                libswscale  \
 
 FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
 --enable-static \
@@ -80,6 +86,9 @@ ifeq ($(SOURCE_OS),darwin)
 	SUBST = $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a
 endif
 CGO_LDFLAGS = $(subst -lx264, $(SUBST),$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS))) 
+ifeq ($(TARGET_OS),windows)
+	CGO_LDFLAGS += -static -static-libgcc -static-libstdc++
+endif
 ifeq ($(SOURCE_OS),darwin)
 ifeq ($(shell brew list | grep -w x264 > /dev/null; echo $$?), 1)
 	brew update && brew install x264
@@ -112,23 +121,49 @@ ifeq ($(TARGET_ARCH),arm64)
 endif
 endif
 
+ifeq ($(TARGET_OS),windows)
+ifeq ($(SOURCE_OS),linux)
+ifeq ($(TARGET_ARCH),amd64)
+    GO_TAGS ?= -tags no_cgo
+    X264_ROOT ?= $(shell pwd)/x264/windows-amd64
+    X264_BUILD_DIR ?= $(X264_ROOT)/build
+    # We need the go build command to think it's in cgo mode
+    export CGO_ENABLED = 1
+    # mingw32 flags refer to 64 bit windows target
+    export CC=/usr/bin/x86_64-w64-mingw32-gcc
+    export CXX=/usr/bin/x86_64-w64-mingw32-g++
+    export AS=x86_64-w64-mingw32-as
+    export AR=x86_64-w64-mingw32-ar
+    export RANLIB=x86_64-w64-mingw32-ranlib
+    export LD=x86_64-w64-mingw32-ld
+    export STRIP=x86_64-w64-mingw32-strip
+    FFMPEG_OPTS += --target-os=mingw32 \
+                   --arch=x86 \
+                   --cpu=x86-64 \
+                   --cross-prefix=x86_64-w64-mingw32- \
+                   --enable-cross-compile \
+                   --pkg-config=$(shell pwd)/etc/pkg-config-wrapper.sh
+endif
+endif
+endif
+
 .PHONY: build-ffmpeg tool-install gofmt lint test profile-cpu profile-memory update-rdk module clean clean-all
 
-all: $(BIN_OUTPUT_PATH)/viamrtsp $(BIN_OUTPUT_PATH)/discovery
+all: $(BIN_VIAMRTSP) $(BIN_DISCOVERY)
 
 # We set GOOS, GOARCH, GO_TAGS, and GO_LDFLAGS to support cross-compilation for android targets.
-$(BIN_OUTPUT_PATH)/viamrtsp: build-ffmpeg *.go cmd/module/*.go
+$(BIN_VIAMRTSP): build-ffmpeg *.go cmd/module/*.go
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" \
 	CGO_CFLAGS="$(CGO_CFLAGS)" \
 	GOOS=$(TARGET_OS) \
 	GOARCH=$(TARGET_ARCH) \
-	go build $(GO_TAGS) -ldflags="-checklinkname=0" -o $(BIN_OUTPUT_PATH)/viamrtsp cmd/module/cmd.go
+	go build $(GO_TAGS) -ldflags="-checklinkname=0" -o $(BIN_VIAMRTSP) cmd/module/cmd.go
 
-$(BIN_OUTPUT_PATH)/discovery: build-ffmpeg *.go cmd/discovery/*.go
+$(BIN_DISCOVERY): build-ffmpeg *.go cmd/discovery/*.go
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" \
 	CGO_CFLAGS="$(CGO_CFLAGS)" \
 	GOOS=$(TARGET_OS) \
-	GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) -ldflags="-checklinkname=0" -o $(BIN_OUTPUT_PATH)/discovery cmd/discovery/cmd.go
+	GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) -ldflags="-checklinkname=0" -o $(BIN_DISCOVERY) cmd/discovery/cmd.go
 
 tool-install:
 	GOBIN=`pwd`/$(TOOL_BIN) go install \
@@ -165,8 +200,10 @@ $(FFMPEG_VERSION_PLATFORM):
 $(FFMPEG_BUILD): $(FFMPEG_VERSION_PLATFORM)
 # Only need nasm to build assembly kernels for amd64 targets.
 ifeq ($(SOURCE_OS),linux)
+ifeq ($(TARGET_OS),linux)
 ifeq ($(shell dpkg -l | grep -w x264 > /dev/null; echo $$?), 1)
 	sudo apt update && sudo apt install -y libx264-dev
+endif
 endif
 ifeq ($(SOURCE_ARCH),amd64)
 	which nasm || (sudo apt update && sudo apt install -y nasm)
@@ -179,7 +216,7 @@ endif
 endif
 	cd $(FFMPEG_VERSION_PLATFORM) && ./configure $(FFMPEG_OPTS) && $(MAKE) -j$(NPROC) && $(MAKE) install
 
-build-ffmpeg: $(NDK_ROOT)
+build-ffmpeg: $(NDK_ROOT) $(X264_BUILD_DIR)
 # Only need nasm to build assembly kernels for amd64 targets.
 ifeq ($(SOURCE_OS),linux)
 ifeq ($(SOURCE_ARCH),amd64)
@@ -211,14 +248,46 @@ endif
 endif
 endif
 
-module: $(BIN_OUTPUT_PATH)/viamrtsp
-	cp $(BIN_OUTPUT_PATH)/viamrtsp bin/viamrtsp
-	tar czf module.tar.gz bin/viamrtsp
-	rm bin/viamrtsp
+$(X264_ROOT):
+ifeq ($(TARGET_OS),windows)
+ifeq ($(SOURCE_OS),linux)
+ifeq ($(TARGET_ARCH),amd64)
+	git clone https://code.videolan.org/videolan/x264.git $(X264_ROOT)
+endif
+endif
+endif
+
+$(X264_BUILD_DIR): $(X264_ROOT)
+ifeq ($(TARGET_OS),windows)
+ifeq ($(SOURCE_OS),linux)
+ifeq ($(TARGET_ARCH),amd64)
+ifeq ($(shell which x86_64-w64-mingw32-gcc > /dev/null; echo $$?), 1)
+	$(info MinGW cross compiler not found, installing...)
+	sudo apt-get update && sudo apt-get install -y mingw-w64
+endif
+	cd $(X264_ROOT) && \
+	./configure \
+		--host=x86_64-w64-mingw32 \
+		--cross-prefix=x86_64-w64-mingw32- \
+		--prefix=$(X264_BUILD_DIR) \
+		--enable-static \
+		--disable-opencl \
+		--disable-asm && \
+	make -j$(NPROC) && \
+	make install
+endif
+endif
+endif
+
+module: $(BIN_VIAMRTSP)
+	cp $(BIN_VIAMRTSP) bin/viamrtsp$(BIN_SUFFIX)
+	tar czf module.tar.gz bin/viamrtsp$(BIN_SUFFIX)
+	rm bin/viamrtsp$(BIN_SUFFIX)
 
 clean:
-	rm -rf $(BIN_OUTPUT_PATH)/viamrtsp module.tar.gz
+	rm -rf $(BIN_VIAMRTSP) $(BIN_DISCOVERY) module.tar.gz
 
 clean-all:
 	rm -rf FFmpeg
+	rm -rf x264
 	git clean -fxd

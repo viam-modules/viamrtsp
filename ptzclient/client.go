@@ -48,18 +48,18 @@ type Config struct {
 }
 
 // Validate validates the configuration for the ONVIF PTZ client.
-func (cfg *Config) Validate(path string) ([]string, error) {
+func (cfg *Config) Validate(path string) ([]string, []string, error) {
 	if cfg.Address == "" {
-		return nil, fmt.Errorf(`expected "address" attribute for %s %q`, Model.String(), path)
+		return nil, nil, fmt.Errorf(`expected "address" attribute for %s %q`, Model.String(), path)
 	}
 
 	if cfg.Username == "" {
-		return nil, fmt.Errorf(`expected "username" attribute for %s %q`, Model.String(), path)
+		return nil, nil, fmt.Errorf(`expected "username" attribute for %s %q`, Model.String(), path)
 	}
 	if cfg.Password == "" {
-		return nil, fmt.Errorf(`expected "password" attribute for %s %q`, Model.String(), path)
+		return nil, nil, fmt.Errorf(`expected "password" attribute for %s %q`, Model.String(), path)
 	}
-	return nil, nil
+	return nil, nil, nil
 }
 
 type onvifPtzClient struct {
