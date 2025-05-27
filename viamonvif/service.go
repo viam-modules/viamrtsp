@@ -309,8 +309,13 @@ func downloadPreviewImage(ctx context.Context, logger logging.Logger, snapshotUR
 	}
 
 	contentType := resp.Header.Get("Content-Type")
-	if !isImageMIMEType(contentType) {
-		return "", fmt.Errorf("snapshot URI returned non-image content type: %s", contentType)
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse content type %s: %w", contentType, err)
+	}
+	isImage := strings.HasPrefix(mediaType, "image/")
+	if !isImage {
+		return "", fmt.Errorf("snapshot URI returned non-image mime type: %s", mediaType)
 	}
 	imageBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -321,14 +326,6 @@ func downloadPreviewImage(ctx context.Context, logger logging.Logger, snapshotUR
 	dataURL := formatDataURL(contentType, imageBytes)
 
 	return dataURL, nil
-}
-
-func isImageMIMEType(mimeType string) bool {
-	mediaType, _, err := mime.ParseMediaType(mimeType)
-	if err != nil {
-		return false
-	}
-	return strings.HasPrefix(mediaType, "image/")
 }
 
 // fetchImageFromRTSPURL fetches the image from the rtsp URL and returns it as a data URL.

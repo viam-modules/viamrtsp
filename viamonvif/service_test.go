@@ -324,7 +324,7 @@ func TestDoCommandPreview(t *testing.T) {
 		result, err := dis.DoCommand(ctx, command)
 		test.That(t, err, test.ShouldNotBeNil)
 		test.That(t, result, test.ShouldBeNil)
-		test.That(t, err.Error(), test.ShouldContainSubstring, "snapshot URI returned non-image content type")
+		test.That(t, err.Error(), test.ShouldContainSubstring, "snapshot URI returned non-image")
 		test.That(t, err.Error(), test.ShouldContainSubstring, "text/html")
 	})
 }
