@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -308,6 +309,14 @@ func downloadPreviewImage(ctx context.Context, logger logging.Logger, snapshotUR
 	}
 
 	contentType := resp.Header.Get("Content-Type")
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse content type %s: %w", contentType, err)
+	}
+	isImage := strings.HasPrefix(mediaType, "image/")
+	if !isImage {
+		return "", fmt.Errorf("snapshot URI returned non-image mime type: %s", mediaType)
+	}
 	imageBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to read image data from http response: %w", err)
