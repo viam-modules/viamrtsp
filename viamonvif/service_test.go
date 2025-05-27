@@ -304,12 +304,12 @@ func TestDoCommandPreview(t *testing.T) {
 	})
 
 	t.Run("Test preview command with HTML content type instead of image", func(t *testing.T) {
-		server := startTestHTTPServer(t, "/snapshot", http.StatusOK, "text/html", "<html><body>Not an image</body></html>", false)
+		server := startTestHTTPServer(t, "/invalid_snapshot", http.StatusOK, "text/html", "<html><body>Not an image</body></html>", false)
 		defer server.Close()
 
 		dis := &rtspDiscovery{
 			rtspToSnapshotURIs: map[string]string{
-				"rtsp://camera1/stream": server.URL + "/snapshot",
+				"rtsp://camera1/stream": server.URL + "/invalid_snapshot",
 			},
 			logger: logger,
 		}
