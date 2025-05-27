@@ -302,6 +302,31 @@ func TestDoCommandPreview(t *testing.T) {
 		test.That(t, err.Error(), test.ShouldContainSubstring, "snapshot error")
 		test.That(t, err.Error(), test.ShouldContainSubstring, "both snapshot and RTSP fetch failed")
 	})
+
+	t.Run("Test preview command with HTML content type instead of image", func(t *testing.T) {
+		server := startTestHTTPServer(t, "/snapshot", http.StatusOK, "text/html", "<html><body>Not an image</body></html>", false)
+		defer server.Close()
+
+		dis := &rtspDiscovery{
+			rtspToSnapshotURIs: map[string]string{
+				"rtsp://camera1/stream": server.URL + "/snapshot",
+			},
+			logger: logger,
+		}
+
+		command := map[string]interface{}{
+			"command": "preview",
+			"attributes": map[string]interface{}{
+				"rtsp_address": "rtsp://camera1/stream",
+			},
+		}
+
+		result, err := dis.DoCommand(ctx, command)
+		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, result, test.ShouldBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "snapshot URI returned non-image content type")
+		test.That(t, err.Error(), test.ShouldContainSubstring, "text/html")
+	})
 }
 
 func startTestHTTPServer(t *testing.T, path string, statusCode int, contentType, responseBody string, useTLS bool) *httptest.Server {
