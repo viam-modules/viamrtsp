@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"runtime"
 
 	"github.com/viam-modules/viamrtsp"
 	"github.com/viam-modules/viamrtsp/ptzclient"
@@ -34,10 +35,12 @@ func realMain(ctx context.Context) error {
 			return err
 		}
 	}
-
-	err = myMod.AddModelFromRegistry(ctx, generic.API, videostore.Model)
-	if err != nil {
-		return err
+	if runtime.GOOS != "windows" {
+		// Only register on non-Windows platforms
+		err = myMod.AddModelFromRegistry(ctx, generic.API, videostore.Model)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = myMod.AddModelFromRegistry(ctx, discovery.API, viamonvif.Model)
