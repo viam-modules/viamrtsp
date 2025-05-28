@@ -35,8 +35,10 @@ func realMain(ctx context.Context) error {
 			return err
 		}
 	}
+	// Video storage functionality is not supported on Windows due to the inability
+	// to save segment files with UTC timestamps.
+	// TODO(RSDK-10759): Add video store Windows support
 	if runtime.GOOS != "windows" {
-		// Only register on non-Windows platforms
 		err = myMod.AddModelFromRegistry(ctx, generic.API, videostore.Model)
 		if err != nil {
 			return err
