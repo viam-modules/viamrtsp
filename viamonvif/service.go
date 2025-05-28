@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -141,7 +142,9 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 		// registered, `tryMDNS` will additionally mutate the `camInfo.RTSPURLs` to use the dns
 		// hostname rather than a raw IP. Such that the camera configs we are about to generate will
 		// use the dns hostname.
-		camInfo.tryMDNS(dis.mdnsServer, dis.logger)
+		if runtime.GOOS != "windows" {
+			camInfo.tryMDNS(dis.mdnsServer, dis.logger)
+		}
 
 		camConfigs, err := createCamerasFromURLs(camInfo, dis.Name().ShortName(), dis.logger)
 		if err != nil {
