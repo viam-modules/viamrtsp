@@ -142,6 +142,8 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 		// registered, `tryMDNS` will additionally mutate the `camInfo.RTSPURLs` to use the dns
 		// hostname rather than a raw IP. Such that the camera configs we are about to generate will
 		// use the dns hostname.
+		// mDNS hostname to IP address resolution is not working on Windows so we skip it.
+		// TODO(RSDK-10796): Add windows mDNS support to zeroconf fork
 		if runtime.GOOS != "windows" {
 			camInfo.tryMDNS(dis.mdnsServer, dis.logger)
 		}
