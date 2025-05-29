@@ -40,6 +40,7 @@ const (
 	snapshotClientTimeout = 5 * time.Second
 	rtspPollTimeout       = 5 * time.Second
 	rtspImageInterval     = 100 * time.Millisecond
+	rtspNameSaltLength    = 4
 	imageReqMimeType      = "image/jpeg"
 )
 
@@ -385,7 +386,7 @@ func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL s
 
 // generateUniqueName creates a unique name by adding timestamp and random bytes
 func generateUniqueName(prefix string) (string, error) {
-	randomBytes := make([]byte, 4)
+	randomBytes := make([]byte, rtspNameSaltLength)
 	if _, err := rand.Read(randomBytes); err != nil {
 		return "", err
 	}

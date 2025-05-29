@@ -378,7 +378,7 @@ func TestDoCommandPreview(t *testing.T) {
 		results := make(chan resultPair, 2)
 
 		// Launch two concurrent requests
-		for i := 0; i < 2; i++ {
+		for range 2 {
 			go func() {
 				defer wg.Done()
 				r, e := dis.DoCommand(ctx, command)
