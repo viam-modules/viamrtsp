@@ -3,8 +3,10 @@ package viamonvif
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/tls"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -334,8 +336,12 @@ func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL s
 	rtspConfig := viamrtsp.Config{
 		Address: rtspURL,
 	}
+	uniqueName, err := generateUniqueName("tmp-camera")
+	if err != nil {
+		return "", fmt.Errorf("failed to generate unique camera name: %w", err)
+	}
 	resourceConfig := resource.Config{
-		Name:                "tmp-camera",
+		Name:                uniqueName,
 		API:                 camera.API,
 		Model:               viamrtsp.ModelAgnostic,
 		ConvertedAttributes: &rtspConfig,
@@ -375,6 +381,18 @@ func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL s
 			return "", fmt.Errorf("context canceled while fetching image from RTSP camera: %w", ctx.Err())
 		}
 	}
+}
+
+// generateUniqueName creates a unique name by adding timestamp and random bytes
+func generateUniqueName(prefix string) (string, error) {
+	randomBytes := make([]byte, 4)
+	if _, err := rand.Read(randomBytes); err != nil {
+		return "", err
+	}
+	timestamp := time.Now().UnixNano()
+	randomHex := hex.EncodeToString(randomBytes)
+	uniqueName := fmt.Sprintf("%s-%d-%s", prefix, timestamp, randomHex)
+	return uniqueName, nil
 }
 
 func createCamerasFromURLs(l CameraInfo, discoveryDependencyName string, logger logging.Logger) ([]resource.Config, error) {
