@@ -27,6 +27,7 @@ go.work
 viamrtsp
 module.tar.gz
 FFmpeg
+x264
 android-ndk*
 ndk
 cpu-profile.txt

@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"runtime"
 
 	"github.com/viam-modules/viamrtsp"
 	"github.com/viam-modules/viamrtsp/ptzclient"
@@ -34,10 +35,14 @@ func realMain(ctx context.Context) error {
 			return err
 		}
 	}
-
-	err = myMod.AddModelFromRegistry(ctx, generic.API, videostore.Model)
-	if err != nil {
-		return err
+	// Video storage functionality is not supported on Windows due to the inability
+	// to save segment files with UTC timestamps.
+	// TODO(RSDK-10759): Add video store Windows support
+	if runtime.GOOS != "windows" {
+		err = myMod.AddModelFromRegistry(ctx, generic.API, videostore.Model)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = myMod.AddModelFromRegistry(ctx, discovery.API, viamonvif.Model)

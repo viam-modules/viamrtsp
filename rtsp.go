@@ -121,10 +121,10 @@ type codecFormat struct {
 }
 
 // Validate checks to see if the attributes of the model are valid.
-func (conf *Config) Validate(path string) ([]string, error) {
+func (conf *Config) Validate(path string) ([]string, []string, error) {
 	_, err := base.ParseURL(conf.Address)
 	if err != nil {
-		return nil, fmt.Errorf("invalid address '%s' for component at path '%s': %w", conf.Address, path, err)
+		return nil, nil, fmt.Errorf("invalid address '%s' for component at path '%s': %w", conf.Address, path, err)
 	}
 
 	var deps []string
@@ -132,7 +132,7 @@ func (conf *Config) Validate(path string) ([]string, error) {
 		deps = []string{conf.DiscoveryDep}
 	}
 
-	return deps, nil
+	return deps, nil, nil
 }
 
 func (conf *Config) parseAndFixAddress(ctx context.Context, logger logging.Logger) (*base.URL, error) {

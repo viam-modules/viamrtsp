@@ -187,17 +187,17 @@ func TestRTSPCamera(t *testing.T) {
 func TestRTSPConfig(t *testing.T) {
 	// success
 	rtspConf := &Config{Address: "rtsp://example.com:5000"}
-	_, err := rtspConf.Validate("path")
+	_, _, err := rtspConf.Validate("path")
 	test.That(t, err, test.ShouldBeNil)
 	// badly formatted rtsp address
 	rtspConf = &Config{Address: "http://example.com"}
-	_, err = rtspConf.Validate("path")
+	_, _, err = rtspConf.Validate("path")
 	test.That(t, err, test.ShouldNotBeNil)
 	test.That(t, err.Error(), test.ShouldContainSubstring, "unsupported scheme")
 	rtspConf = &Config{
 		Address: "rtsp://example.com:5000",
 	}
-	_, err = rtspConf.Validate("path")
+	_, _, err = rtspConf.Validate("path")
 	test.That(t, err, test.ShouldBeNil)
 }
 

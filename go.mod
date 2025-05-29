@@ -20,10 +20,10 @@ require (
 	github.com/viam-modules/video-store v0.0.7
 	github.com/viamrobotics/zeroconf v1.0.12
 	go.uber.org/zap v1.27.0
-	go.viam.com/rdk v0.73.0
+	go.viam.com/rdk v0.75.1-0.20250515175421-57f5948fd245
 	go.viam.com/test v1.2.4
-	go.viam.com/utils v0.1.141
-	golang.org/x/net v0.37.0
+	go.viam.com/utils v0.1.142
+	golang.org/x/net v0.38.0
 )
 
 require (
@@ -60,7 +60,6 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/bkielbasa/cyclop v1.2.1 // indirect
-	github.com/blackjack/webcam v0.6.1 // indirect
 	github.com/blizzy78/varnamelen v0.8.0 // indirect
 	github.com/bombsimon/wsl/v4 v4.4.1 // indirect
 	github.com/breml/bidichk v0.2.7 // indirect
@@ -312,7 +311,7 @@ require (
 	go.uber.org/automaxprocs v1.5.3 // indirect
 	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.viam.com/api v0.1.432 // indirect
+	go.viam.com/api v0.1.435 // indirect
 	goji.io v2.0.2+incompatible // indirect
 	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/exp v0.0.0-20240904232852-e7e105dedf7e // indirect

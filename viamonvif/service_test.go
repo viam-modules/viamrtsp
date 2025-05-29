@@ -78,7 +78,7 @@ func TestCamConfig(t *testing.T) {
 func TestDiscoveryConfig(t *testing.T) {
 	t.Run("Test Empty Config", func(t *testing.T) {
 		cfg := Config{}
-		deps, err := cfg.Validate("")
+		deps, _, err := cfg.Validate("")
 		test.That(t, err, test.ShouldBeNil)
 		test.That(t, deps, test.ShouldBeEmpty)
 	})
@@ -89,13 +89,13 @@ func TestDiscoveryConfig(t *testing.T) {
 			{User: "user3", Pass: ""},
 			{User: "", Pass: ""},
 		}}
-		deps, err := cfg.Validate("")
+		deps, _, err := cfg.Validate("")
 		test.That(t, err, test.ShouldBeNil)
 		test.That(t, deps, test.ShouldBeEmpty)
 	})
 	t.Run("Test Invalid Config", func(t *testing.T) {
 		cfg := Config{Credentials: []device.Credentials{{User: "", Pass: "pass1"}}}
-		deps, err := cfg.Validate("")
+		deps, _, err := cfg.Validate("")
 		test.That(t, err.Error(), test.ShouldContainSubstring, "credential missing username, has password pass1")
 		test.That(t, deps, test.ShouldBeEmpty)
 	})

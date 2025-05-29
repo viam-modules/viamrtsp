@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -56,14 +57,14 @@ type Config struct {
 }
 
 // Validate validates the discovery service.
-func (cfg *Config) Validate(_ string) ([]string, error) {
+func (cfg *Config) Validate(_ string) ([]string, []string, error) {
 	// check that all creds have usernames set. Note a credential can have both fields empty
 	for _, cred := range cfg.Credentials {
 		if cred.Pass != "" && cred.User == "" {
-			return nil, fmt.Errorf("credential missing username, has password %v", cred.Pass)
+			return nil, nil, fmt.Errorf("credential missing username, has password %v", cred.Pass)
 		}
 	}
-	return []string{}, nil
+	return []string{}, nil, nil
 }
 
 type previewRequest struct {
@@ -142,7 +143,11 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 		// registered, `tryMDNS` will additionally mutate the `camInfo.RTSPURLs` to use the dns
 		// hostname rather than a raw IP. Such that the camera configs we are about to generate will
 		// use the dns hostname.
-		camInfo.tryMDNS(dis.mdnsServer, dis.logger)
+		// mDNS hostname to IP address resolution is not working on Windows so we skip it.
+		// TODO(RSDK-10796): Add windows mDNS support to zeroconf fork
+		if runtime.GOOS != "windows" {
+			camInfo.tryMDNS(dis.mdnsServer, dis.logger)
+		}
 
 		camConfigs, err := createCamerasFromURLs(camInfo, dis.Name().ShortName(), dis.logger)
 		if err != nil {

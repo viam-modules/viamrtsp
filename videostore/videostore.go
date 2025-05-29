@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"path/filepath"
 
 	"github.com/viam-modules/video-store/videostore"
 	"go.viam.com/rdk/components/camera"
@@ -16,10 +17,13 @@ import (
 const (
 	maxGRPCSize         = 1024 * 1024 * 32 // bytes
 	defaultFramerate    = 20               // frames per second
-	defaultStoragePath  = ".viam/video-storage"
-	defaultUploadPath   = ".viam/capture/video-upload"
 	defaultVideoBitrate = 1000000
 	defaultVideoPreset  = "ultrafast"
+)
+
+var (
+	defaultStoragePath = filepath.Join(".viam", "video-storage")
+	defaultUploadPath  = filepath.Join(".viam", "capture", "video-upload")
 )
 
 // Model is videostore's Viam model.
