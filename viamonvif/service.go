@@ -39,6 +39,7 @@ const (
 	snapshotClientTimeout = 5 * time.Second
 	rtspPollTimeout       = 5 * time.Second
 	rtspImageInterval     = 100 * time.Millisecond
+	rtspNameSaltLength    = 4
 	imageReqMimeType      = "image/jpeg"
 )
 
@@ -339,8 +340,9 @@ func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL s
 	rtspConfig := viamrtsp.Config{
 		Address: rtspURL,
 	}
+	uniqueName := generateUniqueName("tmp-camera")
 	resourceConfig := resource.Config{
-		Name:                "tmp-camera",
+		Name:                uniqueName,
 		API:                 camera.API,
 		Model:               viamrtsp.ModelAgnostic,
 		ConvertedAttributes: &rtspConfig,
@@ -380,6 +382,13 @@ func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL s
 			return "", fmt.Errorf("context canceled while fetching image from RTSP camera: %w", ctx.Err())
 		}
 	}
+}
+
+// generateUniqueName creates a unique name by adding timestamp and random bytes
+func generateUniqueName(prefix string) string {
+	timestamp := time.Now().UnixNano()
+	uniqueName := fmt.Sprintf("%s-%d", prefix, timestamp)
+	return uniqueName
 }
 
 func createCamerasFromURLs(l CameraInfo, discoveryDependencyName string, logger logging.Logger) ([]resource.Config, error) {
