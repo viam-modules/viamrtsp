@@ -62,6 +62,7 @@ func New(_ context.Context, deps resource.Dependencies, conf resource.Config, lo
 			return nil, err
 		}
 		rtpVs, err := videostore.NewRTPVideoStore(videostore.Config{
+			Name:    conf.ResourceName().Name,
 			Type:    videostore.SourceTypeRTP,
 			Storage: vsConfig.Storage,
 		}, logger)
@@ -76,6 +77,7 @@ func New(_ context.Context, deps resource.Dependencies, conf resource.Config, lo
 			rtpVs.Close()
 			vsConfig.FramePoller.Camera = c
 			fVs, err := videostore.NewFramePollingVideoStore(videostore.Config{
+				Name:        conf.ResourceName().Name,
 				Type:        videostore.SourceTypeFrame,
 				Storage:     vsConfig.Storage,
 				Encoder:     vsConfig.Encoder,
@@ -88,6 +90,7 @@ func New(_ context.Context, deps resource.Dependencies, conf resource.Config, lo
 		}
 	} else {
 		vs, err = videostore.NewReadOnlyVideoStore(videostore.Config{
+			Name:    conf.ResourceName().Name,
 			Type:    videostore.SourceTypeReadOnly,
 			Storage: vsConfig.Storage,
 		}, logger)
