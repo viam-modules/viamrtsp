@@ -36,7 +36,7 @@ func TestDiscoveryService(t *testing.T) {
 		test.That(t, dis.Name().ShortName(), test.ShouldResemble, testName)
 		cfgs, err := dis.DiscoverResources(ctx, nil)
 		test.That(t, cfgs, test.ShouldBeEmpty)
-		test.That(t, err, test.ShouldBeError, errNoCamerasFound)
+		test.That(t, err, test.ShouldContain, errNoCamerasFound)
 	})
 }
 
