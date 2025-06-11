@@ -41,6 +41,7 @@ const (
 	rtspPollTimeout       = 5 * time.Second
 	rtspImageInterval     = 100 * time.Millisecond
 	rtspNameSaltLength    = 4
+	discoveryInterval     = time.Minute
 	imageReqMimeType      = "image/jpeg"
 )
 
@@ -115,6 +116,8 @@ func newDiscovery(_ context.Context, _ resource.Dependencies,
 			filepath.Join(moduleDataDir, "mdns_cache.json"), logger.Sublogger("mdns"))
 	}
 
+	dis.workers.Add(dis.discoveryBackgroundWorker)
+
 	return dis, nil
 }
 
@@ -138,10 +141,9 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 		dis.discoveredResources = discovered
 		dis.logger.Debug("Discovery lookup completed, resources discovered")
 		return dis.discoveredResources, nil
-	} else {
-		dis.logger.Debug("Returning previously discovered resources")
-		return dis.discoveredResources, nil
 	}
+	dis.logger.Debug("Returning cached discovered resources")
+	return dis.discoveredResources, nil
 }
 
 func (dis *rtspDiscovery) runDiscoveryLookup(ctx context.Context, extra map[string]any) ([]resource.Config, error) {
@@ -268,7 +270,7 @@ func (dis *rtspDiscovery) preview(ctx context.Context, rtspURL string) (string, 
 
 // discoveryBackgroundWorker loops and runs the discovery service's DiscoverResources method
 func (dis *rtspDiscovery) discoveryBackgroundWorker(ctx context.Context) {
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(discoveryInterval)
 	defer ticker.Stop()
 
 	for {
