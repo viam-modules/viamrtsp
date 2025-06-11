@@ -127,7 +127,7 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 	// with provided credentials. We ignore any previously discovered resources
 	// and re-run discovery with extra parameters.
 	if len(extra) > 0 {
-		dis.logger.Debugf("Running discovery lookup with extra parameters: %v", extra)
+		dis.logger.Debugf("running discovery lookup with extra parameters: %v", extra)
 		discovered, err := dis.runDiscoveryLookup(ctx, extra)
 		if err != nil {
 			return nil, fmt.Errorf("failed to run discovery lookup: %w", err)
@@ -138,18 +138,18 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 		// lookup again to ensure we have the latest discovered resources.
 		dis.discoveredResourcesMu.Lock()
 		defer dis.discoveredResourcesMu.Unlock()
-		dis.logger.Debug("No extra parameters provided, running discovery lookup")
+		dis.logger.Debug("no extra parameters provided, running discovery lookup with config credentials")
 		discovered, err := dis.runDiscoveryLookup(ctx, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to run discovery lookup: %w", err)
 		}
 		dis.discoveredResources = discovered
-		dis.logger.Debug("Discovery lookup completed, resources discovered")
+		dis.logger.Debug("discovered resources available, returning cached results")
 		return dis.discoveredResources, nil
 	}
 
 	// If we have previously discovered cameras, we will return the cached resources.
-	dis.logger.Debug("Returning cached discovered resources")
+	dis.logger.Debug("returning cached discovered resources")
 	return dis.discoveredResources, nil
 }
 
