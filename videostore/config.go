@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/viam-modules/video-store/videostore"
+	rutils "go.viam.com/rdk/utils"
 	"go.viam.com/utils"
 )
 
@@ -110,10 +111,7 @@ func applyStorageDefaults(c Storage, name string) (videostore.StorageConfig, err
 		c.UploadPath = filepath.Join(home, defaultUploadPath, name)
 	}
 	if c.StoragePath == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return zero, err
-		}
+		home := rutils.PlatformHomeDir()
 		c.StoragePath = filepath.Join(home, defaultStoragePath, name)
 	}
 	return videostore.StorageConfig{
