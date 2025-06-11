@@ -285,14 +285,14 @@ func (dis *rtspDiscovery) discoveryBackgroundWorker(ctx context.Context) {
 		case <-ticker.C:
 			dis.discoveredResourcesMu.Lock()
 			if cams, err := dis.runDiscoveryLookup(ctx, nil); err != nil {
-				dis.logger.Errorf("Discovery failed: %v", err)
+				dis.logger.Errorf("discovery failed: %v", err)
 				dis.discoveredResources = cams
 			} else {
-				dis.logger.Debug("Discovery completed successfully")
+				dis.logger.Debug("discovery completed successfully")
 			}
 			dis.discoveredResourcesMu.Unlock()
 		case <-ctx.Done():
-			dis.logger.Debug("Discovery worker context done, exiting")
+			dis.logger.Debug("discovery worker context done, exiting")
 			return
 		}
 	}
@@ -301,9 +301,10 @@ func (dis *rtspDiscovery) discoveryBackgroundWorker(ctx context.Context) {
 func (dis *rtspDiscovery) Close(_ context.Context) error {
 	dis.mdnsServer.Shutdown()
 	if dis.workers != nil {
+		dis.logger.Debug("stopping discovery service workers")
 		dis.workers.Stop()
 	}
-	dis.logger.Debug("Discovery service closed")
+	dis.logger.Debug("discovery service closed")
 
 	return nil
 }
