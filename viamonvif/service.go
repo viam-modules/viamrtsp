@@ -136,14 +136,14 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 	} else if len(dis.discoveredResources) == 0 {
 		// If discovery has not been run before, or no cameras were discovered,
 		// we will run discovery lookup again.
-		dis.discoveredResourcesMu.Lock()
-		defer dis.discoveredResourcesMu.Unlock()
 		dis.logger.Debug("no extra parameters provided, running discovery lookup with config credentials")
 		discovered, err := dis.runDiscoveryLookup(ctx, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to run discovery lookup: %w", err)
 		}
+		dis.discoveredResourcesMu.Lock()
 		dis.discoveredResources = discovered
+		dis.discoveredResourcesMu.Unlock()
 		dis.logger.Debug("discovered resources available, returning cached results")
 		return dis.discoveredResources, nil
 	}
@@ -283,14 +283,14 @@ func (dis *rtspDiscovery) discoveryBackgroundWorker(ctx context.Context) {
 	for {
 		select {
 		case <-ticker.C:
-			dis.discoveredResourcesMu.Lock()
-			if cams, err := dis.runDiscoveryLookup(ctx, nil); err != nil {
+			if discovered, err := dis.runDiscoveryLookup(ctx, nil); err != nil {
 				dis.logger.Errorf("discovery failed: %v", err)
-				dis.discoveredResources = cams
+				dis.discoveredResourcesMu.Lock()
+				dis.discoveredResources = discovered
+				dis.discoveredResourcesMu.Unlock()
 			} else {
 				dis.logger.Debug("discovery completed successfully")
 			}
-			dis.discoveredResourcesMu.Unlock()
 		case <-ctx.Done():
 			dis.logger.Debug("discovery worker context done, exiting")
 			return
