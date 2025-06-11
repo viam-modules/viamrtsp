@@ -134,8 +134,8 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 		}
 		return discovered, nil
 	} else if len(dis.discoveredResources) == 0 {
-		// If discovery has been run before or no cameras were discovered, we will run discovery
-		// lookup again to ensure we have the latest discovered resources.
+		// If discovery has not been run before, or no cameras were discovered,
+		// we will run discovery lookup again.
 		dis.discoveredResourcesMu.Lock()
 		defer dis.discoveredResourcesMu.Unlock()
 		dis.logger.Debug("no extra parameters provided, running discovery lookup with config credentials")
