@@ -306,7 +306,7 @@ Where:
 
 #### `Save`
 
-The save command retreives video from local storage, concatenates and trims underlying storage segments based on time range, and uploads the clip to the cloud.
+The save command retrieves video from local storage, concatenates and trims underlying storage segments based on time range, and uploads the clip to the cloud.
 
 | Attribute   | Type                | Required/Optional | Description                      |
 |-------------|---------------------|-------------------|----------------------------------|
@@ -389,9 +389,6 @@ The fetch command retrieves video from local storage, and sends the bytes direct
   "video": <video_bytes>
 }
 ```
-
-
-
 
 ## Build for local development
 
