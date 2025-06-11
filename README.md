@@ -425,8 +425,8 @@ We support building this module using the Makefile for the following host/target
         * Build binary: `TARGET_OS=android TARGET_ARCH=arm64 make`
 * Build for Windows target:
     * Cross-compile from Linux/Amd64 host.
-    * Startup canon: `canon -profile viam-rtsp-antique -arch amd64`
-    * Build binary: `TARGET_OS=windows TARGET_ARCH=amd64 make`
+        * Startup canon: `canon -profile viam-rtsp-antique -arch amd64`
+        * Build binary: `TARGET_OS=windows TARGET_ARCH=amd64 make`
 * Binary will be in `bin/<OS>-<CPU>/viamrtsp`
 * Clean up build artifacts: `make clean`
 * Clean up all files not tracked in git: `make clean-all`
