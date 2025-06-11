@@ -3,7 +3,6 @@ package videostore
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/viam-modules/video-store/videostore"
@@ -102,12 +101,8 @@ func applyVideoEncoderDefaults(c Video) videostore.EncoderConfig {
 }
 
 func applyStorageDefaults(c Storage, name string) (videostore.StorageConfig, error) {
-	var zero videostore.StorageConfig
 	if c.UploadPath == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return zero, err
-		}
+		home := rutils.PlatformHomeDir()
 		c.UploadPath = filepath.Join(home, defaultUploadPath, name)
 	}
 	if c.StoragePath == "" {
