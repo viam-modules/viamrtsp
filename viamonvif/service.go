@@ -85,9 +85,9 @@ type rtspDiscovery struct {
 	mdnsServer  *mdnsServer
 	logger      logging.Logger
 
-	workers *utils.StoppableWorkers
-
-	discoveredResources []resource.Config
+	workers               *utils.StoppableWorkers
+	discoveredResourcesMu sync.Mutex
+	discoveredResources   []resource.Config
 }
 
 func newDiscovery(_ context.Context, _ resource.Dependencies,
@@ -132,6 +132,8 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 		}
 		return discovered, nil
 	} else if len(dis.discoveredResources) == 0 {
+		dis.discoveredResourcesMu.Lock()
+		defer dis.discoveredResourcesMu.Unlock()
 		// if no extra parameters and no previously discovered resources, run discovery lookup
 		dis.logger.Debug("No extra parameters provided, running discovery lookup")
 		discovered, err := dis.runDiscoveryLookup(ctx, nil)
@@ -276,12 +278,14 @@ func (dis *rtspDiscovery) discoveryBackgroundWorker(ctx context.Context) {
 	for {
 		select {
 		case <-ticker.C:
+			dis.discoveredResourcesMu.Lock()
 			if cams, err := dis.runDiscoveryLookup(ctx, nil); err != nil {
 				dis.logger.Errorf("Discovery failed: %v", err)
 				dis.discoveredResources = cams
 			} else {
 				dis.logger.Debug("Discovery completed successfully")
 			}
+			dis.discoveredResourcesMu.Unlock()
 		case <-ctx.Done():
 			dis.logger.Debug("Discovery worker context done, exiting")
 			return
