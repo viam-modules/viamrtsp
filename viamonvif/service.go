@@ -123,7 +123,9 @@ func newDiscovery(_ context.Context, _ resource.Dependencies,
 
 // DiscoverResources discovers different rtsp cameras that use onvif.
 func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[string]any) ([]resource.Config, error) {
-	// if extra is not empty rerun runDiscoveryLookup
+	// If extra is not empty, we assume the user wants to discover resources
+	// with provided credentials. We ignore any previously discovered resources
+	// and re-run discovery with extra parameters.
 	if len(extra) > 0 {
 		dis.logger.Debugf("Running discovery lookup with extra parameters: %v", extra)
 		discovered, err := dis.runDiscoveryLookup(ctx, extra)
@@ -132,9 +134,10 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 		}
 		return discovered, nil
 	} else if len(dis.discoveredResources) == 0 {
+		// If discovery has been run before or no cameras were discovered, we will run discovery
+		// lookup again to ensure we have the latest discovered resources.
 		dis.discoveredResourcesMu.Lock()
 		defer dis.discoveredResourcesMu.Unlock()
-		// if no extra parameters and no previously discovered resources, run discovery lookup
 		dis.logger.Debug("No extra parameters provided, running discovery lookup")
 		discovered, err := dis.runDiscoveryLookup(ctx, nil)
 		if err != nil {
@@ -144,6 +147,8 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 		dis.logger.Debug("Discovery lookup completed, resources discovered")
 		return dis.discoveredResources, nil
 	}
+
+	// If we have previously discovered cameras, we will return the cached resources.
 	dis.logger.Debug("Returning cached discovered resources")
 	return dis.discoveredResources, nil
 }
