@@ -150,6 +150,88 @@ The response will be preview image in the [DataURL](https://developer.mozilla.or
 }
 ```
 
+### Get Storage State DoCommand
+
+The `get-storage-state` command retrieves the current state of video storage, including available video time ranges and disk usage information.
+
+| Attribute | Type       | Required/Optional | Description          |
+|-----------|------------|-------------------|----------------------|
+| `command` | string     | required          | The command to be executed. Value must be "get-storage-state". |
+
+#### Get Storage State Request
+```json
+{
+  "command": "get-storage-state"
+}
+```
+
+#### Get Storage State Response
+
+The response includes a list of `stored_video` time ranges and `disk_usage` statistics.
+
+```json
+{
+  "command": "get-storage-state",
+  "stored_video": [
+    {
+      "from": "YYYY-MM-DD_HH-MM-SSZ",
+      "to": "YYYY-MM-DD_HH-MM-SSZ"
+    },
+    // ... more ranges
+  ],
+  "disk_usage": {
+    "storage_path": "/path/to/your/storage/directory",
+    "storage_used_gb": 99.98,
+    "storage_limit_gb": 100,
+    "device_storage_remaining_gb": 697.21
+  }
+}
+```
+
+**Response Fields:**
+
+-   `stored_video`: An array of objects, where each object represents a contiguous block of recorded video.
+    -   `from`: The start UTC timestamp of the video block.
+    -   `to`: The end UTC timestamp of the video block.
+-   `disk_usage`:
+    -   `storage_path`: The configured path where video segments are stored.
+    -   `storage_used_gb`: The amount of disk space (in GB) currently used by the video store in its `storage_path`.
+    -   `storage_limit_gb`: The configured maximum disk space (in GB) allocated for the video store.
+    -   `device_storage_remaining_gb`: The remaining free disk space (in GB) on the underlying storage device where `storage_path` is located.
+
+#### Example Get Storage State Response
+
+```json
+{
+  "command": "get-storage-state",
+  "stored_video": [
+    {
+      "to": "2025-05-18_05-59-58Z",
+      "from": "2025-05-17_20-23-08Z"
+    },
+    {
+      "from": "2025-05-18_06-00-35Z",
+      "to": "2025-05-19_13-56-55Z"
+    },
+    {
+      "from": "2025-05-19_13-57-13Z",
+      "to": "2025-05-19_13-58-18Z"
+    }
+    // ... additional video ranges truncated for brevity
+  ],
+  "disk_usage": {
+    "storage_path": "/root/.viam/video-storage/video_camera-XYZ",
+    "storage_used_gb": 99.98937438707799,
+    "storage_limit_gb": 100,
+    "device_storage_remaining_gb": 697.2153244018555
+  }
+}
+```
+
+> [!NOTE]
+> Swapping the `storage_path` config attribute will not delete any data, it will simply cause video store to start persisting video data to the new path and preserve
+the old `storage_path` directory with the old videos and the old database, and save new videos in the new path.
+
 ### Next steps
 
 Use the `DiscoverResources` API by adding a `viam:viamrtsp:onvif` `discovery` model to retrieve a list of cameras discovered by the service and their configuration. You can then retrieve a preview image from a camera using the `Preview` `DoCommand`. 
