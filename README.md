@@ -250,16 +250,18 @@ If in your rtsp_address your hostname is UPNP_DISCOVER then we will try to find 
 You can filter the results by filling out the `query` field in the configuration. See `viamupnp.DeviceQuery` for supported filters.
 
 ## Configure the `viamrtsp:video-store` generic component for video storage
-This model implements the [`"rdk:component:generic"` API](https://docs.viam.com/components/generic/) for storing video streams from RTSP cameras. It allows you to save video streams to a local file system and upload clips to cloud storage.
+This model implements the [`"rdk:component:generic"` API](https://docs.viam.com/components/generic/) for storing video data from RTSP cameras. It allows you to save video stream to a local file system. You can later upload clips to cloud storage with `save`, or fetch the video bytes directly with `fetch`.
 
 1. Add a viamrtsp camera component (e.g., `viam:viamrtsp:rtsp`).
 2. For cloud upload support, configure a [Data Manager Service](https://docs.viam.com/services/data/cloud-sync/).
 3. Configure the `viamrtsp:video-store` component attributes:
 
 ```json
-"camera": "<rtsp_cam_name>",
-"storage": {
-  "size_gb": 1
+{
+  "camera": "<rtsp_cam_name>",
+  "storage": {
+    "size_gb": 1
+  }
 }
 ```
 
@@ -404,9 +406,9 @@ We support building this module using the Makefile for the following host/target
 | Linux/Amd64  | Android/Arm64| ✅        |
 | Linux/Amd64  | Windows/Amd64| ✅        |
 | Darwin/Arm64 | Darwin/Arm64 | ✅        |
-| Darwin/Arm64 | Android/Arm64| ❌        |
+| Darwin/Arm64 | Android/Arm64| ✅        |
 | Darwin/Amd64 | Darwin/Amd64 | ❌        |
-| Darwin/Amd64 | Android/Arm64| ✅        |
+| Darwin/Amd64 | Android/Arm64| ❌        |
 
 * Build for Linux targets:
     * Install canon: `go install github.com/viamrobotics/canon@latest`
