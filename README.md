@@ -308,7 +308,7 @@ Where:
 
 #### `Save`
 
-The save command retrieves video from local storage, concatenates and trims underlying storage segments based on time range, and uploads the clip to the cloud.
+The save command retrieves video from local storage, concatenates and trims underlying storage segments based on time range, and writes the clip to a subdirectory of .viam/capture so data manager can upload the clip to the cloud.
 
 | Attribute   | Type                | Required/Optional | Description                      |
 |-------------|---------------------|-------------------|----------------------------------|
