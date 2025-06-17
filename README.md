@@ -279,6 +279,15 @@ This model implements the [`"rdk:component:generic"` API](https://docs.viam.com/
 | `video.preset`      | string  | optional     | Encoding preset (e.g., ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow) |
 | `framerate`         | integer | optional     | Frame rate to capture video at (frames per second) |
 
+### Supported Codecs
+The `viamrtsp:video-store` component supports the following codecs:
+| Codec   | Description |
+| ------- | ----------- |
+| `H264`  | H264 bytes directly stored to disk |
+| `H265`  | H265 bytes directly stored to disk |
+| `MPEG4` | Reencoded to H264 and stored to disk |
+| `MJPEG` | Reencoded to H264 and stored to disk |
+
 ### DoCommand API
 
 #### From/To
