@@ -324,7 +324,7 @@ The save command retrieves video from local storage, concatenates and trims unde
 | `command`   | string              | required          | Command to be executed.          |
 | `from`      | timestamp           | required          | Start timestamp.                 |
 | `to`        | timestamp           | required          | End timestamp.                   |
-| `metadata`  | string              | optional          | Arbitrary metadata string.       |
+| `metadata`  | string              | optional          | Arbitrary metadata string that is appended to filename `<component_name>_<timestamp>_<metadata>.mp4`       |
 | `async`     | boolean             | optional          | Whether the operation is async.  |
 
 If you are requesting video from within the most recent 30 second window, use async save to ensure the current video segment is included in the query.
