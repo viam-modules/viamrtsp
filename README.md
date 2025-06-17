@@ -347,6 +347,8 @@ If you are requesting video from within the most recent 30 second window, use as
 }
 ```
 
+The video bytes will be encoded expectations as saved to disk. See [Supported Codecs] table for codec .
+
 ##### Async Save Request
 
 The async save command performs the same operation as the save command, but does not wait for the operation to complete. Use this command when you want to save video slices that include the current in-progress video storage segment. It will wait for the current segment to finish recording before saving the video slice.
@@ -374,6 +376,10 @@ The async save command performs the same operation as the save command, but does
 }
 ```
 
+The video file will be an MP$ encoded as saved on disk. See the [Supported Codecs](#supported-codecs) for codec expectations.
+
+Review the [Work with data](https://docs.viam.com/data-ai/data/) documentation for more information on retrieving the saved video file from the [Viam Data](https://www.viam.com/product/data).
+
 #### `Fetch`
 
 The fetch command retrieves video from local storage, and sends the bytes directly back to the client.
@@ -400,6 +406,7 @@ The fetch command retrieves video from local storage, and sends the bytes direct
   "video": <video_bytes>
 }
 ```
+The video bytes will be encoded as saved on disk within an MP4 container. See the [Supported Codecs](#supported-codecs) for codec expectations.
 
 ## Build for local development
 
