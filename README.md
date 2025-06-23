@@ -347,7 +347,7 @@ If you are requesting video from within the most recent 30 second window, use as
 }
 ```
 
-The returned video file will be an MP4 with the encoding format determined by the input codec type. See the [Supported Codecs](#supported-codecs) section for details on how each codec is handled.
+The saved video file will be an MP4 with the encoding format determined by the input codec type. See the [Supported Codecs](#supported-codecs) section for details on how each codec is handled.
 
 ##### Async Save Request
 
@@ -404,6 +404,8 @@ The fetch command retrieves video from local storage, and sends the bytes direct
   "video": <video_bytes>
 }
 ```
+
+The returned video file will be an MP4 with the encoding format determined by the input codec type. See the [Supported Codecs](#supported-codecs) section for details on how each codec is handled.
 
 ## Build for local development
 
