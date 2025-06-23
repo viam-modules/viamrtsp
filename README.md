@@ -347,7 +347,7 @@ If you are requesting video from within the most recent 30 second window, use as
 }
 ```
 
-The video bytes will be encoded expectations as saved to disk. See [Supported Codecs] table for codec .
+The returned video file will be an MP4 with the encoding format determined by the input codec type. See the [Supported Codecs](#supported-codecs) section for details on how each codec is handled.
 
 ##### Async Save Request
 
@@ -375,8 +375,6 @@ The async save command performs the same operation as the save command, but does
   "status": "async"
 }
 ```
-
-The video file will be an MP$ encoded as saved on disk. See the [Supported Codecs](#supported-codecs) for codec expectations.
 
 Review the [Work with data](https://docs.viam.com/data-ai/data/) documentation for more information on retrieving the saved video file from the [Viam Data](https://www.viam.com/product/data).
 
