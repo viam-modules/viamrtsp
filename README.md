@@ -404,7 +404,6 @@ The fetch command retrieves video from local storage, and sends the bytes direct
   "video": <video_bytes>
 }
 ```
-The video bytes will be encoded as saved on disk within an MP4 container. See the [Supported Codecs](#supported-codecs) for codec expectations.
 
 ## Build for local development
 
