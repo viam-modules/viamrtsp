@@ -134,24 +134,31 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 			return nil, fmt.Errorf("failed to run discovery lookup: %w", err)
 		}
 		return discovered, nil
-	} else if len(dis.discoveredResources) == 0 {
-		// If discovery has not been run before, or no cameras were discovered,
-		// we will run discovery lookup again.
-		dis.logger.Debug("no extra parameters provided, running discovery lookup with config credentials")
-		discovered, err := dis.runDiscoveryLookup(ctx, nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed to run discovery lookup: %w", err)
-		}
-		dis.discoveredResourcesMu.Lock()
-		dis.discoveredResources = discovered
-		dis.discoveredResourcesMu.Unlock()
-		dis.logger.Debug("discovered resources available, returning cached results")
-		return dis.discoveredResources, nil
 	}
 
 	// If we have previously discovered cameras, we will return the cached resources.
-	dis.logger.Debug("returning cached discovered resources")
-	return dis.discoveredResources, nil
+	dis.discoveredResourcesMu.Lock()
+	hasDiscoveredResources := len(dis.discoveredResources) > 0
+	if hasDiscoveredResources {
+		result := dis.discoveredResources
+		dis.discoveredResourcesMu.Unlock()
+		dis.logger.Debug("returning cached discovered resources")
+		return result, nil
+	}
+	dis.discoveredResourcesMu.Unlock()
+
+	// If discovery has not been run before, or no cameras were discovered,
+	// we will attempt the discovery lookup again.
+	dis.logger.Debug("no cached resources, running discovery lookup with config credentials")
+	discovered, err := dis.runDiscoveryLookup(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to run discovery lookup: %w", err)
+	}
+	dis.discoveredResourcesMu.Lock()
+	dis.discoveredResources = discovered
+	dis.discoveredResourcesMu.Unlock()
+
+	return discovered, nil
 }
 
 func (dis *rtspDiscovery) runDiscoveryLookup(ctx context.Context, extra map[string]any) ([]resource.Config, error) {
