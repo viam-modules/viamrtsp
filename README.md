@@ -274,10 +274,10 @@ This model implements the [`"rdk:component:generic"` API](https://docs.viam.com/
 | `storage.size_gb`   | integer | required     | Maximum storage size in gigabytes |
 | `storage.upload_path` | string | optional    | Path where uploaded video segments are saved |
 | `storage.storage_path` | string | optional   | Path where video segments are stored |
-| `video`             | object  | optional     | Video encoding configuration settings |
-| `video.bitrate`     | integer | optional     | Bitrate for video encoding (bits per second) |
-| `video.preset`      | string  | optional     | Encoding preset (e.g., ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow) |
-| `framerate`         | integer | optional     | Frame rate to capture video at (frames per second) |
+| `video`             | object  | optional     | Video encoding configuration settings (only used when re-encoding is required) |
+| `video.bitrate`     | integer | optional     | Bitrate for video encoding (bits per second) - only applies to MPEG4 and MJPEG inputs |
+| `video.preset`      | string  | optional     | Encoding preset (e.g., ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow) - only applies to MPEG4 and MJPEG inputs |
+| `framerate` | integer | optional | Frame rate to capture video at (frames per second) - only applies to MPEG4 and MJPEG inputs |
 
 ### Supported Codecs
 The `viamrtsp:video-store` component supports the following codecs:
@@ -285,8 +285,8 @@ The `viamrtsp:video-store` component supports the following codecs:
 | ------- | ----------- |
 | `H264`  | H264 bytes directly stored to disk |
 | `H265`  | H265 bytes directly stored to disk |
-| `MPEG4` | Reencoded to H264 and stored to disk |
-| `MJPEG` | Reencoded to H264 and stored to disk |
+| `MPEG4` | Re-encoded to H264 and stored to disk |
+| `MJPEG` | Re-encoded to H264 and stored to disk |
 
 ### DoCommand API
 
