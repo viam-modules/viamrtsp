@@ -328,6 +328,9 @@ The save command retrieves video from local storage, concatenates and trims unde
 | `async`     | boolean             | optional          | Whether the operation is async.  |
 
 > [!NOTE]
+> Review the [Work with data](https://docs.viam.com/data-ai/data/) documentation for more information on retrieving the saved video file from[Viam Data](https://www.viam.com/product/data).
+
+> [!NOTE]
 > If you are requesting video from within the most recent 30 second window, use async save to ensure the current video segment is included in the query.
 
 ##### Save Request
@@ -347,6 +350,7 @@ The save command retrieves video from local storage, concatenates and trims unde
   "filename": <filename_to_be_uploaded>
 }
 ```
+
 > [!NOTE]
 > The saved video file will be an MP4 with the video in an encoding format determined by the input codec type. See the [Supported Codecs](#supported-codecs) section for details on how each codec is handled.
 
@@ -377,7 +381,7 @@ The async save command performs the same operation as the save command, but does
 }
 ```
 
-Review the [Work with data](https://docs.viam.com/data-ai/data/) documentation for more information on retrieving the saved video file from the [Viam Data](https://www.viam.com/product/data).
+
 
 #### `Fetch`
 
