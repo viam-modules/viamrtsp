@@ -281,12 +281,12 @@ This model implements the [`"rdk:component:generic"` API](https://docs.viam.com/
 
 ### Supported Codecs
 The `viamrtsp:video-store` component supports the following codecs:
-| Codec   | Description |
-| ------- | ----------- |
-| `H264`  | H264 bytes directly stored to disk |
-| `H265`  | H265 bytes directly stored to disk |
-| `MPEG4` | Re-encoded to H264 and stored to disk |
-| `MJPEG` | Re-encoded to H264 and stored to disk |
+| Input Codec | Output Codec | Description |
+| ----------- | ------------ | ----------- |
+| `H264`      | H264         | Direct storage without re-encoding, preserving original quality |
+| `H265`      | H265         | Direct storage without re-encoding, preserving original quality |
+| `MPEG4`     | H264         | Transcoded to H264 using configured bitrate, preset, and framerate attributes |
+| `MJPEG`     | H264         | Re-encoded from frame sequence to H264 video stream using configured bitrate, preset, and framerate attributes |
 
 ### DoCommand API
 
