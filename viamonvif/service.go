@@ -85,7 +85,8 @@ type rtspDiscovery struct {
 	mdnsServer  *mdnsServer
 	logger      logging.Logger
 
-	workers               *utils.StoppableWorkers
+	workers *utils.StoppableWorkers
+
 	discoveredResourcesMu sync.Mutex
 	discoveredResources   []resource.Config
 }
