@@ -247,7 +247,170 @@ Currently specifying endpoints is not supported through the extras field.
 
 ## UPnP Host Discovery
 If in your rtsp_address your hostname is UPNP_DISCOVER then we will try to find a UPnP host that matches.
-You can filter the results by fillong out the `query` field in the configuration. See `viamupnp.DeviceQuery` for supported filters.
+You can filter the results by filling out the `query` field in the configuration. See `viamupnp.DeviceQuery` for supported filters.
+
+## Configure the `viamrtsp:video-store` generic component for video storage
+This model implements the [`"rdk:component:generic"` API](https://docs.viam.com/components/generic/) for storing video data from RTSP cameras. It allows you to save video stream to a local file system. You can later upload clips to cloud storage with `save`, or fetch the video bytes directly with `fetch`.
+
+1. Add a viamrtsp camera component (e.g., `viam:viamrtsp:rtsp`).
+2. For cloud upload support, configure a [Data Manager Service](https://docs.viam.com/services/data/cloud-sync/).
+3. Configure the `viamrtsp:video-store` component attributes:
+
+```json
+{
+  "camera": "<rtsp_cam_name>",
+  "storage": {
+    "size_gb": 1
+  }
+}
+```
+
+### Attributes
+
+| Name                | Type    | Inclusion    | Description |
+| ------------------- | ------- | ------------ | ----------- |
+| `camera`            | string  | optional     | Name of the camera component to use as the video source |
+| `storage`           | object  | required     | Storage configuration settings |
+| `storage.size_gb`   | integer | required     | Maximum storage size in gigabytes |
+| `storage.upload_path` | string | optional    | Path where uploaded video segments are saved |
+| `storage.storage_path` | string | optional   | Path where video segments are stored |
+| `video`             | object  | optional     | Video encoding configuration settings (only used when re-encoding is required) |
+| `video.bitrate`     | integer | optional     | Bitrate for video encoding (bits per second) - only applies to MPEG4 and MJPEG inputs |
+| `video.preset`      | string  | optional     | Encoding preset (e.g., ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow) - only applies to MPEG4 and MJPEG inputs |
+| `framerate` | integer | optional | Frame rate to capture video at (frames per second) - only applies to MPEG4 and MJPEG inputs |
+
+### Supported Codecs
+The `viamrtsp:video-store` component supports the following codecs:
+| Input Codec | Output Codec | Description |
+| ----------- | ------------ | ----------- |
+| `H264`      | H264         | Direct storage without re-encoding, preserving original quality |
+| `H265`      | H265         | Direct storage without re-encoding, preserving original quality |
+| `MPEG4`     | H264         | Transcoded to H264 using configured bitrate, preset, and framerate attributes |
+| `MJPEG`     | H264         | Re-encoded from frame sequence to H264 video stream using configured bitrate, preset, and framerate attributes |
+
+### DoCommand API
+
+#### From/To
+
+The `From` and `To` timestamps are used to specify the start and end times for video clips. These timestamps must be provided in a specific datetime format to ensure proper parsing and formatting.
+
+##### Datetime Format
+
+The datetime format used is:
+
+- Local Time: `YYYY-MM-DD_HH-MM-SS`
+- UTC Time: `YYYY-MM-DD_HH-MM-SSZ`
+
+Where:
+- `YYYY`: Year (e.g., 2023)
+- `MM`: Month (e.g., 01 for January)
+- `DD`: Day (e.g., 15)
+- `HH`: Hour in 24-hour format (e.g., 14 for 2 PM)
+- `MM`: Minutes (e.g., 30)
+- `SS`: Seconds (e.g., 45)
+- `Z`: Optional suffix indicating the time is in UTC.
+
+##### Datetime Example
+
+- `2024-01-15_14-30-45` represents January 15, 2024, at 2:30:45 PM **local time**.
+- `2024-01-15_14-30-45Z` represents January 15, 2024, at 2:30:45 PM **UTC**.
+
+#### `Save`
+
+The save command retrieves video from local storage, concatenates and trims underlying storage segments based on time range, and writes the clip to a subdirectory of .viam/capture so data manager can upload the clip to the cloud.
+
+| Attribute   | Type                | Required/Optional | Description                      |
+|-------------|---------------------|-------------------|----------------------------------|
+| `command`   | string              | required          | Command to be executed.          |
+| `from`      | timestamp           | required          | Start timestamp.                 |
+| `to`        | timestamp           | required          | End timestamp.                   |
+| `metadata`  | string              | optional          | Arbitrary metadata string that is appended to filename `<component_name>_<timestamp>_<metadata>.mp4`       |
+| `async`     | boolean             | optional          | Whether the operation is async.  |
+
+> [!NOTE]
+> Review the [Work with data](https://docs.viam.com/data-ai/data/) documentation for more information on retrieving the saved video file from[Viam Data](https://www.viam.com/product/data).
+
+> [!NOTE]
+> If you are requesting video from within the most recent 30 second window, use async save to ensure the current video segment is included in the query.
+
+##### Save Request
+```json
+{
+  "command": "save",
+  "from": <start_timestamp>,
+  "to": <end_timestamp>,
+  "metadata": <arbitrary_metadata_string>
+}
+```
+
+##### Save Response
+```json
+{
+  "command": "save",
+  "filename": <filename_to_be_uploaded>
+}
+```
+
+> [!NOTE]
+> The saved video file will be an MP4 with the video in an encoding format determined by the input codec type. See the [Supported Codecs](#supported-codecs) section for details on how each codec is handled.
+
+##### Async Save Request
+
+The async save command performs the same operation as the save command, but does not wait for the operation to complete. Use this command when you want to save video slices that include the current in-progress video storage segment. It will wait for the current segment to finish recording before saving the video slice.
+
+> [!NOTE]
+> The async save command does not support future timestamps. The `from` timestamp must be in the past.
+> The `to` timestamp must be the current time or in the past.
+
+```json
+{
+  "command": "save",
+  "from": <start_timestamp>,
+  "to": <end_timestamp>,
+  "metadata": <arbitrary_metadata_string>,
+  "async": true
+}
+```
+
+##### Async Save Response
+```json
+{
+  "command": "save",
+  "filename": <filename_to_be_uploaded>,
+  "status": "async"
+}
+```
+
+
+
+#### `Fetch`
+
+The fetch command retrieves video from local storage, and sends the bytes directly back to the client.
+
+| Attribute | Type       | Required/Optional | Description          |
+|-----------|------------|-------------------|----------------------|
+| `command` | string     | required          | Command to be executed. |
+| `from`    | timestamp  | required          | Start timestamp.     |
+| `to`      | timestamp  | required          | End timestamp.       |
+
+##### Fetch Request
+```json
+{
+  "command": "fetch",
+  "from": <start_timestamp>,
+  "to": <end_timestamp>
+}
+```
+
+##### Fetch Response
+```json
+{
+  "command": "fetch",
+  "video": <video_bytes>
+}
+```
+> [!NOTE]
+> The returned video bytes will be an MP4 container with video in an encoding format determined by the input codec type. See the [Supported Codecs](#supported-codecs) section for details on how each codec is handled.
 
 ## Build for local development
 
@@ -261,6 +424,7 @@ We support building this module using the Makefile for the following host/target
 | Linux/Arm64  | Android/Arm64| ❌        |
 | Linux/Amd64  | Linux/Amd64  | ✅        |
 | Linux/Amd64  | Android/Arm64| ✅        |
+| Linux/Amd64  | Windows/Amd64| ✅        |
 | Darwin/Arm64 | Darwin/Arm64 | ✅        |
 | Darwin/Arm64 | Android/Arm64| ✅        |
 | Darwin/Amd64 | Darwin/Amd64 | ❌        |
@@ -281,6 +445,10 @@ We support building this module using the Makefile for the following host/target
         * Build binary: `TARGET_OS=android TARGET_ARCH=arm64 make`
     * To build from Darwin/Arm64 host:
         * Build binary: `TARGET_OS=android TARGET_ARCH=arm64 make`
+* Build for Windows target:
+    * Cross-compile from Linux/Amd64 host.
+        * Startup canon: `canon -profile viam-rtsp-antique -arch amd64`
+        * Build binary: `TARGET_OS=windows TARGET_ARCH=amd64 make`
 * Binary will be in `bin/<OS>-<CPU>/viamrtsp`
 * Clean up build artifacts: `make clean`
 * Clean up all files not tracked in git: `make clean-all`
