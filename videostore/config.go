@@ -46,6 +46,7 @@ func applyDefaults(cfg *Config, name string) (videostore.Config, error) {
 
 	ec := applyVideoEncoderDefaults(cfg.Video)
 	return videostore.Config{
+		Name:    name,
 		Storage: sc,
 		Encoder: ec,
 		FramePoller: videostore.FramePollerConfig{
