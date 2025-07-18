@@ -139,14 +139,12 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 
 	// If we have previously discovered cameras, we will return the cached resources.
 	dis.discoveredResourcesMu.Lock()
-	hasDiscoveredResources := len(dis.discoveredResources) > 0
-	if hasDiscoveredResources {
-		result := dis.discoveredResources
-		dis.discoveredResourcesMu.Unlock()
+	cachedDiscovered := dis.discoveredResources
+        dis.discoveredResourcesMu.Unlock()
+	if len(cachedDiscovered) > 0 {
 		dis.logger.Debug("returning cached discovered resources")
-		return result, nil
+		return cachedDiscovered, nil
 	}
-	dis.discoveredResourcesMu.Unlock()
 
 	// If discovery has not been run before, or no cameras were discovered,
 	// we will attempt the discovery lookup again.
