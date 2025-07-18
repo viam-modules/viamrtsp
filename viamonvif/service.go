@@ -309,10 +309,8 @@ func (dis *rtspDiscovery) discoveryBackgroundWorker(ctx context.Context) {
 
 func (dis *rtspDiscovery) Close(_ context.Context) error {
 	dis.mdnsServer.Shutdown()
-	if dis.workers != nil {
-		dis.logger.Debug("stopping discovery service workers")
-		dis.workers.Stop()
-	}
+	dis.logger.Debug("stopping discovery service workers")
+	dis.workers.Stop()
 	dis.logger.Debug("discovery service closed")
 
 	return nil
