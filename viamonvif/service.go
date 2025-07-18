@@ -127,7 +127,8 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 	// If extra is not empty, we assume the user wants to discover resources
 	// with provided credentials. We ignore any previously discovered resources
 	// and re-run discovery with extra parameters.
-	if len(extra) > 0 {
+	_, hasExtraCreds := getCredFromExtra(extra)
+	if hasExtraCreds {
 		dis.logger.Debugf("running discovery lookup with extra parameters: %v", extra)
 		discovered, err := dis.runDiscoveryLookup(ctx, extra)
 		if err != nil {
