@@ -288,18 +288,17 @@ func (dis *rtspDiscovery) preview(ctx context.Context, rtspURL string) (string, 
 func (dis *rtspDiscovery) discoveryBackgroundWorker(ctx context.Context) {
 	ticker := time.NewTicker(discoveryInterval)
 	defer ticker.Stop()
-
 	for {
 		select {
 		case <-ticker.C:
-			if discovered, err := dis.runDiscoveryLookup(ctx, nil); err != nil {
+			discovered, err := dis.runDiscoveryLookup(ctx, nil)
+			if err != nil {
 				dis.logger.Errorf("discovery failed: %v", err)
-				dis.discoveredResourcesMu.Lock()
-				dis.discoveredResources = discovered
-				dis.discoveredResourcesMu.Unlock()
-			} else {
-				dis.logger.Debug("discovery completed successfully")
+				continue
 			}
+			dis.discoveredResourcesMu.Lock()
+			dis.discoveredResources = discovered
+			dis.discoveredResourcesMu.Unlock()
 		case <-ctx.Done():
 			dis.logger.Debug("discovery worker context done, exiting")
 			return
