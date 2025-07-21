@@ -140,7 +140,7 @@ func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[strin
 	// If we have previously discovered cameras, we will return the cached resources.
 	dis.discoveredResourcesMu.Lock()
 	cachedDiscovered := dis.discoveredResources
-        dis.discoveredResourcesMu.Unlock()
+	dis.discoveredResourcesMu.Unlock()
 	if len(cachedDiscovered) > 0 {
 		dis.logger.Debug("returning cached discovered resources")
 		return cachedDiscovered, nil
@@ -282,7 +282,7 @@ func (dis *rtspDiscovery) preview(ctx context.Context, rtspURL string) (string, 
 	return "", fmt.Errorf("both snapshot and RTSP fetch failed: %w", errors.Join(snapshotErr, rtspErr))
 }
 
-// discoveryBackgroundWorker loops and runs the discovery service's DiscoverResources method
+// discoveryBackgroundWorker loops and runs the discovery service's DiscoverResources method.
 func (dis *rtspDiscovery) discoveryBackgroundWorker(ctx context.Context) {
 	ticker := time.NewTicker(discoveryInterval)
 	defer ticker.Stop()
@@ -457,7 +457,7 @@ func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL s
 	}
 }
 
-// generateUniqueName creates a unique name by adding timestamp and random bytes
+// generateUniqueName creates a unique name by adding timestamp and random bytes.
 func generateUniqueName(prefix string) string {
 	timestamp := time.Now().UnixNano()
 	uniqueName := fmt.Sprintf("%s-%d", prefix, timestamp)
