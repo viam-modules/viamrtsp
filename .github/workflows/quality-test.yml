@@ -29,13 +29,6 @@ jobs:
         sudo apt-get update
         sudo add-apt-repository universe && sudo apt-get install -y libfuse2
 
-    - name: Check gofmt
-      run: |
-        if [ -n "$(gofmt -d .)" ]; then
-          echo "gofmt is unhappy with your code quality!! Please run 'make lint' and commit the changes."
-          exit 1
-        fi
-    
     - name: Run linter and static checks
       run: make lint
 
