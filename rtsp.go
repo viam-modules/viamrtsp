@@ -112,6 +112,8 @@ type Config struct {
 	DiscoveryDep string               `json:"discovery_dep,omitempty"`
 
 	VideoStore *videoStoreConfig `json:"video_store,omitempty"`
+	// New attribute to specify allowed transports: "tcp", "udp", "udp-multicast"
+	Transports []string `json:"transports,omitempty"`
 }
 
 // CodecFormat contains a pointer to a format and the corresponding FFmpeg codec.
@@ -125,6 +127,17 @@ func (conf *Config) Validate(path string) ([]string, []string, error) {
 	_, err := base.ParseURL(conf.Address)
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid address '%s' for component at path '%s': %w", conf.Address, path, err)
+	}
+	// Validate Transports if provided.
+	allowed := map[string]bool{
+		"tcp":           true,
+		"udp":           true,
+		"udp-multicast": true,
+	}
+	for _, t := range conf.Transports {
+		if !allowed[strings.ToLower(t)] {
+			return nil, nil, fmt.Errorf("invalid transport '%s', allowed values are: tcp, udp, udp-multicast", t)
+		}
 	}
 
 	var deps []string
@@ -221,6 +234,8 @@ type rtspCamera struct {
 	discoverySvc discovery.Service
 
 	name resource.Name
+
+	preferredTransports []*gortsplib.Transport
 }
 
 // Close closes the camera. It always returns nil, but because of Close() interface, it needs to return an error.
@@ -306,18 +321,18 @@ func (rc *rtspCamera) closeConnection() {
 // default behavior of trying UDP first.
 func (rc *rtspCamera) reconnectClientWithFallbackTransports(codecInfo videoCodec) error {
 	// Define the transport preferences in order.
-	transportTCP := gortsplib.TransportTCP
-	transportUDP := gortsplib.TransportUDP
-	transportUDPMulticast := gortsplib.TransportUDPMulticast
-	transports := []*gortsplib.Transport{
-		&transportTCP,
-		&transportUDP,
-		&transportUDPMulticast,
-	}
+	// transportTCP := gortsplib.TransportTCP
+	// transportUDP := gortsplib.TransportUDP
+	// transportUDPMulticast := gortsplib.TransportUDPMulticast
+	// transports := []*gortsplib.Transport{
+	// 	&transportTCP,
+	// 	&transportUDP,
+	// 	&transportUDPMulticast,
+	// }
 	// Try to reconnect with each transport in the order defined above.
 	// If all attempts fail, return the last error.
 	var lastErr error
-	for _, transport := range transports {
+	for _, transport := range rc.preferredTransports {
 		if err := rc.reconnectClient(codecInfo, transport); err != nil {
 			rc.logger.Warnf("cannot reconnect to rtsp server using transport %s, err: %s", transport.String(), err.Error())
 			lastErr = err
@@ -595,7 +610,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		au, err := rtpDec.Decode(pkt)
 		if err != nil {
 			if !errors.Is(err, rtph264.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph264.ErrMorePacketsNeeded) {
-				rc.logger.Debugf("error decoding(1) h264 rstp stream %w", err)
+				rc.logger.Debugf("error decoding(1) h264 rtsp stream %w", err)
 			}
 			return
 		}
@@ -711,7 +726,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		au, err := rtpDec.Decode(pkt)
 		if err != nil {
 			if !errors.Is(err, rtph265.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph265.ErrMorePacketsNeeded) {
-				rc.logger.Debugw("error decoding(1) h265 rstp stream", "err", err.Error())
+				rc.logger.Debugw("error decoding(1) h265 rtsp stream", "err", err.Error())
 			}
 			return
 		}
@@ -1088,6 +1103,34 @@ func NewRTSPCamera(ctx context.Context, deps resource.Dependencies, conf resourc
 		return nil, err
 	}
 
+	var preferredTransports []*gortsplib.Transport
+	tcp := gortsplib.TransportTCP
+	udp := gortsplib.TransportUDP
+	udpm := gortsplib.TransportUDPMulticast
+	if len(newConf.Transports) > 0 {
+		for _, t := range newConf.Transports {
+			switch strings.ToLower(t) {
+			case "tcp":
+				logger.Info("Adding TCP transport to preferred transports")
+				preferredTransports = append(preferredTransports, &tcp)
+			case "udp":
+				logger.Info("Adding UDP transport to preferred transports")
+				preferredTransports = append(preferredTransports, &udp)
+			case "udp-multicast":
+				logger.Info("Adding UDP-Multicast transport to preferred transports")
+				preferredTransports = append(preferredTransports, &udpm)
+			}
+		}
+	} else {
+		logger.Info("no transports specified in config, using default transports: TCP, UDP, UDP-Multicast")
+		// Fallback to default ordering
+		preferredTransports = []*gortsplib.Transport{
+			&tcp,
+			&udp,
+			&udpm,
+		}
+	}
+
 	var discSvc discovery.Service
 	if newConf.DiscoveryDep != "" {
 		// Some camera configs may rely on an mDNS server running that is managed by the (viamrtsp)
@@ -1116,6 +1159,7 @@ func NewRTSPCamera(ctx context.Context, deps resource.Dependencies, conf resourc
 		iframeOnlyDecode:            newConf.IframeOnlyDecode,
 		u:                           u,
 		name:                        conf.ResourceName(),
+		preferredTransports:         preferredTransports,
 		rtpPassthrough:              rtpPassthrough,
 		videoRequest:                &videoRequest{logger: logger},
 		bufAndCBByID:                make(map[rtppassthrough.SubscriptionID]bufAndCB),
