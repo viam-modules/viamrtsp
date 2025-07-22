@@ -338,7 +338,7 @@ func (rc *rtspCamera) reconnectClientWithFallbackTransports(codecInfo videoCodec
 			lastErr = err
 			continue
 		}
-		rc.logger.Debugf("successfully reconnected to rtsp server url: %s", rc.u)
+		rc.logger.Debugf("successfully reconnected to rtsp server url: %s using transport: %s", rc.u, transport.String())
 		return nil
 	}
 	return fmt.Errorf("all attempts to reconnect to rtsp server failed: %w", lastErr)
