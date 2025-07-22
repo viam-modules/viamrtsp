@@ -199,6 +199,21 @@ func TestRTSPConfig(t *testing.T) {
 	}
 	_, _, err = rtspConf.Validate("path")
 	test.That(t, err, test.ShouldBeNil)
+	// test valid transports list
+	rtspConf = &Config{
+		Address:    "rtsp://example.com:5000",
+		Transports: []string{"tcp", "udp"},
+	}
+	_, _, err = rtspConf.Validate("path")
+	test.That(t, err, test.ShouldBeNil)
+	// test invalid transports list
+	rtspConf = &Config{
+		Address:    "rtsp://example.com:5000",
+		Transports: []string{"tcp", "invalid"},
+	}
+	_, _, err = rtspConf.Validate("path")
+	test.That(t, err, test.ShouldNotBeNil)
+	test.That(t, err.Error(), test.ShouldContainSubstring, "invalid transport")
 }
 
 // Dedicated test for performance benchmarking.
