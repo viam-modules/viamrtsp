@@ -133,7 +133,7 @@ type codecFormat struct {
 }
 
 func isValidTransport(transport string) bool {
-	return slices.Contains(allowedTransports,  strings.ToLower(transport))
+	return slices.Contains(allowedTransports, strings.ToLower(transport))
 }
 
 // Validate checks to see if the attributes of the model are valid.
