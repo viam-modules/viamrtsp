@@ -41,6 +41,7 @@ The following attributes are available for all models of `viamrtsp` cameras:
 | `rtp_passthrough` | bool | Optional | RTP passthrough mode (which improves video streaming efficiency) is supported with the H264 codec. It will be on by default. Set to false to disable H264 RTP passthrough. Default: `true`. |
 | `lazy_decode` | bool | Optional | The camera only decodes video frames when they're requested via the `Image` API, significantly reducing CPU usage during idle periods. Only compatible with `H264` and `H265` codecs. When disabled (default), the camera continuously decodes the stream to maintain the latest frame. Default: `false`. |
 | `i_frame_only_decode` | bool | Optional | Only decodes keyframes (I-frames) from the video stream rather than all incoming frames. This significantly reduces CPU usage at the cost of a lower effective frame rate (typically 1-5 FPS depending on the camera GOP settings). Most suitable for low-motion scenes or when system resources are constrained. Only compatible with `H264` and `H265` codecs. Default: `false`. |
+| `transports` | []string | optional | List of transport protocols, in preference order, to use for the RTP stream (default: `["tcp", "udp", "udp-multicast"]`) |
 
 ### Example configuration
 
@@ -278,7 +279,6 @@ This model implements the [`"rdk:component:generic"` API](https://docs.viam.com/
 | `video.bitrate`     | integer | optional     | Bitrate for video encoding (bits per second) - only applies to MPEG4 and MJPEG inputs |
 | `video.preset`      | string  | optional     | Encoding preset (e.g., ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow) - only applies to MPEG4 and MJPEG inputs |
 | `framerate` | integer | optional | Frame rate to capture video at (frames per second) - only applies to MPEG4 and MJPEG inputs |
-| `transports` | []string | optional | List of transport protocols, in preference order, to use for the RTP stream (default: `["tcp", "udp", "udp-multicast"]`) |
 
 ### Supported Codecs
 The `viamrtsp:video-store` component supports the following codecs:
