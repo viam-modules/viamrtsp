@@ -53,6 +53,10 @@ const (
 	// defaultMPEG4ProfileLevelID is the default profile-level-id value for MPEG4 video
 	// as specified in RFC 6416 Section 7.1 https://datatracker.ietf.org/doc/html/rfc6416#section-7.1
 	defaultMPEG4ProfileLevelID = 1
+	// allowed transport protocol strings.
+	transportTCP          = "tcp"
+	transportUDP          = "udp"
+	transportUDPMulticast = "udp-multicast"
 )
 
 var (
@@ -72,6 +76,12 @@ var (
 	Models = []resource.Model{ModelAgnostic, ModelH264, ModelH265, ModelMJPEG, ModelMPEG4}
 	// ErrH264PassthroughNotEnabled is an error indicating H264 passthrough is not enabled.
 	ErrH264PassthroughNotEnabled = errors.New("H264 passthrough is not enabled")
+	// allowedTransports is a list of valid transport protocols for the RTSP camera.
+	allowedTransports = []string{
+		transportTCP,
+		transportUDP,
+		transportUDPMulticast,
+	}
 )
 
 func init() {
@@ -122,21 +132,21 @@ type codecFormat struct {
 	codec         videoCodec
 }
 
+func isValidTransport(transport string) bool {
+	s := strings.ToLower(transport)
+	return slices.Contains(allowedTransports, s)
+}
+
 // Validate checks to see if the attributes of the model are valid.
 func (conf *Config) Validate(path string) ([]string, []string, error) {
 	_, err := base.ParseURL(conf.Address)
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid address '%s' for component at path '%s': %w", conf.Address, path, err)
 	}
-	// Validate Transports if provided.
-	allowed := map[string]bool{
-		"tcp":           true,
-		"udp":           true,
-		"udp-multicast": true,
-	}
+
 	for _, t := range conf.Transports {
-		if !allowed[strings.ToLower(t)] {
-			return nil, nil, fmt.Errorf("invalid transport '%s', allowed values are: tcp, udp, udp-multicast", t)
+		if !isValidTransport(t) {
+			return nil, nil, fmt.Errorf("invalid transport '%s' for component at path '%s', allowed values are: tcp, udp, udp-multicast", t, path)
 		}
 	}
 
