@@ -278,6 +278,7 @@ This model implements the [`"rdk:component:generic"` API](https://docs.viam.com/
 | `video.bitrate`     | integer | optional     | Bitrate for video encoding (bits per second) - only applies to MPEG4 and MJPEG inputs |
 | `video.preset`      | string  | optional     | Encoding preset (e.g., ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow) - only applies to MPEG4 and MJPEG inputs |
 | `framerate` | integer | optional | Frame rate to capture video at (frames per second) - only applies to MPEG4 and MJPEG inputs |
+| `transports` | []string | optional | List of transport protocols, in preference order, to use for the RTP stream (default: `["tcp", "udp", "udp-multicast"]`) |
 
 ### Supported Codecs
 The `viamrtsp:video-store` component supports the following codecs:
