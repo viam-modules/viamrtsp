@@ -1111,12 +1111,14 @@ func NewRTSPCamera(ctx context.Context, deps resource.Dependencies, conf resourc
 	if len(newConf.Transports) > 0 {
 		for _, t := range newConf.Transports {
 			switch strings.ToLower(t) {
-			case "tcp":
+			case transportTCP:
 				preferredTransports = append(preferredTransports, &tcp)
-			case "udp":
+			case transportUDP:
 				preferredTransports = append(preferredTransports, &udp)
-			case "udp-multicast":
+			case transportUDPMulticast:
 				preferredTransports = append(preferredTransports, &udpm)
+			default:
+				return nil, fmt.Errorf("invalid transport '%s', allowed values are: tcp, udp, udp-multicast", t)
 			}
 		}
 		logger.Debug("using transports specified in config:", newConf.Transports)
