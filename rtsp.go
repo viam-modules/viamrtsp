@@ -320,15 +320,6 @@ func (rc *rtspCamera) closeConnection() {
 // using the transports in the order of TCP, UDP, and UDP Multicast. This overrides gortsplib's
 // default behavior of trying UDP first.
 func (rc *rtspCamera) reconnectClientWithFallbackTransports(codecInfo videoCodec) error {
-	// Define the transport preferences in order.
-	// transportTCP := gortsplib.TransportTCP
-	// transportUDP := gortsplib.TransportUDP
-	// transportUDPMulticast := gortsplib.TransportUDPMulticast
-	// transports := []*gortsplib.Transport{
-	// 	&transportTCP,
-	// 	&transportUDP,
-	// 	&transportUDPMulticast,
-	// }
 	// Try to reconnect with each transport in the order defined above.
 	// If all attempts fail, return the last error.
 	var lastErr error
@@ -1111,19 +1102,17 @@ func NewRTSPCamera(ctx context.Context, deps resource.Dependencies, conf resourc
 		for _, t := range newConf.Transports {
 			switch strings.ToLower(t) {
 			case "tcp":
-				logger.Info("Adding TCP transport to preferred transports")
 				preferredTransports = append(preferredTransports, &tcp)
 			case "udp":
-				logger.Info("Adding UDP transport to preferred transports")
 				preferredTransports = append(preferredTransports, &udp)
 			case "udp-multicast":
-				logger.Info("Adding UDP-Multicast transport to preferred transports")
 				preferredTransports = append(preferredTransports, &udpm)
 			}
 		}
+		logger.Debug("using transports specified in config:", newConf.Transports)
 	} else {
-		logger.Info("no transports specified in config, using default transports: TCP, UDP, UDP-Multicast")
-		// Fallback to default ordering
+		logger.Debug("no transports specified in config, using default transports: TCP, UDP, UDP-Multicast")
+		// Fallback to default transprot pref ordering
 		preferredTransports = []*gortsplib.Transport{
 			&tcp,
 			&udp,
