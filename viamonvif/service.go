@@ -26,6 +26,7 @@ import (
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/services/discovery"
+	"go.viam.com/utils"
 )
 
 // Model is the model for a onvif discovery service for rtsp cameras.
@@ -40,6 +41,7 @@ const (
 	rtspPollTimeout       = 5 * time.Second
 	rtspImageInterval     = 100 * time.Millisecond
 	rtspNameSaltLength    = 4
+	discoveryInterval     = time.Minute
 	imageReqMimeType      = "image/jpeg"
 )
 
@@ -82,6 +84,11 @@ type rtspDiscovery struct {
 	Credentials []device.Credentials
 	mdnsServer  *mdnsServer
 	logger      logging.Logger
+
+	workers *utils.StoppableWorkers
+
+	discoveredResourcesMu sync.Mutex
+	discoveredResources   []resource.Config
 }
 
 func newDiscovery(_ context.Context, _ resource.Dependencies,
@@ -97,6 +104,7 @@ func newDiscovery(_ context.Context, _ resource.Dependencies,
 		Named:       conf.ResourceName().AsNamed(),
 		Credentials: append([]device.Credentials{emptyCred}, cfg.Credentials...),
 		logger:      logger,
+		workers:     utils.NewBackgroundStoppableWorkers(),
 	}
 
 	// viam-server sets this environment variable. The contents of this directory is expected to
@@ -109,11 +117,50 @@ func newDiscovery(_ context.Context, _ resource.Dependencies,
 			filepath.Join(moduleDataDir, "mdns_cache.json"), logger.Sublogger("mdns"))
 	}
 
+	dis.workers.Add(dis.discoveryBackgroundWorker)
+
 	return dis, nil
 }
 
 // DiscoverResources discovers different rtsp cameras that use onvif.
 func (dis *rtspDiscovery) DiscoverResources(ctx context.Context, extra map[string]any) ([]resource.Config, error) {
+	// If extra is not empty, we assume the user wants to discover resources
+	// with provided credentials. We ignore any previously discovered resources
+	// and re-run discovery with extra parameters.
+	_, hasExtraCreds := getCredFromExtra(extra)
+	if hasExtraCreds {
+		dis.logger.Debugf("running discovery lookup with extra parameters: %v", extra)
+		discovered, err := dis.runDiscoveryLookup(ctx, extra)
+		if err != nil {
+			return nil, fmt.Errorf("failed to run discovery lookup: %w", err)
+		}
+		return discovered, nil
+	}
+
+	// If we have previously discovered cameras, we will return the cached resources.
+	dis.discoveredResourcesMu.Lock()
+	cachedDiscovered := dis.discoveredResources
+	dis.discoveredResourcesMu.Unlock()
+	if len(cachedDiscovered) > 0 {
+		dis.logger.Debug("returning cached discovered resources")
+		return cachedDiscovered, nil
+	}
+
+	// If discovery has not been run before, or no cameras were discovered,
+	// we will attempt the discovery lookup again.
+	dis.logger.Debug("no cached resources, running discovery lookup with config credentials")
+	discovered, err := dis.runDiscoveryLookup(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to run discovery lookup: %w", err)
+	}
+	dis.discoveredResourcesMu.Lock()
+	dis.discoveredResources = discovered
+	dis.discoveredResourcesMu.Unlock()
+
+	return discovered, nil
+}
+
+func (dis *rtspDiscovery) runDiscoveryLookup(ctx context.Context, extra map[string]any) ([]resource.Config, error) {
 	localRTSPToSnapshotURIs := make(map[string]string)
 	cams := []resource.Config{}
 
@@ -235,8 +282,34 @@ func (dis *rtspDiscovery) preview(ctx context.Context, rtspURL string) (string, 
 	return "", fmt.Errorf("both snapshot and RTSP fetch failed: %w", errors.Join(snapshotErr, rtspErr))
 }
 
+// discoveryBackgroundWorker loops and runs the discovery service's DiscoverResources method.
+func (dis *rtspDiscovery) discoveryBackgroundWorker(ctx context.Context) {
+	ticker := time.NewTicker(discoveryInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			discovered, err := dis.runDiscoveryLookup(ctx, nil)
+			if err != nil {
+				dis.logger.Errorf("discovery failed: %v", err)
+				continue
+			}
+			dis.discoveredResourcesMu.Lock()
+			dis.discoveredResources = discovered
+			dis.discoveredResourcesMu.Unlock()
+		case <-ctx.Done():
+			dis.logger.Debug("discovery worker context done, exiting")
+			return
+		}
+	}
+}
+
 func (dis *rtspDiscovery) Close(_ context.Context) error {
 	dis.mdnsServer.Shutdown()
+	dis.logger.Debug("stopping discovery service workers")
+	dis.workers.Stop()
+	dis.logger.Debug("discovery service closed")
+
 	return nil
 }
 
@@ -384,7 +457,7 @@ func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL s
 	}
 }
 
-// generateUniqueName creates a unique name by adding timestamp and random bytes
+// generateUniqueName creates a unique name by adding timestamp and random bytes.
 func generateUniqueName(prefix string) string {
 	timestamp := time.Now().UnixNano()
 	uniqueName := fmt.Sprintf("%s-%d", prefix, timestamp)

@@ -35,7 +35,7 @@ jobs:
           echo "gofmt is unhappy with your code quality!! Please run 'make lint' and commit the changes."
           exit 1
         fi
-    
+
     - name: Run linter and static checks
       run: make lint
 
