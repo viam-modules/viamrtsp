@@ -326,7 +326,7 @@ func (rc *rtspCamera) closeConnection() {
 }
 
 // reconnectClientWithFallbackTransports attempts to setup the RTSP client with the given codec
-// using the transports in the order of TCP, UDP, and UDP Multicast. This overrides gortsplib's
+// using the transports specified in the module config. This overrides gortsplib's
 // default behavior of trying UDP first.
 func (rc *rtspCamera) reconnectClientWithFallbackTransports(codecInfo videoCodec) error {
 	// Try to reconnect with each transport in the order defined above.
