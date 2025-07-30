@@ -49,7 +49,7 @@
     {
       "api": "rdk:component:generic",
       "model": "viam:viamrtsp:video-store",
-      "markdown_link": "README.md",
+      "markdown_link": "README.md#configure-the-viamrtspvideo-store-generic-component-for-video-storage",
       "short_description": "A video-store that will store video from a viamrtsp camera."
     },
     {
