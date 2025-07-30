@@ -1122,7 +1122,7 @@ func NewRTSPCamera(ctx context.Context, deps resource.Dependencies, conf resourc
 		}
 		logger.Debug("using transports specified in config:", newConf.Transports)
 	} else {
-		logger.Debug("no transports specified in config, using default transports: TCP")
+		logger.Debug("no transports specified in config, defaulting to TCP")
 		preferredTransports = []*gortsplib.Transport{&tcp}
 	}
 
