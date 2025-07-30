@@ -1122,13 +1122,8 @@ func NewRTSPCamera(ctx context.Context, deps resource.Dependencies, conf resourc
 		}
 		logger.Debug("using transports specified in config:", newConf.Transports)
 	} else {
-		logger.Debug("no transports specified in config, using default transports: TCP, UDP, UDP-Multicast")
-		// Fallback to default transprot pref ordering
-		preferredTransports = []*gortsplib.Transport{
-			&tcp,
-			&udp,
-			&udpm,
-		}
+		logger.Debug("no transports specified in config, using default transports: TCP")
+		preferredTransports = []*gortsplib.Transport{&tcp}
 	}
 
 	var discSvc discovery.Service
