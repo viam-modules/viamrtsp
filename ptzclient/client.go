@@ -149,16 +149,28 @@ func (s *onvifPtzClient) handleGetProfiles() (map[string]interface{}, error) {
 	}
 
 	profileInfo := make(map[string]map[string]interface{}, len(env.Body.GetProfilesResponse.Profiles))
-
 	// For each profile, fetch GetProfile to inspect PTZConfiguration
 	for _, p := range env.Body.GetProfilesResponse.Profiles {
 		tok := p.Token
 		s.logger.Debugf("Processing profile %s", tok)
 
 		gpReq := media.GetProfile{ProfileToken: onvifxsd.ReferenceToken(tok)}
-		// TODO(seanp): Add error handling
-		gpRes, _ := s.dev.CallMethod(gpReq, s.logger)
-		gpBody, _ := io.ReadAll(gpRes.Body)
+		gpRes, err := s.dev.CallMethod(gpReq, s.logger)
+		if err != nil {
+			s.logger.Warnf("Failed to call GetProfile for %s: %v", tok, err)
+			profileInfo[tok] = map[string]interface{}{
+				"supports_ptz": false,
+			}
+			continue
+		}
+		gpBody, err := io.ReadAll(gpRes.Body)
+		if err != nil {
+			s.logger.Warnf("Failed to read GetProfile response for %s: %v", tok, err)
+			profileInfo[tok] = map[string]interface{}{
+				"supports_ptz": false,
+			}
+			continue
+		}
 		gpRes.Body.Close()
 
 		// TODO(seanp): Use struct from onvif lib
