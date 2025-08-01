@@ -56,12 +56,17 @@ func main() {
 		logger.Fatal(err)
 	}
 	defer machine.Close(context.Background())
-	logger.Info("Resources:")
-	logger.Info(machine.ResourceNames())
 
-	ptz, err := generic.FromRobot(machine, "ptz-1")
+	resourceName := "ptz-1" // default resource name
+	if len(os.Args) >= 2 {
+		resourceName = os.Args[1]
+	}
+
+	ptz, err := generic.FromRobot(machine, resourceName)
 	if err != nil {
 		logger.Error(err)
+		logger.Info("Resources:")
+		logger.Info(machine.ResourceNames())
 		return
 	}
 
@@ -118,7 +123,7 @@ func main() {
 				_, err := ptz.DoCommand(context.Background(), map[string]interface{}{
 					"command":    "continuous-move",
 					"pan_speed":  0.0,
-					"tilt_speed": 0.2,
+					"tilt_speed": 0.5,
 					"zoom_speed": 0.0,
 				})
 				if err != nil {
@@ -131,7 +136,7 @@ func main() {
 				_, err := ptz.DoCommand(context.Background(), map[string]interface{}{
 					"command":    "continuous-move",
 					"pan_speed":  0.0,
-					"tilt_speed": -0.2,
+					"tilt_speed": -0.5,
 					"zoom_speed": 0.0,
 				})
 				if err != nil {
@@ -143,7 +148,7 @@ func main() {
 				// left
 				_, err := ptz.DoCommand(context.Background(), map[string]interface{}{
 					"command":    "continuous-move",
-					"pan_speed":  -0.2,
+					"pan_speed":  -0.5,
 					"tilt_speed": 0.0,
 					"zoom_speed": 0.0,
 				})
@@ -156,7 +161,7 @@ func main() {
 				// right
 				_, err := ptz.DoCommand(context.Background(), map[string]interface{}{
 					"command":    "continuous-move",
-					"pan_speed":  0.2,
+					"pan_speed":  0.5,
 					"tilt_speed": 0.0,
 					"zoom_speed": 0.0,
 				})
@@ -171,7 +176,7 @@ func main() {
 					"command":    "continuous-move",
 					"pan_speed":  0.0,
 					"tilt_speed": 0.0,
-					"zoom_speed": 0.2,
+					"zoom_speed": 0.5,
 				})
 				if err != nil {
 					logger.Error(err)
@@ -184,7 +189,7 @@ func main() {
 					"command":    "continuous-move",
 					"pan_speed":  0.0,
 					"tilt_speed": 0.0,
-					"zoom_speed": -0.2,
+					"zoom_speed": -0.5,
 				})
 				if err != nil {
 					logger.Error(err)
@@ -215,6 +220,19 @@ func main() {
 		})
 
 		if key.Code == 27 || key.Code == 3 { // ASCII values for Escape and Ctrl+C
+			fmt.Println("Exiting...")
+			// Stop all ongoing pan/tilt/zoom commands before exiting
+			_, err := ptz.DoCommand(context.Background(),
+				map[string]interface{}{
+					"command":  "stop",
+					"pan_tilt": true,
+					"zoom":     true,
+				},
+			)
+			if err != nil {
+				logger.Error(err)
+			}
+			logger.Info("Stopped all PTZ controls.")
 			os.Exit(0)
 		}
 		return false, nil
