@@ -220,22 +220,11 @@ func (s *onvifPtzClient) handleGetCapabilities() (map[string]interface{}, error)
 	}
 	s.logger.Debugf("GetServiceCapabilities raw response:\n%s", string(body))
 
-	// TODO(seanp): Use struct from onvif/ptz/types.go
 	var envelope struct {
 		XMLName xml.Name `xml:"Envelope"`
 		Body    struct {
-			XMLName                        xml.Name `xml:"Body"`
-			GetServiceCapabilitiesResponse struct {
-				XMLName      xml.Name `xml:"GetServiceCapabilitiesResponse"`
-				Capabilities struct {
-					XMLName                     xml.Name `xml:"Capabilities"`
-					EFlip                       bool     `xml:"EFlip,attr"`
-					Reverse                     bool     `xml:"Reverse,attr"`
-					GetCompatibleConfigurations bool     `xml:"GetCompatibleConfigurations,attr"`
-					MoveStatus                  bool     `xml:"MoveStatus,attr"`
-					StatusPosition              bool     `xml:"StatusPosition,attr"`
-				} `xml:"Capabilities"`
-			} `xml:"GetServiceCapabilitiesResponse"`
+			XMLName                        xml.Name                           `xml:"Body"`
+			GetServiceCapabilitiesResponse ptz.GetServiceCapabilitiesResponse `xml:"GetServiceCapabilitiesResponse"`
 		} `xml:"Body"`
 	}
 
@@ -245,11 +234,11 @@ func (s *onvifPtzClient) handleGetCapabilities() (map[string]interface{}, error)
 
 	caps := envelope.Body.GetServiceCapabilitiesResponse.Capabilities
 	return map[string]interface{}{
-		"e_flip":                        caps.EFlip,
-		"reverse":                       caps.Reverse,
-		"get_compatible_configurations": caps.GetCompatibleConfigurations,
-		"move_status":                   caps.MoveStatus,
-		"status_position":               caps.StatusPosition,
+		"e_flip":                        bool(caps.EFlip),
+		"reverse":                       bool(caps.Reverse),
+		"get_compatible_configurations": bool(caps.GetCompatibleConfigurations),
+		"move_status":                   bool(caps.MoveStatus),
+		"status_position":               bool(caps.StatusPosition),
 	}, nil
 }
 
