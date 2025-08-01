@@ -129,7 +129,6 @@ func (s *onvifPtzClient) Name() resource.Name {
 	return s.name
 }
 
-// handleGetProfiles retrieves available media profiles from the camera and implements the get-profiles command logic.
 func (s *onvifPtzClient) handleGetProfiles() (map[string]interface{}, error) {
 	s.logger.Debug("Fetching media profiles...")
 	req := media.GetProfiles{}
@@ -143,21 +142,59 @@ func (s *onvifPtzClient) handleGetProfiles() (map[string]interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read GetProfiles response body: %w", err)
 	}
-
-	var envelope ProfilesEnvelope
-	err = xml.Unmarshal(bodyBytes, &envelope)
-	if err != nil {
+	var env ProfilesEnvelope
+	if err := xml.Unmarshal(bodyBytes, &env); err != nil {
 		s.logger.Warnf("Failed to unmarshal GetProfiles response. Raw XML:\n%s", string(bodyBytes))
 		return nil, fmt.Errorf("failed to unmarshal GetProfiles response: %w", err)
 	}
 
-	// TODO(seanp): Include profile to node token mapping
-	var tokens []string
-	for _, p := range envelope.Body.GetProfilesResponse.Profiles {
-		tokens = append(tokens, p.Token)
+	tokens := make([]string, 0, len(env.Body.GetProfilesResponse.Profiles))
+	profileInfo := make(map[string]map[string]interface{}, len(tokens))
+
+	// For each profile, fetch GetProfile to inspect PTZConfiguration
+	for _, p := range env.Body.GetProfilesResponse.Profiles {
+		tok := p.Token
+		tokens = append(tokens, tok)
+
+		gpReq := media.GetProfile{ProfileToken: onvifxsd.ReferenceToken(tok)}
+		// TODO(seanp): Add error handling
+		gpRes, _ := s.dev.CallMethod(gpReq, s.logger)
+		gpBody, _ := io.ReadAll(gpRes.Body)
+		gpRes.Body.Close()
+
+		// TODO(seanp): Use struct from onvif lib
+		var gpEnv struct {
+			Body struct {
+				GetProfileResponse struct {
+					Profile *struct {
+						PTZConfiguration *struct {
+							NodeToken onvifxsd.ReferenceToken `xml:"NodeToken"`
+						} `xml:"PTZConfiguration"`
+					} `xml:"Profile"`
+				} `xml:"GetProfileResponse"`
+			} `xml:"Body"`
+		}
+		if err := xml.Unmarshal(gpBody, &gpEnv); err != nil {
+			return nil, fmt.Errorf("unmarshal GetProfile(%s): %w", tok, err)
+		}
+
+		info := map[string]interface{}{}
+		if gpEnv.Body.GetProfileResponse.Profile != nil &&
+			gpEnv.Body.GetProfileResponse.Profile.PTZConfiguration != nil {
+			info["supports_ptz"] = true
+			info["node_token"] = string(gpEnv.Body.GetProfileResponse.Profile.PTZConfiguration.NodeToken)
+		} else {
+			info["supports_ptz"] = false
+		}
+		profileInfo[tok] = info
 	}
+
 	s.logger.Debugf("Found profiles: %v", tokens)
-	return map[string]interface{}{"profiles": tokens}, nil
+	// TODO(seanp): Clean up return map structure
+	return map[string]interface{}{
+		"profiles":        tokens,
+		"profile_details": profileInfo,
+	}, nil
 }
 
 func (s *onvifPtzClient) handleGetCapabilities() (map[string]interface{}, error) {
