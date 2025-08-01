@@ -186,7 +186,6 @@ func (s *onvifPtzClient) handleGetCapabilities() (map[string]interface{}, error)
 					GetCompatibleConfigurations bool     `xml:"GetCompatibleConfigurations,attr"`
 					MoveStatus                  bool     `xml:"MoveStatus,attr"`
 					StatusPosition              bool     `xml:"StatusPosition,attr"`
-					// Remove MoveAndTrack if it’s not present in your response
 				} `xml:"Capabilities"`
 			} `xml:"GetServiceCapabilitiesResponse"`
 		} `xml:"Body"`
@@ -233,6 +232,7 @@ func (s *onvifPtzClient) handleGetNodes() (map[string]interface{}, error) {
 	}
 	defer res.Body.Close()
 
+	// TODO(seanp): Is this xml struct available in the ONVIF library?
 	body, _ := io.ReadAll(res.Body)
 	var env struct {
 		Body struct {
@@ -255,9 +255,9 @@ func (s *onvifPtzClient) handleGetNodes() (map[string]interface{}, error) {
 		return nil, fmt.Errorf("unmarshal GetNodes: %w", err)
 	}
 
+	// TODO(seanp): Can we simplify this?
 	out := make(map[string]interface{}, len(env.Body.GetNodesResponse.PTZNode))
 	for _, node := range env.Body.GetNodesResponse.PTZNode {
-		// build each slice explicitly
 		cpt := make([]map[string]interface{}, len(node.SupportedPTZSpaces.ContinuousPanTilt))
 		for i, sp := range node.SupportedPTZSpaces.ContinuousPanTilt {
 			cpt[i] = map[string]interface{}{
