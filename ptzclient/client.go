@@ -206,25 +206,6 @@ func (s *onvifPtzClient) handleGetCapabilities() (map[string]interface{}, error)
 }
 
 func (s *onvifPtzClient) handleGetNodes() (map[string]interface{}, error) {
-	type space2D struct {
-		URI    string `xml:"URI"`
-		XRange struct {
-			Min float64 `xml:"Min"`
-			Max float64 `xml:"Max"`
-		} `xml:"XRange"`
-		YRange struct {
-			Min float64 `xml:"Min"`
-			Max float64 `xml:"Max"`
-		} `xml:"YRange"`
-	}
-	type space1D struct {
-		URI    string `xml:"URI"`
-		XRange struct {
-			Min float64 `xml:"Min"`
-			Max float64 `xml:"Max"`
-		} `xml:"XRange"`
-	}
-
 	req := ptz.GetNodes{}
 	res, err := s.dev.CallMethod(req, s.logger)
 	if err != nil {
@@ -232,85 +213,42 @@ func (s *onvifPtzClient) handleGetNodes() (map[string]interface{}, error) {
 	}
 	defer res.Body.Close()
 
-	// TODO(seanp): Is this xml struct available in the ONVIF library?
-	body, _ := io.ReadAll(res.Body)
-	var env struct {
+	var resp struct {
 		Body struct {
 			GetNodesResponse struct {
-				PTZNode []struct {
-					Token              string `xml:"token,attr"`
-					SupportedPTZSpaces struct {
-						ContinuousPanTilt []space2D `xml:"ContinuousPanTiltVelocitySpace"`
-						ContinuousZoom    []space1D `xml:"ContinuousZoomVelocitySpace"`
-						RelativePanTilt   []space2D `xml:"RelativePanTiltTranslationSpace"`
-						RelativeZoom      []space1D `xml:"RelativeZoomTranslationSpace"`
-						AbsolutePanTilt   []space2D `xml:"AbsolutePanTiltPositionSpace"`
-						AbsoluteZoom      []space1D `xml:"AbsoluteZoomPositionSpace"`
-					} `xml:"SupportedPTZSpaces"`
-				} `xml:"PTZNode"`
+				Nodes []onvifxsd.PTZNode `xml:"PTZNode"`
 			} `xml:"GetNodesResponse"`
 		} `xml:"Body"`
 	}
-	if err := xml.Unmarshal(body, &env); err != nil {
+	if err := xml.NewDecoder(res.Body).Decode(&resp); err != nil {
 		return nil, fmt.Errorf("unmarshal GetNodes: %w", err)
 	}
 
-	// TODO(seanp): Can we simplify this?
-	out := make(map[string]interface{}, len(env.Body.GetNodesResponse.PTZNode))
-	for _, node := range env.Body.GetNodesResponse.PTZNode {
-		cpt := make([]map[string]interface{}, len(node.SupportedPTZSpaces.ContinuousPanTilt))
-		for i, sp := range node.SupportedPTZSpaces.ContinuousPanTilt {
-			cpt[i] = map[string]interface{}{
-				"uri":   sp.URI,
-				"x_min": sp.XRange.Min, "x_max": sp.XRange.Max,
-				"y_min": sp.YRange.Min, "y_max": sp.YRange.Max,
+	out := make(map[string]interface{}, len(resp.Body.GetNodesResponse.Nodes))
+	for _, node := range resp.Body.GetNodesResponse.Nodes {
+		spaces := node.SupportedPTZSpaces
+
+		to2D := func(desc onvifxsd.Space2DDescription) map[string]interface{} {
+			return map[string]interface{}{
+				"uri":   string(desc.URI),
+				"x_min": desc.XRange.Min, "x_max": desc.XRange.Max,
+				"y_min": desc.YRange.Min, "y_max": desc.YRange.Max,
 			}
 		}
-		cz := make([]map[string]interface{}, len(node.SupportedPTZSpaces.ContinuousZoom))
-		for i, sp := range node.SupportedPTZSpaces.ContinuousZoom {
-			cz[i] = map[string]interface{}{
-				"uri":   sp.URI,
-				"x_min": sp.XRange.Min, "x_max": sp.XRange.Max,
-			}
-		}
-		rpt := make([]map[string]interface{}, len(node.SupportedPTZSpaces.RelativePanTilt))
-		for i, sp := range node.SupportedPTZSpaces.RelativePanTilt {
-			rpt[i] = map[string]interface{}{
-				"uri":   sp.URI,
-				"x_min": sp.XRange.Min, "x_max": sp.XRange.Max,
-				"y_min": sp.YRange.Min, "y_max": sp.YRange.Max,
-			}
-		}
-		rz := make([]map[string]interface{}, len(node.SupportedPTZSpaces.RelativeZoom))
-		for i, sp := range node.SupportedPTZSpaces.RelativeZoom {
-			rz[i] = map[string]interface{}{
-				"uri":   sp.URI,
-				"x_min": sp.XRange.Min, "x_max": sp.XRange.Max,
-			}
-		}
-		apt := make([]map[string]interface{}, len(node.SupportedPTZSpaces.AbsolutePanTilt))
-		for i, sp := range node.SupportedPTZSpaces.AbsolutePanTilt {
-			apt[i] = map[string]interface{}{
-				"uri":   sp.URI,
-				"x_min": sp.XRange.Min, "x_max": sp.XRange.Max,
-				"y_min": sp.YRange.Min, "y_max": sp.YRange.Max,
-			}
-		}
-		az := make([]map[string]interface{}, len(node.SupportedPTZSpaces.AbsoluteZoom))
-		for i, sp := range node.SupportedPTZSpaces.AbsoluteZoom {
-			az[i] = map[string]interface{}{
-				"uri":   sp.URI,
-				"x_min": sp.XRange.Min, "x_max": sp.XRange.Max,
+		to1D := func(desc onvifxsd.Space1DDescription) map[string]interface{} {
+			return map[string]interface{}{
+				"uri":   string(desc.URI),
+				"x_min": desc.XRange.Min, "x_max": desc.XRange.Max,
 			}
 		}
 
-		out[node.Token] = map[string]interface{}{
-			"continuous_pan_tilt": cpt,
-			"continuous_zoom":     cz,
-			"relative_pan_tilt":   rpt,
-			"relative_zoom":       rz,
-			"absolute_pan_tilt":   apt,
-			"absolute_zoom":       az,
+		out[string(node.Token)] = map[string]interface{}{
+			"continuous_pan_tilt": to2D(spaces.ContinuousPanTiltVelocitySpace),
+			"continuous_zoom":     to1D(spaces.ContinuousZoomVelocitySpace),
+			"relative_pan_tilt":   to2D(spaces.RelativePanTiltTranslationSpace),
+			"relative_zoom":       to1D(spaces.RelativeZoomTranslationSpace),
+			"absolute_pan_tilt":   to2D(spaces.AbsolutePanTiltPositionSpace),
+			"absolute_zoom":       to1D(spaces.AbsoluteZoomPositionSpace),
 		}
 	}
 	return out, nil
