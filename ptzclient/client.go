@@ -151,6 +151,7 @@ func (s *onvifPtzClient) handleGetProfiles() (map[string]interface{}, error) {
 		return nil, fmt.Errorf("failed to unmarshal GetProfiles response: %w", err)
 	}
 
+	// TODO(seanp): Include profile to node token mapping
 	var tokens []string
 	for _, p := range envelope.Body.GetProfilesResponse.Profiles {
 		tokens = append(tokens, p.Token)
@@ -173,6 +174,7 @@ func (s *onvifPtzClient) handleGetCapabilities() (map[string]interface{}, error)
 	}
 	s.logger.Debugf("GetServiceCapabilities raw response:\n%s", string(body))
 
+	// TODO(seanp): Use struct from onvif/ptz/types.go
 	var envelope struct {
 		XMLName xml.Name `xml:"Envelope"`
 		Body    struct {
