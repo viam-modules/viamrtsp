@@ -35,6 +35,7 @@ import (
 	"go.viam.com/rdk/pointcloud"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/services/discovery"
+	"go.viam.com/rdk/spatialmath"
 	rutils "go.viam.com/rdk/utils"
 	"go.viam.com/utils"
 )
@@ -1376,6 +1377,7 @@ func isCompactableH264(nalu []byte) bool {
 
 // Image returns the latest frame as JPEG bytes.
 func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
+	fmt.Println("hello from image")
 	rc.closeMu.RLock()
 	defer rc.closeMu.RUnlock()
 	start := time.Now()
@@ -1396,6 +1398,10 @@ func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]int
 		}, nil
 	}
 	return rc.getAndConvertFrame(mimeType)
+}
+
+func (rc *rtspCamera) Geometries(_ context.Context, _ map[string]interface{}) ([]spatialmath.Geometry, error) {
+	return nil, errors.New("not implemented")
 }
 
 func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, camera.ImageMetadata, error) {
@@ -1453,15 +1459,9 @@ func (rc *rtspCamera) Name() resource.Name {
 	return rc.name
 }
 
-func (rc *rtspCamera) Images(_ context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
-	rc.latestFrameMu.Lock()
-	defer rc.latestFrameMu.Unlock()
-	if rc.latestFrame == nil {
-		return nil, resource.ResponseMetadata{}, errors.New("no frame yet")
-	}
-	return []camera.NamedImage{
-		{Image: rc.latestFrame.toImage()},
-	}, resource.ResponseMetadata{CapturedAt: time.Now()}, nil
+func (rc *rtspCamera) Images(ctx context.Context, filterSourceNames []string, extra map[string]interface{}) ([]camera.NamedImage, resource.ResponseMetadata, error) {
+	fmt.Println("hello from images")
+	return camera.GetImagesFromGetImage(ctx, rutils.MimeTypeJPEG, extra, rc, rc.logger)
 }
 
 func (rc *rtspCamera) NextPointCloud(_ context.Context) (pointcloud.PointCloud, error) {
