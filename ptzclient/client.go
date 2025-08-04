@@ -203,10 +203,11 @@ func (s *onvifPtzClient) handleGetProfiles() (map[string]interface{}, error) {
 		profileInfo[tok] = info
 	}
 
-	s.logger.Debugf("Found profiles: %v", profileInfo)
-	return map[string]interface{}{
-		"profiles": profileInfo,
-	}, nil
+	flattened := make(map[string]interface{}, len(profileInfo))
+	for k, v := range profileInfo {
+		flattened[k] = v
+	}
+	return flattened, nil
 }
 
 func (s *onvifPtzClient) handleGetCapabilities() (map[string]interface{}, error) {
