@@ -246,6 +246,44 @@ func (s *onvifPtzClient) handleGetCapabilities() (map[string]interface{}, error)
 	}, nil
 }
 
+// extractPositionTypeFromURI returns the last segment of a URI.
+func extractPositionTypeFromURI(uri string) string {
+	parts := strings.Split(uri, "/")
+	if len(parts) == 0 {
+		return ""
+	}
+	return parts[len(parts)-1]
+}
+
+// to2D returns a 2D description map if any meaningful data exists; otherwise nil.
+func to2D(desc onvifxsd.Space2DDescription) map[string]interface{} {
+	space := extractPositionTypeFromURI(string(desc.URI))
+	// Check if we got meaningful data.
+	if space == "" && desc.XRange.Min == 0 && desc.XRange.Max == 0 && desc.YRange.Min == 0 && desc.YRange.Max == 0 {
+		return nil
+	}
+	return map[string]interface{}{
+		"space": space,
+		"x_min": desc.XRange.Min,
+		"x_max": desc.XRange.Max,
+		"y_min": desc.YRange.Min,
+		"y_max": desc.YRange.Max,
+	}
+}
+
+// to1D returns a 1D description map if any meaningful data exists; otherwise nil.
+func to1D(desc onvifxsd.Space1DDescription) map[string]interface{} {
+	space := extractPositionTypeFromURI(string(desc.URI))
+	if space == "" && desc.XRange.Min == 0 && desc.XRange.Max == 0 {
+		return nil
+	}
+	return map[string]interface{}{
+		"space": space,
+		"x_min": desc.XRange.Min,
+		"x_max": desc.XRange.Max,
+	}
+}
+
 func (s *onvifPtzClient) handleGetNodes() (map[string]interface{}, error) {
 	req := ptz.GetNodes{}
 	res, err := s.dev.CallMethod(req, s.logger)
@@ -269,46 +307,47 @@ func (s *onvifPtzClient) handleGetNodes() (map[string]interface{}, error) {
 	for _, node := range resp.Body.GetNodesResponse.Nodes {
 		spaces := node.SupportedPTZSpaces
 
-		to2D := func(desc onvifxsd.Space2DDescription) map[string]interface{} {
-			return map[string]interface{}{
-				"space": extractPositionTypeFromURI(string(desc.URI)),
-				"x_min": desc.XRange.Min, "x_max": desc.XRange.Max,
-				"y_min": desc.YRange.Min, "y_max": desc.YRange.Max,
-			}
+		abs := map[string]interface{}{}
+		if panTilt := to2D(spaces.AbsolutePanTiltPositionSpace); panTilt != nil {
+			abs["pan_tilt"] = panTilt
 		}
-		to1D := func(desc onvifxsd.Space1DDescription) map[string]interface{} {
-			return map[string]interface{}{
-				"space": extractPositionTypeFromURI(string(desc.URI)),
-				"x_min": desc.XRange.Min, "x_max": desc.XRange.Max,
-			}
+		if zoom := to1D(spaces.AbsoluteZoomPositionSpace); zoom != nil {
+			abs["zoom"] = zoom
 		}
 
-		out[string(node.Token)] = map[string]interface{}{
-			"absolute": map[string]interface{}{
-				"pan_tilt": to2D(spaces.AbsolutePanTiltPositionSpace),
-				"zoom":     to1D(spaces.AbsoluteZoomPositionSpace),
-			},
-			"continuous": map[string]interface{}{
-				"pan_tilt": to2D(spaces.ContinuousPanTiltVelocitySpace),
-				"zoom":     to1D(spaces.ContinuousZoomVelocitySpace),
-			},
-			"relative": map[string]interface{}{
-				"pan_tilt": to2D(spaces.RelativePanTiltTranslationSpace),
-				"zoom":     to1D(spaces.RelativeZoomTranslationSpace),
-			},
+		cont := map[string]interface{}{}
+		if panTilt := to2D(spaces.ContinuousPanTiltVelocitySpace); panTilt != nil {
+			cont["pan_tilt"] = panTilt
+		}
+		if zoom := to1D(spaces.ContinuousZoomVelocitySpace); zoom != nil {
+			cont["zoom"] = zoom
+		}
+
+		rel := map[string]interface{}{}
+		if panTilt := to2D(spaces.RelativePanTiltTranslationSpace); panTilt != nil {
+			rel["pan_tilt"] = panTilt
+		}
+		if zoom := to1D(spaces.RelativeZoomTranslationSpace); zoom != nil {
+			rel["zoom"] = zoom
+		}
+
+		nodeMap := map[string]interface{}{}
+		if len(abs) > 0 {
+			nodeMap["absolute"] = abs
+		}
+		if len(cont) > 0 {
+			nodeMap["continuous"] = cont
+		}
+		if len(rel) > 0 {
+			nodeMap["relative"] = rel
+		}
+
+		// Only include this node if at least one group has meaningful data.
+		if len(nodeMap) > 0 {
+			out[string(node.Token)] = nodeMap
 		}
 	}
 	return out, nil
-}
-
-func extractPositionTypeFromURI(uri string) string {
-	// Example URI: "http://www.onvif.org/ver10/tptz/PanTiltSpaces/GenericSpeedSpace"
-	// We want to extract "GenericSpeedSpace" from this.
-	parts := strings.Split(uri, "/")
-	if len(parts) == 0 {
-		return ""
-	}
-	return parts[len(parts)-1]
 }
 
 // handleGetStatus implements the get-status command logic.
