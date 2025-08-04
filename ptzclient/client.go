@@ -284,12 +284,18 @@ func (s *onvifPtzClient) handleGetNodes() (map[string]interface{}, error) {
 		}
 
 		out[string(node.Token)] = map[string]interface{}{
-			"continuous_pan_tilt": to2D(spaces.ContinuousPanTiltVelocitySpace),
-			"continuous_zoom":     to1D(spaces.ContinuousZoomVelocitySpace),
-			"relative_pan_tilt":   to2D(spaces.RelativePanTiltTranslationSpace),
-			"relative_zoom":       to1D(spaces.RelativeZoomTranslationSpace),
-			"absolute_pan_tilt":   to2D(spaces.AbsolutePanTiltPositionSpace),
-			"absolute_zoom":       to1D(spaces.AbsoluteZoomPositionSpace),
+			"absolute": map[string]interface{}{
+				"pan_tilt": to2D(spaces.AbsolutePanTiltPositionSpace),
+				"zoom":     to1D(spaces.AbsoluteZoomPositionSpace),
+			},
+			"continuous": map[string]interface{}{
+				"pan_tilt": to2D(spaces.ContinuousPanTiltVelocitySpace),
+				"zoom":     to1D(spaces.ContinuousZoomVelocitySpace),
+			},
+			"relative": map[string]interface{}{
+				"pan_tilt": to2D(spaces.RelativePanTiltTranslationSpace),
+				"zoom":     to1D(spaces.RelativeZoomTranslationSpace),
+			},
 		}
 	}
 	return out, nil
