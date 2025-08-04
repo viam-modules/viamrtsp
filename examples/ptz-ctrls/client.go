@@ -220,7 +220,7 @@ func main() {
 		})
 
 		if key.Code == 27 || key.Code == 3 { // ASCII values for Escape and Ctrl+C
-			fmt.Println("Exiting...")
+			logger.Info("Exiting...")
 			// Stop all ongoing pan/tilt/zoom commands before exiting
 			_, err := ptz.DoCommand(context.Background(),
 				map[string]interface{}{
