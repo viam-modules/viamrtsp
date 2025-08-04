@@ -271,14 +271,14 @@ func (s *onvifPtzClient) handleGetNodes() (map[string]interface{}, error) {
 
 		to2D := func(desc onvifxsd.Space2DDescription) map[string]interface{} {
 			return map[string]interface{}{
-				"uri":   string(desc.URI),
+				"space": extractPositionTypeFromURI(string(desc.URI)),
 				"x_min": desc.XRange.Min, "x_max": desc.XRange.Max,
 				"y_min": desc.YRange.Min, "y_max": desc.YRange.Max,
 			}
 		}
 		to1D := func(desc onvifxsd.Space1DDescription) map[string]interface{} {
 			return map[string]interface{}{
-				"uri":   string(desc.URI),
+				"space": extractPositionTypeFromURI(string(desc.URI)),
 				"x_min": desc.XRange.Min, "x_max": desc.XRange.Max,
 			}
 		}
@@ -299,6 +299,16 @@ func (s *onvifPtzClient) handleGetNodes() (map[string]interface{}, error) {
 		}
 	}
 	return out, nil
+}
+
+func extractPositionTypeFromURI(uri string) string {
+	// Example URI: "http://www.onvif.org/ver10/tptz/PanTiltSpaces/GenericSpeedSpace"
+	// We want to extract "GenericSpeedSpace" from this.
+	parts := strings.Split(uri, "/")
+	if len(parts) == 0 {
+		return ""
+	}
+	return parts[len(parts)-1]
 }
 
 // handleGetStatus implements the get-status command logic.
