@@ -210,7 +210,7 @@ func main() {
 				_, err := ptz.DoCommand(context.Background(), map[string]interface{}{
 					"command":  "stop",
 					"pan_tilt": true,
-					"zoom":     false,
+					"zoom":     true,
 				})
 				if err != nil {
 					logger.Error(err)
