@@ -171,7 +171,10 @@ func (s *onvifPtzClient) handleGetProfiles() (map[string]interface{}, error) {
 			}
 			continue
 		}
-		gpRes.Body.Close()
+		err = gpRes.Body.Close()
+		if err != nil {
+			s.logger.Warnf("Failed to close GetProfile response body for %s: %v", tok, err)
+		}
 
 		// TODO(seanp): Use struct from onvif lib
 		var gpEnv struct {
