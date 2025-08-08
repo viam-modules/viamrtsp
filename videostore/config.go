@@ -3,10 +3,10 @@ package videostore
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/viam-modules/video-store/videostore"
+	rutils "go.viam.com/rdk/utils"
 	"go.viam.com/utils"
 )
 
@@ -39,10 +39,8 @@ func applyDefaults(cfg *Config, name string) (videostore.Config, error) {
 	if fps == 0 {
 		fps = defaultFramerate
 	}
-	sc, err := applyStorageDefaults(cfg.Storage, name)
-	if err != nil {
-		return videostore.Config{}, err
-	}
+
+	sc := applyStorageDefaults(cfg.Storage, name)
 
 	ec := applyVideoEncoderDefaults(cfg.Video)
 	return videostore.Config{
@@ -68,10 +66,7 @@ func (cfg *Config) Validate(path string) ([]string, []string, error) {
 		return nil, nil, fmt.Errorf("invalid framerate %d, must be greater than 0", cfg.Framerate)
 	}
 
-	sConfig, err := applyStorageDefaults(cfg.Storage, "someprefix")
-	if err != nil {
-		return nil, nil, err
-	}
+	sConfig := applyStorageDefaults(cfg.Storage, "someprefix")
 	if err := sConfig.Validate(); err != nil {
 		return nil, nil, err
 	}
@@ -100,20 +95,13 @@ func applyVideoEncoderDefaults(c Video) videostore.EncoderConfig {
 	}
 }
 
-func applyStorageDefaults(c Storage, name string) (videostore.StorageConfig, error) {
-	var zero videostore.StorageConfig
+func applyStorageDefaults(c Storage, name string) videostore.StorageConfig {
 	if c.UploadPath == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return zero, err
-		}
+		home := rutils.PlatformHomeDir()
 		c.UploadPath = filepath.Join(home, defaultUploadPath, name)
 	}
 	if c.StoragePath == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return zero, err
-		}
+		home := rutils.PlatformHomeDir()
 		c.StoragePath = filepath.Join(home, defaultStoragePath, name)
 	}
 	return videostore.StorageConfig{
@@ -121,5 +109,5 @@ func applyStorageDefaults(c Storage, name string) (videostore.StorageConfig, err
 		OutputFileNamePrefix: name,
 		UploadPath:           c.UploadPath,
 		StoragePath:          c.StoragePath,
-	}, nil
+	}
 }
