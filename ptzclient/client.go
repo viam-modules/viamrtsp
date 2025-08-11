@@ -39,12 +39,42 @@ func init() {
 	)
 }
 
+type PTZCaps struct {
+	StatusPosition              bool `json:"status_position"`
+	EFlip                       bool `json:"e_flip"`
+	Reverse                     bool `json:"reverse"`
+	GetCompatibleConfigurations bool `json:"get_compatible_configurations"`
+	MoveStatus                  bool `json:"move_status"`
+}
+
+type PanTiltSpace struct {
+	XMin  float64 `json:"x_min"`
+	XMax  float64 `json:"x_max"`
+	YMin  float64 `json:"y_min"`
+	YMax  float64 `json:"y_max"`
+	Space string  `json:"space"`
+}
+type ZoomSpace struct {
+	XMin  float64 `json:"x_min"`
+	XMax  float64 `json:"x_max"`
+	Space string  `json:"space"`
+}
+
+type PTZMovement struct {
+	PanTilt PanTiltSpace `json:"pan_tilt,omitempty"`
+	Zoom    ZoomSpace    `json:"zoom,omitempty"`
+}
+
 // Config represents the configuration for the ONVIF PTZ client.
 type Config struct {
-	Address      string `json:"address"`
-	Username     string `json:"username"`
-	Password     string `json:"password"`
-	ProfileToken string `json:"profile_token"`
+	Address      string                 `json:"address"`
+	Username     string                 `json:"username"`
+	Password     string                 `json:"password"`
+	ProfileToken string                 `json:"profile_token"`
+	NodeToken    string                 `json:"node_token,omitempty"`
+	Movements    map[string]PTZMovement `json:"movements,omitempty"`     // Optional PTZ movements
+	DiscoveryDep string                 `json:"discovery_dep,omitempty"` // Optional dependency for discovery
+
 }
 
 // Validate validates the configuration for the ONVIF PTZ client.

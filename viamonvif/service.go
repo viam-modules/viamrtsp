@@ -21,8 +21,10 @@ import (
 
 	"github.com/icholy/digest"
 	"github.com/viam-modules/viamrtsp"
+	"github.com/viam-modules/viamrtsp/ptzclient"
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"go.viam.com/rdk/components/camera"
+	"go.viam.com/rdk/components/generic"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/services/discovery"
@@ -193,6 +195,7 @@ func (dis *rtspDiscovery) runDiscoveryLookup(ctx context.Context, extra map[stri
 		// use the dns hostname.
 		// mDNS hostname to IP address resolution is not working on Windows so we skip it.
 		// TODO(RSDK-10796): Add windows mDNS support to zeroconf fork
+		// TODO(seanp): Handle mDNS for ptz-client as well
 		if runtime.GOOS != "windows" {
 			camInfo.tryMDNS(dis.mdnsServer, dis.logger)
 		}
@@ -207,6 +210,12 @@ func (dis *rtspDiscovery) runDiscoveryLookup(ctx context.Context, extra map[stri
 			dis.logger.Debugf("Added snapshot mapping: %s - %s", endpoint.StreamURI, endpoint.SnapshotURI)
 		}
 		cams = append(cams, camConfigs...)
+
+		ptzConfigs, err := createPTZFromInfo(camInfo, dis.Name().ShortName(), dis.logger)
+		if err != nil {
+			continue
+		}
+		cams = append(cams, ptzConfigs...)
 	}
 
 	// Only lock when updating the shared URI map
@@ -518,6 +527,56 @@ func createCameraConfig(name string, attributes viamrtsp.Config) (resource.Confi
 
 	return resource.Config{
 		Name: name, API: camera.API, Model: viamrtsp.ModelAgnostic,
+		Attributes: result, ConvertedAttributes: &attributes,
+	}, nil
+}
+
+func createPTZFromInfo(l CameraInfo, discoveryDependencyName string, logger logging.Logger) ([]resource.Config, error) {
+	ptzConfigs := []resource.Config{}
+	for index, u := range l.PTZEndpoints {
+		logger.Debugf("PTZ URL:\t%s", u)
+
+		// Some URLs may contain a hostname that is served by the DiscoveryService's mDNS
+		// server. For those that are, we create a config where the dependency is explicitly written
+		// down.
+		discDep := ""
+		if l.urlDependsOnMDNS(index) {
+			discDep = discoveryDependencyName
+		}
+
+		config := ptzclient.Config{
+			Address:      u.Address,
+			Username:     u.Username,
+			Password:     u.Password,
+			ProfileToken: u.ProfileToken,
+			NodeToken:    u.PTZNodeToken,
+			Movements:    u.Movements,
+			DiscoveryDep: discDep,
+		}
+
+		cfg, err := createPTZClientConfig(l.Name(index), config)
+		if err != nil {
+			return nil, err
+		}
+		ptzConfigs = append(ptzConfigs, cfg)
+	}
+
+	return ptzConfigs, nil
+}
+
+// createPTZClientConfig creates a resource.Config for a PTZ client.
+func createPTZClientConfig(name string, attributes ptzclient.Config) (resource.Config, error) {
+	jsonBytes, err := json.Marshal(attributes)
+	if err != nil {
+		return resource.Config{}, err
+	}
+	var result map[string]interface{}
+	if err = json.Unmarshal(jsonBytes, &result); err != nil {
+		return resource.Config{}, err
+	}
+
+	return resource.Config{
+		Name: "ptz-client-" + name, API: generic.API, Model: ptzclient.Model,
 		Attributes: result, ConvertedAttributes: &attributes,
 	}, nil
 }

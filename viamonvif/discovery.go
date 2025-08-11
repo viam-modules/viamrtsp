@@ -14,6 +14,7 @@ import (
 	"unicode"
 
 	"github.com/viam-modules/viamrtsp"
+	"github.com/viam-modules/viamrtsp/ptzclient"
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"github.com/viam-modules/viamrtsp/viamonvif/xsd/onvif"
 	"go.viam.com/rdk/logging"
@@ -23,6 +24,7 @@ import (
 // OnvifDevice is an interface to abstract device methods used in the code.
 // Used instead of onvif.Device to allow for mocking in tests.
 type OnvifDevice interface {
+	GetXaddr() *url.URL
 	GetDeviceInformation(ctx context.Context) (device.GetDeviceInformationResponse, error)
 	GetProfiles(ctx context.Context) (device.GetProfilesResponse, error)
 	GetStreamURI(ctx context.Context, token onvif.ReferenceToken, creds device.Credentials) (*url.URL, error)
@@ -113,10 +115,21 @@ type MediaInfo struct {
 	Codec       string              `json:"codec"`
 }
 
+type PTZInfo struct {
+	Address      string                           `json:"address"`
+	Username     string                           `json:"username"`
+	Password     string                           `json:"password"`
+	ProfileToken string                           `json:"profile_token"`
+	PTZNodeToken string                           `json:"ptz_node_token"`
+	Capabilities ptzclient.PTZCaps                `json:"capabilities"`
+	Movements    map[string]ptzclient.PTZMovement `json:"movements"`
+}
+
 // CameraInfo holds both the RTSP URLs and supplementary camera details.
 type CameraInfo struct {
 	Host            string      `json:"host"`
 	MediaEndpoints  []MediaInfo `json:"media_endpoints"`
+	PTZEndpoints    []PTZInfo   `json:"ptz_endpoints,omitempty"` // PTZ endpoints are optional
 	Manufacturer    string      `json:"manufacturer"`
 	Model           string      `json:"model"`
 	SerialNumber    string      `json:"serial_number"`
@@ -188,6 +201,7 @@ func (cam *CameraInfo) urlDependsOnMDNS(idx int) bool {
 // CameraInfoList is a struct containing a list of CameraInfo structs.
 type CameraInfoList struct {
 	Cameras []CameraInfo `json:"cameras"`
+	PTZs    []PTZInfo    `json:"ptzs,omitempty"` // PTZs are optional
 }
 
 // DiscoverCameraInfo discovers camera information on a given uri
@@ -265,7 +279,7 @@ func GetCameraInfo(
 	logger.Debugf("ip: %s GetCapabilities: DeviceInfo: %#v", xaddr, dev)
 
 	// Call the ONVIF Media service to get the available media profiles using the same device instance
-	mes, err := GetMediaInfoFromProfiles(ctx, dev, creds, logger)
+	mes, pes, err := GetMediaInfoFromProfiles(ctx, dev, creds, logger)
 	if err != nil {
 		return zero, fmt.Errorf("failed to get stream info: %w", err)
 	}
@@ -278,12 +292,23 @@ func GetCameraInfo(
 		SerialNumber:    resp.SerialNumber,
 		FirmwareVersion: resp.FirmwareVersion,
 		HardwareID:      resp.HardwareID,
+		PTZEndpoints:    pes,
 
 		// Will be nil if there's an error.
 		deviceIP: net.ParseIP(xaddr.Host),
 	}
 
 	return cameraInfo, nil
+}
+
+func ExtractInfoFromProfiles(
+	ctx context.Context,
+	dev OnvifDevice,
+	profileToken onvif.ReferenceToken,
+	logger logging.Logger,
+) ([]MediaInfo, []PTZInfo, error) {
+	// Get the media info from the profiles
+	return nil, nil, nil
 }
 
 // GetMediaInfoFromProfiles uses the ONVIF Media service to get the RTSP stream URLs
@@ -293,13 +318,14 @@ func GetMediaInfoFromProfiles(
 	dev OnvifDevice,
 	creds device.Credentials,
 	logger logging.Logger,
-) ([]MediaInfo, error) {
+) ([]MediaInfo, []PTZInfo, error) {
 	resp, err := dev.GetProfiles(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var mes []MediaInfo
+	var ptzInfos []PTZInfo
 	// Iterate over all profiles and get the RTSP stream and snapshot URI for each one
 	for _, profile := range resp.Profiles {
 		logger.Debugf("Looking up media info for profile: %s (token: %s)", profile.Name, profile.Token)
@@ -328,7 +354,54 @@ func GetMediaInfoFromProfiles(
 			},
 			Codec: string(profile.VideoEncoderConfiguration.Encoding),
 		})
+
+		// Here we will also fech ptzInfo if available.
+		// Check if the profile has PTZ capabilities
+		if profile.PTZConfiguration.Token == "" {
+			logger.Debugf("Profile %s does not have PTZ capabilities, %s", profile.Name, streamURI.String())
+			continue
+		}
+
+		logger.Debugf("Profile %s has PTZ capabilities, %s", profile.Name, streamURI.String())
+		ptzCfg := profile.PTZConfiguration
+		nodeToken := string(ptzCfg.NodeToken)
+		movements := map[string]ptzclient.PTZMovement{}
+		absPanTilt := ptzCfg.PanTiltLimits.Range
+		absZoom := ptzCfg.ZoomLimits.Range
+		if absPanTilt.URI != "" || absZoom.URI != "" {
+			movements["continuous"] = ptzclient.PTZMovement{
+				PanTilt: ptzclient.PanTiltSpace{
+					XMin:  absPanTilt.XRange.Min,
+					XMax:  absPanTilt.XRange.Max,
+					YMin:  absPanTilt.YRange.Min,
+					YMax:  absPanTilt.YRange.Max,
+					Space: lastURISegment(string(absPanTilt.URI)),
+				},
+				Zoom: ptzclient.ZoomSpace{
+					XMin:  absZoom.XRange.Min,
+					XMax:  absZoom.XRange.Max,
+					Space: lastURISegment(string(absZoom.URI)),
+				},
+			}
+		}
+
+		ptzInfos = append(ptzInfos, PTZInfo{
+			Address:      dev.GetXaddr().Host,
+			Username:     creds.User,
+			Password:     creds.Pass,
+			ProfileToken: string(profile.Token),
+			PTZNodeToken: nodeToken,
+			Capabilities: ptzclient.PTZCaps{}, // TODO(seanp): Do we want to fill caps in?
+			Movements:    movements,
+		})
+
+		logger.Debugf("PTZ Info for profile %s: %+v", profile.Name, ptzInfos[len(ptzInfos)-1])
 	}
 
-	return mes, nil
+	return mes, ptzInfos, nil
+}
+
+func lastURISegment(uri string) string {
+	parts := strings.Split(uri, "/")
+	return parts[len(parts)-1]
 }

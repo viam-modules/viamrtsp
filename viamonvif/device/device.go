@@ -413,3 +413,15 @@ func (dev *Device) sendSoap(ctx context.Context, endpoint, message string) ([]by
 
 	return io.ReadAll(resp.Body)
 }
+
+func (dev *Device) GetXaddr() *url.URL {
+	if dev.xaddr == nil {
+		return nil
+	}
+	// Return a copy of the xaddr to avoid external modification.
+	return &url.URL{
+		Scheme: dev.xaddr.Scheme,
+		Host:   dev.xaddr.Host,
+		Path:   dev.xaddr.Path,
+	}
+}
