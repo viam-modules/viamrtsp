@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/beevik/etree"
+	"github.com/hexbabe/sean-onvif/ptz"
 	"github.com/viam-modules/viamrtsp/viamonvif/gosoap"
 	"github.com/viam-modules/viamrtsp/viamonvif/xsd/onvif"
 	"go.viam.com/rdk/logging"
@@ -424,4 +425,30 @@ func (dev *Device) GetXaddr() *url.URL {
 		Host:   dev.xaddr.Host,
 		Path:   dev.xaddr.Path,
 	}
+}
+
+func (dev *Device) GetPTZNodes(ctx context.Context) ([]onvif.PTZNode, error) {
+	req := ptz.GetNodes{}
+	data, err := dev.callOnvifServiceMethod(ctx, dev.endpoints["ptz"], req)
+	if err != nil {
+		return nil, fmt.Errorf("GetNodes failed: %w", err)
+	}
+	dev.logger.Debugf("GetPTZNodes response body: %s", string(data))
+
+	// minimal envelope for decoding only the PTZNode elements
+	// TODO: should we add this to the ptz or onvif package?
+	var env struct {
+		XMLName xml.Name `xml:"Envelope"`
+		Body    struct {
+			GetNodesResponse struct {
+				Nodes []onvif.PTZNode `xml:"PTZNode"`
+			} `xml:"GetNodesResponse"`
+		} `xml:"Body"`
+	}
+
+	if err := xml.Unmarshal(data, &env); err != nil {
+		return nil, fmt.Errorf("unmarshal GetNodesResponse: %w", err)
+	}
+
+	return env.Body.GetNodesResponse.Nodes, nil
 }

@@ -71,7 +71,7 @@ type Config struct {
 	Username     string                 `json:"username"`
 	Password     string                 `json:"password"`
 	ProfileToken string                 `json:"profile_token"`
-	NodeToken    string                 `json:"node_token,omitempty"`
+	NodeToken    string                 `json:"ptz_node_token,omitempty"`
 	Movements    map[string]PTZMovement `json:"movements,omitempty"`     // Optional PTZ movements
 	DiscoveryDep string                 `json:"discovery_dep,omitempty"` // Optional dependency for discovery
 

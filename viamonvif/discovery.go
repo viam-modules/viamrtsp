@@ -24,11 +24,12 @@ import (
 // OnvifDevice is an interface to abstract device methods used in the code.
 // Used instead of onvif.Device to allow for mocking in tests.
 type OnvifDevice interface {
-	GetXaddr() *url.URL
 	GetDeviceInformation(ctx context.Context) (device.GetDeviceInformationResponse, error)
 	GetProfiles(ctx context.Context) (device.GetProfilesResponse, error)
 	GetStreamURI(ctx context.Context, token onvif.ReferenceToken, creds device.Credentials) (*url.URL, error)
 	GetSnapshotURI(ctx context.Context, token onvif.ReferenceToken, creds device.Credentials) (*url.URL, error)
+	GetPTZNodes(ctx context.Context) ([]onvif.PTZNode, error)
+	GetXaddr() *url.URL
 }
 
 // DiscoverCameras performs WS-Discovery
@@ -355,7 +356,6 @@ func GetMediaInfoFromProfiles(
 			Codec: string(profile.VideoEncoderConfiguration.Encoding),
 		})
 
-		// Here we will also fech ptzInfo if available.
 		// Check if the profile has PTZ capabilities
 		if profile.PTZConfiguration.Token == "" {
 			logger.Debugf("Profile %s does not have PTZ capabilities, %s", profile.Name, streamURI.String())
@@ -363,26 +363,76 @@ func GetMediaInfoFromProfiles(
 		}
 
 		logger.Debugf("Profile %s has PTZ capabilities, %s", profile.Name, streamURI.String())
+
+		nodes, err := dev.GetPTZNodes(ctx)
+		if err != nil {
+			logger.Warnf("Unable to determine onvif ptz nodes for profile %s: %s, err: %s",
+				profile.Name, streamURI.String(), err)
+			continue
+		}
+
 		ptzCfg := profile.PTZConfiguration
 		nodeToken := string(ptzCfg.NodeToken)
-		movements := map[string]ptzclient.PTZMovement{}
-		absPanTilt := ptzCfg.PanTiltLimits.Range
-		absZoom := ptzCfg.ZoomLimits.Range
-		if absPanTilt.URI != "" || absZoom.URI != "" {
-			movements["continuous"] = ptzclient.PTZMovement{
-				PanTilt: ptzclient.PanTiltSpace{
-					XMin:  absPanTilt.XRange.Min,
-					XMax:  absPanTilt.XRange.Max,
-					YMin:  absPanTilt.YRange.Min,
-					YMax:  absPanTilt.YRange.Max,
-					Space: lastURISegment(string(absPanTilt.URI)),
-				},
-				Zoom: ptzclient.ZoomSpace{
-					XMin:  absZoom.XRange.Min,
-					XMax:  absZoom.XRange.Max,
-					Space: lastURISegment(string(absZoom.URI)),
-				},
+
+		// find the matching PTZNode
+		var selected *onvif.PTZNode
+		for i := range nodes {
+			if string(nodes[i].Token) == nodeToken {
+				selected = &nodes[i]
+				break
 			}
+		}
+		if selected == nil {
+			logger.Warnf("PTZ node %s not found for profile %s", nodeToken, profile.Name)
+			continue
+		}
+
+		// helpers to turn ONVIF spaces into config types
+		make2D := func(d onvif.Space2DDescription) *ptzclient.PanTiltSpace {
+			if d.URI == "" {
+				return nil
+			}
+			return &ptzclient.PanTiltSpace{
+				XMin:  d.XRange.Min,
+				XMax:  d.XRange.Max,
+				YMin:  d.YRange.Min,
+				YMax:  d.YRange.Max,
+				Space: lastURISegment(string(d.URI)),
+			}
+		}
+		make1D := func(d onvif.Space1DDescription) *ptzclient.ZoomSpace {
+			if d.URI == "" {
+				return nil
+			}
+			return &ptzclient.ZoomSpace{
+				XMin:  d.XRange.Min,
+				XMax:  d.XRange.Max,
+				Space: lastURISegment(string(d.URI)),
+			}
+		}
+
+		movements := map[string]ptzclient.PTZMovement{}
+
+		if pt := make2D(selected.SupportedPTZSpaces.AbsolutePanTiltPositionSpace); pt != nil {
+			m := ptzclient.PTZMovement{PanTilt: *pt}
+			if z := make1D(selected.SupportedPTZSpaces.AbsoluteZoomPositionSpace); z != nil {
+				m.Zoom = *z
+			}
+			movements["absolute"] = m
+		}
+		if pt := make2D(selected.SupportedPTZSpaces.RelativePanTiltTranslationSpace); pt != nil {
+			m := ptzclient.PTZMovement{PanTilt: *pt}
+			if z := make1D(selected.SupportedPTZSpaces.RelativeZoomTranslationSpace); z != nil {
+				m.Zoom = *z
+			}
+			movements["relative"] = m
+		}
+		if pt := make2D(selected.SupportedPTZSpaces.ContinuousPanTiltVelocitySpace); pt != nil {
+			m := ptzclient.PTZMovement{PanTilt: *pt}
+			if z := make1D(selected.SupportedPTZSpaces.ContinuousZoomVelocitySpace); z != nil {
+				m.Zoom = *z
+			}
+			movements["continuous"] = m
 		}
 
 		ptzInfos = append(ptzInfos, PTZInfo{
@@ -391,11 +441,9 @@ func GetMediaInfoFromProfiles(
 			Password:     creds.Pass,
 			ProfileToken: string(profile.Token),
 			PTZNodeToken: nodeToken,
-			Capabilities: ptzclient.PTZCaps{}, // TODO(seanp): Do we want to fill caps in?
+			Capabilities: ptzclient.PTZCaps{}, // TODO: Fill this with actual capabilities
 			Movements:    movements,
 		})
-
-		logger.Debugf("PTZ Info for profile %s: %+v", profile.Name, ptzInfos[len(ptzInfos)-1])
 	}
 
 	return mes, ptzInfos, nil
