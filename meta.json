@@ -2,7 +2,7 @@
   "module_id": "viam:viamrtsp",
   "visibility": "public",
   "url": "https://github.com/viam-modules/viamrtsp",
-  "description": "module for rtsp, currently supports x264 and x265",
+  "description": "Viam module for streaming, discovering, PTZ control and storing video from rtsp cameras.",
   "models": [
     {
       "api": "rdk:component:camera",
