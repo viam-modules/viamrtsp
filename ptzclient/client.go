@@ -129,7 +129,6 @@ func (s *onvifPtzClient) Name() resource.Name {
 	return s.name
 }
 
-// handleGetProfiles retrieves available media profiles from the camera and implements the get-profiles command logic.
 func (s *onvifPtzClient) handleGetProfiles() (map[string]interface{}, error) {
 	s.logger.Debug("Fetching media profiles...")
 	req := media.GetProfiles{}
@@ -143,20 +142,212 @@ func (s *onvifPtzClient) handleGetProfiles() (map[string]interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read GetProfiles response body: %w", err)
 	}
-
-	var envelope ProfilesEnvelope
-	err = xml.Unmarshal(bodyBytes, &envelope)
-	if err != nil {
+	var env ProfilesEnvelope
+	if err := xml.Unmarshal(bodyBytes, &env); err != nil {
 		s.logger.Warnf("Failed to unmarshal GetProfiles response. Raw XML:\n%s", string(bodyBytes))
 		return nil, fmt.Errorf("failed to unmarshal GetProfiles response: %w", err)
 	}
 
-	var tokens []string
-	for _, p := range envelope.Body.GetProfilesResponse.Profiles {
-		tokens = append(tokens, p.Token)
+	profileInfo := make(map[string]map[string]interface{}, len(env.Body.GetProfilesResponse.Profiles))
+	// For each profile, fetch GetProfile to inspect PTZConfiguration
+	for _, p := range env.Body.GetProfilesResponse.Profiles {
+		tok := p.Token
+		s.logger.Debugf("Processing profile %s", tok)
+
+		gpReq := media.GetProfile{ProfileToken: onvifxsd.ReferenceToken(tok)}
+		gpRes, err := s.dev.CallMethod(gpReq, s.logger)
+		if err != nil {
+			s.logger.Warnf("Failed to call GetProfile for %s: %v", tok, err)
+			profileInfo[tok] = map[string]interface{}{
+				"supports_ptz": false,
+			}
+			continue
+		}
+		gpBody, err := io.ReadAll(gpRes.Body)
+		if err != nil {
+			s.logger.Warnf("Failed to read GetProfile response for %s: %v", tok, err)
+			profileInfo[tok] = map[string]interface{}{
+				"supports_ptz": false,
+			}
+			continue
+		}
+		err = gpRes.Body.Close()
+		if err != nil {
+			s.logger.Warnf("Failed to close GetProfile response body for %s: %v", tok, err)
+		}
+
+		// TODO(seanp): Use struct from onvif lib
+		var gpEnv struct {
+			Body struct {
+				GetProfileResponse struct {
+					Profile *struct {
+						PTZConfiguration *struct {
+							NodeToken onvifxsd.ReferenceToken `xml:"NodeToken"`
+						} `xml:"PTZConfiguration"`
+					} `xml:"Profile"`
+				} `xml:"GetProfileResponse"`
+			} `xml:"Body"`
+		}
+		if err := xml.Unmarshal(gpBody, &gpEnv); err != nil {
+			return nil, fmt.Errorf("unmarshal GetProfile(%s): %w", tok, err)
+		}
+
+		info := map[string]interface{}{}
+		if gpEnv.Body.GetProfileResponse.Profile != nil &&
+			gpEnv.Body.GetProfileResponse.Profile.PTZConfiguration != nil {
+			info["supports_ptz"] = true
+			info["ptz_node_token"] = string(gpEnv.Body.GetProfileResponse.Profile.PTZConfiguration.NodeToken)
+		} else {
+			info["supports_ptz"] = false
+		}
+		profileInfo[tok] = info
 	}
-	s.logger.Debugf("Found profiles: %v", tokens)
-	return map[string]interface{}{"profiles": tokens}, nil
+
+	flattened := make(map[string]interface{}, len(profileInfo))
+	for k, v := range profileInfo {
+		flattened[k] = v
+	}
+	return flattened, nil
+}
+
+func (s *onvifPtzClient) handleGetCapabilities() (map[string]interface{}, error) {
+	req := ptz.GetServiceCapabilities{}
+	res, err := s.dev.CallMethod(req, s.logger)
+	if err != nil {
+		return nil, fmt.Errorf("GetServiceCapabilities failed: %w", err)
+	}
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+	s.logger.Debugf("GetServiceCapabilities raw response:\n%s", string(body))
+
+	var envelope struct {
+		XMLName xml.Name `xml:"Envelope"`
+		Body    struct {
+			XMLName                        xml.Name                           `xml:"Body"`
+			GetServiceCapabilitiesResponse ptz.GetServiceCapabilitiesResponse `xml:"GetServiceCapabilitiesResponse"`
+		} `xml:"Body"`
+	}
+
+	if err := xml.Unmarshal(body, &envelope); err != nil {
+		return nil, fmt.Errorf("unmarshal GetServiceCapabilities: %w", err)
+	}
+
+	caps := envelope.Body.GetServiceCapabilitiesResponse.Capabilities
+	return map[string]interface{}{
+		"e_flip":                        bool(caps.EFlip),
+		"reverse":                       bool(caps.Reverse),
+		"get_compatible_configurations": bool(caps.GetCompatibleConfigurations),
+		"move_status":                   bool(caps.MoveStatus),
+		"status_position":               bool(caps.StatusPosition),
+	}, nil
+}
+
+// extractPositionTypeFromURI returns the last segment of a URI.
+func extractPositionTypeFromURI(uri string) string {
+	parts := strings.Split(uri, "/")
+	if len(parts) == 0 {
+		return ""
+	}
+	return parts[len(parts)-1]
+}
+
+// to2D returns a 2D description map if any meaningful data exists; otherwise nil.
+func to2D(desc onvifxsd.Space2DDescription) map[string]interface{} {
+	space := extractPositionTypeFromURI(string(desc.URI))
+	// Check if we got meaningful data.
+	if space == "" && desc.XRange.Min == 0 && desc.XRange.Max == 0 && desc.YRange.Min == 0 && desc.YRange.Max == 0 {
+		return nil
+	}
+	return map[string]interface{}{
+		"space": space,
+		"x_min": desc.XRange.Min,
+		"x_max": desc.XRange.Max,
+		"y_min": desc.YRange.Min,
+		"y_max": desc.YRange.Max,
+	}
+}
+
+// to1D returns a 1D description map if any meaningful data exists; otherwise nil.
+func to1D(desc onvifxsd.Space1DDescription) map[string]interface{} {
+	space := extractPositionTypeFromURI(string(desc.URI))
+	if space == "" && desc.XRange.Min == 0 && desc.XRange.Max == 0 {
+		return nil
+	}
+	return map[string]interface{}{
+		"space": space,
+		"x_min": desc.XRange.Min,
+		"x_max": desc.XRange.Max,
+	}
+}
+
+func (s *onvifPtzClient) handleGetNodes() (map[string]interface{}, error) {
+	req := ptz.GetNodes{}
+	res, err := s.dev.CallMethod(req, s.logger)
+	if err != nil {
+		return nil, fmt.Errorf("GetNodes failed: %w", err)
+	}
+	defer res.Body.Close()
+
+	var resp struct {
+		Body struct {
+			GetNodesResponse struct {
+				Nodes []onvifxsd.PTZNode `xml:"PTZNode"`
+			} `xml:"GetNodesResponse"`
+		} `xml:"Body"`
+	}
+	if err := xml.NewDecoder(res.Body).Decode(&resp); err != nil {
+		return nil, fmt.Errorf("unmarshal GetNodes: %w", err)
+	}
+
+	out := make(map[string]interface{}, len(resp.Body.GetNodesResponse.Nodes))
+	for _, node := range resp.Body.GetNodesResponse.Nodes {
+		spaces := node.SupportedPTZSpaces
+
+		abs := map[string]interface{}{}
+		if panTilt := to2D(spaces.AbsolutePanTiltPositionSpace); panTilt != nil {
+			abs["pan_tilt"] = panTilt
+		}
+		if zoom := to1D(spaces.AbsoluteZoomPositionSpace); zoom != nil {
+			abs["zoom"] = zoom
+		}
+
+		cont := map[string]interface{}{}
+		if panTilt := to2D(spaces.ContinuousPanTiltVelocitySpace); panTilt != nil {
+			cont["pan_tilt"] = panTilt
+		}
+		if zoom := to1D(spaces.ContinuousZoomVelocitySpace); zoom != nil {
+			cont["zoom"] = zoom
+		}
+
+		rel := map[string]interface{}{}
+		if panTilt := to2D(spaces.RelativePanTiltTranslationSpace); panTilt != nil {
+			rel["pan_tilt"] = panTilt
+		}
+		if zoom := to1D(spaces.RelativeZoomTranslationSpace); zoom != nil {
+			rel["zoom"] = zoom
+		}
+
+		nodeMap := map[string]interface{}{}
+		if len(abs) > 0 {
+			nodeMap["absolute"] = abs
+		}
+		if len(cont) > 0 {
+			nodeMap["continuous"] = cont
+		}
+		if len(rel) > 0 {
+			nodeMap["relative"] = rel
+		}
+
+		// Only include this node if at least one group has meaningful data.
+		if len(nodeMap) > 0 {
+			out[string(node.Token)] = nodeMap
+		}
+	}
+	return out, nil
 }
 
 // handleGetStatus implements the get-status command logic.
@@ -492,6 +683,10 @@ func (s *onvifPtzClient) DoCommand(_ context.Context, cmd map[string]interface{}
 	switch strings.ToLower(command) {
 	case "get-profiles":
 		return s.handleGetProfiles()
+	case "get-capabilities":
+		return s.handleGetCapabilities()
+	case "get-nodes":
+		return s.handleGetNodes()
 	case "get-status":
 		return s.handleGetStatus()
 	case "stop":
