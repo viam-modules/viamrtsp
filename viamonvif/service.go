@@ -546,6 +546,7 @@ func createPTZFromInfo(l CameraInfo, discoveryDependencyName string, logger logg
 
 		config := ptzclient.Config{
 			Address:      u.Address,
+			RTSPAddress:  u.RTSPAddress,
 			Username:     u.Username,
 			Password:     u.Password,
 			ProfileToken: u.ProfileToken,

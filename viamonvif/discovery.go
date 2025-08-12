@@ -118,6 +118,7 @@ type MediaInfo struct {
 
 type PTZInfo struct {
 	Address      string                           `json:"address"`
+	RTSPAddress  string                           `json:"rtsp_address,omitempty"` // Optional RTSP address
 	Username     string                           `json:"username"`
 	Password     string                           `json:"password"`
 	ProfileToken string                           `json:"profile_token"`
@@ -437,6 +438,7 @@ func GetMediaInfoFromProfiles(
 
 		ptzInfos = append(ptzInfos, PTZInfo{
 			Address:      dev.GetXaddr().Host,
+			RTSPAddress:  streamURI.String(),
 			Username:     creds.User,
 			Password:     creds.Pass,
 			ProfileToken: string(profile.Token),

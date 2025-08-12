@@ -72,9 +72,9 @@ type Config struct {
 	Password     string                 `json:"password"`
 	ProfileToken string                 `json:"profile_token"`
 	NodeToken    string                 `json:"ptz_node_token,omitempty"`
-	Movements    map[string]PTZMovement `json:"movements,omitempty"`     // Optional PTZ movements
-	DiscoveryDep string                 `json:"discovery_dep,omitempty"` // Optional dependency for discovery
-
+	Movements    map[string]PTZMovement `json:"movements,omitempty"`
+	DiscoveryDep string                 `json:"discovery_dep,omitempty"`
+	RTSPAddress  string                 `json:"rtsp_address,omitempty"`
 }
 
 // Validate validates the configuration for the ONVIF PTZ client.
