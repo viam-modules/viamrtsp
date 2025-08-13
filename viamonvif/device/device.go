@@ -415,12 +415,11 @@ func (dev *Device) sendSoap(ctx context.Context, endpoint, message string) ([]by
 	return io.ReadAll(resp.Body)
 }
 
-// GetXaddr returns the device's xaddr URL.
+// GetXaddr returns the URL of the Onvif web service.
 func (dev *Device) GetXaddr() *url.URL {
 	if dev.xaddr == nil {
 		return nil
 	}
-	// Return a copy of the xaddr to avoid external modification.
 	return &url.URL{
 		Scheme: dev.xaddr.Scheme,
 		Host:   dev.xaddr.Host,
@@ -428,7 +427,18 @@ func (dev *Device) GetXaddr() *url.URL {
 	}
 }
 
-// GetPTZNodes retrieves the PTZ nodes from the device.
+// minimal envelope for decoding only the PTZNode elements
+type getNodesEnvelope struct {
+	XMLName xml.Name `xml:"Envelope"`
+	Body    struct {
+		GetNodesResponse struct {
+			Nodes []onvif.PTZNode `xml:"PTZNode"`
+		} `xml:"GetNodesResponse"`
+	} `xml:"Body"`
+}
+
+// GetPTZNodes returns a list of PTZ nodes supported by the device.
+// Includes complete information about each node's movement capabilities.
 func (dev *Device) GetPTZNodes(ctx context.Context) ([]onvif.PTZNode, error) {
 	req := ptz.GetNodes{}
 	data, err := dev.callOnvifServiceMethod(ctx, dev.endpoints["ptz"], req)
@@ -437,17 +447,7 @@ func (dev *Device) GetPTZNodes(ctx context.Context) ([]onvif.PTZNode, error) {
 	}
 	dev.logger.Debugf("GetPTZNodes response body: %s", string(data))
 
-	// minimal envelope for decoding only the PTZNode elements
-	// TODO: should we add this to the ptz or onvif package?
-	var env struct {
-		XMLName xml.Name `xml:"Envelope"`
-		Body    struct {
-			GetNodesResponse struct {
-				Nodes []onvif.PTZNode `xml:"PTZNode"`
-			} `xml:"GetNodesResponse"`
-		} `xml:"Body"`
-	}
-
+	var env getNodesEnvelope
 	if err := xml.Unmarshal(data, &env); err != nil {
 		return nil, fmt.Errorf("unmarshal GetNodesResponse: %w", err)
 	}
