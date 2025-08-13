@@ -427,7 +427,7 @@ func (dev *Device) GetXaddr() *url.URL {
 	}
 }
 
-// minimal envelope for decoding only the PTZNode elements
+// minimal envelope for decoding only the PTZNode elements.
 type getNodesEnvelope struct {
 	XMLName xml.Name `xml:"Envelope"`
 	Body    struct {
