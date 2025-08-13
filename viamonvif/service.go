@@ -195,7 +195,6 @@ func (dis *rtspDiscovery) runDiscoveryLookup(ctx context.Context, extra map[stri
 		// use the dns hostname.
 		// mDNS hostname to IP address resolution is not working on Windows so we skip it.
 		// TODO(RSDK-10796): Add windows mDNS support to zeroconf fork
-		// TODO(seanp): Handle mDNS for ptz-client as well
 		if runtime.GOOS != "windows" {
 			camInfo.tryMDNS(dis.mdnsServer, dis.logger)
 		}
@@ -211,7 +210,7 @@ func (dis *rtspDiscovery) runDiscoveryLookup(ctx context.Context, extra map[stri
 		}
 		cams = append(cams, camConfigs...)
 
-		ptzConfigs, err := createPTZFromInfo(camInfo, dis.Name().ShortName(), dis.logger)
+		ptzConfigs, err := createPTZClientFromInfo(camInfo, dis.Name().ShortName(), dis.logger)
 		if err != nil {
 			continue
 		}
@@ -531,14 +530,11 @@ func createCameraConfig(name string, attributes viamrtsp.Config) (resource.Confi
 	}, nil
 }
 
-func createPTZFromInfo(l CameraInfo, discoveryDependencyName string, logger logging.Logger) ([]resource.Config, error) {
+func createPTZClientFromInfo(l CameraInfo, discoveryDependencyName string, logger logging.Logger) ([]resource.Config, error) {
 	ptzConfigs := []resource.Config{}
 	for index, u := range l.PTZEndpoints {
 		logger.Debugf("PTZ URL:\t%s", u)
 
-		// Some URLs may contain a hostname that is served by the DiscoveryService's mDNS
-		// server. For those that are, we create a config where the dependency is explicitly written
-		// down.
 		discDep := ""
 		if l.urlDependsOnMDNS(index) {
 			discDep = discoveryDependencyName
