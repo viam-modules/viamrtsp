@@ -186,6 +186,17 @@ func (cam *CameraInfo) tryMDNS(mdnsServer *mdnsServer, logger logging.Logger) {
 		}
 	}
 
+	// Also need to replace IP address with hostname in PTZ endpoints.
+	for idx := range cam.PTZEndpoints {
+		if strings.Contains(cam.PTZEndpoints[idx].RTSPAddress, cam.deviceIP.String()) {
+			cam.PTZEndpoints[idx].RTSPAddress = strings.Replace(cam.PTZEndpoints[idx].RTSPAddress, cam.deviceIP.String(), cam.mdnsName, 1)
+			cam.PTZEndpoints[idx].Address = strings.Replace(cam.PTZEndpoints[idx].Address, cam.deviceIP.String(), cam.mdnsName, 1)
+		} else {
+			logger.Debugf("PTZ RTSP URL did not contain expected hostname. URL: %v HostName: %v",
+				cam.PTZEndpoints[idx].RTSPAddress, cam.deviceIP.String())
+		}
+	}
+
 	if !wasIPFound {
 		// If for some reason, the `deviceIP`/`xaddr.Host` IP was not found in any of the RTSP urls,
 		// stop serving mdns requests for that serial number.
