@@ -216,7 +216,6 @@ func (cam *CameraInfo) urlDependsOnMDNS(idx int) bool {
 // CameraInfoList is a struct containing a list of CameraInfo structs.
 type CameraInfoList struct {
 	Cameras []CameraInfo `json:"cameras"`
-	PTZs    []PTZInfo    `json:"ptzs,omitempty"` // PTZs are optional
 }
 
 // DiscoverCameraInfo discovers camera information on a given uri
@@ -440,8 +439,13 @@ func GetMediaInfoFromProfiles(
 			movements["continuous"] = m
 		}
 
+		var host string
+		if x := dev.GetXaddr(); x != nil {
+			host = x.Host
+		}
+
 		ptzInfos = append(ptzInfos, PTZInfo{
-			Address:      dev.GetXaddr().Host,
+			Address:      host,
 			RTSPAddress:  streamURI.String(),
 			Username:     creds.User,
 			Password:     creds.Pass,
