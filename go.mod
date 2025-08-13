@@ -371,3 +371,5 @@ require (
 )
 
 replace go.viam.com/rdk => ../sean-rdk
+
+replace github.com/viam-modules/video-store => ../sean-video-store
