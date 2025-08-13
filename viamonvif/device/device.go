@@ -415,6 +415,7 @@ func (dev *Device) sendSoap(ctx context.Context, endpoint, message string) ([]by
 	return io.ReadAll(resp.Body)
 }
 
+// GetXaddr returns the device's xaddr URL.
 func (dev *Device) GetXaddr() *url.URL {
 	if dev.xaddr == nil {
 		return nil
@@ -427,6 +428,7 @@ func (dev *Device) GetXaddr() *url.URL {
 	}
 }
 
+// GetPTZNodes retrieves the PTZ nodes from the device.
 func (dev *Device) GetPTZNodes(ctx context.Context) ([]onvif.PTZNode, error) {
 	req := ptz.GetNodes{}
 	data, err := dev.callOnvifServiceMethod(ctx, dev.endpoints["ptz"], req)

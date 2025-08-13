@@ -39,6 +39,7 @@ func init() {
 	)
 }
 
+// PTZCaps defines the capabilities of the ONVIF PTZ service.
 type PTZCaps struct {
 	StatusPosition              bool `json:"status_position"`
 	EFlip                       bool `json:"e_flip"`
@@ -47,6 +48,7 @@ type PTZCaps struct {
 	MoveStatus                  bool `json:"move_status"`
 }
 
+// PanTiltSpace defines the pan and tilt space for the PTZ movement.
 type PanTiltSpace struct {
 	XMin  float64 `json:"x_min"`
 	XMax  float64 `json:"x_max"`
@@ -54,12 +56,15 @@ type PanTiltSpace struct {
 	YMax  float64 `json:"y_max"`
 	Space string  `json:"space"`
 }
+
+// ZoomSpace defines the zoom space for the PTZ movement.
 type ZoomSpace struct {
 	XMin  float64 `json:"x_min"`
 	XMax  float64 `json:"x_max"`
 	Space string  `json:"space"`
 }
 
+// PTZMovement defines the movement parameters for pan, tilt, and zoom.
 type PTZMovement struct {
 	PanTilt PanTiltSpace `json:"pan_tilt,omitempty"`
 	Zoom    ZoomSpace    `json:"zoom,omitempty"`

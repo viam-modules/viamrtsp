@@ -61,6 +61,19 @@ func (m *MockDevice) GetStreamURI(_ context.Context, token onvif.ReferenceToken,
 	return u, nil
 }
 
+// TODO: Implement GetPTZNodes to return a list of PTZ nodes.
+func (m *MockDevice) GetPTZNodes(_ context.Context) ([]onvif.PTZNode, error) {
+	return []onvif.PTZNode{}, nil
+}
+
+func (m *MockDevice) GetXaddr() *url.URL {
+	u, err := url.Parse("http://localhost:80")
+	if err != nil {
+		panic(fmt.Sprintf("failed to parse mock device URL: %v", err))
+	}
+	return u
+}
+
 func TestGetCameraInfo(t *testing.T) {
 	t.Run("GetCameraInfo", func(t *testing.T) {
 		mockDevice := &MockDevice{}

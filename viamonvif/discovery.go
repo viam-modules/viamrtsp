@@ -116,6 +116,7 @@ type MediaInfo struct {
 	Codec       string              `json:"codec"`
 }
 
+// PTZInfo holds detailed information about a camera's PTZ support.
 type PTZInfo struct {
 	Address      string                           `json:"address"`
 	RTSPAddress  string                           `json:"rtsp_address,omitempty"` // Optional RTSP address
@@ -312,16 +313,6 @@ func GetCameraInfo(
 	}
 
 	return cameraInfo, nil
-}
-
-func ExtractInfoFromProfiles(
-	ctx context.Context,
-	dev OnvifDevice,
-	profileToken onvif.ReferenceToken,
-	logger logging.Logger,
-) ([]MediaInfo, []PTZInfo, error) {
-	// Get the media info from the profiles
-	return nil, nil, nil
 }
 
 // GetMediaInfoFromProfiles uses the ONVIF Media service to get the RTSP stream URLs
