@@ -132,7 +132,7 @@ type PTZInfo struct {
 type CameraInfo struct {
 	Host            string      `json:"host"`
 	MediaEndpoints  []MediaInfo `json:"media_endpoints"`
-	PTZEndpoints    []PTZInfo   `json:"ptz_endpoints,omitempty"` // PTZ endpoints are optional
+	PTZEndpoints    []PTZInfo   `json:"ptz_endpoints,omitempty"` // Optional, may be empty if no PTZ support is found.
 	Manufacturer    string      `json:"manufacturer"`
 	Model           string      `json:"model"`
 	SerialNumber    string      `json:"serial_number"`
@@ -192,6 +192,7 @@ func (cam *CameraInfo) tryMDNS(mdnsServer *mdnsServer, logger logging.Logger) {
 		if strings.Contains(cam.PTZEndpoints[idx].RTSPAddress, cam.deviceIP.String()) {
 			cam.PTZEndpoints[idx].RTSPAddress = strings.Replace(cam.PTZEndpoints[idx].RTSPAddress, cam.deviceIP.String(), cam.mdnsName, 1)
 			cam.PTZEndpoints[idx].Address = strings.Replace(cam.PTZEndpoints[idx].Address, cam.deviceIP.String(), cam.mdnsName, 1)
+			wasIPFound = true
 		} else {
 			logger.Debugf("PTZ RTSP URL did not contain expected hostname. URL: %v HostName: %v",
 				cam.PTZEndpoints[idx].RTSPAddress, cam.deviceIP.String())
@@ -390,7 +391,7 @@ func GetMediaInfoFromProfiles(
 			continue
 		}
 
-		// helpers to turn ONVIF spaces into config types
+		// Helpers to turn ONVIF spaces into config types
 		make2D := func(d onvif.Space2DDescription) *ptzclient.PanTiltSpace {
 			if d.URI == "" {
 				return nil
@@ -400,7 +401,7 @@ func GetMediaInfoFromProfiles(
 				XMax:  d.XRange.Max,
 				YMin:  d.YRange.Min,
 				YMax:  d.YRange.Max,
-				Space: lastURISegment(string(d.URI)),
+				Space: uriToSpaceName(string(d.URI)),
 			}
 		}
 		make1D := func(d onvif.Space1DDescription) *ptzclient.ZoomSpace {
@@ -410,12 +411,13 @@ func GetMediaInfoFromProfiles(
 			return &ptzclient.ZoomSpace{
 				XMin:  d.XRange.Min,
 				XMax:  d.XRange.Max,
-				Space: lastURISegment(string(d.URI)),
+				Space: uriToSpaceName(string(d.URI)),
 			}
 		}
 
+		// Build the PTZInfo with supported movements. If a movement type is not supported,
+		// it will not be included in the Movements map.
 		movements := map[string]ptzclient.PTZMovement{}
-
 		if pt := make2D(selected.SupportedPTZSpaces.AbsolutePanTiltPositionSpace); pt != nil {
 			m := ptzclient.PTZMovement{PanTilt: *pt}
 			if z := make1D(selected.SupportedPTZSpaces.AbsoluteZoomPositionSpace); z != nil {
@@ -445,7 +447,7 @@ func GetMediaInfoFromProfiles(
 			Password:     creds.Pass,
 			ProfileToken: string(profile.Token),
 			PTZNodeToken: nodeToken,
-			Capabilities: ptzclient.PTZCaps{}, // TODO: Fill this with actual capabilities
+			Capabilities: ptzclient.PTZCaps{}, // TODO: Fill this with service capabilities if needed
 			Movements:    movements,
 		})
 	}
@@ -453,7 +455,8 @@ func GetMediaInfoFromProfiles(
 	return mes, ptzInfos, nil
 }
 
-func lastURISegment(uri string) string {
+// uriToSpaceName extracts the space name from a URI.
+func uriToSpaceName(uri string) string {
 	parts := strings.Split(uri, "/")
 	return parts[len(parts)-1]
 }
