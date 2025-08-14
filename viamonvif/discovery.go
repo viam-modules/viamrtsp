@@ -50,7 +50,7 @@ func DiscoverCameras(
 		utils.ManagedGo(func() {
 			cameraInfo, err := DiscoverCameraInfo(ctx, xaddr, creds, logger)
 			if err != nil {
-				logger.Warnf("failed to connect to ONVIF device %s", err)
+				logger.Debugf("failed to connect to ONVIF device %s", err)
 				return
 			}
 			ch <- cameraInfo
@@ -219,7 +219,7 @@ func DiscoverCameraInfo(
 
 		cameraInfo, err := GetCameraInfo(ctx, dev, xaddr, cred, logger)
 		if err != nil {
-			logger.Warnf("Failed to get camera info from %s: %v", xaddr, err)
+			logger.Debugf("Failed to get camera info from %s: %v", xaddr, err)
 			continue
 		}
 		// once we have added a camera info break
