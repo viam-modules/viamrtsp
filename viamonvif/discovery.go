@@ -369,7 +369,7 @@ func GetMediaInfoFromProfiles(
 
 		nodes, err := dev.GetPTZNodes(ctx)
 		if err != nil {
-			logger.Warnf("Unable to determine onvif ptz nodes for profile %s: %s, err: %s",
+			logger.Debugf("Unable to determine onvif ptz nodes for profile %s: %s, err: %s",
 				profile.Name, streamURI.String(), err)
 			continue
 		}
@@ -386,7 +386,7 @@ func GetMediaInfoFromProfiles(
 			}
 		}
 		if selected == nil {
-			logger.Warnf("PTZ node %s not found for profile %s", nodeToken, profile.Name)
+			logger.Debugf("PTZ node %s not found for profile %s", nodeToken, profile.Name)
 			continue
 		}
 

@@ -184,7 +184,7 @@ func (dis *rtspDiscovery) runDiscoveryLookup(ctx context.Context, extra map[stri
 		dis.logger.Debugf("%s %s %s", camInfo.Manufacturer, camInfo.Model, camInfo.SerialNumber)
 		// some cameras return with no urls. explicitly skipping those so the behavior is clear in the service.
 		if len(camInfo.MediaEndpoints) == 0 {
-			dis.logger.Errorf("No urls found for camera, skipping. %s %s %s",
+			dis.logger.Debugf("No urls found for camera, skipping. %s %s %s",
 				camInfo.Manufacturer, camInfo.Model, camInfo.SerialNumber)
 			continue
 		}
@@ -212,6 +212,7 @@ func (dis *rtspDiscovery) runDiscoveryLookup(ctx context.Context, extra map[stri
 
 		ptzConfigs, err := createPTZClientFromInfo(camInfo, dis.Name().ShortName(), dis.logger)
 		if err != nil {
+			dis.logger.Debugf("Failed to create PTZ client configs for camera %s: %v", camInfo.Name, err)
 			continue
 		}
 		cams = append(cams, ptzConfigs...)
