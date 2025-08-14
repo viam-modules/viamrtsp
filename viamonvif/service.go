@@ -21,8 +21,10 @@ import (
 
 	"github.com/icholy/digest"
 	"github.com/viam-modules/viamrtsp"
+	"github.com/viam-modules/viamrtsp/ptzclient"
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"go.viam.com/rdk/components/camera"
+	"go.viam.com/rdk/components/generic"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/services/discovery"
@@ -40,9 +42,9 @@ const (
 	snapshotClientTimeout = 5 * time.Second
 	rtspPollTimeout       = 5 * time.Second
 	rtspImageInterval     = 100 * time.Millisecond
-	rtspNameSaltLength    = 4
 	discoveryInterval     = time.Minute
 	imageReqMimeType      = "image/jpeg"
+	ptzClientNamePrefix   = "ptz-client-"
 )
 
 func init() {
@@ -182,7 +184,7 @@ func (dis *rtspDiscovery) runDiscoveryLookup(ctx context.Context, extra map[stri
 		dis.logger.Debugf("%s %s %s", camInfo.Manufacturer, camInfo.Model, camInfo.SerialNumber)
 		// some cameras return with no urls. explicitly skipping those so the behavior is clear in the service.
 		if len(camInfo.MediaEndpoints) == 0 {
-			dis.logger.Errorf("No urls found for camera, skipping. %s %s %s",
+			dis.logger.Debugf("No urls found for camera, skipping. %s %s %s",
 				camInfo.Manufacturer, camInfo.Model, camInfo.SerialNumber)
 			continue
 		}
@@ -207,6 +209,13 @@ func (dis *rtspDiscovery) runDiscoveryLookup(ctx context.Context, extra map[stri
 			dis.logger.Debugf("Added snapshot mapping: %s - %s", endpoint.StreamURI, endpoint.SnapshotURI)
 		}
 		cams = append(cams, camConfigs...)
+
+		ptzConfigs, err := createPTZClientFromInfo(camInfo, dis.Name().ShortName(), dis.logger)
+		if err != nil {
+			dis.logger.Debugf("Failed to create PTZ client configs for camera %s: %v", camInfo.Name, err)
+			continue
+		}
+		cams = append(cams, ptzConfigs...)
 	}
 
 	// Only lock when updating the shared URI map
@@ -518,6 +527,54 @@ func createCameraConfig(name string, attributes viamrtsp.Config) (resource.Confi
 
 	return resource.Config{
 		Name: name, API: camera.API, Model: viamrtsp.ModelAgnostic,
+		Attributes: result, ConvertedAttributes: &attributes,
+	}, nil
+}
+
+func createPTZClientFromInfo(l CameraInfo, discoveryDependencyName string, logger logging.Logger) ([]resource.Config, error) {
+	ptzConfigs := []resource.Config{}
+	for index, u := range l.PTZEndpoints {
+		logger.Debugf("PTZ URL:\t%s", u)
+
+		discDep := ""
+		if l.urlDependsOnMDNS(index) {
+			discDep = discoveryDependencyName
+		}
+
+		config := ptzclient.Config{
+			Address:      u.Address,
+			RTSPAddress:  u.RTSPAddress,
+			Username:     u.Username,
+			Password:     u.Password,
+			ProfileToken: u.ProfileToken,
+			NodeToken:    u.PTZNodeToken,
+			Movements:    u.Movements,
+			DiscoveryDep: discDep,
+		}
+
+		cfg, err := createPTZClientConfig(l.Name(index), config)
+		if err != nil {
+			return nil, err
+		}
+		ptzConfigs = append(ptzConfigs, cfg)
+	}
+
+	return ptzConfigs, nil
+}
+
+// createPTZClientConfig creates a resource.Config for a PTZ client.
+func createPTZClientConfig(name string, attributes ptzclient.Config) (resource.Config, error) {
+	jsonBytes, err := json.Marshal(attributes)
+	if err != nil {
+		return resource.Config{}, err
+	}
+	var result map[string]interface{}
+	if err = json.Unmarshal(jsonBytes, &result); err != nil {
+		return resource.Config{}, err
+	}
+
+	return resource.Config{
+		Name: ptzClientNamePrefix + name, API: generic.API, Model: ptzclient.Model,
 		Attributes: result, ConvertedAttributes: &attributes,
 	}, nil
 }
