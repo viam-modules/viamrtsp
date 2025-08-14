@@ -42,9 +42,9 @@ const (
 	snapshotClientTimeout = 5 * time.Second
 	rtspPollTimeout       = 5 * time.Second
 	rtspImageInterval     = 100 * time.Millisecond
-	rtspNameSaltLength    = 4
 	discoveryInterval     = time.Minute
 	imageReqMimeType      = "image/jpeg"
+	ptzClientNamePrefix   = "ptz-client-"
 )
 
 func init() {
@@ -574,7 +574,7 @@ func createPTZClientConfig(name string, attributes ptzclient.Config) (resource.C
 	}
 
 	return resource.Config{
-		Name: "ptz-client-" + name, API: generic.API, Model: ptzclient.Model,
+		Name: ptzClientNamePrefix + name, API: generic.API, Model: ptzclient.Model,
 		Attributes: result, ConvertedAttributes: &attributes,
 	}, nil
 }
