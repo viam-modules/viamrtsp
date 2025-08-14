@@ -126,7 +126,7 @@ func NewDevice(ctx context.Context, params Params, logger logging.Logger) (*Devi
 		}
 
 		if skipVerify {
-			logger.Infof("TLS certificate verification disabled for local IP address: %s.",
+			logger.Debugf("TLS certificate verification disabled for local IP address: %s.",
 				params.Xaddr.Hostname())
 		}
 	}
