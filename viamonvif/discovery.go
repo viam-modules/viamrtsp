@@ -460,6 +460,8 @@ func GetMediaInfoFromProfiles(
 }
 
 // uriToSpaceName extracts the space name from a URI.
+// For example, given the URI "http://www.onvif.org/ver10/tptz/PanTiltSpaces/PositionGenericSpace",
+// it returns "PositionGenericSpace".
 func uriToSpaceName(uri string) string {
 	parts := strings.Split(uri, "/")
 	return parts[len(parts)-1]
