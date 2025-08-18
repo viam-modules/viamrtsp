@@ -11,6 +11,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/viam-modules/viamrtsp/ptzclient"
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"github.com/viam-modules/viamrtsp/viamonvif/xsd/onvif"
 	"go.viam.com/rdk/logging"
@@ -38,6 +39,9 @@ func (m *MockDevice) GetProfiles(_ context.Context) (device.GetProfilesResponse,
 			{
 				Token: "profile1",
 				Name:  "Main Profile",
+				PTZConfiguration: onvif.PTZConfiguration{
+					NodeToken: onvif.ReferenceToken("PTZNode1"),
+				},
 			},
 		},
 	}, nil
@@ -61,13 +65,31 @@ func (m *MockDevice) GetStreamURI(_ context.Context, token onvif.ReferenceToken,
 	return u, nil
 }
 
-// TODO: Implement GetPTZNodes to return a list of PTZ nodes.
 func (m *MockDevice) GetPTZNodes(_ context.Context) ([]onvif.PTZNode, error) {
-	return []onvif.PTZNode{}, nil
+	// Fill out mock PTZ nodes as needed for testing.
+	node := onvif.PTZNode{
+		DeviceEntity: onvif.DeviceEntity{
+			Token: "PTZNode1",
+		},
+		Name: "PTZNode1",
+		SupportedPTZSpaces: onvif.PTZSpaces{
+			ContinuousPanTiltVelocitySpace: onvif.Space2DDescription{
+				URI:    "http://www.onvif.org/ver10/tptz/PanTiltSpaces/VelocityGenericSpace",
+				XRange: onvif.FloatRange{Min: -1.0, Max: 1.0},
+				YRange: onvif.FloatRange{Min: -1.0, Max: 1.0},
+			},
+			// optional: add zoom if you need it in tests
+			ContinuousZoomVelocitySpace: onvif.Space1DDescription{
+				URI:    "http://www.onvif.org/ver10/tptz/ZoomSpaces/VelocityGenericSpace",
+				XRange: onvif.FloatRange{Min: 0.0, Max: 1.0},
+			},
+		},
+	}
+	return []onvif.PTZNode{node}, nil
 }
 
 func (m *MockDevice) GetXaddr() *url.URL {
-	u, err := url.Parse("http://localhost:80")
+	u, err := url.Parse("http://192.168.1.100:80")
 	if err != nil {
 		panic(fmt.Sprintf("failed to parse mock device URL: %v", err))
 	}
@@ -107,6 +129,36 @@ func TestGetCameraInfo(t *testing.T) {
 			test.That(t, len(cameraInfo.MediaEndpoints), test.ShouldEqual, 1)
 			test.That(t, cameraInfo.MediaEndpoints[0].StreamURI, test.ShouldEqual, "rtsp://192.168.1.100/stream")
 			test.That(t, cameraInfo.MediaEndpoints[0].SnapshotURI, test.ShouldEqual, "http://example.com/snapshot.jpg")
+		})
+
+		t.Run("GetCameraInfo with PTZ node containing continuous movement support", func(t *testing.T) {
+			uri, err := url.Parse("192.168.1.100")
+			test.That(t, err, test.ShouldBeNil)
+			cameraInfo, err := GetCameraInfo(context.Background(), mockDevice, uri, device.Credentials{}, logger)
+			test.That(t, err, test.ShouldBeNil)
+			test.That(t, len(cameraInfo.MediaEndpoints), test.ShouldEqual, 1)
+			test.That(t, len(cameraInfo.PTZEndpoints), test.ShouldEqual, 1)
+			expectedMovements := map[string]ptzclient.PTZMovement{
+				"continuous": {
+					PanTilt: ptzclient.PanTiltSpace{
+						XMin:  -1.0,
+						XMax:  1.0,
+						YMin:  -1.0,
+						YMax:  1.0,
+						Space: "VelocityGenericSpace",
+					},
+					Zoom: ptzclient.ZoomSpace{
+						XMin:  0.0,
+						XMax:  1.0,
+						Space: "VelocityGenericSpace",
+					},
+				},
+			}
+			test.That(t,
+				cameraInfo.PTZEndpoints[0].Movements,
+				test.ShouldResemble,
+				expectedMovements,
+			)
 		})
 	})
 }
