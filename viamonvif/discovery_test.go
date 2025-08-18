@@ -159,6 +159,10 @@ func TestGetCameraInfo(t *testing.T) {
 				test.ShouldResemble,
 				expectedMovements,
 			)
+			test.That(t, cameraInfo.PTZEndpoints[0].PTZNodeToken, test.ShouldEqual, "PTZNode1")
+			test.That(t, cameraInfo.PTZEndpoints[0].ProfileToken, test.ShouldEqual, "profile1")
+			test.That(t, cameraInfo.PTZEndpoints[0].RTSPAddress, test.ShouldEqual, "rtsp://192.168.1.100/stream")
+			test.That(t, cameraInfo.PTZEndpoints[0].Address, test.ShouldEqual, "192.168.1.100:80")
 		})
 	})
 }
