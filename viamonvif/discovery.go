@@ -119,12 +119,11 @@ type MediaInfo struct {
 // PTZInfo holds detailed information about a camera's PTZ support.
 type PTZInfo struct {
 	Address      string                           `json:"address"`
-	RTSPAddress  string                           `json:"rtsp_address,omitempty"` // Optional RTSP address
+	RTSPAddress  string                           `json:"rtsp_address"`
 	Username     string                           `json:"username"`
 	Password     string                           `json:"password"`
 	ProfileToken string                           `json:"profile_token"`
 	PTZNodeToken string                           `json:"ptz_node_token"`
-	Capabilities ptzclient.PTZCaps                `json:"capabilities"`
 	Movements    map[string]ptzclient.PTZMovement `json:"movements"`
 }
 
@@ -459,7 +458,6 @@ func GetMediaInfoFromProfiles(
 			Password:     creds.Pass,
 			ProfileToken: string(profile.Token),
 			PTZNodeToken: nodeToken,
-			Capabilities: ptzclient.PTZCaps{}, // TODO: Fill this with service capabilities if needed
 			Movements:    movements,
 		})
 	}

@@ -39,15 +39,6 @@ func init() {
 	)
 }
 
-// PTZCaps defines the capabilities of the ONVIF PTZ service.
-type PTZCaps struct {
-	StatusPosition              bool `json:"status_position"`
-	EFlip                       bool `json:"e_flip"`
-	Reverse                     bool `json:"reverse"`
-	GetCompatibleConfigurations bool `json:"get_compatible_configurations"`
-	MoveStatus                  bool `json:"move_status"`
-}
-
 // PanTiltSpace defines the pan and tilt space for the PTZ movement.
 type PanTiltSpace struct {
 	XMin  float64 `json:"x_min"`
