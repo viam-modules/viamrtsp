@@ -377,7 +377,11 @@ func GetMediaInfoFromProfiles(
 		ptzCfg := profile.PTZConfiguration
 		nodeToken := string(ptzCfg.NodeToken)
 
-		// find the matching PTZNode
+		// Find the matching PTZNode. We only want to use the node that matches the token
+		// specified in the profile's PTZConfiguration.
+		// If we don't find a matching node, we skip this profile.
+		// This is a safeguard against cameras that return multiple nodes
+		// but only one is actually associated with the profile we're examining.
 		var selected *onvif.PTZNode
 		for i := range nodes {
 			if string(nodes[i].Token) == nodeToken {
