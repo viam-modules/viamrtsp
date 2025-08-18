@@ -66,7 +66,6 @@ func (m *MockDevice) GetStreamURI(_ context.Context, token onvif.ReferenceToken,
 }
 
 func (m *MockDevice) GetPTZNodes(_ context.Context) ([]onvif.PTZNode, error) {
-	// Fill out mock PTZ nodes as needed for testing.
 	node := onvif.PTZNode{
 		DeviceEntity: onvif.DeviceEntity{
 			Token: "PTZNode1",
@@ -78,7 +77,6 @@ func (m *MockDevice) GetPTZNodes(_ context.Context) ([]onvif.PTZNode, error) {
 				XRange: onvif.FloatRange{Min: -1.0, Max: 1.0},
 				YRange: onvif.FloatRange{Min: -1.0, Max: 1.0},
 			},
-			// optional: add zoom if you need it in tests
 			ContinuousZoomVelocitySpace: onvif.Space1DDescription{
 				URI:    "http://www.onvif.org/ver10/tptz/ZoomSpaces/VelocityGenericSpace",
 				XRange: onvif.FloatRange{Min: 0.0, Max: 1.0},
