@@ -444,8 +444,12 @@ func GetMediaInfoFromProfiles(
 		}
 
 		var host string
-		if x := dev.GetXaddr(); x != nil {
-			host = x.Host
+		xaddr := dev.GetXaddr()
+		if xaddr != nil {
+			host = xaddr.Host
+		} else {
+			logger.Debugf("Could not get XAddr from device, skipping the PTZ profile %s", profile.Name)
+			continue
 		}
 
 		ptzInfos = append(ptzInfos, PTZInfo{
