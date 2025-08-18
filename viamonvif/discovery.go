@@ -360,7 +360,7 @@ func GetMediaInfoFromProfiles(
 		})
 
 		// Check if the profile has PTZ capabilities
-		if profile.PTZConfiguration.Token == "" {
+		if profile.PTZConfiguration.NodeToken == "" {
 			logger.Debugf("Profile %s does not have PTZ capabilities, %s", profile.Name, streamURI.String())
 			continue
 		}
