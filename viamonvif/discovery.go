@@ -292,20 +292,20 @@ func GetCameraInfo(
 	logger.Debugf("ip: %s GetCapabilities: DeviceInfo: %#v", xaddr, dev)
 
 	// Call the ONVIF Media service to get the available media profiles using the same device instance
-	mes, pes, err := GetMediaInfoFromProfiles(ctx, dev, creds, logger)
+	mediaInfos, ptzInfos, err := GetMediaInfoFromProfiles(ctx, dev, creds, logger)
 	if err != nil {
 		return zero, fmt.Errorf("failed to get stream info: %w", err)
 	}
 
 	cameraInfo := CameraInfo{
 		Host:            xaddr.Host,
-		MediaEndpoints:  mes,
+		MediaEndpoints:  mediaInfos,
 		Manufacturer:    resp.Manufacturer,
 		Model:           resp.Model,
 		SerialNumber:    resp.SerialNumber,
 		FirmwareVersion: resp.FirmwareVersion,
 		HardwareID:      resp.HardwareID,
-		PTZEndpoints:    pes,
+		PTZEndpoints:    ptzInfos,
 
 		// Will be nil if there's an error.
 		deviceIP: net.ParseIP(xaddr.Host),
@@ -327,7 +327,7 @@ func GetMediaInfoFromProfiles(
 		return nil, nil, err
 	}
 
-	var mes []MediaInfo
+	var mediaInfos []MediaInfo
 	var ptzInfos []PTZInfo
 	// Iterate over all profiles and get the RTSP stream and snapshot URI for each one
 	for _, profile := range resp.Profiles {
@@ -347,7 +347,7 @@ func GetMediaInfoFromProfiles(
 		}
 
 		// Always add the MediaInfo if we get a stream URI, even if the snapshot URI fails.
-		mes = append(mes, MediaInfo{
+		mediaInfos = append(mediaInfos, MediaInfo{
 			StreamURI:   streamURI.String(),
 			SnapshotURI: snapshotURIString,
 			FrameRate:   int(profile.VideoEncoderConfiguration.RateControl.FrameRateLimit),
@@ -462,7 +462,7 @@ func GetMediaInfoFromProfiles(
 		})
 	}
 
-	return mes, ptzInfos, nil
+	return mediaInfos, ptzInfos, nil
 }
 
 // uriToSpaceName extracts the space name from a URI.
