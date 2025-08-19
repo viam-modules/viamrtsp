@@ -427,16 +427,6 @@ func (dev *Device) GetXaddr() *url.URL {
 	}
 }
 
-// minimal envelope for decoding only the PTZNode elements.
-type getNodesEnvelope struct {
-	XMLName xml.Name `xml:"Envelope"`
-	Body    struct {
-		GetNodesResponse struct {
-			Nodes []onvif.PTZNode `xml:"PTZNode"`
-		} `xml:"GetNodesResponse"`
-	} `xml:"Body"`
-}
-
 // GetPTZNodes returns a list of PTZ nodes supported by the device.
 // Includes complete information about each node's movement capabilities.
 func (dev *Device) GetPTZNodes(ctx context.Context) ([]onvif.PTZNode, error) {
@@ -447,7 +437,7 @@ func (dev *Device) GetPTZNodes(ctx context.Context) ([]onvif.PTZNode, error) {
 	}
 	dev.logger.Debugf("GetPTZNodes response body: %s", string(data))
 
-	var env getNodesEnvelope
+	var env onvif.GetNodesEnvelope
 	if err := xml.Unmarshal(data, &env); err != nil {
 		return nil, fmt.Errorf("unmarshal GetNodesResponse: %w", err)
 	}
