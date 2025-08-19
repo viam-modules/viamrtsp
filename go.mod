@@ -20,9 +20,9 @@ require (
 	github.com/viam-modules/video-store v0.0.8-rc2
 	github.com/viamrobotics/zeroconf v1.0.12
 	go.uber.org/zap v1.27.0
-	go.viam.com/rdk v0.78.2
+	go.viam.com/rdk v0.89.0-rc0
 	go.viam.com/test v1.2.4
-	go.viam.com/utils v0.1.154
+	go.viam.com/utils v0.1.159
 	golang.org/x/net v0.42.0
 )
 
@@ -333,7 +333,7 @@ require (
 	go.uber.org/automaxprocs v1.5.3 // indirect
 	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.viam.com/api v0.1.462 // indirect
+	go.viam.com/api v0.1.467 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20230525183740-e7c30c78aeb2 // indirect
 	goji.io v2.0.2+incompatible // indirect
 	golang.org/x/crypto v0.40.0 // indirect
@@ -369,7 +369,5 @@ require (
 	mvdan.cc/unparam v0.0.0-20240528143540-8a5130ca722f // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 )
-
-replace go.viam.com/rdk => ../sean-rdk
 
 replace github.com/viam-modules/video-store => ../sean-video-store
