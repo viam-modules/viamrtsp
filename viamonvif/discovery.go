@@ -381,14 +381,16 @@ func GetMediaInfoFromProfiles(
 		// If we don't find a matching node, we skip this profile.
 		// This is a safeguard against cameras that return multiple nodes
 		// but only one is actually associated with the profile we're examining.
-		var selected *onvif.PTZNode
-		for i := range nodes {
-			if string(nodes[i].Token) == nodeToken {
-				selected = &nodes[i]
+		var selected onvif.PTZNode
+		ptzNodeFound := false
+		for _, node := range nodes {
+			if string(node.Token) == nodeToken {
+				selected = node
+				ptzNodeFound = true
 				break
 			}
 		}
-		if selected == nil {
+		if !ptzNodeFound {
 			logger.Debugf("PTZ node %s not found for profile %s", nodeToken, profile.Name)
 			continue
 		}
