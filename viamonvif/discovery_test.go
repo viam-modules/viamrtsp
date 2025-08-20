@@ -136,7 +136,7 @@ func TestGetCameraInfo(t *testing.T) {
 			test.That(t, len(cameraInfo.PTZEndpoints), test.ShouldEqual, 0)
 		})
 
-		t.Run("GetCameraInfo with one PTZ node with continuous movement support", func(t *testing.T) {
+		t.Run("GetCameraInfo with one PTZ node", func(t *testing.T) {
 			mockDevice.GetProfilesFn = func(_ context.Context) (device.GetProfilesResponse, error) {
 				return device.GetProfilesResponse{
 					Profiles: []onvif.Profile{
@@ -201,6 +201,133 @@ func TestGetCameraInfo(t *testing.T) {
 			test.That(t, cameraInfo.PTZEndpoints[0].ProfileToken, test.ShouldEqual, "profile1")
 			test.That(t, cameraInfo.PTZEndpoints[0].RTSPAddress, test.ShouldEqual, "rtsp://192.168.1.100/stream")
 			test.That(t, cameraInfo.PTZEndpoints[0].Address, test.ShouldEqual, "192.168.1.100:80")
+		})
+
+		t.Run("GetCameraInfo with multiple PTZ nodes", func(t *testing.T) {
+			mockDevice.GetProfilesFn = func(_ context.Context) (device.GetProfilesResponse, error) {
+				return device.GetProfilesResponse{
+					Profiles: []onvif.Profile{
+						{
+							Token: "profile1",
+							Name:  "Main Profile",
+							PTZConfiguration: onvif.PTZConfiguration{
+								NodeToken: onvif.ReferenceToken("PTZNode1"),
+							},
+						},
+						{
+							Token: "profile2",
+							Name:  "Secondary Profile",
+							PTZConfiguration: onvif.PTZConfiguration{
+								NodeToken: onvif.ReferenceToken("PTZNode2"),
+							},
+						},
+					},
+				}, nil
+			}
+			mockDevice.GetStreamURIFn = func(_ context.Context, token onvif.ReferenceToken, _ device.Credentials) (*url.URL, error) {
+				if token == "profile1" {
+					return url.Parse("rtsp://192.168.1.100/stream1")
+				}
+				if token == "profile2" {
+					return url.Parse("rtsp://192.168.1.100/stream2")
+				}
+				return nil, errors.New("invalid mock profile")
+			}
+			mockDevice.GetPTZNodesFn = func(_ context.Context) ([]onvif.PTZNode, error) {
+				nodes := []onvif.PTZNode{
+					{
+						DeviceEntity: onvif.DeviceEntity{
+							Token: "PTZNode1",
+						},
+						Name: "PTZNode1",
+						SupportedPTZSpaces: onvif.PTZSpaces{
+							ContinuousPanTiltVelocitySpace: onvif.Space2DDescription{
+								URI:    "http://www.onvif.org/ver10/tptz/PanTiltSpaces/VelocityGenericSpace",
+								XRange: onvif.FloatRange{Min: -1.0, Max: 1.0},
+								YRange: onvif.FloatRange{Min: -1.0, Max: 1.0},
+							},
+							ContinuousZoomVelocitySpace: onvif.Space1DDescription{
+								URI:    "http://www.onvif.org/ver10/tptz/ZoomSpaces/VelocityGenericSpace",
+								XRange: onvif.FloatRange{Min: 0.0, Max: 1.0},
+							},
+						},
+					},
+					{
+						DeviceEntity: onvif.DeviceEntity{
+							Token: "PTZNode2",
+						},
+						Name: "PTZNode2",
+						SupportedPTZSpaces: onvif.PTZSpaces{
+							ContinuousPanTiltVelocitySpace: onvif.Space2DDescription{
+								URI:    "http://www.onvif.org/ver10/tptz/PanTiltSpaces/VelocityGenericSpace",
+								XRange: onvif.FloatRange{Min: -0.5, Max: 0.5},
+								YRange: onvif.FloatRange{Min: -0.5, Max: 0.5},
+							},
+							ContinuousZoomVelocitySpace: onvif.Space1DDescription{
+								URI:    "http://www.onvif.org/ver10/tptz/ZoomSpaces/VelocityGenericSpace",
+								XRange: onvif.FloatRange{Min: 0.0, Max: 2.0},
+							},
+						},
+					},
+				}
+				return nodes, nil
+			}
+			uri, err := url.Parse("http://192.168.1.100")
+			test.That(t, err, test.ShouldBeNil)
+			cameraInfo, err := GetCameraInfo(context.Background(), mockDevice, uri, device.Credentials{}, logger)
+			test.That(t, err, test.ShouldBeNil)
+			test.That(t, len(cameraInfo.MediaEndpoints), test.ShouldEqual, 2)
+			test.That(t, len(cameraInfo.PTZEndpoints), test.ShouldEqual, 2)
+			expectedMovements1 := map[string]ptzclient.PTZMovement{
+				"continuous": {
+					PanTilt: ptzclient.PanTiltSpace{
+						XMin:  -1.0,
+						XMax:  1.0,
+						YMin:  -1.0,
+						YMax:  1.0,
+						Space: "VelocityGenericSpace",
+					},
+					Zoom: ptzclient.ZoomSpace{
+						XMin:  0.0,
+						XMax:  1.0,
+						Space: "VelocityGenericSpace",
+					},
+				},
+			}
+			expectedMovements2 := map[string]ptzclient.PTZMovement{
+				"continuous": {
+					PanTilt: ptzclient.PanTiltSpace{
+						XMin:  -0.5,
+						XMax:  0.5,
+						YMin:  -0.5,
+						YMax:  0.5,
+						Space: "VelocityGenericSpace",
+					},
+					Zoom: ptzclient.ZoomSpace{
+						XMin:  0.0,
+						XMax:  2.0,
+						Space: "VelocityGenericSpace",
+					},
+				},
+			}
+			test.That(t,
+				cameraInfo.PTZEndpoints[0].Movements,
+				test.ShouldResemble,
+				expectedMovements1,
+			)
+			test.That(t,
+				cameraInfo.PTZEndpoints[1].Movements,
+				test.ShouldResemble,
+				expectedMovements2,
+			)
+			test.That(t, cameraInfo.PTZEndpoints[0].PTZNodeToken, test.ShouldEqual, "PTZNode1")
+			test.That(t, cameraInfo.PTZEndpoints[0].ProfileToken, test.ShouldEqual, "profile1")
+			test.That(t, cameraInfo.PTZEndpoints[0].RTSPAddress, test.ShouldEqual, "rtsp://192.168.1.100/stream1")
+			test.That(t, cameraInfo.PTZEndpoints[0].Address, test.ShouldEqual, "192.168.1.100:80")
+			test.That(t, cameraInfo.PTZEndpoints[1].PTZNodeToken, test.ShouldEqual, "PTZNode2")
+			test.That(t, cameraInfo.PTZEndpoints[1].ProfileToken, test.ShouldEqual, "profile2")
+			test.That(t, cameraInfo.PTZEndpoints[1].RTSPAddress, test.ShouldEqual, "rtsp://192.168.1.100/stream2")
+			test.That(t, cameraInfo.PTZEndpoints[1].Address, test.ShouldEqual, "192.168.1.100:80")
 		})
 	})
 }
