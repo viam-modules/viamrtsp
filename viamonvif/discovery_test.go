@@ -19,10 +19,35 @@ import (
 	"go.viam.com/utils"
 )
 
-type MockDevice struct{}
+type MockDevice struct {
+	GetProfilesFn    func(context.Context) (device.GetProfilesResponse, error)
+	GetPTZNodesFn    func(context.Context) ([]onvif.PTZNode, error)
+	GetStreamURIFn   func(context.Context, onvif.ReferenceToken, device.Credentials) (*url.URL, error)
+	GetSnapshotURIFn func(context.Context, onvif.ReferenceToken, device.Credentials) (*url.URL, error)
+	GetXaddrFn       func() *url.URL
+}
 
 func NewMockDevice() *MockDevice {
-	return &MockDevice{}
+	return &MockDevice{
+		GetProfilesFn: func(_ context.Context) (device.GetProfilesResponse, error) {
+			return device.GetProfilesResponse{Profiles: []onvif.Profile{
+				{Token: "profile1", Name: "Main Profile"},
+			}}, nil
+		},
+		GetPTZNodesFn: func(_ context.Context) ([]onvif.PTZNode, error) {
+			return []onvif.PTZNode{}, nil
+		},
+		GetStreamURIFn: func(_ context.Context, _ onvif.ReferenceToken, _ device.Credentials) (*url.URL, error) {
+			return url.Parse("rtsp://192.168.1.100/stream")
+		},
+		GetSnapshotURIFn: func(_ context.Context, _ onvif.ReferenceToken, _ device.Credentials) (*url.URL, error) {
+			return url.Parse("http://example.com/snapshot.jpg")
+		},
+		GetXaddrFn: func() *url.URL {
+			u, _ := url.Parse("http://192.168.1.100:80")
+			return u
+		},
+	}
 }
 
 func (m *MockDevice) GetDeviceInformation(_ context.Context) (device.GetDeviceInformationResponse, error) {
@@ -33,71 +58,45 @@ func (m *MockDevice) GetDeviceInformation(_ context.Context) (device.GetDeviceIn
 	}, nil
 }
 
-func (m *MockDevice) GetProfiles(_ context.Context) (device.GetProfilesResponse, error) {
-	return device.GetProfilesResponse{
-		Profiles: []onvif.Profile{
-			{
-				Token: "profile1",
-				Name:  "Main Profile",
-				PTZConfiguration: onvif.PTZConfiguration{
-					NodeToken: onvif.ReferenceToken("PTZNode1"),
-				},
-			},
-		},
-	}, nil
+func (m *MockDevice) GetProfiles(ctx context.Context) (device.GetProfilesResponse, error) {
+	return m.GetProfilesFn(ctx)
 }
 
-func (m *MockDevice) GetSnapshotURI(_ context.Context, _ onvif.ReferenceToken, _ device.Credentials) (*url.URL, error) {
-	return url.Parse("http://example.com/snapshot.jpg")
+func (m *MockDevice) GetSnapshotURI(ctx context.Context, token onvif.ReferenceToken, creds device.Credentials) (*url.URL, error) {
+	return m.GetSnapshotURIFn(ctx, token, creds)
 }
 
-func (m *MockDevice) GetStreamURI(_ context.Context, token onvif.ReferenceToken, creds device.Credentials) (*url.URL, error) {
-	if token != "profile1" {
-		return nil, errors.New("invalid mock profile")
-	}
-	u, err := url.Parse("rtsp://192.168.1.100/stream")
-	if err != nil {
-		return nil, err
-	}
-	if creds.User != "" || creds.Pass != "" {
-		u.User = url.UserPassword(creds.User, creds.Pass)
-	}
-	return u, nil
+func (m *MockDevice) GetStreamURI(ctx context.Context, token onvif.ReferenceToken, creds device.Credentials) (*url.URL, error) {
+	return m.GetStreamURIFn(ctx, token, creds)
 }
 
-func (m *MockDevice) GetPTZNodes(_ context.Context) ([]onvif.PTZNode, error) {
-	node := onvif.PTZNode{
-		DeviceEntity: onvif.DeviceEntity{
-			Token: "PTZNode1",
-		},
-		Name: "PTZNode1",
-		SupportedPTZSpaces: onvif.PTZSpaces{
-			ContinuousPanTiltVelocitySpace: onvif.Space2DDescription{
-				URI:    "http://www.onvif.org/ver10/tptz/PanTiltSpaces/VelocityGenericSpace",
-				XRange: onvif.FloatRange{Min: -1.0, Max: 1.0},
-				YRange: onvif.FloatRange{Min: -1.0, Max: 1.0},
-			},
-			ContinuousZoomVelocitySpace: onvif.Space1DDescription{
-				URI:    "http://www.onvif.org/ver10/tptz/ZoomSpaces/VelocityGenericSpace",
-				XRange: onvif.FloatRange{Min: 0.0, Max: 1.0},
-			},
-		},
-	}
-	return []onvif.PTZNode{node}, nil
+func (m *MockDevice) GetPTZNodes(ctx context.Context) ([]onvif.PTZNode, error) {
+	return m.GetPTZNodesFn(ctx)
 }
 
 func (m *MockDevice) GetXaddr() *url.URL {
-	u, err := url.Parse("http://192.168.1.100:80")
-	if err != nil {
-		panic(fmt.Sprintf("failed to parse mock device URL: %v", err))
-	}
-	return u
+	return m.GetXaddrFn()
 }
 
 func TestGetCameraInfo(t *testing.T) {
 	t.Run("GetCameraInfo", func(t *testing.T) {
-		mockDevice := &MockDevice{}
+		// mockDevice := &MockDevice{}
+		mockDevice := NewMockDevice()
 		logger := logging.NewTestLogger(t)
+
+		mockDevice.GetStreamURIFn = func(_ context.Context, token onvif.ReferenceToken, creds device.Credentials) (*url.URL, error) {
+			if token != "profile1" {
+				return nil, errors.New("invalid mock profile")
+			}
+			u, err := url.Parse("rtsp://192.168.1.100/stream")
+			if err != nil {
+				return nil, err
+			}
+			if creds.User != "" || creds.Pass != "" {
+				u.User = url.UserPassword(creds.User, creds.Pass)
+			}
+			return u, nil
+		}
 
 		uri, err := url.Parse("192.168.1.100")
 		test.That(t, err, test.ShouldBeNil)
@@ -129,7 +128,40 @@ func TestGetCameraInfo(t *testing.T) {
 			test.That(t, cameraInfo.MediaEndpoints[0].SnapshotURI, test.ShouldEqual, "http://example.com/snapshot.jpg")
 		})
 
-		t.Run("GetCameraInfo with PTZ node containing continuous movement support", func(t *testing.T) {
+		t.Run("GetCameraInfo with PTZ node containing one ptz node with continuous movement support", func(t *testing.T) {
+			mockDevice.GetProfilesFn = func(_ context.Context) (device.GetProfilesResponse, error) {
+				return device.GetProfilesResponse{
+					Profiles: []onvif.Profile{
+						{
+							Token: "profile1",
+							Name:  "Main Profile",
+							PTZConfiguration: onvif.PTZConfiguration{
+								NodeToken: onvif.ReferenceToken("PTZNode1"),
+							},
+						},
+					},
+				}, nil
+			}
+			mockDevice.GetPTZNodesFn = func(_ context.Context) ([]onvif.PTZNode, error) {
+				node := onvif.PTZNode{
+					DeviceEntity: onvif.DeviceEntity{
+						Token: "PTZNode1",
+					},
+					Name: "PTZNode1",
+					SupportedPTZSpaces: onvif.PTZSpaces{
+						ContinuousPanTiltVelocitySpace: onvif.Space2DDescription{
+							URI:    "http://www.onvif.org/ver10/tptz/PanTiltSpaces/VelocityGenericSpace",
+							XRange: onvif.FloatRange{Min: -1.0, Max: 1.0},
+							YRange: onvif.FloatRange{Min: -1.0, Max: 1.0},
+						},
+						ContinuousZoomVelocitySpace: onvif.Space1DDescription{
+							URI:    "http://www.onvif.org/ver10/tptz/ZoomSpaces/VelocityGenericSpace",
+							XRange: onvif.FloatRange{Min: 0.0, Max: 1.0},
+						},
+					},
+				}
+				return []onvif.PTZNode{node}, nil
+			}
 			uri, err := url.Parse("192.168.1.100")
 			test.That(t, err, test.ShouldBeNil)
 			cameraInfo, err := GetCameraInfo(context.Background(), mockDevice, uri, device.Credentials{}, logger)
