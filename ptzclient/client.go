@@ -39,12 +39,38 @@ func init() {
 	)
 }
 
+// PanTiltSpace defines the pan and tilt space for the PTZ movement.
+type PanTiltSpace struct {
+	XMin  float64 `json:"x_min"`
+	XMax  float64 `json:"x_max"`
+	YMin  float64 `json:"y_min"`
+	YMax  float64 `json:"y_max"`
+	Space string  `json:"space"`
+}
+
+// ZoomSpace defines the zoom space for the PTZ movement.
+type ZoomSpace struct {
+	XMin  float64 `json:"x_min"`
+	XMax  float64 `json:"x_max"`
+	Space string  `json:"space"`
+}
+
+// PTZMovement defines the movement parameters for pan, tilt, and zoom.
+type PTZMovement struct {
+	PanTilt PanTiltSpace `json:"pan_tilt,omitempty"`
+	Zoom    ZoomSpace    `json:"zoom,omitempty"`
+}
+
 // Config represents the configuration for the ONVIF PTZ client.
 type Config struct {
-	Address      string `json:"address"`
-	Username     string `json:"username"`
-	Password     string `json:"password"`
-	ProfileToken string `json:"profile_token"`
+	Address      string                 `json:"address"`
+	Username     string                 `json:"username"`
+	Password     string                 `json:"password"`
+	ProfileToken string                 `json:"profile_token"`
+	NodeToken    string                 `json:"ptz_node_token,omitempty"`
+	Movements    map[string]PTZMovement `json:"movements,omitempty"`
+	DiscoveryDep string                 `json:"discovery_dep,omitempty"`
+	RTSPAddress  string                 `json:"rtsp_address,omitempty"`
 }
 
 // Validate validates the configuration for the ONVIF PTZ client.

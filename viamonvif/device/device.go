@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/beevik/etree"
+	"github.com/hexbabe/sean-onvif/ptz"
 	"github.com/viam-modules/viamrtsp/viamonvif/gosoap"
 	"github.com/viam-modules/viamrtsp/viamonvif/xsd/onvif"
 	"go.viam.com/rdk/logging"
@@ -412,4 +413,34 @@ func (dev *Device) sendSoap(ctx context.Context, endpoint, message string) ([]by
 	}
 
 	return io.ReadAll(resp.Body)
+}
+
+// GetXaddr returns the URL of the Onvif web service.
+func (dev *Device) GetXaddr() *url.URL {
+	if dev.xaddr == nil {
+		return nil
+	}
+	return &url.URL{
+		Scheme: dev.xaddr.Scheme,
+		Host:   dev.xaddr.Host,
+		Path:   dev.xaddr.Path,
+	}
+}
+
+// GetPTZNodes returns a list of PTZ nodes supported by the device.
+// Includes complete information about each node's movement capabilities.
+func (dev *Device) GetPTZNodes(ctx context.Context) ([]onvif.PTZNode, error) {
+	req := ptz.GetNodes{}
+	data, err := dev.callOnvifServiceMethod(ctx, dev.endpoints["ptz"], req)
+	if err != nil {
+		return nil, fmt.Errorf("GetNodes failed: %w", err)
+	}
+	dev.logger.Debugf("GetPTZNodes response body: %s", string(data))
+
+	var env onvif.GetNodesEnvelope
+	if err := xml.Unmarshal(data, &env); err != nil {
+		return nil, fmt.Errorf("unmarshal GetNodesResponse: %w", err)
+	}
+
+	return env.Body.GetNodesResponse.Nodes, nil
 }

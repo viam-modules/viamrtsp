@@ -14,6 +14,7 @@ import (
 	"unicode"
 
 	"github.com/viam-modules/viamrtsp"
+	"github.com/viam-modules/viamrtsp/ptzclient"
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"github.com/viam-modules/viamrtsp/viamonvif/xsd/onvif"
 	"go.viam.com/rdk/logging"
@@ -27,6 +28,8 @@ type OnvifDevice interface {
 	GetProfiles(ctx context.Context) (device.GetProfilesResponse, error)
 	GetStreamURI(ctx context.Context, token onvif.ReferenceToken, creds device.Credentials) (*url.URL, error)
 	GetSnapshotURI(ctx context.Context, token onvif.ReferenceToken, creds device.Credentials) (*url.URL, error)
+	GetPTZNodes(ctx context.Context) ([]onvif.PTZNode, error)
+	GetXaddr() *url.URL
 }
 
 // DiscoverCameras performs WS-Discovery
@@ -113,10 +116,22 @@ type MediaInfo struct {
 	Codec       string              `json:"codec"`
 }
 
+// PTZInfo holds detailed information about a camera's PTZ support.
+type PTZInfo struct {
+	Address      string                           `json:"address"`
+	RTSPAddress  string                           `json:"rtsp_address"`
+	Username     string                           `json:"username"`
+	Password     string                           `json:"password"`
+	ProfileToken string                           `json:"profile_token"`
+	PTZNodeToken string                           `json:"ptz_node_token"`
+	Movements    map[string]ptzclient.PTZMovement `json:"movements"`
+}
+
 // CameraInfo holds both the RTSP URLs and supplementary camera details.
 type CameraInfo struct {
 	Host            string      `json:"host"`
 	MediaEndpoints  []MediaInfo `json:"media_endpoints"`
+	PTZEndpoints    []PTZInfo   `json:"ptz_endpoints,omitempty"` // Optional, may be empty if no PTZ support is found.
 	Manufacturer    string      `json:"manufacturer"`
 	Model           string      `json:"model"`
 	SerialNumber    string      `json:"serial_number"`
@@ -168,6 +183,18 @@ func (cam *CameraInfo) tryMDNS(mdnsServer *mdnsServer, logger logging.Logger) {
 		} else {
 			logger.Debugf("RTSP URL did not contain expected hostname. URL: %v HostName: %v",
 				cam.MediaEndpoints[idx].StreamURI, cam.deviceIP.String())
+		}
+	}
+
+	// Also need to replace IP address with hostname in PTZ endpoints.
+	for idx := range cam.PTZEndpoints {
+		if strings.Contains(cam.PTZEndpoints[idx].RTSPAddress, cam.deviceIP.String()) {
+			cam.PTZEndpoints[idx].RTSPAddress = strings.Replace(cam.PTZEndpoints[idx].RTSPAddress, cam.deviceIP.String(), cam.mdnsName, 1)
+			cam.PTZEndpoints[idx].Address = strings.Replace(cam.PTZEndpoints[idx].Address, cam.deviceIP.String(), cam.mdnsName, 1)
+			wasIPFound = true
+		} else {
+			logger.Debugf("PTZ RTSP URL did not contain expected hostname. URL: %v HostName: %v",
+				cam.PTZEndpoints[idx].RTSPAddress, cam.deviceIP.String())
 		}
 	}
 
@@ -265,19 +292,20 @@ func GetCameraInfo(
 	logger.Debugf("ip: %s GetCapabilities: DeviceInfo: %#v", xaddr, dev)
 
 	// Call the ONVIF Media service to get the available media profiles using the same device instance
-	mes, err := GetMediaInfoFromProfiles(ctx, dev, creds, logger)
+	mediaInfos, ptzInfos, err := GetMediaInfoFromProfiles(ctx, dev, creds, logger)
 	if err != nil {
 		return zero, fmt.Errorf("failed to get stream info: %w", err)
 	}
 
 	cameraInfo := CameraInfo{
 		Host:            xaddr.Host,
-		MediaEndpoints:  mes,
+		MediaEndpoints:  mediaInfos,
 		Manufacturer:    resp.Manufacturer,
 		Model:           resp.Model,
 		SerialNumber:    resp.SerialNumber,
 		FirmwareVersion: resp.FirmwareVersion,
 		HardwareID:      resp.HardwareID,
+		PTZEndpoints:    ptzInfos,
 
 		// Will be nil if there's an error.
 		deviceIP: net.ParseIP(xaddr.Host),
@@ -293,13 +321,14 @@ func GetMediaInfoFromProfiles(
 	dev OnvifDevice,
 	creds device.Credentials,
 	logger logging.Logger,
-) ([]MediaInfo, error) {
+) ([]MediaInfo, []PTZInfo, error) {
 	resp, err := dev.GetProfiles(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	var mes []MediaInfo
+	var mediaInfos []MediaInfo
+	var ptzInfos []PTZInfo
 	// Iterate over all profiles and get the RTSP stream and snapshot URI for each one
 	for _, profile := range resp.Profiles {
 		logger.Debugf("Looking up media info for profile: %s (token: %s)", profile.Name, profile.Token)
@@ -318,7 +347,7 @@ func GetMediaInfoFromProfiles(
 		}
 
 		// Always add the MediaInfo if we get a stream URI, even if the snapshot URI fails.
-		mes = append(mes, MediaInfo{
+		mediaInfos = append(mediaInfos, MediaInfo{
 			StreamURI:   streamURI.String(),
 			SnapshotURI: snapshotURIString,
 			FrameRate:   int(profile.VideoEncoderConfiguration.RateControl.FrameRateLimit),
@@ -328,7 +357,122 @@ func GetMediaInfoFromProfiles(
 			},
 			Codec: string(profile.VideoEncoderConfiguration.Encoding),
 		})
+
+		// Check if the profile has PTZ capabilities
+		if profile.PTZConfiguration.NodeToken == "" {
+			logger.Debugf("Profile %s does not have PTZ capabilities, %s", profile.Name, streamURI.String())
+			continue
+		}
+
+		logger.Debugf("Profile %s has PTZ capabilities, %s", profile.Name, streamURI.String())
+
+		nodes, err := dev.GetPTZNodes(ctx)
+		if err != nil {
+			logger.Debugf("Unable to determine onvif ptz nodes for profile %s: %s, err: %s",
+				profile.Name, streamURI.String(), err)
+			continue
+		}
+
+		ptzCfg := profile.PTZConfiguration
+		nodeToken := string(ptzCfg.NodeToken)
+
+		// Find the matching PTZNode. We only want to use the node that matches the token
+		// specified in the profile's PTZConfiguration.
+		// If we don't find a matching node, we skip this profile.
+		// This is a safeguard against cameras that return multiple nodes
+		// but only one is actually associated with the profile we're examining.
+		var selected onvif.PTZNode
+		ptzNodeFound := false
+		for _, node := range nodes {
+			if string(node.Token) == nodeToken {
+				selected = node
+				ptzNodeFound = true
+				break
+			}
+		}
+		if !ptzNodeFound {
+			logger.Debugf("PTZ node %s not found for profile %s", nodeToken, profile.Name)
+			continue
+		}
+
+		// Helpers to turn ONVIF spaces into config types
+		make2D := func(d onvif.Space2DDescription) *ptzclient.PanTiltSpace {
+			if d.URI == "" {
+				return nil
+			}
+			return &ptzclient.PanTiltSpace{
+				XMin:  d.XRange.Min,
+				XMax:  d.XRange.Max,
+				YMin:  d.YRange.Min,
+				YMax:  d.YRange.Max,
+				Space: uriToSpaceName(string(d.URI)),
+			}
+		}
+		make1D := func(d onvif.Space1DDescription) *ptzclient.ZoomSpace {
+			if d.URI == "" {
+				return nil
+			}
+			return &ptzclient.ZoomSpace{
+				XMin:  d.XRange.Min,
+				XMax:  d.XRange.Max,
+				Space: uriToSpaceName(string(d.URI)),
+			}
+		}
+
+		// Build the PTZInfo with supported movements. If a movement type is not supported,
+		// it will not be included in the Movements map. Pointers are used in the helper functions
+		// to indicate whether a movement type is supported or not. Nil pointers indicate
+		// unsupported movement types.
+		movements := map[string]ptzclient.PTZMovement{}
+		if pt := make2D(selected.SupportedPTZSpaces.AbsolutePanTiltPositionSpace); pt != nil {
+			m := ptzclient.PTZMovement{PanTilt: *pt}
+			if z := make1D(selected.SupportedPTZSpaces.AbsoluteZoomPositionSpace); z != nil {
+				m.Zoom = *z
+			}
+			movements["absolute"] = m
+		}
+		if pt := make2D(selected.SupportedPTZSpaces.RelativePanTiltTranslationSpace); pt != nil {
+			m := ptzclient.PTZMovement{PanTilt: *pt}
+			if z := make1D(selected.SupportedPTZSpaces.RelativeZoomTranslationSpace); z != nil {
+				m.Zoom = *z
+			}
+			movements["relative"] = m
+		}
+		if pt := make2D(selected.SupportedPTZSpaces.ContinuousPanTiltVelocitySpace); pt != nil {
+			m := ptzclient.PTZMovement{PanTilt: *pt}
+			if z := make1D(selected.SupportedPTZSpaces.ContinuousZoomVelocitySpace); z != nil {
+				m.Zoom = *z
+			}
+			movements["continuous"] = m
+		}
+
+		var host string
+		xaddr := dev.GetXaddr()
+		if xaddr != nil {
+			host = xaddr.Host
+		} else {
+			logger.Debugf("Could not get XAddr from device, skipping the PTZ profile %s", profile.Name)
+			continue
+		}
+
+		ptzInfos = append(ptzInfos, PTZInfo{
+			Address:      host,
+			RTSPAddress:  streamURI.String(),
+			Username:     creds.User,
+			Password:     creds.Pass,
+			ProfileToken: string(profile.Token),
+			PTZNodeToken: nodeToken,
+			Movements:    movements,
+		})
 	}
 
-	return mes, nil
+	return mediaInfos, ptzInfos, nil
+}
+
+// uriToSpaceName extracts the space name from a URI.
+// For example, given the URI "http://www.onvif.org/ver10/tptz/PanTiltSpaces/PositionGenericSpace",
+// it returns "PositionGenericSpace".
+func uriToSpaceName(uri string) string {
+	parts := strings.Split(uri, "/")
+	return parts[len(parts)-1]
 }

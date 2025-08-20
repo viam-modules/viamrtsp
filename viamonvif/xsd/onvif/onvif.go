@@ -5,6 +5,8 @@
 package onvif
 
 import (
+	"encoding/xml"
+
 	"github.com/viam-modules/viamrtsp/viamonvif/xsd"
 )
 
@@ -932,6 +934,15 @@ type PTZSpaces struct {
 }
 
 type PTZSpacesExtension xsd.AnyType
+
+type GetNodesEnvelope struct {
+	XMLName xml.Name `xml:"Envelope"`
+	Body    struct {
+		GetNodesResponse struct {
+			Nodes []PTZNode `xml:"PTZNode"`
+		} `xml:"GetNodesResponse"`
+	} `xml:"Body"`
+}
 
 // TODO: restriction.
 type AuxiliaryData xsd.String
