@@ -420,7 +420,9 @@ func GetMediaInfoFromProfiles(
 		}
 
 		// Build the PTZInfo with supported movements. If a movement type is not supported,
-		// it will not be included in the Movements map.
+		// it will not be included in the Movements map. Pointers are used in the helper functions
+		// to indicate whether a movement type is supported or not. Nil pointers indicate
+		// unsupported movement types.
 		movements := map[string]ptzclient.PTZMovement{}
 		if pt := make2D(selected.SupportedPTZSpaces.AbsolutePanTiltPositionSpace); pt != nil {
 			m := ptzclient.PTZMovement{PanTilt: *pt}
