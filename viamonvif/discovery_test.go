@@ -128,7 +128,15 @@ func TestGetCameraInfo(t *testing.T) {
 			test.That(t, cameraInfo.MediaEndpoints[0].SnapshotURI, test.ShouldEqual, "http://example.com/snapshot.jpg")
 		})
 
-		t.Run("GetCameraInfo with PTZ node containing one ptz node with continuous movement support", func(t *testing.T) {
+		t.Run("GetCameraInfo with no PTZ nodes", func(t *testing.T) {
+			uri, err := url.Parse("192.168.1.100")
+			test.That(t, err, test.ShouldBeNil)
+			cameraInfo, err := GetCameraInfo(context.Background(), mockDevice, uri, device.Credentials{}, logger)
+			test.That(t, err, test.ShouldBeNil)
+			test.That(t, len(cameraInfo.PTZEndpoints), test.ShouldEqual, 0)
+		})
+
+		t.Run("GetCameraInfo with one PTZ node with continuous movement support", func(t *testing.T) {
 			mockDevice.GetProfilesFn = func(_ context.Context) (device.GetProfilesResponse, error) {
 				return device.GetProfilesResponse{
 					Profiles: []onvif.Profile{
