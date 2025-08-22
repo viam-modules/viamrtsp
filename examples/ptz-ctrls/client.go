@@ -89,9 +89,10 @@ func main() {
 	// Map of keys to release timers
 	pressed := make(map[string]*time.Timer)
 	var mu sync.Mutex
+	var cmdMu sync.Mutex // mutex to serialize PTZ commands
 
 	// Duration after which we consider the key "released"
-	releaseDelay := 100 * time.Millisecond
+	releaseDelay := 10 * time.Millisecond
 
 	fmt.Println("Keyboard Controls:")
 	fmt.Println("W/w: Tilt up")
@@ -119,6 +120,8 @@ func main() {
 		switch keyStr {
 		case "W", "w":
 			go func() {
+				cmdMu.Lock()
+				defer cmdMu.Unlock()
 				// up
 				_, err := ptz.DoCommand(context.Background(), map[string]interface{}{
 					"command":    "continuous-move",
@@ -132,6 +135,8 @@ func main() {
 			}()
 		case "S", "s":
 			go func() {
+				cmdMu.Lock()
+				defer cmdMu.Unlock()
 				// down
 				_, err := ptz.DoCommand(context.Background(), map[string]interface{}{
 					"command":    "continuous-move",
@@ -145,6 +150,8 @@ func main() {
 			}()
 		case "A", "a":
 			go func() {
+				cmdMu.Lock()
+				defer cmdMu.Unlock()
 				// left
 				_, err := ptz.DoCommand(context.Background(), map[string]interface{}{
 					"command":    "continuous-move",
@@ -158,6 +165,8 @@ func main() {
 			}()
 		case "D", "d":
 			go func() {
+				cmdMu.Lock()
+				defer cmdMu.Unlock()
 				// right
 				_, err := ptz.DoCommand(context.Background(), map[string]interface{}{
 					"command":    "continuous-move",
@@ -171,6 +180,8 @@ func main() {
 			}()
 		case "R", "r":
 			go func() {
+				cmdMu.Lock()
+				defer cmdMu.Unlock()
 				// zoom in
 				_, err := ptz.DoCommand(context.Background(), map[string]interface{}{
 					"command":    "continuous-move",
@@ -184,6 +195,8 @@ func main() {
 			}()
 		case "F", "f":
 			go func() {
+				cmdMu.Lock()
+				defer cmdMu.Unlock()
 				// zoom out
 				_, err := ptz.DoCommand(context.Background(), map[string]interface{}{
 					"command":    "continuous-move",
@@ -207,6 +220,8 @@ func main() {
 
 			// Send stop command after key release
 			go func() {
+				cmdMu.Lock()
+				defer cmdMu.Unlock()
 				_, err := ptz.DoCommand(context.Background(), map[string]interface{}{
 					"command":  "stop",
 					"pan_tilt": true,
@@ -222,6 +237,7 @@ func main() {
 		if key.Code == 27 || key.Code == 3 { // ASCII values for Escape and Ctrl+C
 			logger.Info("Exiting...")
 			// Stop all ongoing pan/tilt/zoom commands before exiting
+			cmdMu.Lock()
 			_, err := ptz.DoCommand(context.Background(),
 				map[string]interface{}{
 					"command":  "stop",
@@ -229,6 +245,7 @@ func main() {
 					"zoom":     true,
 				},
 			)
+			cmdMu.Unlock()
 			if err != nil {
 				logger.Error(err)
 			}
