@@ -88,8 +88,8 @@ func main() {
 
 	// Map of keys to release timers
 	pressed := make(map[string]*time.Timer)
-	var mu sync.Mutex
-	var cmdMu sync.Mutex // mutex to serialize PTZ commands
+	var timerMu sync.Mutex // mutex for release timers
+	var cmdMu sync.Mutex   // mutex to serialize PTZ commands
 
 	// Duration after which we consider the key "released"
 	releaseDelay := 10 * time.Millisecond
@@ -104,8 +104,8 @@ func main() {
 	fmt.Println("Esc or Ctrl+C: Exit")
 
 	keyboard.Listen(func(key keys.Key) (stop bool, err error) {
-		mu.Lock()
-		defer mu.Unlock()
+		timerMu.Lock()
+		defer timerMu.Unlock()
 
 		keyStr := key.String() // Convert the key to a string
 		fmt.Printf("Key pressed: %s\n", keyStr)
@@ -214,8 +214,8 @@ func main() {
 
 		// Start a timer to emulate "key release"
 		pressed[keyStr] = time.AfterFunc(releaseDelay, func() {
-			mu.Lock()
-			defer mu.Unlock()
+			timerMu.Lock()
+			defer timerMu.Unlock()
 			delete(pressed, keyStr)
 
 			// Send stop command after key release
