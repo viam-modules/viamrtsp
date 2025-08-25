@@ -17,7 +17,7 @@ require (
 	github.com/pion/rtp v1.8.21
 	github.com/rhysd/actionlint v1.6.27
 	github.com/stretchr/testify v1.10.0
-	github.com/viam-modules/video-store v0.0.8-rc2
+	github.com/viam-modules/video-store v0.0.8-rc3
 	github.com/viamrobotics/zeroconf v1.0.12
 	go.uber.org/zap v1.27.0
 	go.viam.com/rdk v0.89.0
@@ -369,5 +369,3 @@ require (
 	mvdan.cc/unparam v0.0.0-20240528143540-8a5130ca722f // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 )
-
-replace github.com/viam-modules/video-store => ../sean-video-store
