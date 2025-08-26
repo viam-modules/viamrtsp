@@ -35,6 +35,7 @@ import (
 	"go.viam.com/rdk/pointcloud"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/services/discovery"
+	"go.viam.com/rdk/spatialmath"
 	rutils "go.viam.com/rdk/utils"
 	"go.viam.com/utils"
 )
@@ -1453,7 +1454,7 @@ func (rc *rtspCamera) Name() resource.Name {
 	return rc.name
 }
 
-func (rc *rtspCamera) Images(_ context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
+func (rc *rtspCamera) Images(_ context.Context, _ map[string]interface{}) ([]camera.NamedImage, resource.ResponseMetadata, error) {
 	rc.latestFrameMu.Lock()
 	defer rc.latestFrameMu.Unlock()
 	if rc.latestFrame == nil {
@@ -1462,6 +1463,10 @@ func (rc *rtspCamera) Images(_ context.Context) ([]camera.NamedImage, resource.R
 	return []camera.NamedImage{
 		{Image: rc.latestFrame.toImage()},
 	}, resource.ResponseMetadata{CapturedAt: time.Now()}, nil
+}
+
+func (rc *rtspCamera) Geometries(_ context.Context, _ map[string]interface{}) ([]spatialmath.Geometry, error) {
+	return nil, errors.New("not implemented")
 }
 
 func (rc *rtspCamera) NextPointCloud(_ context.Context) (pointcloud.PointCloud, error) {
