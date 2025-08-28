@@ -119,8 +119,8 @@ func NewClient(
 	cancelCtx, cancelFunc := context.WithCancel(context.Background())
 
 	logger.Debugf("Attempting to connect to ONVIF device at %s", conf.Address)
-	// build device parameters, credentials are optional for unauthenticated cameras
 	params := onvif.DeviceParams{Xaddr: conf.Address}
+	// Credentials are optional for unauthenticated cameras
 	if conf.Username != "" {
 		params.Username = conf.Username
 	}
