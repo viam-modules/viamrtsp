@@ -64,8 +64,8 @@ type PTZMovement struct {
 // Config represents the configuration for the ONVIF PTZ client.
 type Config struct {
 	Address      string                 `json:"address"`
-	Username     string                 `json:"username"`
-	Password     string                 `json:"password"`
+	Username     string                 `json:"username,omitempty"`
+	Password     string                 `json:"password,omitempty"`
 	ProfileToken string                 `json:"profile_token"`
 	NodeToken    string                 `json:"ptz_node_token,omitempty"`
 	Movements    map[string]PTZMovement `json:"movements,omitempty"`
@@ -79,12 +79,6 @@ func (cfg *Config) Validate(path string) ([]string, []string, error) {
 		return nil, nil, fmt.Errorf(`expected "address" attribute for %s %q`, Model.String(), path)
 	}
 
-	if cfg.Username == "" {
-		return nil, nil, fmt.Errorf(`expected "username" attribute for %s %q`, Model.String(), path)
-	}
-	if cfg.Password == "" {
-		return nil, nil, fmt.Errorf(`expected "password" attribute for %s %q`, Model.String(), path)
-	}
 	return nil, nil, nil
 }
 
@@ -125,11 +119,15 @@ func NewClient(
 	cancelCtx, cancelFunc := context.WithCancel(context.Background())
 
 	logger.Debugf("Attempting to connect to ONVIF device at %s", conf.Address)
-	dev, err := onvif.NewDevice(onvif.DeviceParams{
-		Xaddr:    conf.Address,
-		Username: conf.Username,
-		Password: conf.Password,
-	})
+	params := onvif.DeviceParams{Xaddr: conf.Address}
+	// Credentials are optional for unauthenticated cameras
+	if conf.Username != "" {
+		params.Username = conf.Username
+	}
+	if conf.Password != "" {
+		params.Password = conf.Password
+	}
+	dev, err := onvif.NewDevice(params)
 	if err != nil {
 		cancelFunc()
 		return nil, fmt.Errorf("failed to create ONVIF device for %s: %w", conf.Address, err)
