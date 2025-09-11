@@ -24,7 +24,7 @@ const (
 	defaultPanSpeed              = 0.5
 	defaultTiltSpeed             = 0.5
 	defaultZoomSpeed             = 0.5
-	defaultContinuousZoomTimeout = "PT10S"
+	maxContinuousMovementTimeout = "PT10S"
 )
 
 // Model is the model for the ONVIF PTZ client.
@@ -296,7 +296,7 @@ func (s *onvifPtzClient) handleContinuousMove(cmd map[string]interface{}) (map[s
 				Space: ContinuousZoomVelocityGenericSpace,
 			},
 		},
-		Timeout: xsd.Duration(defaultContinuousZoomTimeout),
+		Timeout: xsd.Duration(maxContinuousMovementTimeout),
 	}
 
 	s.logger.Debugf(
