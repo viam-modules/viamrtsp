@@ -83,7 +83,7 @@ ifeq ($(SOURCE_OS),linux)
 	SUBST = -l:libx264.a
 endif
 ifeq ($(SOURCE_OS),darwin)
-	SUBST = $(HOMEBREW_PREFIX)/Cellar/x264/r3108/lib/libx264.a
+	SUBST = $(shell brew --prefix x264)/lib/libx264.a
 endif
 CGO_LDFLAGS = $(subst -lx264, $(SUBST),$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS))) 
 ifeq ($(TARGET_OS),windows)
