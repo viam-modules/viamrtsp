@@ -1454,14 +1454,24 @@ func (rc *rtspCamera) Name() resource.Name {
 	return rc.name
 }
 
-func (rc *rtspCamera) Images(_ context.Context, _ map[string]interface{}) ([]camera.NamedImage, resource.ResponseMetadata, error) {
-	rc.latestFrameMu.Lock()
-	defer rc.latestFrameMu.Unlock()
-	if rc.latestFrame == nil {
-		return nil, resource.ResponseMetadata{}, errors.New("no frame yet")
+// Images returns the latest frame as a named image as jpeg bytes.
+func (rc *rtspCamera) Images(
+	ctx context.Context,
+	_ []string,
+	_ map[string]interface{},
+) ([]camera.NamedImage, resource.ResponseMetadata, error) {
+	imgBytes, metadata, err := rc.Image(ctx, rutils.MimeTypeJPEG, nil)
+	if err != nil {
+		return nil, resource.ResponseMetadata{}, err
 	}
+
+	namedImage, err := camera.NamedImageFromBytes(imgBytes, "", metadata.MimeType)
+	if err != nil {
+		return nil, resource.ResponseMetadata{}, err
+	}
+
 	return []camera.NamedImage{
-		{Image: rc.latestFrame.toImage()},
+		namedImage,
 	}, resource.ResponseMetadata{CapturedAt: time.Now()}, nil
 }
 
