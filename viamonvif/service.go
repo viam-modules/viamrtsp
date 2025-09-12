@@ -28,6 +28,7 @@ import (
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/services/discovery"
+	rutils "go.viam.com/rdk/utils"
 	"go.viam.com/utils"
 )
 
@@ -43,7 +44,6 @@ const (
 	rtspPollTimeout       = 5 * time.Second
 	rtspImageInterval     = 100 * time.Millisecond
 	discoveryInterval     = time.Minute
-	imageReqMimeType      = "image/jpeg"
 	ptzClientNamePrefix   = "ptz-client-"
 )
 
@@ -450,10 +450,25 @@ func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL s
 		select {
 		case <-ticker.C:
 			// Attempt to get an image from the RTSP camera
-			img, metadata, err := camera.Image(ctx, imageReqMimeType, nil)
+			namedImages, _, err := camera.Images(ctx, nil, nil)
 			if err == nil {
-				logger.Debugf("Received image with metadata: %v, size: %d bytes", metadata, len(img))
-				dataURL := formatDataURL(metadata.MimeType, img)
+				if len(namedImages) != 1 {
+					imageErr = fmt.Errorf("expected exactly 1 image, got %d", len(namedImages))
+					continue
+				}
+				namedImage := namedImages[0]
+				imgBytes, err := namedImage.Bytes(ctx)
+				if err != nil {
+					imageErr = fmt.Errorf("failed to get image bytes: %w", err)
+					continue
+				}
+				if namedImage.MimeType() != rutils.MimeTypeJPEG {
+					imageErr = fmt.Errorf("expected %s, got %s", rutils.MimeTypeJPEG, namedImage.MimeType())
+					continue
+				}
+
+				logger.Debugf("Received image with metadata: %v, size: %d bytes", namedImage.SourceName, len(imgBytes))
+				dataURL := formatDataURL(rutils.MimeTypeJPEG, imgBytes)
 				return dataURL, nil
 			}
 			imageErr = err
