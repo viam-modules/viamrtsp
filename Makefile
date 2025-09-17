@@ -180,13 +180,13 @@ lint: gofmt tool-install build-ffmpeg
 test: build-ffmpeg
 	CGO_CFLAGS="$(CGO_CFLAGS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" go test -ldflags="-checklinkname=0" -race -v ./...
 
-profile-cpu:
-	go test -v -cpuprofile cpu.prof -run "^TestRTSPCameraPerformance$$" -bench github.com/viam-modules/viamrtsp
+profile-cpu: build-ffmpeg
+	CGO_CFLAGS="$(CGO_CFLAGS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" go test -v -cpuprofile cpu.prof -run "^TestRTSPCameraPerformance$$" -bench github.com/viam-modules/viamrtsp
 	go tool pprof -top cpu.prof > cpu-profile.txt
 	rm cpu.prof
 
-profile-memory:
-	go test -v -memprofile mem.prof -run "^TestRTSPCameraPerformance$$" -bench github.com/viam-modules/viamrtsp
+profile-memory: build-ffmpeg
+	CGO_CFLAGS="$(CGO_CFLAGS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" go test -v -memprofile mem.prof -run "^TestRTSPCameraPerformance$$" -bench github.com/viam-modules/viamrtsp
 	go tool pprof -top mem.prof > mem-profile.txt
 	rm mem.prof
 
