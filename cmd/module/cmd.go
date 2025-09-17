@@ -5,6 +5,7 @@ import (
 	"context"
 
 	"github.com/viam-modules/viamrtsp"
+	"github.com/viam-modules/viamrtsp/encoder"
 	"github.com/viam-modules/viamrtsp/ptzclient"
 	"github.com/viam-modules/viamrtsp/upnpdiscovery"
 	"github.com/viam-modules/viamrtsp/viamonvif"
@@ -36,6 +37,12 @@ func realMain(ctx context.Context) error {
 	}
 
 	err = myMod.AddModelFromRegistry(ctx, generic.API, videostore.Model)
+	if err != nil {
+		return err
+	}
+
+	// Register x264 encoder service
+	err = myMod.AddModelFromRegistry(ctx, generic.API, encoder.Model)
 	if err != nil {
 		return err
 	}
