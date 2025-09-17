@@ -5,13 +5,15 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"io"
 	"path/filepath"
 
+	vsapi "github.com/viam-modules/viamrtsp/videostore/src/videostore_api_go"
 	vscamera "github.com/viam-modules/video-store/model/camera"
 	"github.com/viam-modules/video-store/videostore"
+
 	vsutils "github.com/viam-modules/video-store/videostore/utils"
 	"go.viam.com/rdk/components/camera"
-	"go.viam.com/rdk/components/generic"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 )
@@ -32,7 +34,7 @@ var (
 var Model = resource.ModelNamespace("viam").WithFamily("viamrtsp").WithModel("video-store")
 
 func init() {
-	resource.RegisterComponent(generic.API, Model, resource.Registration[resource.Resource, *Config]{
+	resource.RegisterService(vsapi.API, Model, resource.Registration[vsapi.VideoStore, *Config]{
 		Constructor: New,
 	})
 }
@@ -46,7 +48,7 @@ type service struct {
 }
 
 // New creates a new videostore.
-func New(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger logging.Logger) (resource.Resource, error) {
+func New(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger logging.Logger) (vsapi.VideoStore, error) {
 	newConf, err := resource.NativeConfig[*Config](conf)
 	if err != nil {
 		logger.Error(err.Error())
@@ -235,4 +237,69 @@ func toFetchCommand(command map[string]interface{}) (*videostore.FetchRequest, e
 		return nil, err
 	}
 	return &videostore.FetchRequest{From: from, To: to}, nil
+}
+
+func (s *service) Fetch(ctx context.Context, from, to string) ([]byte, error) {
+	fromTS, err := vsutils.ParseDateTimeString(from)
+	if err != nil {
+		return nil, err
+	}
+	toTS, err := vsutils.ParseDateTimeString(to)
+	if err != nil {
+		return nil, err
+	}
+	res, err := s.vs.Fetch(ctx, &videostore.FetchRequest{From: fromTS, To: toTS})
+	if err != nil {
+		return nil, err
+	}
+	return res.Video, nil
+}
+
+func (s *service) Save(ctx context.Context, from, to string) (string, error) {
+	fromTS, err := vsutils.ParseDateTimeString(from)
+	if err != nil {
+		return "", err
+	}
+	toTS, err := vsutils.ParseDateTimeString(to)
+	if err != nil {
+		return "", err
+	}
+	res, err := s.vs.Save(ctx, &videostore.SaveRequest{From: fromTS, To: toTS})
+	if err != nil {
+		return "", err
+	}
+	return res.Filename, nil
+}
+
+func (s *service) FetchStream(ctx context.Context, from, to string, w io.Writer) error {
+	fromTS, err := vsutils.ParseDateTimeString(from)
+	if err != nil {
+		return err
+	}
+	toTS, err := vsutils.ParseDateTimeString(to)
+	if err != nil {
+		return err
+	}
+	res, err := s.vs.Fetch(ctx, &videostore.FetchRequest{From: fromTS, To: toTS})
+	if err != nil {
+		return err
+	}
+	// chunk and write 64kb at a time
+	const chunkSize = 64 * 1024 // 64KB
+	data := res.Video
+	for start := 0; start < len(data); start += chunkSize {
+		end := start + chunkSize
+		if end > len(data) {
+			end = len(data)
+		}
+		if _, err := w.Write(data[start:end]); err != nil {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+	}
+	return nil
 }
