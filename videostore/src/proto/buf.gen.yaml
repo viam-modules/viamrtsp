@@ -13,3 +13,7 @@ plugins:
     opt:
       - paths=source_relative
       - generate_unbound_methods=true
+  - plugin: buf.build/connectrpc/es
+    out: speech_service_api_js/grpc
+  - plugin: buf.build/bufbuild/es
+    out: speech_service_api_js/grpc
