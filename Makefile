@@ -279,6 +279,15 @@ endif
 endif
 endif
 
+videostore/buf.lock: videostore/buf.yaml
+	cd videostore && /home/viam/go/bin/buf mod update
+
+videostore/src/videostore_api_go/grpc/videostore.pb.go: videostore/src/proto/videostore.proto videostore/buf.gen.yaml videostore/buf.lock
+	cd videostore && /home/viam/go/bin/buf generate buf.build/googleapis/googleapis
+	cd videostore && /home/viam/go/bin/buf generate --template ./src/proto/buf.gen.yaml --path ./src/proto
+
+generate: videostore/src/videostore_api_go/grpc/videostore.pb.go
+
 module: $(BIN_VIAMRTSP)
 	cp $(BIN_VIAMRTSP) bin/viamrtsp$(BIN_SUFFIX)
 	tar czf module.tar.gz bin/viamrtsp$(BIN_SUFFIX)

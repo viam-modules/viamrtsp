@@ -1,0 +1,15 @@
+version: v1
+plugins:
+  - plugin: buf.build/protocolbuffers/go:v1.34.2
+    out: src/videostore_api_go/grpc
+    opt:
+      - paths=source_relative
+  - plugin: buf.build/grpc/go:v1.5.1
+    out: src/videostore_api_go/grpc
+    opt:
+      - paths=source_relative
+  - plugin: buf.build/grpc-ecosystem/gateway:v2.22.0
+    out: src/videostore_api_go/grpc
+    opt:
+      - paths=source_relative
+      - generate_unbound_methods=true
