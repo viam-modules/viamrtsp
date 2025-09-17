@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"io"
 	"path/filepath"
 
 	vsapi "github.com/viam-modules/viamrtsp/videostore/src/videostore_api_go"
@@ -268,4 +269,37 @@ func (s *service) Save(ctx context.Context, from, to string) (string, error) {
 		return "", err
 	}
 	return res.Filename, nil
+}
+
+func (s *service) FetchStream(ctx context.Context, from, to string, w io.Writer) error {
+	fromTS, err := vsutils.ParseDateTimeString(from)
+	if err != nil {
+		return err
+	}
+	toTS, err := vsutils.ParseDateTimeString(to)
+	if err != nil {
+		return err
+	}
+	res, err := s.vs.Fetch(ctx, &videostore.FetchRequest{From: fromTS, To: toTS})
+	if err != nil {
+		return err
+	}
+	// chunk and write 64kb at a time
+	const chunkSize = 64 * 1024 // 64KB
+	data := res.Video
+	for start := 0; start < len(data); start += chunkSize {
+		end := start + chunkSize
+		if end > len(data) {
+			end = len(data)
+		}
+		if _, err := w.Write(data[start:end]); err != nil {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+	}
+	return nil
 }

@@ -19,15 +19,16 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	VideostoreService_Fetch_FullMethodName = "/viammodules.service.videostore.v1.videostoreService/Fetch"
-	VideostoreService_Save_FullMethodName  = "/viammodules.service.videostore.v1.videostoreService/Save"
+	VideostoreService_FetchStream_FullMethodName = "/viammodules.service.videostore.v1.videostoreService/FetchStream"
+	VideostoreService_Fetch_FullMethodName       = "/viammodules.service.videostore.v1.videostoreService/Fetch"
+	VideostoreService_Save_FullMethodName        = "/viammodules.service.videostore.v1.videostoreService/Save"
 )
 
 // VideostoreServiceClient is the client API for VideostoreService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type VideostoreServiceClient interface {
-	// rpc FetchStream(FetchStreamRequest) returns (stream FetchStreamResponse);
+	FetchStream(ctx context.Context, in *FetchStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[FetchStreamResponse], error)
 	// Unary fetch between [from, to]
 	Fetch(ctx context.Context, in *FetchRequest, opts ...grpc.CallOption) (*FetchResponse, error)
 	// Unary save between [from, to]
@@ -41,6 +42,25 @@ type videostoreServiceClient struct {
 func NewVideostoreServiceClient(cc grpc.ClientConnInterface) VideostoreServiceClient {
 	return &videostoreServiceClient{cc}
 }
+
+func (c *videostoreServiceClient) FetchStream(ctx context.Context, in *FetchStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[FetchStreamResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &VideostoreService_ServiceDesc.Streams[0], VideostoreService_FetchStream_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[FetchStreamRequest, FetchStreamResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type VideostoreService_FetchStreamClient = grpc.ServerStreamingClient[FetchStreamResponse]
 
 func (c *videostoreServiceClient) Fetch(ctx context.Context, in *FetchRequest, opts ...grpc.CallOption) (*FetchResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -66,7 +86,7 @@ func (c *videostoreServiceClient) Save(ctx context.Context, in *SaveRequest, opt
 // All implementations must embed UnimplementedVideostoreServiceServer
 // for forward compatibility.
 type VideostoreServiceServer interface {
-	// rpc FetchStream(FetchStreamRequest) returns (stream FetchStreamResponse);
+	FetchStream(*FetchStreamRequest, grpc.ServerStreamingServer[FetchStreamResponse]) error
 	// Unary fetch between [from, to]
 	Fetch(context.Context, *FetchRequest) (*FetchResponse, error)
 	// Unary save between [from, to]
@@ -81,6 +101,9 @@ type VideostoreServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedVideostoreServiceServer struct{}
 
+func (UnimplementedVideostoreServiceServer) FetchStream(*FetchStreamRequest, grpc.ServerStreamingServer[FetchStreamResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method FetchStream not implemented")
+}
 func (UnimplementedVideostoreServiceServer) Fetch(context.Context, *FetchRequest) (*FetchResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Fetch not implemented")
 }
@@ -107,6 +130,17 @@ func RegisterVideostoreServiceServer(s grpc.ServiceRegistrar, srv VideostoreServ
 	}
 	s.RegisterService(&VideostoreService_ServiceDesc, srv)
 }
+
+func _VideostoreService_FetchStream_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(FetchStreamRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(VideostoreServiceServer).FetchStream(m, &grpc.GenericServerStream[FetchStreamRequest, FetchStreamResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type VideostoreService_FetchStreamServer = grpc.ServerStreamingServer[FetchStreamResponse]
 
 func _VideostoreService_Fetch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(FetchRequest)
@@ -160,6 +194,12 @@ var VideostoreService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _VideostoreService_Save_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "FetchStream",
+			Handler:       _VideostoreService_FetchStream_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "src/proto/videostore.proto",
 }

@@ -63,10 +63,16 @@ func main() {
 	to := now.Add(-30 * time.Second).Format("2006-01-02_15-04-05")
 
 	ctx := context.Background()
-	video, err := videoStore.Fetch(ctx, from, to)
+	// video, err := videoStore.Fetch(ctx, from, to)
+	// if err != nil {
+	// 	logger.Errorf("Failed to save video segment: %v", err)
+	// 	os.Exit(1)
+	// }
+	// logger.Infof("Fetched video segment of length %d bytes", len(video))
+	ioWriter := os.Stdout
+	err = videoStore.FetchStream(ctx, from, to, ioWriter)
 	if err != nil {
-		logger.Errorf("Failed to save video segment: %v", err)
+		logger.Errorf("Failed to fetch video segment stream: %v", err)
 		os.Exit(1)
 	}
-	logger.Infof("Fetched video segment of length %d bytes", len(video))
 }
