@@ -1,19 +1,19 @@
 version: v1
 plugins:
   - plugin: buf.build/protocolbuffers/go:v1.34.2
-    out: src/videostore_api_go/grpc
+    out: videostore_api_go/grpc
     opt:
       - paths=source_relative
   - plugin: buf.build/grpc/go:v1.5.1
-    out: src/videostore_api_go/grpc
+    out: videostore_api_go/grpc
     opt:
       - paths=source_relative
   - plugin: buf.build/grpc-ecosystem/gateway:v2.22.0
-    out: src/videostore_api_go/grpc
+    out: videostore_api_go/grpc
     opt:
       - paths=source_relative
       - generate_unbound_methods=true
+  - plugin: buf.build/bufbuild/es:v1.10.0
+    out: videostore_api_js/grpc
   - plugin: buf.build/connectrpc/es
-    out: speech_service_api_js/grpc
-  - plugin: buf.build/bufbuild/es
-    out: speech_service_api_js/grpc
+    out: videostore_api_js/grpc

@@ -1,0 +1,30 @@
+{
+  "name": "@viam-modules/videostore-js",
+  "version": "0.0.1",
+  "description": "",
+  "main": "dist/api.mjs",
+  "types": "dist/api.d.mts",
+  "exports": {
+    ".": { "import": "./dist/api.mjs", "types": "./dist/api.d.mts" }
+  },
+  "scripts": {
+    "test": "npx tsx api.ts",
+    "build": "tsup api.ts --format esm --dts --clean  --out-dir dist --tsconfig tsconfig.json",
+    "pack": "npm pack"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@bufbuild/protobuf": "^1.9.0",
+    "@connectrpc/connect": "^1.6.1",
+    "@connectrpc/connect-node": "^1.6.1",
+    "@viamrobotics/sdk": "^0.38.0",
+    "googleapis": "^133.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}
