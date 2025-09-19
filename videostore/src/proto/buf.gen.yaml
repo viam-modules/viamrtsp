@@ -17,3 +17,7 @@ plugins:
     out: videostore_api_js/grpc
   - plugin: buf.build/connectrpc/es
     out: videostore_api_js/grpc
+  - plugin: buf.build/protocolbuffers/dart:v22.5.0
+    out: videostore_api_dart/grpc
+  - plugin: buf.build/connectrpc/dart:v1.0.0
+    out: videostore_api_dart/grpc
