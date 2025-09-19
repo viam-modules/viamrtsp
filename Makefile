@@ -282,9 +282,9 @@ endif
 videostore/buf.lock: videostore/buf.yaml
 	cd videostore && /home/viam/go/bin/buf mod update
 
-videostore/src/videostore_api_go/grpc/videostore.pb.go: videostore/src/proto/videostore.proto videostore/buf.gen.yaml videostore/buf.lock
-	cd videostore && /home/viam/go/bin/buf generate buf.build/googleapis/googleapis
-	cd videostore && /home/viam/go/bin/buf generate --template ./src/proto/buf.gen.yaml --path ./src/proto
+videostore/src/videostore_api_go/grpc/videostore.pb.go: videostore/src/proto/videostore.proto videostore/src/proto/buf.gen.yaml videostore/buf.lock
+	cd videostore && /home/viam/go/bin/buf generate buf.build/googleapis/googleapis --template ./src/proto/buf.gen.yaml  -o ./src
+	cd videostore && /home/viam/go/bin/buf generate --template ./src/proto/buf.gen.yaml --path ./src/proto -o ./src
 
 generate: videostore/src/videostore_api_go/grpc/videostore.pb.go
 
