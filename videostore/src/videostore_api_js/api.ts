@@ -63,11 +63,16 @@ export class VideostoreClient extends Viam.Client {
             from: from,
             to: to,
         });
-
         this.options.requestLogger?.(req);
-        const stream = this.client.fetchStream(req);
-        for await (const res of stream) {
-            onChunk(res.videoData);
+        try {
+            const stream = this.client.fetchStream(req);
+            for await (const res of stream) {
+                console.log(`fetchStream response #${res}`); // Log each response
+                onChunk(res.videoData);
+            }
+        } catch (error) {
+            this.options.requestLogger?.(error);
+            throw error;
         }
     }
 
