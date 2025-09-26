@@ -494,9 +494,11 @@ func (m *rawSegmenterMux) writeH264(au [][]byte, pts int64) error {
 		return nil
 	}
 
-	packed, err := h264.AnnexBMarshal(au)
+	// Pack avcc instead of annexb since ffmpeg segmenter expects avcc
+	// This removes the need for libav to spint up a bsf filter to convert annexb to avcc
+	packed, err := h264.AVCCMarshal(au)
 	if err != nil {
-		m.logger.Errorf("AnnexBMarshal err: %s", err.Error())
+		m.logger.Errorf("failed to marshal avcc: %s", err)
 		return err
 	}
 
@@ -562,7 +564,7 @@ func (m *rawSegmenterMux) maybeReInitVideoStore() error {
 		return err
 	}
 
-	if err := m.rawSeg.Init(codec, width, height); err != nil {
+	if err := m.rawSeg.Init(codec, width, height, m.metadata.sps, m.metadata.pps, m.metadata.vps); err != nil {
 		return err
 	}
 

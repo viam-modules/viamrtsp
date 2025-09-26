@@ -4,6 +4,7 @@ package videostore
 import (
 	"context"
 	"encoding/base64"
+	"encoding/binary"
 	"errors"
 	"io"
 	"path/filepath"
@@ -284,10 +285,28 @@ func (s *service) FetchStream(ctx context.Context, from, to string, w io.Writer)
 	if err != nil {
 		return err
 	}
+
+	data := res.Video
+
+	// log size of video
+	s.logger.Infof("streaming video of size from concat: %d bytes", len(data))
+
+	// Find end of moov atom
+	// moovEnd := findMoovEnd(data)
+	// if moovEnd <= 0 {
+	// 	return errors.New("could not find moov atom")
+	// }
+
+	// // Send ftyp+moov as first chunk
+	// if _, err := w.Write(data[:moovEnd]); err != nil {
+	// 	return err
+	// }
+
 	// chunk and write 64kb at a time
 	const chunkSize = 64 * 1024 // 64KB
-	data := res.Video
+	// data := res.Video
 	for start := 0; start < len(data); start += chunkSize {
+		// for start := moovEnd; start < len(data); start += chunkSize {
 		end := start + chunkSize
 		if end > len(data) {
 			end = len(data)
@@ -302,4 +321,28 @@ func (s *service) FetchStream(ctx context.Context, from, to string, w io.Writer)
 		}
 	}
 	return nil
+	// req := &videostore.FetchRequest{From: fromTS, To: toTS}
+	// emit := func(chunk []byte) error {
+	// 	// log size
+	// 	s.logger.Infof("streaming video chunk: %d bytes", len(chunk))
+	// 	_, err := w.Write(chunk)
+	// 	return err
+	// }
+	// return s.vs.FetchStream(ctx, req, emit)
+}
+
+func findMoovEnd(data []byte) int {
+	i := 0
+	for i+8 <= len(data) {
+		size := int(binary.BigEndian.Uint32(data[i : i+4]))
+		if size < 8 || i+size > len(data) {
+			break
+		}
+		typ := string(data[i+4 : i+8])
+		if typ == "moov" {
+			return i + size
+		}
+		i += size
+	}
+	return -1
 }

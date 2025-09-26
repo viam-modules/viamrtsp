@@ -69,6 +69,7 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
 --enable-libx264 \
 --enable-muxer=mp4 \
 --enable-muxer=segment \
+--enable-muxer=mov \
 --enable-network \
 --enable-parser=h264 \
 --enable-parser=hevc \
