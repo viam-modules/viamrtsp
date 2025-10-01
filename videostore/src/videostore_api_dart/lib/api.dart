@@ -4,6 +4,9 @@ import 'grpc/src/proto/videostore.pb.dart';
 import 'grpc/src/proto/videostore.pbgrpc.dart';
 import 'package:viam_sdk/viam_sdk.dart';
 import 'dart:async';
+
+// Need to fire off this before fetching videostore resources
+// This is done automatically with built-in SDK resources
 void ensureVideostoreRegistered() {
   try {
     if (!Registry.instance.subtypes.containsKey(VideoStore.subtype)) {
@@ -16,6 +19,7 @@ void ensureVideostoreRegistered() {
     }
   } catch (_) {
     // ignore if already registered or registration fails
+    print('Error registering VideoStore subtype, possibly already registered.');
   }
 }
 /*
@@ -42,7 +46,8 @@ abstract class VideoStore extends Resource {
     static const Subtype subtype = Subtype('viam-modules', 'service', 'videostore');
     Future<FetchResult> fetch(String from, String to);
     Future<SaveResult> save(String from, String to);
-    Future<void> fetchStream(String from, String to, Function(List<int> chunk) onData);
+    // Future<void> fetchStream(String from, String to, Function(List<int> chunk) onData);
+    Stream<List<int>> fetchStream(String from, String to);
     static ResourceName getResourceName(String name) {
         return VideoStore.subtype.getResourceName(name);
     }
@@ -86,20 +91,19 @@ class VideostoreClient extends VideoStore with RPCDebugLoggerMixin implements Re
     }
 
     @override
-    Future<void> fetchStream(String from, String to, Function(List<int> chunk) onData) async {
+    Stream<List<int>> fetchStream(String from, String to) {
         print("fetchStream called with from: $from, to: $to, name: $name");
         final request = FetchStreamRequest()
             ..name = name
             ..from = from
             ..to = to;
-        final responseStream = client.fetchStream(request);
-        print('Starting to receive stream...');
-        await for (var response in responseStream) {
-            print('Received chunk of size: ${response.videoData.length}');
-            onData(response.videoData);
-        }
-        print('Stream ended.');
+
+        final response = client.fetchStream(request);
+        final mapped = response.map((resp) {
+            final len = resp.videoData.length;
+            print('fetchStream: received chunk size=$len');
+            return resp.videoData;
+        });
+        return mapped;
     }
-
-
 }
