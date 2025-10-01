@@ -42,11 +42,9 @@ class SaveResult {
 
 // create wrapper class for grpc client and server
 abstract class VideoStore extends Resource {
-    // static const Subtype subtype = Subtype('viam', 'viamrtsp', 'video-store');
     static const Subtype subtype = Subtype('viam-modules', 'service', 'videostore');
     Future<FetchResult> fetch(String from, String to);
     Future<SaveResult> save(String from, String to);
-    // Future<void> fetchStream(String from, String to, Function(List<int> chunk) onData);
     Stream<List<int>> fetchStream(String from, String to);
     static ResourceName getResourceName(String name) {
         return VideoStore.subtype.getResourceName(name);
