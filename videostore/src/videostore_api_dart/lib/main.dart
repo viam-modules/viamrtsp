@@ -18,8 +18,7 @@ import 'api.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
-    // wait for 10 seconds
-    await Future.delayed(const Duration(seconds: 5));
+    // await Future.delayed(const Duration(seconds: 5));
     ensureVideostoreRegistered(); // <--- ensure registry entry exists
     print('Testing videostore client');
     const host = 'framework-1-main.wcfb1lr0dn.viam.cloud';
@@ -29,14 +28,15 @@ Future<void> main() async {
     //   ..webRtcOptions = (DialWebRtcOptions()..disable = true);
 
     // final robotOpts = RobotClientOptions.withApiKeyAndDialOptions(apiKeyID, apiKey, dialOpts);
-    final machine = await RobotClient.atAddress(
-      host,
-      RobotClientOptions.withApiKey(apiKeyID, apiKey),
-    );
     // final machine = await RobotClient.atAddress(
     //   host,
     //   robotOpts,
     // );
+    final machine = await RobotClient.atAddress(
+      host,
+      RobotClientOptions.withApiKey(apiKeyID, apiKey),
+    );
+
     print('resourceNames: ${machine.resourceNames}');
     final rn = VideoStore.subtype.getResourceName('vs-1');
     print('expected ResourceName: $rn');
@@ -59,12 +59,21 @@ Future<void> main() async {
 
     final to = fmtYmdHms(now.subtract(const Duration(seconds: 40)));
     final from = fmtYmdHms(now.subtract(const Duration(seconds: 50)));
-    // final result = await videostore.fetch(from, to);
-    // print('Fetched video data of size: ${result.video_data.length}');
     print('Fetching from $from to $to');
-    await videostore.fetchStream(from, to, (chunk) {
-      print('Received chunk of size: ${chunk.length}');
+    // Test streaming fetch
+    final stream = videostore.fetchStream(from, to);
+    final sub = stream.listen(
+        (chunk) => print('Main: got chunk length=${chunk.length}'),
+        onError: (e) => print('stream error: $e'),
+        onDone: () => print('stream done'),
+    );
+    Future.delayed(const Duration(seconds: 30), () async {
+      await sub.cancel();
+      print('Subscription cancelled by timeout');
     });
+    // Test unary fetch
+    final result = await videostore.fetch(from, to);
+    print('Fetched video data of size: ${result.video_data.length}');
     print('Fetch complete.');
   } catch (e, st) {
     print('Unhandled exception: $e');
