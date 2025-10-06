@@ -1,5 +1,5 @@
 name: videostore_api
-description: Custom videostore grpc API
+description: Custom videostore gRPC API
 version: 0.0.0
 homepage: https://github.com/viam-modules/viamrtsp
 
@@ -14,6 +14,11 @@ dependencies:
   protobuf: ^3.0.0
   connectrpc: ^1.0.0
   viam_sdk: ^0.10.0
+  flutter_dotenv: ^5.1.0
+
+flutter:
+  assets:
+    - .env
 
 # dependency_overrides:
 #   protobuf: ^4.2.0
