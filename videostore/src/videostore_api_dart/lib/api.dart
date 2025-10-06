@@ -40,7 +40,7 @@ class SaveResult {
     });
 }
 
-// Create wrappe class for grpc client and server
+// Create wrapped class for grpc client and server
 abstract class VideoStore extends Resource {
     static const Subtype subtype = Subtype('viam-modules', 'service', 'videostore');
     Future<FetchResult> fetch(String from, String to);
