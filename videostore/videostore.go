@@ -293,54 +293,13 @@ func (s *service) FetchStream(ctx context.Context, from, to, container string, w
 		container = "mp4"
 	}
 	s.logger.Info(fmt.Sprintf("Fetching video stream from %s to %s in container %s", fromTS, toTS, container))
-	res, err := s.vs.Fetch(ctx, &videostore.FetchRequest{From: fromTS, To: toTS, Container: container})
-	if err != nil {
+	req := &videostore.FetchRequest{From: fromTS, To: toTS, Container: container}
+	emit := func(chunk []byte) error {
+		s.logger.Infof("streaming video chunk: %d bytes", len(chunk))
+		_, err := w.Write(chunk)
 		return err
 	}
-
-	data := res.Video
-
-	// log size of video
-	s.logger.Infof("streaming video of size from concat: %d bytes", len(data))
-
-	// Find end of moov atom
-	// moovEnd := findMoovEnd(data)
-	// if moovEnd <= 0 {
-	// 	return errors.New("could not find moov atom")
-	// }
-
-	// // Send ftyp+moov as first chunk
-	// if _, err := w.Write(data[:moovEnd]); err != nil {
-	// 	return err
-	// }
-
-	// chunk and write 64kb at a time
-	const chunkSize = 64 * 1024 // 64KB
-	// data := res.Video
-	for start := 0; start < len(data); start += chunkSize {
-		// for start := moovEnd; start < len(data); start += chunkSize {
-		end := start + chunkSize
-		if end > len(data) {
-			end = len(data)
-		}
-		if _, err := w.Write(data[start:end]); err != nil {
-			return err
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-	}
-	return nil
-	// req := &videostore.FetchRequest{From: fromTS, To: toTS}
-	// emit := func(chunk []byte) error {
-	// 	// log size
-	// 	s.logger.Infof("streaming video chunk: %d bytes", len(chunk))
-	// 	_, err := w.Write(chunk)
-	// 	return err
-	// }
-	// return s.vs.FetchStream(ctx, req, emit)
+	return s.vs.FetchStream(ctx, req, emit)
 }
 
 func findMoovEnd(data []byte) int {
