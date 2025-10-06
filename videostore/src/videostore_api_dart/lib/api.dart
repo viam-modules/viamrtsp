@@ -18,7 +18,7 @@ void ensureVideostoreRegistered() {
       );
     }
   } catch (_) {
-    // ignore if already registered or registration fails
+    // Ignore if already registered or registration fails
     print('Error registering VideoStore subtype, possibly already registered.');
   }
 }
@@ -40,7 +40,7 @@ class SaveResult {
     });
 }
 
-// create wrapper class for grpc client and server
+// Create wrappe class for grpc client and server
 abstract class VideoStore extends Resource {
     static const Subtype subtype = Subtype('viam-modules', 'service', 'videostore');
     Future<FetchResult> fetch(String from, String to);
@@ -54,7 +54,6 @@ abstract class VideoStore extends Resource {
     }
 }
 
-// create client class that extends ViamClient and implements VideoStore
 class VideostoreClient extends VideoStore with RPCDebugLoggerMixin implements ResourceRPCClient {
     @override
     final String name;
@@ -73,7 +72,6 @@ class VideostoreClient extends VideoStore with RPCDebugLoggerMixin implements Re
             ..name = name
             ..from = from
             ..to = to;
-        print("calling fetch with from: $from, to: $to, name: $name");
         final response = await client.fetch(request);
         return FetchResult(video_data: response.videoData);
     }
@@ -90,7 +88,6 @@ class VideostoreClient extends VideoStore with RPCDebugLoggerMixin implements Re
 
     @override
     Stream<List<int>> fetchStream(String from, String to) {
-        print("fetchStream called with from: $from, to: $to, name: $name");
         final request = FetchStreamRequest()
             ..name = name
             ..from = from
@@ -98,8 +95,6 @@ class VideostoreClient extends VideoStore with RPCDebugLoggerMixin implements Re
 
         final response = client.fetchStream(request);
         final mapped = response.map((resp) {
-            final len = resp.videoData.length;
-            print('fetchStream: received chunk size=$len');
             return resp.videoData;
         });
         return mapped;
