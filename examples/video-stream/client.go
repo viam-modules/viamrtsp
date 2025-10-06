@@ -73,7 +73,7 @@ func main() {
 
 	// Test that video bytes can be streamed and written to a file
 	ioWriter := os.Stdout
-	err = videoStore.FetchStream(ctx, from, to, ioWriter)
+	err = videoStore.FetchStream(ctx, from, to, "mp4", ioWriter)
 	if err != nil {
 		logger.Errorf("Failed to fetch video segment stream: %v", err)
 		os.Exit(1)

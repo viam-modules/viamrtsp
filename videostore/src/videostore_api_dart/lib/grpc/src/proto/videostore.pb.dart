@@ -18,6 +18,7 @@ class FetchStreamRequest extends $pb.GeneratedMessage {
     $core.String? name,
     $core.String? from,
     $core.String? to,
+    $core.String? container,
   }) {
     final $result = create();
     if (name != null) {
@@ -29,6 +30,9 @@ class FetchStreamRequest extends $pb.GeneratedMessage {
     if (to != null) {
       $result.to = to;
     }
+    if (container != null) {
+      $result.container = container;
+    }
     return $result;
   }
   FetchStreamRequest._() : super();
@@ -39,6 +43,7 @@ class FetchStreamRequest extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'name')
     ..aOS(2, _omitFieldNames ? '' : 'from')
     ..aOS(3, _omitFieldNames ? '' : 'to')
+    ..aOS(4, _omitFieldNames ? '' : 'container')
     ..hasRequiredFields = false
   ;
 
@@ -72,7 +77,6 @@ class FetchStreamRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearName() => clearField(1);
 
-  /// Date-time in format YYYY-MM-DD_HH-MM-SS
   @$pb.TagNumber(2)
   $core.String get from => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -82,7 +86,6 @@ class FetchStreamRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearFrom() => clearField(2);
 
-  /// Date-time in format YYYY-MM-DD_HH-MM-SS
   @$pb.TagNumber(3)
   $core.String get to => $_getSZ(2);
   @$pb.TagNumber(3)
@@ -91,6 +94,15 @@ class FetchStreamRequest extends $pb.GeneratedMessage {
   $core.bool hasTo() => $_has(2);
   @$pb.TagNumber(3)
   void clearTo() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get container => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set container($core.String v) { $_setString(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasContainer() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearContainer() => clearField(4);
 }
 
 class FetchStreamResponse extends $pb.GeneratedMessage {
@@ -148,6 +160,7 @@ class FetchRequest extends $pb.GeneratedMessage {
     $core.String? name,
     $core.String? from,
     $core.String? to,
+    $core.String? container,
   }) {
     final $result = create();
     if (name != null) {
@@ -159,6 +172,9 @@ class FetchRequest extends $pb.GeneratedMessage {
     if (to != null) {
       $result.to = to;
     }
+    if (container != null) {
+      $result.container = container;
+    }
     return $result;
   }
   FetchRequest._() : super();
@@ -169,6 +185,7 @@ class FetchRequest extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'name')
     ..aOS(2, _omitFieldNames ? '' : 'from')
     ..aOS(3, _omitFieldNames ? '' : 'to')
+    ..aOS(4, _omitFieldNames ? '' : 'container')
     ..hasRequiredFields = false
   ;
 
@@ -202,7 +219,6 @@ class FetchRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearName() => clearField(1);
 
-  /// Date-time in format YYYY-MM-DD_HH-MM-SS
   @$pb.TagNumber(2)
   $core.String get from => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -212,7 +228,6 @@ class FetchRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearFrom() => clearField(2);
 
-  /// Date-time in format YYYY-MM-DD_HH-MM-SS
   @$pb.TagNumber(3)
   $core.String get to => $_getSZ(2);
   @$pb.TagNumber(3)
@@ -221,6 +236,15 @@ class FetchRequest extends $pb.GeneratedMessage {
   $core.bool hasTo() => $_has(2);
   @$pb.TagNumber(3)
   void clearTo() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get container => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set container($core.String v) { $_setString(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasContainer() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearContainer() => clearField(4);
 }
 
 class FetchResponse extends $pb.GeneratedMessage {
@@ -279,6 +303,7 @@ class SaveRequest extends $pb.GeneratedMessage {
     $core.String? name,
     $core.String? from,
     $core.String? to,
+    $core.String? container,
   }) {
     final $result = create();
     if (name != null) {
@@ -290,6 +315,9 @@ class SaveRequest extends $pb.GeneratedMessage {
     if (to != null) {
       $result.to = to;
     }
+    if (container != null) {
+      $result.container = container;
+    }
     return $result;
   }
   SaveRequest._() : super();
@@ -300,6 +328,7 @@ class SaveRequest extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'name')
     ..aOS(2, _omitFieldNames ? '' : 'from')
     ..aOS(3, _omitFieldNames ? '' : 'to')
+    ..aOS(4, _omitFieldNames ? '' : 'container')
     ..hasRequiredFields = false
   ;
 
@@ -333,7 +362,6 @@ class SaveRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearName() => clearField(1);
 
-  /// Date-time in format YYYY-MM-DD_HH-MM-SS
   @$pb.TagNumber(2)
   $core.String get from => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -343,7 +371,6 @@ class SaveRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearFrom() => clearField(2);
 
-  /// Date-time in format YYYY-MM-DD_HH-MM-SS
   @$pb.TagNumber(3)
   $core.String get to => $_getSZ(2);
   @$pb.TagNumber(3)
@@ -352,6 +379,15 @@ class SaveRequest extends $pb.GeneratedMessage {
   $core.bool hasTo() => $_has(2);
   @$pb.TagNumber(3)
   void clearTo() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get container => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set container($core.String v) { $_setString(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasContainer() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearContainer() => clearField(4);
 }
 
 class SaveResponse extends $pb.GeneratedMessage {

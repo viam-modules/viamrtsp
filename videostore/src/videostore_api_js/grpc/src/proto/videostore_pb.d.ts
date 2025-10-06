@@ -16,18 +16,21 @@ export declare class FetchStreamRequest extends Message<FetchStreamRequest> {
   name: string;
 
   /**
-   * Date-time in format YYYY-MM-DD_HH-MM-SS
-   *
    * @generated from field: string from = 2;
    */
   from: string;
 
   /**
-   * Date-time in format YYYY-MM-DD_HH-MM-SS
-   *
    * @generated from field: string to = 3;
    */
   to: string;
+
+  /**
+   * e.g., "mp4", "fmp4"
+   *
+   * @generated from field: string container = 4;
+   */
+  container: string;
 
   constructor(data?: PartialMessage<FetchStreamRequest>);
 
@@ -78,18 +81,21 @@ export declare class FetchRequest extends Message<FetchRequest> {
   name: string;
 
   /**
-   * Date-time in format YYYY-MM-DD_HH-MM-SS
-   *
    * @generated from field: string from = 2;
    */
   from: string;
 
   /**
-   * Date-time in format YYYY-MM-DD_HH-MM-SS
-   *
    * @generated from field: string to = 3;
    */
   to: string;
+
+  /**
+   * e.g., "mp4", "fmp4"
+   *
+   * @generated from field: string container = 4;
+   */
+  container: string;
 
   constructor(data?: PartialMessage<FetchRequest>);
 
@@ -142,18 +148,21 @@ export declare class SaveRequest extends Message<SaveRequest> {
   name: string;
 
   /**
-   * Date-time in format YYYY-MM-DD_HH-MM-SS
-   *
    * @generated from field: string from = 2;
    */
   from: string;
 
   /**
-   * Date-time in format YYYY-MM-DD_HH-MM-SS
-   *
    * @generated from field: string to = 3;
    */
   to: string;
+
+  /**
+   * e.g., "mp4", "fmp4"
+   *
+   * @generated from field: string container = 4;
+   */
+  container: string;
 
   constructor(data?: PartialMessage<SaveRequest>);
 

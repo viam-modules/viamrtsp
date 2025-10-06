@@ -14,6 +14,7 @@ export const FetchStreamRequest = /*@__PURE__*/ proto3.makeMessageType(
     { no: 1, name: "name", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 2, name: "from", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 3, name: "to", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 4, name: "container", kind: "scalar", T: 9 /* ScalarType.STRING */ },
   ],
 );
 
@@ -36,6 +37,7 @@ export const FetchRequest = /*@__PURE__*/ proto3.makeMessageType(
     { no: 1, name: "name", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 2, name: "from", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 3, name: "to", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 4, name: "container", kind: "scalar", T: 9 /* ScalarType.STRING */ },
   ],
 );
 
@@ -58,6 +60,7 @@ export const SaveRequest = /*@__PURE__*/ proto3.makeMessageType(
     { no: 1, name: "name", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 2, name: "from", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 3, name: "to", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 4, name: "container", kind: "scalar", T: 9 /* ScalarType.STRING */ },
   ],
 );
 

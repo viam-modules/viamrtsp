@@ -14,6 +14,7 @@ message FetchStreamRequest {
   string name = 1;
   string from = 2;
   string to = 3;
+  string container = 4; // e.g., "mp4", "fmp4"
 }
 
 message FetchStreamResponse {
@@ -24,6 +25,7 @@ message FetchRequest {
   string name = 1;
   string from = 2;
   string to = 3;
+  string container = 4; // e.g., "mp4", "fmp4"
 }
 
 message FetchResponse {
@@ -35,6 +37,7 @@ message SaveRequest {
   string name = 1;
   string from = 2;
   string to = 3;
+  string container = 4; // e.g., "mp4", "fmp4"
 }
 
 message SaveResponse {

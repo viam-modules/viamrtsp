@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"path/filepath"
 
@@ -125,6 +126,7 @@ func (s *service) Close(_ context.Context) error {
 	return nil
 }
 
+// TODO(seanp): Remove DoCommand handlers, this is here for backwards compatibility
 func (s *service) DoCommand(ctx context.Context, command map[string]interface{}) (map[string]interface{}, error) {
 	cmd, ok := command["command"].(string)
 	if !ok {
@@ -240,7 +242,7 @@ func toFetchCommand(command map[string]interface{}) (*videostore.FetchRequest, e
 	return &videostore.FetchRequest{From: from, To: to}, nil
 }
 
-func (s *service) Fetch(ctx context.Context, from, to string) ([]byte, error) {
+func (s *service) Fetch(ctx context.Context, from, to, container string) ([]byte, error) {
 	fromTS, err := vsutils.ParseDateTimeString(from)
 	if err != nil {
 		return nil, err
@@ -249,14 +251,17 @@ func (s *service) Fetch(ctx context.Context, from, to string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	res, err := s.vs.Fetch(ctx, &videostore.FetchRequest{From: fromTS, To: toTS})
+	if container == "" {
+		container = "mp4"
+	}
+	res, err := s.vs.Fetch(ctx, &videostore.FetchRequest{From: fromTS, To: toTS, Container: container})
 	if err != nil {
 		return nil, err
 	}
 	return res.Video, nil
 }
 
-func (s *service) Save(ctx context.Context, from, to string) (string, error) {
+func (s *service) Save(ctx context.Context, from, to, container string) (string, error) {
 	fromTS, err := vsutils.ParseDateTimeString(from)
 	if err != nil {
 		return "", err
@@ -265,14 +270,17 @@ func (s *service) Save(ctx context.Context, from, to string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	res, err := s.vs.Save(ctx, &videostore.SaveRequest{From: fromTS, To: toTS})
+	if container == "" {
+		container = "mp4"
+	}
+	res, err := s.vs.Save(ctx, &videostore.SaveRequest{From: fromTS, To: toTS, Container: container})
 	if err != nil {
 		return "", err
 	}
 	return res.Filename, nil
 }
 
-func (s *service) FetchStream(ctx context.Context, from, to string, w io.Writer) error {
+func (s *service) FetchStream(ctx context.Context, from, to, container string, w io.Writer) error {
 	fromTS, err := vsutils.ParseDateTimeString(from)
 	if err != nil {
 		return err
@@ -281,7 +289,11 @@ func (s *service) FetchStream(ctx context.Context, from, to string, w io.Writer)
 	if err != nil {
 		return err
 	}
-	res, err := s.vs.Fetch(ctx, &videostore.FetchRequest{From: fromTS, To: toTS})
+	if container == "" {
+		container = "mp4"
+	}
+	s.logger.Info(fmt.Sprintf("Fetching video stream from %s to %s in container %s", fromTS, toTS, container))
+	res, err := s.vs.Fetch(ctx, &videostore.FetchRequest{From: fromTS, To: toTS, Container: container})
 	if err != nil {
 		return err
 	}

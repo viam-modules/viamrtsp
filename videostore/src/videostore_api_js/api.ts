@@ -29,11 +29,12 @@ export class VideostoreClient extends Viam.Client {
         this.options = options;
     }
 
-    async fetch(from: string, to: string): Promise<Uint8Array> {
+    async fetch(from: string, to: string, container: string): Promise<Uint8Array> {
         const req = new pb.FetchRequest({
             name: this.name,
             from: from,
             to: to,
+            container: container,
         });
 
         this.options.requestLogger?.(req);
@@ -41,11 +42,12 @@ export class VideostoreClient extends Viam.Client {
         return res.videoData;
     }
 
-    async save(from: string, to: string): Promise<string> {
+    async save(from: string, to: string, container: string): Promise<string> {
         const req = new pb.SaveRequest({
             name: this.name,
             from: from,
             to: to,
+            container: container,
         });
 
         this.options.requestLogger?.(req);
@@ -56,18 +58,21 @@ export class VideostoreClient extends Viam.Client {
     async fetchStream(
         from: string,
         to: string,
+        container: string,
         onChunk: (chunk: Uint8Array) => void
     ): Promise<void> {
         const req = new pb.FetchStreamRequest({
             name: this.name,
             from: from,
             to: to,
+            container: container,
         });
+        console.log("fetchStream request:", req);
         this.options.requestLogger?.(req);
         try {
             const stream = this.client.fetchStream(req);
             for await (const res of stream) {
-                console.log(`fetchStream response #${res}`); // Log each response
+                // console.log(`fetchStream response #${res}`); // Log each response
                 onChunk(res.videoData);
             }
         } catch (error) {

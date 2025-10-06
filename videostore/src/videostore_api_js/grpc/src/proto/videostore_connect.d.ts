@@ -22,8 +22,6 @@ export declare const videostoreService: {
       readonly kind: MethodKind.ServerStreaming,
     },
     /**
-     * Unary fetch between [from, to]
-     *
      * @generated from rpc viammodules.service.videostore.v1.videostoreService.Fetch
      */
     readonly fetch: {
@@ -33,8 +31,6 @@ export declare const videostoreService: {
       readonly kind: MethodKind.Unary,
     },
     /**
-     * Unary save between [from, to]
-     *
      * @generated from rpc viammodules.service.videostore.v1.videostoreService.Save
      */
     readonly save: {

@@ -22,8 +22,6 @@ export const videostoreService = {
       kind: MethodKind.ServerStreaming,
     },
     /**
-     * Unary fetch between [from, to]
-     *
      * @generated from rpc viammodules.service.videostore.v1.videostoreService.Fetch
      */
     fetch: {
@@ -33,8 +31,6 @@ export const videostoreService = {
       kind: MethodKind.Unary,
     },
     /**
-     * Unary save between [from, to]
-     *
      * @generated from rpc viammodules.service.videostore.v1.videostoreService.Save
      */
     save: {

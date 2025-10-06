@@ -26,7 +26,6 @@ func FromRobot(r robot.Robot, name string) (VideoStore, error) {
 
 func init() {
 	resource.RegisterAPI(API, resource.APIRegistration[VideoStore]{
-		// Reconfigurable, and contents of reconfwrapper.go are only needed for standalone (non-module) uses.
 		RPCServiceServerConstructor: NewRPCServiceServer,
 		RPCServiceHandler:           videostorepb.RegisterVideostoreServiceHandlerFromEndpoint,
 		RPCServiceDesc:              &videostorepb.VideostoreService_ServiceDesc,
@@ -44,9 +43,9 @@ func init() {
 
 type VideoStore interface {
 	resource.Resource
-	Fetch(ctx context.Context, from, to string) ([]byte, error)
-	Save(ctx context.Context, from, to string) (string, error)
-	FetchStream(ctx context.Context, from, to string, w io.Writer) error
+	Fetch(ctx context.Context, from, to, container string) ([]byte, error)
+	Save(ctx context.Context, from, to, container string) (string, error)
+	FetchStream(ctx context.Context, from, to, container string, w io.Writer) error
 }
 
 type videostoreServer struct {
@@ -63,7 +62,7 @@ func (s *videostoreServer) Fetch(ctx context.Context, req *videostorepb.FetchReq
 	if err != nil {
 		return nil, err
 	}
-	resp, err := vs.Fetch(ctx, req.From, req.To)
+	resp, err := vs.Fetch(ctx, req.From, req.To, req.Container)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +74,7 @@ func (s *videostoreServer) Save(ctx context.Context, req *videostorepb.SaveReque
 	if err != nil {
 		return nil, err
 	}
-	resp, err := vs.Save(ctx, req.From, req.To)
+	resp, err := vs.Save(ctx, req.From, req.To, req.Container)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +88,7 @@ func (s *videostoreServer) FetchStream(req *videostorepb.FetchStreamRequest, str
 		return err
 	}
 	// Stream directly via the interface to avoid buffering.
-	return vs.FetchStream(stream.Context(), req.From, req.To, streamWriter{stream: stream})
+	return vs.FetchStream(stream.Context(), req.From, req.To, req.Container, streamWriter{stream: stream})
 }
 
 type streamWriter struct {
@@ -134,11 +133,12 @@ func clientFromSvcClient(sc *videostoreClient, name string) VideoStore {
 	return &namedVideostoreClient{sc, name}
 }
 
-func (nvc *namedVideostoreClient) Fetch(ctx context.Context, from, to string) ([]byte, error) {
+func (nvc *namedVideostoreClient) Fetch(ctx context.Context, from, to, container string) ([]byte, error) {
 	req := &videostorepb.FetchRequest{
-		Name: nvc.name,
-		From: from,
-		To:   to,
+		Name:      nvc.name,
+		From:      from,
+		To:        to,
+		Container: container,
 	}
 	resp, err := nvc.client.Fetch(ctx, req)
 	if err != nil {
@@ -147,11 +147,12 @@ func (nvc *namedVideostoreClient) Fetch(ctx context.Context, from, to string) ([
 	return resp.VideoData, nil
 }
 
-func (nvc *namedVideostoreClient) Save(ctx context.Context, from, to string) (string, error) {
+func (nvc *namedVideostoreClient) Save(ctx context.Context, from, to, container string) (string, error) {
 	req := &videostorepb.SaveRequest{
-		Name: nvc.name,
-		From: from,
-		To:   to,
+		Name:      nvc.name,
+		From:      from,
+		To:        to,
+		Container: container,
 	}
 	resp, err := nvc.client.Save(ctx, req)
 	if err != nil {
@@ -160,11 +161,12 @@ func (nvc *namedVideostoreClient) Save(ctx context.Context, from, to string) (st
 	return resp.Filename, nil
 }
 
-func (nvc *namedVideostoreClient) FetchStream(ctx context.Context, from, to string, w io.Writer) error {
+func (nvc *namedVideostoreClient) FetchStream(ctx context.Context, from, to, container string, w io.Writer) error {
 	req := &videostorepb.FetchStreamRequest{
-		Name: nvc.name,
-		From: from,
-		To:   to,
+		Name:      nvc.name,
+		From:      from,
+		To:        to,
+		Container: container,
 	}
 	st, err := nvc.client.FetchStream(ctx, req)
 	if err != nil {

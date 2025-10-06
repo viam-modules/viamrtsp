@@ -20,13 +20,14 @@ const FetchStreamRequest$json = {
     {'1': 'name', '3': 1, '4': 1, '5': 9, '10': 'name'},
     {'1': 'from', '3': 2, '4': 1, '5': 9, '10': 'from'},
     {'1': 'to', '3': 3, '4': 1, '5': 9, '10': 'to'},
+    {'1': 'container', '3': 4, '4': 1, '5': 9, '10': 'container'},
   ],
 };
 
 /// Descriptor for `FetchStreamRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List fetchStreamRequestDescriptor = $convert.base64Decode(
     'ChJGZXRjaFN0cmVhbVJlcXVlc3QSEgoEbmFtZRgBIAEoCVIEbmFtZRISCgRmcm9tGAIgASgJUg'
-    'Rmcm9tEg4KAnRvGAMgASgJUgJ0bw==');
+    'Rmcm9tEg4KAnRvGAMgASgJUgJ0bxIcCgljb250YWluZXIYBCABKAlSCWNvbnRhaW5lcg==');
 
 @$core.Deprecated('Use fetchStreamResponseDescriptor instead')
 const FetchStreamResponse$json = {
@@ -47,13 +48,14 @@ const FetchRequest$json = {
     {'1': 'name', '3': 1, '4': 1, '5': 9, '10': 'name'},
     {'1': 'from', '3': 2, '4': 1, '5': 9, '10': 'from'},
     {'1': 'to', '3': 3, '4': 1, '5': 9, '10': 'to'},
+    {'1': 'container', '3': 4, '4': 1, '5': 9, '10': 'container'},
   ],
 };
 
 /// Descriptor for `FetchRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List fetchRequestDescriptor = $convert.base64Decode(
     'CgxGZXRjaFJlcXVlc3QSEgoEbmFtZRgBIAEoCVIEbmFtZRISCgRmcm9tGAIgASgJUgRmcm9tEg'
-    '4KAnRvGAMgASgJUgJ0bw==');
+    '4KAnRvGAMgASgJUgJ0bxIcCgljb250YWluZXIYBCABKAlSCWNvbnRhaW5lcg==');
 
 @$core.Deprecated('Use fetchResponseDescriptor instead')
 const FetchResponse$json = {
@@ -74,13 +76,14 @@ const SaveRequest$json = {
     {'1': 'name', '3': 1, '4': 1, '5': 9, '10': 'name'},
     {'1': 'from', '3': 2, '4': 1, '5': 9, '10': 'from'},
     {'1': 'to', '3': 3, '4': 1, '5': 9, '10': 'to'},
+    {'1': 'container', '3': 4, '4': 1, '5': 9, '10': 'container'},
   ],
 };
 
 /// Descriptor for `SaveRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List saveRequestDescriptor = $convert.base64Decode(
     'CgtTYXZlUmVxdWVzdBISCgRuYW1lGAEgASgJUgRuYW1lEhIKBGZyb20YAiABKAlSBGZyb20SDg'
-    'oCdG8YAyABKAlSAnRv');
+    'oCdG8YAyABKAlSAnRvEhwKCWNvbnRhaW5lchgEIAEoCVIJY29udGFpbmVy');
 
 @$core.Deprecated('Use saveResponseDescriptor instead')
 const SaveResponse$json = {

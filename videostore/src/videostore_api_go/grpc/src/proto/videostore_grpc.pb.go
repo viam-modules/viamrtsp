@@ -29,9 +29,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type VideostoreServiceClient interface {
 	FetchStream(ctx context.Context, in *FetchStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[FetchStreamResponse], error)
-	// Unary fetch between [from, to]
 	Fetch(ctx context.Context, in *FetchRequest, opts ...grpc.CallOption) (*FetchResponse, error)
-	// Unary save between [from, to]
 	Save(ctx context.Context, in *SaveRequest, opts ...grpc.CallOption) (*SaveResponse, error)
 }
 
@@ -87,9 +85,7 @@ func (c *videostoreServiceClient) Save(ctx context.Context, in *SaveRequest, opt
 // for forward compatibility.
 type VideostoreServiceServer interface {
 	FetchStream(*FetchStreamRequest, grpc.ServerStreamingServer[FetchStreamResponse]) error
-	// Unary fetch between [from, to]
 	Fetch(context.Context, *FetchRequest) (*FetchResponse, error)
-	// Unary save between [from, to]
 	Save(context.Context, *SaveRequest) (*SaveResponse, error)
 	mustEmbedUnimplementedVideostoreServiceServer()
 }
