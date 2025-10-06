@@ -67,7 +67,7 @@ func main() {
 	}
 	now := time.Now()
 	from := now.Add(-60 * time.Second).Format("2006-01-02_15-04-05")
-	to := now.Add(-30 * time.Second).Format("2006-01-02_15-04-05")
+	to := now.Add(-50 * time.Second).Format("2006-01-02_15-04-05")
 
 	ctx := context.Background()
 
