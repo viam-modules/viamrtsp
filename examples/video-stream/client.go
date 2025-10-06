@@ -15,6 +15,14 @@ import (
 func main() {
 	logger := logging.NewDebugLogger("client")
 
+	resourceName := "vs-1"
+	if len(os.Args) > 1 && os.Args[1] != "" {
+		resourceName = os.Args[1]
+		logger.Infof("Using VideoStore resource: %s", resourceName)
+	} else {
+		logger.Infof("No resource arg provided; defaulting to %s", resourceName)
+	}
+
 	if err := godotenv.Load(); err != nil {
 		logger.Errorf("No .env file found: %v", err)
 		logger.Info("Make sure to set VIAM_API_KEY, VIAM_API_KEY_ID, and VIAM_MACHINE_ADDRESS environment variables.")
@@ -52,7 +60,6 @@ func main() {
 	}
 	defer machine.Close(context.Background())
 
-	resourceName := "vs-1"
 	videoStore, err := vsapi.FromRobot(machine, resourceName)
 	if err != nil {
 		logger.Errorf("Failed to get video store resource: %v", err)
@@ -63,12 +70,8 @@ func main() {
 	to := now.Add(-30 * time.Second).Format("2006-01-02_15-04-05")
 
 	ctx := context.Background()
-	// video, err := videoStore.Fetch(ctx, from, to)
-	// if err != nil {
-	// 	logger.Errorf("Failed to save video segment: %v", err)
-	// 	os.Exit(1)
-	// }
-	// logger.Infof("Fetched video segment of length %d bytes", len(video))
+
+	// Test that video bytes can be streamed and written to a file
 	ioWriter := os.Stdout
 	err = videoStore.FetchStream(ctx, from, to, ioWriter)
 	if err != nil {
