@@ -6,17 +6,13 @@ option go_package = "./videostore-api";
 
 service videostoreService {
   rpc FetchStream(FetchStreamRequest) returns (stream FetchStreamResponse);
-  // Unary fetch between [from, to]
   rpc Fetch(FetchRequest) returns (FetchResponse);
-  // Unary save between [from, to]
   rpc Save(SaveRequest) returns (SaveResponse);
 }
 
 message FetchStreamRequest {
   string name = 1;
-  // Date-time in format YYYY-MM-DD_HH-MM-SS
   string from = 2;
-  // Date-time in format YYYY-MM-DD_HH-MM-SS
   string to = 3;
 }
 
@@ -26,9 +22,7 @@ message FetchStreamResponse {
 
 message FetchRequest {
   string name = 1;
-  // Date-time in format YYYY-MM-DD_HH-MM-SS
   string from = 2;
-  // Date-time in format YYYY-MM-DD_HH-MM-SS
   string to = 3;
 }
 
@@ -39,9 +33,7 @@ message FetchResponse {
 
 message SaveRequest {
   string name = 1;
-  // Date-time in format YYYY-MM-DD_HH-MM-SS
   string from = 2;
-  // Date-time in format YYYY-MM-DD_HH-MM-SS
   string to = 3;
 }
 
