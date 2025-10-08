@@ -99,13 +99,12 @@ class _MyHomePageState extends State<MyHomePage> {
         _resources = names;
       });
       print(names);
-      print("yooooooooo");
       final rn = VideoStore.subtype.getResourceName('vs-1'); 
       if (!names.contains(rn)) {
-        // setState(() {
-        //   _status = 'VideoStore resource vs-1 not found. Available: $names';
-        //   _robot = robot;
-        // });
+        setState(() {
+          _status = 'VideoStore resource vs-1 not found. Available: $names';
+          _robot = robot;
+        });
         print('VideoStore resource vs-1 not found. Available: $names');
         return;
       }
