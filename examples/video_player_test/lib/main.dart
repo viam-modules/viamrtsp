@@ -134,16 +134,6 @@ class _MyHomePageState extends State<MyHomePage> {
     final to = _fmtYmdHms(now.subtract(const Duration(seconds: 40)));
     final from = _fmtYmdHms(now.subtract(const Duration(seconds: 50)));
     print('fetching between $from and $to');
-    // final stream = vs.fetchStream(from, to);
-    // final sub = stream.listen(
-    //     (chunk) => print('Main: got chunk length=${chunk.length}'),
-    //     onError: (e) => print('stream error: $e'),
-    //     onDone: () => print('stream done'),
-    // );
-    // Future.delayed(const Duration(seconds: 30), () async {
-    //   await sub.cancel();
-    //   print('Subscription cancelled by timeout');
-    // });
     await _startLocalServerIfNeeded();
     _buffer = _ProgressiveVideoBuffer();
     _bufferedBytes = 0;
@@ -156,8 +146,7 @@ class _MyHomePageState extends State<MyHomePage> {
         _buffer?.add(chunk);
         _bufferedBytes += chunk.length;
         // Heuristic: start player after first 32KB (likely contains MP4 header + moov)
-        // if (!_videoInitStarted && _bufferedBytes > 32 * 1024) {
-        if (!_videoInitStarted && _bufferedBytes > 128 * 1024) {
+        if (!_videoInitStarted && _bufferedBytes > 32 * 1024) {
           _videoInitStarted = true;
           _initVideoPlayer();
         }
@@ -277,11 +266,6 @@ class _MyHomePageState extends State<MyHomePage> {
           // wireframe for each widget.
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
             const SizedBox(height: 16),
             Text('Status: $_status'),
             if (_error != null)
