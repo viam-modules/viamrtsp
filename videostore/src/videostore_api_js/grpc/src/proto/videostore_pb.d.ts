@@ -91,8 +91,6 @@ export declare class FetchRequest extends Message<FetchRequest> {
   to: string;
 
   /**
-   * e.g., "mp4", "fmp4"
-   *
    * @generated from field: string container = 4;
    */
   container: string;
@@ -117,8 +115,6 @@ export declare class FetchRequest extends Message<FetchRequest> {
  */
 export declare class FetchResponse extends Message<FetchResponse> {
   /**
-   * Raw video bytes for the requested interval
-   *
    * @generated from field: bytes video_data = 1;
    */
   videoData: Uint8Array;
@@ -158,8 +154,6 @@ export declare class SaveRequest extends Message<SaveRequest> {
   to: string;
 
   /**
-   * e.g., "mp4", "fmp4"
-   *
    * @generated from field: string container = 4;
    */
   container: string;
@@ -184,8 +178,6 @@ export declare class SaveRequest extends Message<SaveRequest> {
  */
 export declare class SaveResponse extends Message<SaveResponse> {
   /**
-   * Filename (or identifier) of the saved artifact
-   *
    * @generated from field: string filename = 1;
    */
   filename: string;
@@ -203,5 +195,136 @@ export declare class SaveResponse extends Message<SaveResponse> {
   static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): SaveResponse;
 
   static equals(a: SaveResponse | PlainMessage<SaveResponse> | undefined, b: SaveResponse | PlainMessage<SaveResponse> | undefined): boolean;
+}
+
+/**
+ * @generated from message viammodules.service.videostore.v1.GetStorageStateRequest
+ */
+export declare class GetStorageStateRequest extends Message<GetStorageStateRequest> {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  constructor(data?: PartialMessage<GetStorageStateRequest>);
+
+  static readonly runtime: typeof proto3;
+  static readonly typeName = "viammodules.service.videostore.v1.GetStorageStateRequest";
+  static readonly fields: FieldList;
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): GetStorageStateRequest;
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): GetStorageStateRequest;
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): GetStorageStateRequest;
+
+  static equals(a: GetStorageStateRequest | PlainMessage<GetStorageStateRequest> | undefined, b: GetStorageStateRequest | PlainMessage<GetStorageStateRequest> | undefined): boolean;
+}
+
+/**
+ * @generated from message viammodules.service.videostore.v1.GetStorageStateResponse
+ */
+export declare class GetStorageStateResponse extends Message<GetStorageStateResponse> {
+  /**
+   * @generated from field: viammodules.service.videostore.v1.StorageState state = 1;
+   */
+  state?: StorageState;
+
+  constructor(data?: PartialMessage<GetStorageStateResponse>);
+
+  static readonly runtime: typeof proto3;
+  static readonly typeName = "viammodules.service.videostore.v1.GetStorageStateResponse";
+  static readonly fields: FieldList;
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): GetStorageStateResponse;
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): GetStorageStateResponse;
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): GetStorageStateResponse;
+
+  static equals(a: GetStorageStateResponse | PlainMessage<GetStorageStateResponse> | undefined, b: GetStorageStateResponse | PlainMessage<GetStorageStateResponse> | undefined): boolean;
+}
+
+/**
+ * @generated from message viammodules.service.videostore.v1.StorageState
+ */
+export declare class StorageState extends Message<StorageState> {
+  /**
+   * @generated from field: int64 storage_used_bytes = 1;
+   */
+  storageUsedBytes: bigint;
+
+  /**
+   * @generated from field: int64 total_duration_ms = 2;
+   */
+  totalDurationMs: bigint;
+
+  /**
+   * @generated from field: int32 video_count = 3;
+   */
+  videoCount: number;
+
+  /**
+   * @generated from field: repeated viammodules.service.videostore.v1.VideoRange ranges = 4;
+   */
+  ranges: VideoRange[];
+
+  /**
+   * @generated from field: int32 storage_limit_gb = 5;
+   */
+  storageLimitGb: number;
+
+  /**
+   * @generated from field: double device_storage_remaining_gb = 6;
+   */
+  deviceStorageRemainingGb: number;
+
+  /**
+   * @generated from field: string storage_path = 7;
+   */
+  storagePath: string;
+
+  constructor(data?: PartialMessage<StorageState>);
+
+  static readonly runtime: typeof proto3;
+  static readonly typeName = "viammodules.service.videostore.v1.StorageState";
+  static readonly fields: FieldList;
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): StorageState;
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): StorageState;
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): StorageState;
+
+  static equals(a: StorageState | PlainMessage<StorageState> | undefined, b: StorageState | PlainMessage<StorageState> | undefined): boolean;
+}
+
+/**
+ * @generated from message viammodules.service.videostore.v1.VideoRange
+ */
+export declare class VideoRange extends Message<VideoRange> {
+  /**
+   * @generated from field: string from = 1;
+   */
+  from: string;
+
+  /**
+   * @generated from field: string to = 2;
+   */
+  to: string;
+
+  constructor(data?: PartialMessage<VideoRange>);
+
+  static readonly runtime: typeof proto3;
+  static readonly typeName = "viammodules.service.videostore.v1.VideoRange";
+  static readonly fields: FieldList;
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): VideoRange;
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): VideoRange;
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): VideoRange;
+
+  static equals(a: VideoRange | PlainMessage<VideoRange> | undefined, b: VideoRange | PlainMessage<VideoRange> | undefined): boolean;
 }
 

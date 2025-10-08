@@ -74,3 +74,50 @@ export const SaveResponse = /*@__PURE__*/ proto3.makeMessageType(
   ],
 );
 
+/**
+ * @generated from message viammodules.service.videostore.v1.GetStorageStateRequest
+ */
+export const GetStorageStateRequest = /*@__PURE__*/ proto3.makeMessageType(
+  "viammodules.service.videostore.v1.GetStorageStateRequest",
+  () => [
+    { no: 1, name: "name", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+  ],
+);
+
+/**
+ * @generated from message viammodules.service.videostore.v1.GetStorageStateResponse
+ */
+export const GetStorageStateResponse = /*@__PURE__*/ proto3.makeMessageType(
+  "viammodules.service.videostore.v1.GetStorageStateResponse",
+  () => [
+    { no: 1, name: "state", kind: "message", T: StorageState },
+  ],
+);
+
+/**
+ * @generated from message viammodules.service.videostore.v1.StorageState
+ */
+export const StorageState = /*@__PURE__*/ proto3.makeMessageType(
+  "viammodules.service.videostore.v1.StorageState",
+  () => [
+    { no: 1, name: "storage_used_bytes", kind: "scalar", T: 3 /* ScalarType.INT64 */ },
+    { no: 2, name: "total_duration_ms", kind: "scalar", T: 3 /* ScalarType.INT64 */ },
+    { no: 3, name: "video_count", kind: "scalar", T: 5 /* ScalarType.INT32 */ },
+    { no: 4, name: "ranges", kind: "message", T: VideoRange, repeated: true },
+    { no: 5, name: "storage_limit_gb", kind: "scalar", T: 5 /* ScalarType.INT32 */ },
+    { no: 6, name: "device_storage_remaining_gb", kind: "scalar", T: 1 /* ScalarType.DOUBLE */ },
+    { no: 7, name: "storage_path", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+  ],
+);
+
+/**
+ * @generated from message viammodules.service.videostore.v1.VideoRange
+ */
+export const VideoRange = /*@__PURE__*/ proto3.makeMessageType(
+  "viammodules.service.videostore.v1.VideoRange",
+  () => [
+    { no: 1, name: "from", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "to", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+  ],
+);
+

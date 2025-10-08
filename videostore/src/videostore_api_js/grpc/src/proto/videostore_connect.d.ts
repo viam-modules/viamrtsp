@@ -3,7 +3,7 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { FetchRequest, FetchResponse, FetchStreamRequest, FetchStreamResponse, SaveRequest, SaveResponse } from "./videostore_pb.js";
+import { FetchRequest, FetchResponse, FetchStreamRequest, FetchStreamResponse, GetStorageStateRequest, GetStorageStateResponse, SaveRequest, SaveResponse } from "./videostore_pb.js";
 import { MethodKind } from "@bufbuild/protobuf";
 
 /**
@@ -37,6 +37,15 @@ export declare const videostoreService: {
       readonly name: "Save",
       readonly I: typeof SaveRequest,
       readonly O: typeof SaveResponse,
+      readonly kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc viammodules.service.videostore.v1.videostoreService.GetStorageState
+     */
+    readonly getStorageState: {
+      readonly name: "GetStorageState",
+      readonly I: typeof GetStorageStateRequest,
+      readonly O: typeof GetStorageStateResponse,
       readonly kind: MethodKind.Unary,
     },
   }

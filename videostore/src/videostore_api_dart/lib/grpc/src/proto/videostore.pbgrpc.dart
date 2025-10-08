@@ -33,6 +33,10 @@ class videostoreServiceClient extends $grpc.Client {
       '/viammodules.service.videostore.v1.videostoreService/Save',
       ($0.SaveRequest value) => value.writeToBuffer(),
       ($core.List<$core.int> value) => $0.SaveResponse.fromBuffer(value));
+  static final _$getStorageState = $grpc.ClientMethod<$0.GetStorageStateRequest, $0.GetStorageStateResponse>(
+      '/viammodules.service.videostore.v1.videostoreService/GetStorageState',
+      ($0.GetStorageStateRequest value) => value.writeToBuffer(),
+      ($core.List<$core.int> value) => $0.GetStorageStateResponse.fromBuffer(value));
 
   videostoreServiceClient($grpc.ClientChannel channel,
       {$grpc.CallOptions? options,
@@ -50,6 +54,10 @@ class videostoreServiceClient extends $grpc.Client {
 
   $grpc.ResponseFuture<$0.SaveResponse> save($0.SaveRequest request, {$grpc.CallOptions? options}) {
     return $createUnaryCall(_$save, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.GetStorageStateResponse> getStorageState($0.GetStorageStateRequest request, {$grpc.CallOptions? options}) {
+    return $createUnaryCall(_$getStorageState, request, options: options);
   }
 }
 
@@ -79,6 +87,13 @@ abstract class videostoreServiceBase extends $grpc.Service {
         false,
         ($core.List<$core.int> value) => $0.SaveRequest.fromBuffer(value),
         ($0.SaveResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.GetStorageStateRequest, $0.GetStorageStateResponse>(
+        'GetStorageState',
+        getStorageState_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.GetStorageStateRequest.fromBuffer(value),
+        ($0.GetStorageStateResponse value) => value.writeToBuffer()));
   }
 
   $async.Stream<$0.FetchStreamResponse> fetchStream_Pre($grpc.ServiceCall call, $async.Future<$0.FetchStreamRequest> request) async* {
@@ -93,7 +108,12 @@ abstract class videostoreServiceBase extends $grpc.Service {
     return save(call, await request);
   }
 
+  $async.Future<$0.GetStorageStateResponse> getStorageState_Pre($grpc.ServiceCall call, $async.Future<$0.GetStorageStateRequest> request) async {
+    return getStorageState(call, await request);
+  }
+
   $async.Stream<$0.FetchStreamResponse> fetchStream($grpc.ServiceCall call, $0.FetchStreamRequest request);
   $async.Future<$0.FetchResponse> fetch($grpc.ServiceCall call, $0.FetchRequest request);
   $async.Future<$0.SaveResponse> save($grpc.ServiceCall call, $0.SaveRequest request);
+  $async.Future<$0.GetStorageStateResponse> getStorageState($grpc.ServiceCall call, $0.GetStorageStateRequest request);
 }
