@@ -5,9 +5,33 @@ package viammodules.service.videostore.v1;
 option go_package = "./videostore-api";
 
 service videostoreService {
-  rpc FetchStream(FetchStreamRequest) returns (stream FetchStreamResponse);
-  rpc Fetch(FetchRequest) returns (FetchResponse);
   rpc Save(SaveRequest) returns (SaveResponse);
+  rpc Fetch(FetchRequest) returns (FetchResponse);
+  rpc FetchStream(FetchStreamRequest) returns (stream FetchStreamResponse);
+  rpc GetStorageState(GetStorageStateRequest) returns (GetStorageStateResponse);
+}
+
+message SaveRequest {
+  string name = 1;
+  string from = 2;
+  string to = 3;
+  string container = 4;
+  bool async = 5;
+}
+
+message SaveResponse {
+  string filename = 1;
+}
+
+message FetchRequest {
+  string name = 1;
+  string from = 2;
+  string to = 3;
+  string container = 4;
+}
+
+message FetchResponse {
+  bytes video_data = 1;
 }
 
 message FetchStreamRequest {
@@ -21,26 +45,25 @@ message FetchStreamResponse {
   bytes video_data = 1;
 }
 
-message FetchRequest {
+message GetStorageStateRequest {
   string name = 1;
-  string from = 2;
-  string to = 3;
-  string container = 4; // e.g., "mp4", "fmp4"
 }
 
-message FetchResponse {
-  // Raw video bytes for the requested interval
-  bytes video_data = 1;
+message GetStorageStateResponse {
+  StorageState state = 1;
 }
 
-message SaveRequest {
-  string name = 1;
-  string from = 2;
-  string to = 3;
-  string container = 4; // e.g., "mp4", "fmp4"
+message StorageState {
+  int64 storage_used_bytes = 1;
+  int64 total_duration_ms = 2;
+  int32 video_count = 3;
+  repeated VideoRange ranges = 4;
+  int32 storage_limit_gb = 5;
+  double device_storage_remaining_gb = 6;
+  string storage_path = 7;
 }
 
-message SaveResponse {
-  // Filename (or identifier) of the saved artifact
-  string filename = 1;
+message VideoRange {
+  string from = 1;
+  string to = 2;
 }
