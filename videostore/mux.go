@@ -564,7 +564,7 @@ func (m *rawSegmenterMux) maybeReInitVideoStore() error {
 		return err
 	}
 
-	if err := m.rawSeg.Init(codec, width, height, m.metadata.sps, m.metadata.pps, m.metadata.vps); err != nil {
+	if err := m.rawSeg.Init(codec, width, height); err != nil {
 		return err
 	}
 
