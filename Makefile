@@ -286,11 +286,10 @@ endif
 endif
 endif
 
-videostore/buf.lock: videostore/buf.yaml
+videostore/buf.lock: videostore/buf.yaml $(BUF_BIN)
 	cd videostore && $(BUF_BIN) mod update
 
-videostore/src/videostore_api_go/grpc/videostore.pb.go: videostore/src/proto/videostore.proto videostore/src/proto/buf.gen.yaml videostore/buf.lock
-	cd videostore && $(BUF_BIN) generate buf.build/googleapis/googleapis --template ./src/proto/buf.gen.yaml  -o ./src
+videostore/src/videostore_api_go/grpc/videostore.pb.go: videostore/src/proto/videostore.proto videostore/src/proto/buf.gen.yaml videostore/buf.lock $(BUF_BIN)
 	cd videostore && $(BUF_BIN) generate --template ./src/proto/buf.gen.yaml --path ./src/proto -o ./src
 
 generate: videostore/src/videostore_api_go/grpc/videostore.pb.go $(BUF_BIN)
