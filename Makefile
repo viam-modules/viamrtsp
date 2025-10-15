@@ -36,7 +36,8 @@ ifeq ($(TARGET_OS),windows)
 endif
 BIN_VIAMRTSP := $(BIN_OUTPUT_PATH)/viamrtsp$(BIN_SUFFIX)
 BIN_DISCOVERY := $(BIN_OUTPUT_PATH)/discovery$(BIN_SUFFIX)
-TOOL_BIN = bin/gotools/$(shell uname -s)-$(shell uname -m)
+TOOL_BIN = $(abspath bin/gotools/$(shell uname -s)-$(shell uname -m))
+BUF_BIN := $(TOOL_BIN)/buf
 
 FFMPEG_TAG ?= n6.1
 FFMPEG_VERSION ?= $(shell pwd)/FFmpeg/$(FFMPEG_TAG)
@@ -172,6 +173,11 @@ tool-install:
 		github.com/golangci/golangci-lint/cmd/golangci-lint \
 		github.com/rhysd/actionlint/cmd/actionlint
 
+$(BUF_BIN):
+	mkdir -p $(TOOL_BIN)
+	GOBIN=`pwd`/$(TOOL_BIN) go install github.com/bufbuild/buf/cmd/buf@latest
+
+
 gofmt:
 	gofmt -w -s .
 
@@ -281,13 +287,13 @@ endif
 endif
 
 videostore/buf.lock: videostore/buf.yaml
-	cd videostore && /home/viam/go/bin/buf mod update
+	cd videostore && $(TOOL_BIN)/buf mod update
 
 videostore/src/videostore_api_go/grpc/videostore.pb.go: videostore/src/proto/videostore.proto videostore/src/proto/buf.gen.yaml videostore/buf.lock
-	cd videostore && /home/viam/go/bin/buf generate buf.build/googleapis/googleapis --template ./src/proto/buf.gen.yaml  -o ./src
-	cd videostore && /home/viam/go/bin/buf generate --template ./src/proto/buf.gen.yaml --path ./src/proto -o ./src
+	cd videostore && $(TOOL_BIN)/buf generate buf.build/googleapis/googleapis --template ./src/proto/buf.gen.yaml  -o ./src
+	cd videostore && $(TOOL_BIN)/buf generate --template ./src/proto/buf.gen.yaml --path ./src/proto -o ./src
 
-generate: videostore/src/videostore_api_go/grpc/videostore.pb.go
+generate: videostore/src/videostore_api_go/grpc/videostore.pb.go $(BUF_BIN)
 
 module: $(BIN_VIAMRTSP)
 	cp $(BIN_VIAMRTSP) bin/viamrtsp$(BIN_SUFFIX)
