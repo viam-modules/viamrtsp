@@ -287,17 +287,17 @@ endif
 endif
 
 videostore/buf.lock: videostore/buf.yaml
-	cd videostore && $(TOOL_BIN)/buf mod update
+	cd videostore && $(BUF_BIN) mod update
 
 videostore/src/videostore_api_go/grpc/videostore.pb.go: videostore/src/proto/videostore.proto videostore/src/proto/buf.gen.yaml videostore/buf.lock
-	cd videostore && $(TOOL_BIN)/buf generate buf.build/googleapis/googleapis --template ./src/proto/buf.gen.yaml  -o ./src
-	cd videostore && $(TOOL_BIN)/buf generate --template ./src/proto/buf.gen.yaml --path ./src/proto -o ./src
+	cd videostore && $(BUF_BIN) generate buf.build/googleapis/googleapis --template ./src/proto/buf.gen.yaml  -o ./src
+	cd videostore && $(BUF_BIN) generate --template ./src/proto/buf.gen.yaml --path ./src/proto -o ./src
 
 generate: videostore/src/videostore_api_go/grpc/videostore.pb.go $(BUF_BIN)
 
 module: $(BIN_VIAMRTSP)
 	cp $(BIN_VIAMRTSP) bin/viamrtsp$(BIN_SUFFIX)
-	tar czf module.tar.gz bin/viamrtsp$(BIN_SUFFIX)
+	tar czf module.tar.gz bin/viamrtsp$(BIN_S	UFFIX)
 	rm bin/viamrtsp$(BIN_SUFFIX)
 
 clean:
