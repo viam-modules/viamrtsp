@@ -494,9 +494,7 @@ func (m *rawSegmenterMux) writeH264(au [][]byte, pts int64) error {
 		return nil
 	}
 
-	// Pack avcc instead of annexb since ffmpeg segmenter expects avcc
-	// This removes the need for libav to spint up a bsf filter to convert annexb to avcc
-	packed, err := h264.AVCCMarshal(au)
+	packed, err := h264.AnnexBMarshal(au)
 	if err != nil {
 		m.logger.Errorf("failed to marshal avcc: %s", err)
 		return err
