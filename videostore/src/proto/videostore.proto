@@ -15,12 +15,15 @@ message SaveRequest {
   string name = 1;
   string from = 2;
   string to = 3;
-  string container = 4;
-  bool async = 5;
+  string container = 4; // e.g., "mp4", "fmp4"
+  string metadata = 5;
+  bool async = 6;
+  string request_id = 7;
 }
 
 message SaveResponse {
   string filename = 1;
+  string request_id = 2;
 }
 
 message FetchRequest {
@@ -28,29 +31,35 @@ message FetchRequest {
   string from = 2;
   string to = 3;
   string container = 4;
+  string request_id = 5;
 }
 
 message FetchResponse {
   bytes video_data = 1;
+  string request_id = 2;
 }
 
-message FetchStreamRequest {
-  string name = 1;
-  string from = 2;
-  string to = 3;
-  string container = 4; // e.g., "mp4", "fmp4"
+  message FetchStreamRequest {
+    string name = 1;
+    string from = 2;
+    string to = 3;
+    string container = 4; // e.g., "mp4", "fmp4"
+    string request_id = 5;
 }
 
 message FetchStreamResponse {
   bytes video_data = 1;
+  string request_id = 2;
 }
 
 message GetStorageStateRequest {
   string name = 1;
+  string request_id = 2;
 }
 
 message GetStorageStateResponse {
   StorageState state = 1;
+  string request_id = 2;
 }
 
 message StorageState {

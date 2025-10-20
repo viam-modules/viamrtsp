@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/google/uuid"
 	videostorepb "github.com/viam-modules/viamrtsp/videostore/src/videostore_api_go/grpc/src/proto"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
@@ -43,21 +44,38 @@ func init() {
 
 type VideoStore interface {
 	resource.Resource
+	Save(ctx context.Context, from, to, container, metadata string, async bool) (string, error)
 	Fetch(ctx context.Context, from, to, container string) ([]byte, error)
-	Save(ctx context.Context, from, to, container string) (string, error)
 	FetchStream(ctx context.Context, from, to, container string, w io.Writer) error
 }
 
 type videostoreServer struct {
 	videostorepb.UnimplementedVideostoreServiceServer
-	coll resource.APIResourceCollection[VideoStore]
+	coll   resource.APIResourceCollection[VideoStore]
+	logger logging.Logger
 }
 
 func NewRPCServiceServer(coll resource.APIResourceCollection[VideoStore]) interface{} {
-	return &videostoreServer{coll: coll}
+	logger := logging.NewLogger("VideoStoreServer")
+	return &videostoreServer{coll: coll, logger: logger}
+}
+
+func (s *videostoreServer) Save(ctx context.Context, req *videostorepb.SaveRequest) (*videostorepb.SaveResponse, error) {
+	s.logger.Debugf("Received Save request: %+v", req)
+	vs, err := s.coll.Resource(req.Name)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := vs.Save(ctx, req.From, req.To, req.Container, req.Metadata, req.Async)
+	if err != nil {
+		return nil, err
+	}
+
+	return &videostorepb.SaveResponse{Filename: resp, RequestId: req.RequestId}, nil
 }
 
 func (s *videostoreServer) Fetch(ctx context.Context, req *videostorepb.FetchRequest) (*videostorepb.FetchResponse, error) {
+	s.logger.Debugf("Received Fetch request: %+v", req)
 	vs, err := s.coll.Resource(req.Name)
 	if err != nil {
 		return nil, err
@@ -66,37 +84,26 @@ func (s *videostoreServer) Fetch(ctx context.Context, req *videostorepb.FetchReq
 	if err != nil {
 		return nil, err
 	}
-	return &videostorepb.FetchResponse{VideoData: resp}, nil
-}
-
-func (s *videostoreServer) Save(ctx context.Context, req *videostorepb.SaveRequest) (*videostorepb.SaveResponse, error) {
-	vs, err := s.coll.Resource(req.Name)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := vs.Save(ctx, req.From, req.To, req.Container)
-	if err != nil {
-		return nil, err
-	}
-
-	return &videostorepb.SaveResponse{Filename: resp}, nil
+	return &videostorepb.FetchResponse{VideoData: resp, RequestId: req.RequestId}, nil
 }
 
 func (s *videostoreServer) FetchStream(req *videostorepb.FetchStreamRequest, stream videostorepb.VideostoreService_FetchStreamServer) error {
+	s.logger.Debugf("Received FetchStream request: %+v", req)
 	vs, err := s.coll.Resource(req.Name)
 	if err != nil {
 		return err
 	}
 	// Stream directly via the interface to avoid buffering.
-	return vs.FetchStream(stream.Context(), req.From, req.To, req.Container, streamWriter{stream: stream})
+	return vs.FetchStream(stream.Context(), req.From, req.To, req.Container, streamWriter{stream: stream, requestID: req.RequestId})
 }
 
 type streamWriter struct {
-	stream videostorepb.VideostoreService_FetchStreamServer
+	stream    videostorepb.VideostoreService_FetchStreamServer
+	requestID string
 }
 
 func (w streamWriter) Write(p []byte) (int, error) {
-	if err := w.stream.Send(&videostorepb.FetchStreamResponse{VideoData: p}); err != nil {
+	if err := w.stream.Send(&videostorepb.FetchStreamResponse{VideoData: p, RequestId: w.requestID}); err != nil {
 		return 0, err
 	}
 	return len(p), nil
@@ -139,6 +146,7 @@ func (nvc *namedVideostoreClient) Fetch(ctx context.Context, from, to, container
 		From:      from,
 		To:        to,
 		Container: container,
+		RequestId: uuid.New().String(),
 	}
 	resp, err := nvc.client.Fetch(ctx, req)
 	if err != nil {
@@ -147,12 +155,15 @@ func (nvc *namedVideostoreClient) Fetch(ctx context.Context, from, to, container
 	return resp.VideoData, nil
 }
 
-func (nvc *namedVideostoreClient) Save(ctx context.Context, from, to, container string) (string, error) {
+func (nvc *namedVideostoreClient) Save(ctx context.Context, from, to, container, metadata string, async bool) (string, error) {
 	req := &videostorepb.SaveRequest{
 		Name:      nvc.name,
 		From:      from,
 		To:        to,
 		Container: container,
+		Metadata:  metadata,
+		Async:     async,
+		RequestId: uuid.New().String(),
 	}
 	resp, err := nvc.client.Save(ctx, req)
 	if err != nil {
@@ -167,6 +178,7 @@ func (nvc *namedVideostoreClient) FetchStream(ctx context.Context, from, to, con
 		From:      from,
 		To:        to,
 		Container: container,
+		RequestId: uuid.New().String(),
 	}
 	st, err := nvc.client.FetchStream(ctx, req)
 	if err != nil {

@@ -13,13 +13,13 @@ export const videostoreService = {
   typeName: "viammodules.service.videostore.v1.videostoreService",
   methods: {
     /**
-     * @generated from rpc viammodules.service.videostore.v1.videostoreService.FetchStream
+     * @generated from rpc viammodules.service.videostore.v1.videostoreService.Save
      */
-    fetchStream: {
-      name: "FetchStream",
-      I: FetchStreamRequest,
-      O: FetchStreamResponse,
-      kind: MethodKind.ServerStreaming,
+    save: {
+      name: "Save",
+      I: SaveRequest,
+      O: SaveResponse,
+      kind: MethodKind.Unary,
     },
     /**
      * @generated from rpc viammodules.service.videostore.v1.videostoreService.Fetch
@@ -31,13 +31,13 @@ export const videostoreService = {
       kind: MethodKind.Unary,
     },
     /**
-     * @generated from rpc viammodules.service.videostore.v1.videostoreService.Save
+     * @generated from rpc viammodules.service.videostore.v1.videostoreService.FetchStream
      */
-    save: {
-      name: "Save",
-      I: SaveRequest,
-      O: SaveResponse,
-      kind: MethodKind.Unary,
+    fetchStream: {
+      name: "FetchStream",
+      I: FetchStreamRequest,
+      O: FetchStreamResponse,
+      kind: MethodKind.ServerStreaming,
     },
     /**
      * @generated from rpc viammodules.service.videostore.v1.videostoreService.GetStorageState

@@ -63,6 +63,7 @@ export const ListOperationsRequest = /*@__PURE__*/ proto3.makeMessageType(
     { no: 1, name: "filter", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 2, name: "page_size", kind: "scalar", T: 5 /* ScalarType.INT32 */ },
     { no: 3, name: "page_token", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 5, name: "return_partial_success", kind: "scalar", T: 8 /* ScalarType.BOOL */ },
   ],
 );
 
@@ -77,6 +78,7 @@ export const ListOperationsResponse = /*@__PURE__*/ proto3.makeMessageType(
   () => [
     { no: 1, name: "operations", kind: "message", T: Operation, repeated: true },
     { no: 2, name: "next_page_token", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 3, name: "unreachable", kind: "scalar", T: 9 /* ScalarType.STRING */, repeated: true },
   ],
 );
 

@@ -13,33 +13,40 @@ import 'dart:convert' as $convert;
 import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
-@$core.Deprecated('Use fetchStreamRequestDescriptor instead')
-const FetchStreamRequest$json = {
-  '1': 'FetchStreamRequest',
+@$core.Deprecated('Use saveRequestDescriptor instead')
+const SaveRequest$json = {
+  '1': 'SaveRequest',
   '2': [
     {'1': 'name', '3': 1, '4': 1, '5': 9, '10': 'name'},
     {'1': 'from', '3': 2, '4': 1, '5': 9, '10': 'from'},
     {'1': 'to', '3': 3, '4': 1, '5': 9, '10': 'to'},
     {'1': 'container', '3': 4, '4': 1, '5': 9, '10': 'container'},
+    {'1': 'metadata', '3': 5, '4': 1, '5': 9, '10': 'metadata'},
+    {'1': 'async', '3': 6, '4': 1, '5': 8, '10': 'async'},
+    {'1': 'request_id', '3': 7, '4': 1, '5': 9, '10': 'requestId'},
   ],
 };
 
-/// Descriptor for `FetchStreamRequest`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List fetchStreamRequestDescriptor = $convert.base64Decode(
-    'ChJGZXRjaFN0cmVhbVJlcXVlc3QSEgoEbmFtZRgBIAEoCVIEbmFtZRISCgRmcm9tGAIgASgJUg'
-    'Rmcm9tEg4KAnRvGAMgASgJUgJ0bxIcCgljb250YWluZXIYBCABKAlSCWNvbnRhaW5lcg==');
+/// Descriptor for `SaveRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List saveRequestDescriptor = $convert.base64Decode(
+    'CgtTYXZlUmVxdWVzdBISCgRuYW1lGAEgASgJUgRuYW1lEhIKBGZyb20YAiABKAlSBGZyb20SDg'
+    'oCdG8YAyABKAlSAnRvEhwKCWNvbnRhaW5lchgEIAEoCVIJY29udGFpbmVyEhoKCG1ldGFkYXRh'
+    'GAUgASgJUghtZXRhZGF0YRIUCgVhc3luYxgGIAEoCFIFYXN5bmMSHQoKcmVxdWVzdF9pZBgHIA'
+    'EoCVIJcmVxdWVzdElk');
 
-@$core.Deprecated('Use fetchStreamResponseDescriptor instead')
-const FetchStreamResponse$json = {
-  '1': 'FetchStreamResponse',
+@$core.Deprecated('Use saveResponseDescriptor instead')
+const SaveResponse$json = {
+  '1': 'SaveResponse',
   '2': [
-    {'1': 'video_data', '3': 1, '4': 1, '5': 12, '10': 'videoData'},
+    {'1': 'filename', '3': 1, '4': 1, '5': 9, '10': 'filename'},
+    {'1': 'request_id', '3': 2, '4': 1, '5': 9, '10': 'requestId'},
   ],
 };
 
-/// Descriptor for `FetchStreamResponse`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List fetchStreamResponseDescriptor = $convert.base64Decode(
-    'ChNGZXRjaFN0cmVhbVJlc3BvbnNlEh0KCnZpZGVvX2RhdGEYASABKAxSCXZpZGVvRGF0YQ==');
+/// Descriptor for `SaveResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List saveResponseDescriptor = $convert.base64Decode(
+    'CgxTYXZlUmVzcG9uc2USGgoIZmlsZW5hbWUYASABKAlSCGZpbGVuYW1lEh0KCnJlcXVlc3RfaW'
+    'QYAiABKAlSCXJlcXVlc3RJZA==');
 
 @$core.Deprecated('Use fetchRequestDescriptor instead')
 const FetchRequest$json = {
@@ -49,78 +56,90 @@ const FetchRequest$json = {
     {'1': 'from', '3': 2, '4': 1, '5': 9, '10': 'from'},
     {'1': 'to', '3': 3, '4': 1, '5': 9, '10': 'to'},
     {'1': 'container', '3': 4, '4': 1, '5': 9, '10': 'container'},
+    {'1': 'request_id', '3': 5, '4': 1, '5': 9, '10': 'requestId'},
   ],
 };
 
 /// Descriptor for `FetchRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List fetchRequestDescriptor = $convert.base64Decode(
     'CgxGZXRjaFJlcXVlc3QSEgoEbmFtZRgBIAEoCVIEbmFtZRISCgRmcm9tGAIgASgJUgRmcm9tEg'
-    '4KAnRvGAMgASgJUgJ0bxIcCgljb250YWluZXIYBCABKAlSCWNvbnRhaW5lcg==');
+    '4KAnRvGAMgASgJUgJ0bxIcCgljb250YWluZXIYBCABKAlSCWNvbnRhaW5lchIdCgpyZXF1ZXN0'
+    'X2lkGAUgASgJUglyZXF1ZXN0SWQ=');
 
 @$core.Deprecated('Use fetchResponseDescriptor instead')
 const FetchResponse$json = {
   '1': 'FetchResponse',
   '2': [
     {'1': 'video_data', '3': 1, '4': 1, '5': 12, '10': 'videoData'},
+    {'1': 'request_id', '3': 2, '4': 1, '5': 9, '10': 'requestId'},
   ],
 };
 
 /// Descriptor for `FetchResponse`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List fetchResponseDescriptor = $convert.base64Decode(
-    'Cg1GZXRjaFJlc3BvbnNlEh0KCnZpZGVvX2RhdGEYASABKAxSCXZpZGVvRGF0YQ==');
+    'Cg1GZXRjaFJlc3BvbnNlEh0KCnZpZGVvX2RhdGEYASABKAxSCXZpZGVvRGF0YRIdCgpyZXF1ZX'
+    'N0X2lkGAIgASgJUglyZXF1ZXN0SWQ=');
 
-@$core.Deprecated('Use saveRequestDescriptor instead')
-const SaveRequest$json = {
-  '1': 'SaveRequest',
+@$core.Deprecated('Use fetchStreamRequestDescriptor instead')
+const FetchStreamRequest$json = {
+  '1': 'FetchStreamRequest',
   '2': [
     {'1': 'name', '3': 1, '4': 1, '5': 9, '10': 'name'},
     {'1': 'from', '3': 2, '4': 1, '5': 9, '10': 'from'},
     {'1': 'to', '3': 3, '4': 1, '5': 9, '10': 'to'},
     {'1': 'container', '3': 4, '4': 1, '5': 9, '10': 'container'},
+    {'1': 'request_id', '3': 5, '4': 1, '5': 9, '10': 'requestId'},
   ],
 };
 
-/// Descriptor for `SaveRequest`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List saveRequestDescriptor = $convert.base64Decode(
-    'CgtTYXZlUmVxdWVzdBISCgRuYW1lGAEgASgJUgRuYW1lEhIKBGZyb20YAiABKAlSBGZyb20SDg'
-    'oCdG8YAyABKAlSAnRvEhwKCWNvbnRhaW5lchgEIAEoCVIJY29udGFpbmVy');
+/// Descriptor for `FetchStreamRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List fetchStreamRequestDescriptor = $convert.base64Decode(
+    'ChJGZXRjaFN0cmVhbVJlcXVlc3QSEgoEbmFtZRgBIAEoCVIEbmFtZRISCgRmcm9tGAIgASgJUg'
+    'Rmcm9tEg4KAnRvGAMgASgJUgJ0bxIcCgljb250YWluZXIYBCABKAlSCWNvbnRhaW5lchIdCgpy'
+    'ZXF1ZXN0X2lkGAUgASgJUglyZXF1ZXN0SWQ=');
 
-@$core.Deprecated('Use saveResponseDescriptor instead')
-const SaveResponse$json = {
-  '1': 'SaveResponse',
+@$core.Deprecated('Use fetchStreamResponseDescriptor instead')
+const FetchStreamResponse$json = {
+  '1': 'FetchStreamResponse',
   '2': [
-    {'1': 'filename', '3': 1, '4': 1, '5': 9, '10': 'filename'},
+    {'1': 'video_data', '3': 1, '4': 1, '5': 12, '10': 'videoData'},
+    {'1': 'request_id', '3': 2, '4': 1, '5': 9, '10': 'requestId'},
   ],
 };
 
-/// Descriptor for `SaveResponse`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List saveResponseDescriptor = $convert.base64Decode(
-    'CgxTYXZlUmVzcG9uc2USGgoIZmlsZW5hbWUYASABKAlSCGZpbGVuYW1l');
+/// Descriptor for `FetchStreamResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List fetchStreamResponseDescriptor = $convert.base64Decode(
+    'ChNGZXRjaFN0cmVhbVJlc3BvbnNlEh0KCnZpZGVvX2RhdGEYASABKAxSCXZpZGVvRGF0YRIdCg'
+    'pyZXF1ZXN0X2lkGAIgASgJUglyZXF1ZXN0SWQ=');
 
 @$core.Deprecated('Use getStorageStateRequestDescriptor instead')
 const GetStorageStateRequest$json = {
   '1': 'GetStorageStateRequest',
   '2': [
     {'1': 'name', '3': 1, '4': 1, '5': 9, '10': 'name'},
+    {'1': 'request_id', '3': 2, '4': 1, '5': 9, '10': 'requestId'},
   ],
 };
 
 /// Descriptor for `GetStorageStateRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List getStorageStateRequestDescriptor = $convert.base64Decode(
-    'ChZHZXRTdG9yYWdlU3RhdGVSZXF1ZXN0EhIKBG5hbWUYASABKAlSBG5hbWU=');
+    'ChZHZXRTdG9yYWdlU3RhdGVSZXF1ZXN0EhIKBG5hbWUYASABKAlSBG5hbWUSHQoKcmVxdWVzdF'
+    '9pZBgCIAEoCVIJcmVxdWVzdElk');
 
 @$core.Deprecated('Use getStorageStateResponseDescriptor instead')
 const GetStorageStateResponse$json = {
   '1': 'GetStorageStateResponse',
   '2': [
     {'1': 'state', '3': 1, '4': 1, '5': 11, '6': '.viammodules.service.videostore.v1.StorageState', '10': 'state'},
+    {'1': 'request_id', '3': 2, '4': 1, '5': 9, '10': 'requestId'},
   ],
 };
 
 /// Descriptor for `GetStorageStateResponse`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List getStorageStateResponseDescriptor = $convert.base64Decode(
     'ChdHZXRTdG9yYWdlU3RhdGVSZXNwb25zZRJFCgVzdGF0ZRgBIAEoCzIvLnZpYW1tb2R1bGVzLn'
-    'NlcnZpY2UudmlkZW9zdG9yZS52MS5TdG9yYWdlU3RhdGVSBXN0YXRl');
+    'NlcnZpY2UudmlkZW9zdG9yZS52MS5TdG9yYWdlU3RhdGVSBXN0YXRlEh0KCnJlcXVlc3RfaWQY'
+    'AiABKAlSCXJlcXVlc3RJZA==');
 
 @$core.Deprecated('Use storageStateDescriptor instead')
 const StorageState$json = {

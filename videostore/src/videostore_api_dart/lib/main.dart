@@ -61,7 +61,7 @@ Future<void> main() async {
     int totalStreamedBytes = 0;
     final sw = Stopwatch()..start();
     bool done = false;
-    final stream = videostore.fetchStream(from, to);
+    final stream = videostore.fetchStream(from, to, "fmp4");
     late StreamSubscription<List<int>> sub;
     sub = stream.listen(
         (chunk) {
@@ -87,7 +87,7 @@ Future<void> main() async {
 
     // Test unary fetch
     print('Unary fetch from $from to $to');
-    final result = await videostore.fetch(from, to);
+    final result = await videostore.fetch(from, to, "mp4");
     print('Unary fetch complete, Bytes: ${result.video_data.length}');
 
     // Gracefully shutdown flutter app

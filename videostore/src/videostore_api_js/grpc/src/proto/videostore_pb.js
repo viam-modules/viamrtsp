@@ -6,25 +6,29 @@
 import { proto3 } from "@bufbuild/protobuf";
 
 /**
- * @generated from message viammodules.service.videostore.v1.FetchStreamRequest
+ * @generated from message viammodules.service.videostore.v1.SaveRequest
  */
-export const FetchStreamRequest = /*@__PURE__*/ proto3.makeMessageType(
-  "viammodules.service.videostore.v1.FetchStreamRequest",
+export const SaveRequest = /*@__PURE__*/ proto3.makeMessageType(
+  "viammodules.service.videostore.v1.SaveRequest",
   () => [
     { no: 1, name: "name", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 2, name: "from", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 3, name: "to", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 4, name: "container", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 5, name: "metadata", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 6, name: "async", kind: "scalar", T: 8 /* ScalarType.BOOL */ },
+    { no: 7, name: "request_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
   ],
 );
 
 /**
- * @generated from message viammodules.service.videostore.v1.FetchStreamResponse
+ * @generated from message viammodules.service.videostore.v1.SaveResponse
  */
-export const FetchStreamResponse = /*@__PURE__*/ proto3.makeMessageType(
-  "viammodules.service.videostore.v1.FetchStreamResponse",
+export const SaveResponse = /*@__PURE__*/ proto3.makeMessageType(
+  "viammodules.service.videostore.v1.SaveResponse",
   () => [
-    { no: 1, name: "video_data", kind: "scalar", T: 12 /* ScalarType.BYTES */ },
+    { no: 1, name: "filename", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "request_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
   ],
 );
 
@@ -38,6 +42,7 @@ export const FetchRequest = /*@__PURE__*/ proto3.makeMessageType(
     { no: 2, name: "from", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 3, name: "to", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 4, name: "container", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 5, name: "request_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
   ],
 );
 
@@ -48,29 +53,32 @@ export const FetchResponse = /*@__PURE__*/ proto3.makeMessageType(
   "viammodules.service.videostore.v1.FetchResponse",
   () => [
     { no: 1, name: "video_data", kind: "scalar", T: 12 /* ScalarType.BYTES */ },
+    { no: 2, name: "request_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
   ],
 );
 
 /**
- * @generated from message viammodules.service.videostore.v1.SaveRequest
+ * @generated from message viammodules.service.videostore.v1.FetchStreamRequest
  */
-export const SaveRequest = /*@__PURE__*/ proto3.makeMessageType(
-  "viammodules.service.videostore.v1.SaveRequest",
+export const FetchStreamRequest = /*@__PURE__*/ proto3.makeMessageType(
+  "viammodules.service.videostore.v1.FetchStreamRequest",
   () => [
     { no: 1, name: "name", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 2, name: "from", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 3, name: "to", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 4, name: "container", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 5, name: "request_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
   ],
 );
 
 /**
- * @generated from message viammodules.service.videostore.v1.SaveResponse
+ * @generated from message viammodules.service.videostore.v1.FetchStreamResponse
  */
-export const SaveResponse = /*@__PURE__*/ proto3.makeMessageType(
-  "viammodules.service.videostore.v1.SaveResponse",
+export const FetchStreamResponse = /*@__PURE__*/ proto3.makeMessageType(
+  "viammodules.service.videostore.v1.FetchStreamResponse",
   () => [
-    { no: 1, name: "filename", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 1, name: "video_data", kind: "scalar", T: 12 /* ScalarType.BYTES */ },
+    { no: 2, name: "request_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
   ],
 );
 
@@ -81,6 +89,7 @@ export const GetStorageStateRequest = /*@__PURE__*/ proto3.makeMessageType(
   "viammodules.service.videostore.v1.GetStorageStateRequest",
   () => [
     { no: 1, name: "name", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "request_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
   ],
 );
 
@@ -91,6 +100,7 @@ export const GetStorageStateResponse = /*@__PURE__*/ proto3.makeMessageType(
   "viammodules.service.videostore.v1.GetStorageStateResponse",
   () => [
     { no: 1, name: "state", kind: "message", T: StorageState },
+    { no: 2, name: "request_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
   ],
 );
 

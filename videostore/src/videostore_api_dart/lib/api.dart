@@ -4,6 +4,7 @@ import 'grpc/src/proto/videostore.pb.dart';
 import 'grpc/src/proto/videostore.pbgrpc.dart';
 import 'package:viam_sdk/viam_sdk.dart';
 import 'dart:async';
+import 'package:uuid/uuid.dart';
 
 // Need to fire off this before fetching videostore resources
 // This is done automatically with built-in SDK resources
@@ -28,24 +29,28 @@ void ensureVideostoreRegistered() {
 */
 class FetchResult {
     List<int> video_data;
+    String request_id;
     FetchResult({
       required this.video_data,
+      required this.request_id,
     });
 }
 
 class SaveResult {
     String filename;
+    String request_id;
     SaveResult({
       required this.filename,
+      required this.request_id,
     });
 }
 
 // Create wrapped class for grpc client and server
 abstract class VideoStore extends Resource {
     static const Subtype subtype = Subtype('viam-modules', 'service', 'videostore');
-    Future<FetchResult> fetch(String from, String to);
-    Future<SaveResult> save(String from, String to);
-    Stream<List<int>> fetchStream(String from, String to);
+    Future<SaveResult> save(String from, String to, String container, String metadata, bool async);
+    Future<FetchResult> fetch(String from, String to, String container);
+    Stream<List<int>> fetchStream(String from, String to, String container);
     static ResourceName getResourceName(String name) {
         return VideoStore.subtype.getResourceName(name);
     }
@@ -67,32 +72,39 @@ class VideostoreClient extends VideoStore with RPCDebugLoggerMixin implements Re
     VideostoreClient(this.name, this.channel);
 
     @override
-    Future<FetchResult> fetch(String from, String to) async {
-        final request = FetchRequest()
-            ..name = name
-            ..from = from
-            ..to = to;
-        final response = await client.fetch(request);
-        return FetchResult(video_data: response.videoData);
-    }
-
-    @override
-    Future<SaveResult> save(String from, String to) async {
+    Future<SaveResult> save(String from, String to, String container, String metadata, bool async) async {
         final request = SaveRequest()
             ..name = name
             ..from = from
-            ..to = to;
+            ..to = to
+            ..container = container
+            ..metadata = metadata
+            ..async = async
+            ..requestId = Uuid().v4();
         final response = await client.save(request);
-        return SaveResult(filename: response.filename);
+        return SaveResult(filename: response.filename, request_id: request.requestId);
     }
 
     @override
-    Stream<List<int>> fetchStream(String from, String to) {
+    Future<FetchResult> fetch(String from, String to, String container) async {
+        final request = FetchRequest()
+            ..name = name
+            ..from = from
+            ..to = to
+            ..container = container
+            ..requestId = Uuid().v4();
+        final response = await client.fetch(request);
+        return FetchResult(video_data: response.videoData, request_id: request.requestId);
+    }
+
+    @override
+    Stream<List<int>> fetchStream(String from, String to, String container) {
         final request = FetchStreamRequest()
             ..name = name
             ..from = from
-            ..to = to;
-
+            ..to = to
+            ..container = container
+            ..requestId = Uuid().v4();
         final response = client.fetchStream(request);
         final mapped = response.map((resp) {
             return resp.videoData;

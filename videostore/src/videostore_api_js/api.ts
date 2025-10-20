@@ -6,11 +6,12 @@ import { videostoreService } from './grpc/src/proto/videostore_connect.js';
 import * as pb from './grpc/src/proto/videostore_pb.js';
 
 export interface Videostore extends Viam.Resource {
-    fetch(from: string, to: string): Promise<Uint8Array>;
-    save(from: string, to: string): Promise<string>;
+    fetch(from: string, to: string, container: string): Promise<Uint8Array>;
+    save(from: string, to: string, container: string, metadata: string, async: boolean): Promise<string>;
     fetchStream(
         from: string,
         to: string,
+        container: string,
         onChunk: (chunk: Uint8Array) => void
     ): Promise<void>;
     doCommand(command: Struct): Promise<JsonValue>;
@@ -35,6 +36,7 @@ export class VideostoreClient extends Viam.Client {
             from: from,
             to: to,
             container: container,
+            requestId: crypto.randomUUID(),
         });
 
         this.options.requestLogger?.(req);
@@ -42,12 +44,15 @@ export class VideostoreClient extends Viam.Client {
         return res.videoData;
     }
 
-    async save(from: string, to: string, container: string): Promise<string> {
+    async save(from: string, to: string, container: string, metadata: string, async: boolean): Promise<string> {
         const req = new pb.SaveRequest({
             name: this.name,
             from: from,
             to: to,
             container: container,
+            metadata: metadata,
+            async: async,
+            requestId: crypto.randomUUID(),
         });
 
         this.options.requestLogger?.(req);
@@ -66,8 +71,8 @@ export class VideostoreClient extends Viam.Client {
             from: from,
             to: to,
             container: container,
+            requestId: crypto.randomUUID(),
         });
-        console.log("fetchStream request:", req);
         this.options.requestLogger?.(req);
         try {
             const stream = this.client.fetchStream(req);

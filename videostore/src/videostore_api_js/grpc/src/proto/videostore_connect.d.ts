@@ -13,13 +13,13 @@ export declare const videostoreService: {
   readonly typeName: "viammodules.service.videostore.v1.videostoreService",
   readonly methods: {
     /**
-     * @generated from rpc viammodules.service.videostore.v1.videostoreService.FetchStream
+     * @generated from rpc viammodules.service.videostore.v1.videostoreService.Save
      */
-    readonly fetchStream: {
-      readonly name: "FetchStream",
-      readonly I: typeof FetchStreamRequest,
-      readonly O: typeof FetchStreamResponse,
-      readonly kind: MethodKind.ServerStreaming,
+    readonly save: {
+      readonly name: "Save",
+      readonly I: typeof SaveRequest,
+      readonly O: typeof SaveResponse,
+      readonly kind: MethodKind.Unary,
     },
     /**
      * @generated from rpc viammodules.service.videostore.v1.videostoreService.Fetch
@@ -31,13 +31,13 @@ export declare const videostoreService: {
       readonly kind: MethodKind.Unary,
     },
     /**
-     * @generated from rpc viammodules.service.videostore.v1.videostoreService.Save
+     * @generated from rpc viammodules.service.videostore.v1.videostoreService.FetchStream
      */
-    readonly save: {
-      readonly name: "Save",
-      readonly I: typeof SaveRequest,
-      readonly O: typeof SaveResponse,
-      readonly kind: MethodKind.Unary,
+    readonly fetchStream: {
+      readonly name: "FetchStream",
+      readonly I: typeof FetchStreamRequest,
+      readonly O: typeof FetchStreamResponse,
+      readonly kind: MethodKind.ServerStreaming,
     },
     /**
      * @generated from rpc viammodules.service.videostore.v1.videostoreService.GetStorageState

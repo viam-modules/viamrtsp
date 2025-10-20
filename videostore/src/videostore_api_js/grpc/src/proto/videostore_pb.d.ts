@@ -7,9 +7,9 @@ import type { BinaryReadOptions, FieldList, JsonReadOptions, JsonValue, PartialM
 import { Message, proto3 } from "@bufbuild/protobuf";
 
 /**
- * @generated from message viammodules.service.videostore.v1.FetchStreamRequest
+ * @generated from message viammodules.service.videostore.v1.SaveRequest
  */
-export declare class FetchStreamRequest extends Message<FetchStreamRequest> {
+export declare class SaveRequest extends Message<SaveRequest> {
   /**
    * @generated from field: string name = 1;
    */
@@ -32,43 +32,63 @@ export declare class FetchStreamRequest extends Message<FetchStreamRequest> {
    */
   container: string;
 
-  constructor(data?: PartialMessage<FetchStreamRequest>);
+  /**
+   * @generated from field: string metadata = 5;
+   */
+  metadata: string;
+
+  /**
+   * @generated from field: bool async = 6;
+   */
+  async: boolean;
+
+  /**
+   * @generated from field: string request_id = 7;
+   */
+  requestId: string;
+
+  constructor(data?: PartialMessage<SaveRequest>);
 
   static readonly runtime: typeof proto3;
-  static readonly typeName = "viammodules.service.videostore.v1.FetchStreamRequest";
+  static readonly typeName = "viammodules.service.videostore.v1.SaveRequest";
   static readonly fields: FieldList;
 
-  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): FetchStreamRequest;
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): SaveRequest;
 
-  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): FetchStreamRequest;
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): SaveRequest;
 
-  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): FetchStreamRequest;
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): SaveRequest;
 
-  static equals(a: FetchStreamRequest | PlainMessage<FetchStreamRequest> | undefined, b: FetchStreamRequest | PlainMessage<FetchStreamRequest> | undefined): boolean;
+  static equals(a: SaveRequest | PlainMessage<SaveRequest> | undefined, b: SaveRequest | PlainMessage<SaveRequest> | undefined): boolean;
 }
 
 /**
- * @generated from message viammodules.service.videostore.v1.FetchStreamResponse
+ * @generated from message viammodules.service.videostore.v1.SaveResponse
  */
-export declare class FetchStreamResponse extends Message<FetchStreamResponse> {
+export declare class SaveResponse extends Message<SaveResponse> {
   /**
-   * @generated from field: bytes video_data = 1;
+   * @generated from field: string filename = 1;
    */
-  videoData: Uint8Array;
+  filename: string;
 
-  constructor(data?: PartialMessage<FetchStreamResponse>);
+  /**
+   * @generated from field: string request_id = 2;
+   */
+  requestId: string;
+
+  constructor(data?: PartialMessage<SaveResponse>);
 
   static readonly runtime: typeof proto3;
-  static readonly typeName = "viammodules.service.videostore.v1.FetchStreamResponse";
+  static readonly typeName = "viammodules.service.videostore.v1.SaveResponse";
   static readonly fields: FieldList;
 
-  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): FetchStreamResponse;
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): SaveResponse;
 
-  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): FetchStreamResponse;
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): SaveResponse;
 
-  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): FetchStreamResponse;
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): SaveResponse;
 
-  static equals(a: FetchStreamResponse | PlainMessage<FetchStreamResponse> | undefined, b: FetchStreamResponse | PlainMessage<FetchStreamResponse> | undefined): boolean;
+  static equals(a: SaveResponse | PlainMessage<SaveResponse> | undefined, b: SaveResponse | PlainMessage<SaveResponse> | undefined): boolean;
 }
 
 /**
@@ -95,6 +115,11 @@ export declare class FetchRequest extends Message<FetchRequest> {
    */
   container: string;
 
+  /**
+   * @generated from field: string request_id = 5;
+   */
+  requestId: string;
+
   constructor(data?: PartialMessage<FetchRequest>);
 
   static readonly runtime: typeof proto3;
@@ -119,6 +144,11 @@ export declare class FetchResponse extends Message<FetchResponse> {
    */
   videoData: Uint8Array;
 
+  /**
+   * @generated from field: string request_id = 2;
+   */
+  requestId: string;
+
   constructor(data?: PartialMessage<FetchResponse>);
 
   static readonly runtime: typeof proto3;
@@ -135,9 +165,9 @@ export declare class FetchResponse extends Message<FetchResponse> {
 }
 
 /**
- * @generated from message viammodules.service.videostore.v1.SaveRequest
+ * @generated from message viammodules.service.videostore.v1.FetchStreamRequest
  */
-export declare class SaveRequest extends Message<SaveRequest> {
+export declare class FetchStreamRequest extends Message<FetchStreamRequest> {
   /**
    * @generated from field: string name = 1;
    */
@@ -154,47 +184,59 @@ export declare class SaveRequest extends Message<SaveRequest> {
   to: string;
 
   /**
+   * e.g., "mp4", "fmp4"
+   *
    * @generated from field: string container = 4;
    */
   container: string;
 
-  constructor(data?: PartialMessage<SaveRequest>);
+  /**
+   * @generated from field: string request_id = 5;
+   */
+  requestId: string;
+
+  constructor(data?: PartialMessage<FetchStreamRequest>);
 
   static readonly runtime: typeof proto3;
-  static readonly typeName = "viammodules.service.videostore.v1.SaveRequest";
+  static readonly typeName = "viammodules.service.videostore.v1.FetchStreamRequest";
   static readonly fields: FieldList;
 
-  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): SaveRequest;
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): FetchStreamRequest;
 
-  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): SaveRequest;
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): FetchStreamRequest;
 
-  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): SaveRequest;
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): FetchStreamRequest;
 
-  static equals(a: SaveRequest | PlainMessage<SaveRequest> | undefined, b: SaveRequest | PlainMessage<SaveRequest> | undefined): boolean;
+  static equals(a: FetchStreamRequest | PlainMessage<FetchStreamRequest> | undefined, b: FetchStreamRequest | PlainMessage<FetchStreamRequest> | undefined): boolean;
 }
 
 /**
- * @generated from message viammodules.service.videostore.v1.SaveResponse
+ * @generated from message viammodules.service.videostore.v1.FetchStreamResponse
  */
-export declare class SaveResponse extends Message<SaveResponse> {
+export declare class FetchStreamResponse extends Message<FetchStreamResponse> {
   /**
-   * @generated from field: string filename = 1;
+   * @generated from field: bytes video_data = 1;
    */
-  filename: string;
+  videoData: Uint8Array;
 
-  constructor(data?: PartialMessage<SaveResponse>);
+  /**
+   * @generated from field: string request_id = 2;
+   */
+  requestId: string;
+
+  constructor(data?: PartialMessage<FetchStreamResponse>);
 
   static readonly runtime: typeof proto3;
-  static readonly typeName = "viammodules.service.videostore.v1.SaveResponse";
+  static readonly typeName = "viammodules.service.videostore.v1.FetchStreamResponse";
   static readonly fields: FieldList;
 
-  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): SaveResponse;
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): FetchStreamResponse;
 
-  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): SaveResponse;
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): FetchStreamResponse;
 
-  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): SaveResponse;
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): FetchStreamResponse;
 
-  static equals(a: SaveResponse | PlainMessage<SaveResponse> | undefined, b: SaveResponse | PlainMessage<SaveResponse> | undefined): boolean;
+  static equals(a: FetchStreamResponse | PlainMessage<FetchStreamResponse> | undefined, b: FetchStreamResponse | PlainMessage<FetchStreamResponse> | undefined): boolean;
 }
 
 /**
@@ -205,6 +247,11 @@ export declare class GetStorageStateRequest extends Message<GetStorageStateReque
    * @generated from field: string name = 1;
    */
   name: string;
+
+  /**
+   * @generated from field: string request_id = 2;
+   */
+  requestId: string;
 
   constructor(data?: PartialMessage<GetStorageStateRequest>);
 
@@ -229,6 +276,11 @@ export declare class GetStorageStateResponse extends Message<GetStorageStateResp
    * @generated from field: viammodules.service.videostore.v1.StorageState state = 1;
    */
   state?: StorageState;
+
+  /**
+   * @generated from field: string request_id = 2;
+   */
+  requestId: string;
 
   constructor(data?: PartialMessage<GetStorageStateResponse>);
 

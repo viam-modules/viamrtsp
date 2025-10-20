@@ -14,296 +14,15 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
-class FetchStreamRequest extends $pb.GeneratedMessage {
-  factory FetchStreamRequest({
-    $core.String? name,
-    $core.String? from,
-    $core.String? to,
-    $core.String? container,
-  }) {
-    final $result = create();
-    if (name != null) {
-      $result.name = name;
-    }
-    if (from != null) {
-      $result.from = from;
-    }
-    if (to != null) {
-      $result.to = to;
-    }
-    if (container != null) {
-      $result.container = container;
-    }
-    return $result;
-  }
-  FetchStreamRequest._() : super();
-  factory FetchStreamRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
-  factory FetchStreamRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'FetchStreamRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'viammodules.service.videostore.v1'), createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'name')
-    ..aOS(2, _omitFieldNames ? '' : 'from')
-    ..aOS(3, _omitFieldNames ? '' : 'to')
-    ..aOS(4, _omitFieldNames ? '' : 'container')
-    ..hasRequiredFields = false
-  ;
-
-  @$core.Deprecated(
-  'Using this can add significant overhead to your binary. '
-  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
-  'Will be removed in next major version')
-  FetchStreamRequest clone() => FetchStreamRequest()..mergeFromMessage(this);
-  @$core.Deprecated(
-  'Using this can add significant overhead to your binary. '
-  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
-  'Will be removed in next major version')
-  FetchStreamRequest copyWith(void Function(FetchStreamRequest) updates) => super.copyWith((message) => updates(message as FetchStreamRequest)) as FetchStreamRequest;
-
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static FetchStreamRequest create() => FetchStreamRequest._();
-  FetchStreamRequest createEmptyInstance() => create();
-  static $pb.PbList<FetchStreamRequest> createRepeated() => $pb.PbList<FetchStreamRequest>();
-  @$core.pragma('dart2js:noInline')
-  static FetchStreamRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<FetchStreamRequest>(create);
-  static FetchStreamRequest? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.String get name => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set name($core.String v) { $_setString(0, v); }
-  @$pb.TagNumber(1)
-  $core.bool hasName() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearName() => clearField(1);
-
-  @$pb.TagNumber(2)
-  $core.String get from => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set from($core.String v) { $_setString(1, v); }
-  @$pb.TagNumber(2)
-  $core.bool hasFrom() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearFrom() => clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.String get to => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set to($core.String v) { $_setString(2, v); }
-  @$pb.TagNumber(3)
-  $core.bool hasTo() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearTo() => clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.String get container => $_getSZ(3);
-  @$pb.TagNumber(4)
-  set container($core.String v) { $_setString(3, v); }
-  @$pb.TagNumber(4)
-  $core.bool hasContainer() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearContainer() => clearField(4);
-}
-
-class FetchStreamResponse extends $pb.GeneratedMessage {
-  factory FetchStreamResponse({
-    $core.List<$core.int>? videoData,
-  }) {
-    final $result = create();
-    if (videoData != null) {
-      $result.videoData = videoData;
-    }
-    return $result;
-  }
-  FetchStreamResponse._() : super();
-  factory FetchStreamResponse.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
-  factory FetchStreamResponse.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'FetchStreamResponse', package: const $pb.PackageName(_omitMessageNames ? '' : 'viammodules.service.videostore.v1'), createEmptyInstance: create)
-    ..a<$core.List<$core.int>>(1, _omitFieldNames ? '' : 'videoData', $pb.PbFieldType.OY)
-    ..hasRequiredFields = false
-  ;
-
-  @$core.Deprecated(
-  'Using this can add significant overhead to your binary. '
-  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
-  'Will be removed in next major version')
-  FetchStreamResponse clone() => FetchStreamResponse()..mergeFromMessage(this);
-  @$core.Deprecated(
-  'Using this can add significant overhead to your binary. '
-  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
-  'Will be removed in next major version')
-  FetchStreamResponse copyWith(void Function(FetchStreamResponse) updates) => super.copyWith((message) => updates(message as FetchStreamResponse)) as FetchStreamResponse;
-
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static FetchStreamResponse create() => FetchStreamResponse._();
-  FetchStreamResponse createEmptyInstance() => create();
-  static $pb.PbList<FetchStreamResponse> createRepeated() => $pb.PbList<FetchStreamResponse>();
-  @$core.pragma('dart2js:noInline')
-  static FetchStreamResponse getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<FetchStreamResponse>(create);
-  static FetchStreamResponse? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.List<$core.int> get videoData => $_getN(0);
-  @$pb.TagNumber(1)
-  set videoData($core.List<$core.int> v) { $_setBytes(0, v); }
-  @$pb.TagNumber(1)
-  $core.bool hasVideoData() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearVideoData() => clearField(1);
-}
-
-class FetchRequest extends $pb.GeneratedMessage {
-  factory FetchRequest({
-    $core.String? name,
-    $core.String? from,
-    $core.String? to,
-    $core.String? container,
-  }) {
-    final $result = create();
-    if (name != null) {
-      $result.name = name;
-    }
-    if (from != null) {
-      $result.from = from;
-    }
-    if (to != null) {
-      $result.to = to;
-    }
-    if (container != null) {
-      $result.container = container;
-    }
-    return $result;
-  }
-  FetchRequest._() : super();
-  factory FetchRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
-  factory FetchRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'FetchRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'viammodules.service.videostore.v1'), createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'name')
-    ..aOS(2, _omitFieldNames ? '' : 'from')
-    ..aOS(3, _omitFieldNames ? '' : 'to')
-    ..aOS(4, _omitFieldNames ? '' : 'container')
-    ..hasRequiredFields = false
-  ;
-
-  @$core.Deprecated(
-  'Using this can add significant overhead to your binary. '
-  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
-  'Will be removed in next major version')
-  FetchRequest clone() => FetchRequest()..mergeFromMessage(this);
-  @$core.Deprecated(
-  'Using this can add significant overhead to your binary. '
-  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
-  'Will be removed in next major version')
-  FetchRequest copyWith(void Function(FetchRequest) updates) => super.copyWith((message) => updates(message as FetchRequest)) as FetchRequest;
-
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static FetchRequest create() => FetchRequest._();
-  FetchRequest createEmptyInstance() => create();
-  static $pb.PbList<FetchRequest> createRepeated() => $pb.PbList<FetchRequest>();
-  @$core.pragma('dart2js:noInline')
-  static FetchRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<FetchRequest>(create);
-  static FetchRequest? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.String get name => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set name($core.String v) { $_setString(0, v); }
-  @$pb.TagNumber(1)
-  $core.bool hasName() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearName() => clearField(1);
-
-  @$pb.TagNumber(2)
-  $core.String get from => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set from($core.String v) { $_setString(1, v); }
-  @$pb.TagNumber(2)
-  $core.bool hasFrom() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearFrom() => clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.String get to => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set to($core.String v) { $_setString(2, v); }
-  @$pb.TagNumber(3)
-  $core.bool hasTo() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearTo() => clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.String get container => $_getSZ(3);
-  @$pb.TagNumber(4)
-  set container($core.String v) { $_setString(3, v); }
-  @$pb.TagNumber(4)
-  $core.bool hasContainer() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearContainer() => clearField(4);
-}
-
-class FetchResponse extends $pb.GeneratedMessage {
-  factory FetchResponse({
-    $core.List<$core.int>? videoData,
-  }) {
-    final $result = create();
-    if (videoData != null) {
-      $result.videoData = videoData;
-    }
-    return $result;
-  }
-  FetchResponse._() : super();
-  factory FetchResponse.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
-  factory FetchResponse.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'FetchResponse', package: const $pb.PackageName(_omitMessageNames ? '' : 'viammodules.service.videostore.v1'), createEmptyInstance: create)
-    ..a<$core.List<$core.int>>(1, _omitFieldNames ? '' : 'videoData', $pb.PbFieldType.OY)
-    ..hasRequiredFields = false
-  ;
-
-  @$core.Deprecated(
-  'Using this can add significant overhead to your binary. '
-  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
-  'Will be removed in next major version')
-  FetchResponse clone() => FetchResponse()..mergeFromMessage(this);
-  @$core.Deprecated(
-  'Using this can add significant overhead to your binary. '
-  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
-  'Will be removed in next major version')
-  FetchResponse copyWith(void Function(FetchResponse) updates) => super.copyWith((message) => updates(message as FetchResponse)) as FetchResponse;
-
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static FetchResponse create() => FetchResponse._();
-  FetchResponse createEmptyInstance() => create();
-  static $pb.PbList<FetchResponse> createRepeated() => $pb.PbList<FetchResponse>();
-  @$core.pragma('dart2js:noInline')
-  static FetchResponse getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<FetchResponse>(create);
-  static FetchResponse? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.List<$core.int> get videoData => $_getN(0);
-  @$pb.TagNumber(1)
-  set videoData($core.List<$core.int> v) { $_setBytes(0, v); }
-  @$pb.TagNumber(1)
-  $core.bool hasVideoData() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearVideoData() => clearField(1);
-}
-
 class SaveRequest extends $pb.GeneratedMessage {
   factory SaveRequest({
     $core.String? name,
     $core.String? from,
     $core.String? to,
     $core.String? container,
+    $core.String? metadata,
+    $core.bool? async,
+    $core.String? requestId,
   }) {
     final $result = create();
     if (name != null) {
@@ -317,6 +36,15 @@ class SaveRequest extends $pb.GeneratedMessage {
     }
     if (container != null) {
       $result.container = container;
+    }
+    if (metadata != null) {
+      $result.metadata = metadata;
+    }
+    if (async != null) {
+      $result.async = async;
+    }
+    if (requestId != null) {
+      $result.requestId = requestId;
     }
     return $result;
   }
@@ -329,6 +57,9 @@ class SaveRequest extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'from')
     ..aOS(3, _omitFieldNames ? '' : 'to')
     ..aOS(4, _omitFieldNames ? '' : 'container')
+    ..aOS(5, _omitFieldNames ? '' : 'metadata')
+    ..aOB(6, _omitFieldNames ? '' : 'async')
+    ..aOS(7, _omitFieldNames ? '' : 'requestId')
     ..hasRequiredFields = false
   ;
 
@@ -388,15 +119,46 @@ class SaveRequest extends $pb.GeneratedMessage {
   $core.bool hasContainer() => $_has(3);
   @$pb.TagNumber(4)
   void clearContainer() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get metadata => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set metadata($core.String v) { $_setString(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasMetadata() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearMetadata() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.bool get async => $_getBF(5);
+  @$pb.TagNumber(6)
+  set async($core.bool v) { $_setBool(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasAsync() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearAsync() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.String get requestId => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set requestId($core.String v) { $_setString(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasRequestId() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearRequestId() => clearField(7);
 }
 
 class SaveResponse extends $pb.GeneratedMessage {
   factory SaveResponse({
     $core.String? filename,
+    $core.String? requestId,
   }) {
     final $result = create();
     if (filename != null) {
       $result.filename = filename;
+    }
+    if (requestId != null) {
+      $result.requestId = requestId;
     }
     return $result;
   }
@@ -406,6 +168,7 @@ class SaveResponse extends $pb.GeneratedMessage {
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'SaveResponse', package: const $pb.PackageName(_omitMessageNames ? '' : 'viammodules.service.videostore.v1'), createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'filename')
+    ..aOS(2, _omitFieldNames ? '' : 'requestId')
     ..hasRequiredFields = false
   ;
 
@@ -438,15 +201,368 @@ class SaveResponse extends $pb.GeneratedMessage {
   $core.bool hasFilename() => $_has(0);
   @$pb.TagNumber(1)
   void clearFilename() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get requestId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set requestId($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasRequestId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRequestId() => clearField(2);
+}
+
+class FetchRequest extends $pb.GeneratedMessage {
+  factory FetchRequest({
+    $core.String? name,
+    $core.String? from,
+    $core.String? to,
+    $core.String? container,
+    $core.String? requestId,
+  }) {
+    final $result = create();
+    if (name != null) {
+      $result.name = name;
+    }
+    if (from != null) {
+      $result.from = from;
+    }
+    if (to != null) {
+      $result.to = to;
+    }
+    if (container != null) {
+      $result.container = container;
+    }
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    return $result;
+  }
+  FetchRequest._() : super();
+  factory FetchRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory FetchRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'FetchRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'viammodules.service.videostore.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'name')
+    ..aOS(2, _omitFieldNames ? '' : 'from')
+    ..aOS(3, _omitFieldNames ? '' : 'to')
+    ..aOS(4, _omitFieldNames ? '' : 'container')
+    ..aOS(5, _omitFieldNames ? '' : 'requestId')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  FetchRequest clone() => FetchRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  FetchRequest copyWith(void Function(FetchRequest) updates) => super.copyWith((message) => updates(message as FetchRequest)) as FetchRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static FetchRequest create() => FetchRequest._();
+  FetchRequest createEmptyInstance() => create();
+  static $pb.PbList<FetchRequest> createRepeated() => $pb.PbList<FetchRequest>();
+  @$core.pragma('dart2js:noInline')
+  static FetchRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<FetchRequest>(create);
+  static FetchRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get name => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set name($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasName() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearName() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get from => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set from($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasFrom() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearFrom() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get to => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set to($core.String v) { $_setString(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasTo() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearTo() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get container => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set container($core.String v) { $_setString(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasContainer() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearContainer() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get requestId => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set requestId($core.String v) { $_setString(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasRequestId() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearRequestId() => clearField(5);
+}
+
+class FetchResponse extends $pb.GeneratedMessage {
+  factory FetchResponse({
+    $core.List<$core.int>? videoData,
+    $core.String? requestId,
+  }) {
+    final $result = create();
+    if (videoData != null) {
+      $result.videoData = videoData;
+    }
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    return $result;
+  }
+  FetchResponse._() : super();
+  factory FetchResponse.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory FetchResponse.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'FetchResponse', package: const $pb.PackageName(_omitMessageNames ? '' : 'viammodules.service.videostore.v1'), createEmptyInstance: create)
+    ..a<$core.List<$core.int>>(1, _omitFieldNames ? '' : 'videoData', $pb.PbFieldType.OY)
+    ..aOS(2, _omitFieldNames ? '' : 'requestId')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  FetchResponse clone() => FetchResponse()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  FetchResponse copyWith(void Function(FetchResponse) updates) => super.copyWith((message) => updates(message as FetchResponse)) as FetchResponse;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static FetchResponse create() => FetchResponse._();
+  FetchResponse createEmptyInstance() => create();
+  static $pb.PbList<FetchResponse> createRepeated() => $pb.PbList<FetchResponse>();
+  @$core.pragma('dart2js:noInline')
+  static FetchResponse getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<FetchResponse>(create);
+  static FetchResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.List<$core.int> get videoData => $_getN(0);
+  @$pb.TagNumber(1)
+  set videoData($core.List<$core.int> v) { $_setBytes(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasVideoData() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearVideoData() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get requestId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set requestId($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasRequestId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRequestId() => clearField(2);
+}
+
+class FetchStreamRequest extends $pb.GeneratedMessage {
+  factory FetchStreamRequest({
+    $core.String? name,
+    $core.String? from,
+    $core.String? to,
+    $core.String? container,
+    $core.String? requestId,
+  }) {
+    final $result = create();
+    if (name != null) {
+      $result.name = name;
+    }
+    if (from != null) {
+      $result.from = from;
+    }
+    if (to != null) {
+      $result.to = to;
+    }
+    if (container != null) {
+      $result.container = container;
+    }
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    return $result;
+  }
+  FetchStreamRequest._() : super();
+  factory FetchStreamRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory FetchStreamRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'FetchStreamRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'viammodules.service.videostore.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'name')
+    ..aOS(2, _omitFieldNames ? '' : 'from')
+    ..aOS(3, _omitFieldNames ? '' : 'to')
+    ..aOS(4, _omitFieldNames ? '' : 'container')
+    ..aOS(5, _omitFieldNames ? '' : 'requestId')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  FetchStreamRequest clone() => FetchStreamRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  FetchStreamRequest copyWith(void Function(FetchStreamRequest) updates) => super.copyWith((message) => updates(message as FetchStreamRequest)) as FetchStreamRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static FetchStreamRequest create() => FetchStreamRequest._();
+  FetchStreamRequest createEmptyInstance() => create();
+  static $pb.PbList<FetchStreamRequest> createRepeated() => $pb.PbList<FetchStreamRequest>();
+  @$core.pragma('dart2js:noInline')
+  static FetchStreamRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<FetchStreamRequest>(create);
+  static FetchStreamRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get name => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set name($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasName() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearName() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get from => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set from($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasFrom() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearFrom() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get to => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set to($core.String v) { $_setString(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasTo() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearTo() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get container => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set container($core.String v) { $_setString(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasContainer() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearContainer() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get requestId => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set requestId($core.String v) { $_setString(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasRequestId() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearRequestId() => clearField(5);
+}
+
+class FetchStreamResponse extends $pb.GeneratedMessage {
+  factory FetchStreamResponse({
+    $core.List<$core.int>? videoData,
+    $core.String? requestId,
+  }) {
+    final $result = create();
+    if (videoData != null) {
+      $result.videoData = videoData;
+    }
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    return $result;
+  }
+  FetchStreamResponse._() : super();
+  factory FetchStreamResponse.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory FetchStreamResponse.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'FetchStreamResponse', package: const $pb.PackageName(_omitMessageNames ? '' : 'viammodules.service.videostore.v1'), createEmptyInstance: create)
+    ..a<$core.List<$core.int>>(1, _omitFieldNames ? '' : 'videoData', $pb.PbFieldType.OY)
+    ..aOS(2, _omitFieldNames ? '' : 'requestId')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  FetchStreamResponse clone() => FetchStreamResponse()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  FetchStreamResponse copyWith(void Function(FetchStreamResponse) updates) => super.copyWith((message) => updates(message as FetchStreamResponse)) as FetchStreamResponse;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static FetchStreamResponse create() => FetchStreamResponse._();
+  FetchStreamResponse createEmptyInstance() => create();
+  static $pb.PbList<FetchStreamResponse> createRepeated() => $pb.PbList<FetchStreamResponse>();
+  @$core.pragma('dart2js:noInline')
+  static FetchStreamResponse getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<FetchStreamResponse>(create);
+  static FetchStreamResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.List<$core.int> get videoData => $_getN(0);
+  @$pb.TagNumber(1)
+  set videoData($core.List<$core.int> v) { $_setBytes(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasVideoData() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearVideoData() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get requestId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set requestId($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasRequestId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRequestId() => clearField(2);
 }
 
 class GetStorageStateRequest extends $pb.GeneratedMessage {
   factory GetStorageStateRequest({
     $core.String? name,
+    $core.String? requestId,
   }) {
     final $result = create();
     if (name != null) {
       $result.name = name;
+    }
+    if (requestId != null) {
+      $result.requestId = requestId;
     }
     return $result;
   }
@@ -456,6 +572,7 @@ class GetStorageStateRequest extends $pb.GeneratedMessage {
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'GetStorageStateRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'viammodules.service.videostore.v1'), createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'name')
+    ..aOS(2, _omitFieldNames ? '' : 'requestId')
     ..hasRequiredFields = false
   ;
 
@@ -488,15 +605,28 @@ class GetStorageStateRequest extends $pb.GeneratedMessage {
   $core.bool hasName() => $_has(0);
   @$pb.TagNumber(1)
   void clearName() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get requestId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set requestId($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasRequestId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRequestId() => clearField(2);
 }
 
 class GetStorageStateResponse extends $pb.GeneratedMessage {
   factory GetStorageStateResponse({
     StorageState? state,
+    $core.String? requestId,
   }) {
     final $result = create();
     if (state != null) {
       $result.state = state;
+    }
+    if (requestId != null) {
+      $result.requestId = requestId;
     }
     return $result;
   }
@@ -506,6 +636,7 @@ class GetStorageStateResponse extends $pb.GeneratedMessage {
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'GetStorageStateResponse', package: const $pb.PackageName(_omitMessageNames ? '' : 'viammodules.service.videostore.v1'), createEmptyInstance: create)
     ..aOM<StorageState>(1, _omitFieldNames ? '' : 'state', subBuilder: StorageState.create)
+    ..aOS(2, _omitFieldNames ? '' : 'requestId')
     ..hasRequiredFields = false
   ;
 
@@ -540,6 +671,15 @@ class GetStorageStateResponse extends $pb.GeneratedMessage {
   void clearState() => clearField(1);
   @$pb.TagNumber(1)
   StorageState ensureState() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  $core.String get requestId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set requestId($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasRequestId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRequestId() => clearField(2);
 }
 
 class StorageState extends $pb.GeneratedMessage {

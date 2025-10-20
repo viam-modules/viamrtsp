@@ -261,7 +261,7 @@ func (s *service) Fetch(ctx context.Context, from, to, container string) ([]byte
 	return res.Video, nil
 }
 
-func (s *service) Save(ctx context.Context, from, to, container string) (string, error) {
+func (s *service) Save(ctx context.Context, from, to, container, metadata string, async bool) (string, error) {
 	fromTS, err := vsutils.ParseDateTimeString(from)
 	if err != nil {
 		return "", err
@@ -273,7 +273,7 @@ func (s *service) Save(ctx context.Context, from, to, container string) (string,
 	if container == "" {
 		container = "mp4"
 	}
-	res, err := s.vs.Save(ctx, &videostore.SaveRequest{From: fromTS, To: toTS, Container: container})
+	res, err := s.vs.Save(ctx, &videostore.SaveRequest{From: fromTS, To: toTS, Container: container, Metadata: metadata, Async: async})
 	if err != nil {
 		return "", err
 	}
