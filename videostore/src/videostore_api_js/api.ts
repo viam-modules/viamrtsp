@@ -6,8 +6,8 @@ import { videostoreService } from './grpc/src/proto/videostore_connect.js';
 import * as pb from './grpc/src/proto/videostore_pb.js';
 
 export interface Videostore extends Viam.Resource {
-    fetch(from: string, to: string, container: string): Promise<Uint8Array>;
     save(from: string, to: string, container: string, metadata: string, async: boolean): Promise<string>;
+    fetch(from: string, to: string, container: string): Promise<Uint8Array>;
     fetchStream(
         from: string,
         to: string,
@@ -77,7 +77,6 @@ export class VideostoreClient extends Viam.Client {
         try {
             const stream = this.client.fetchStream(req);
             for await (const res of stream) {
-                // console.log(`fetchStream response #${res}`); // Log each response
                 onChunk(res.videoData);
             }
         } catch (error) {
