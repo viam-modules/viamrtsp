@@ -251,9 +251,6 @@ func (s *service) Fetch(ctx context.Context, from, to, container string) ([]byte
 	if err != nil {
 		return nil, err
 	}
-	if container == "" {
-		container = "mp4"
-	}
 	res, err := s.vs.Fetch(ctx, &videostore.FetchRequest{From: fromTS, To: toTS, Container: container})
 	if err != nil {
 		return nil, err
@@ -270,9 +267,6 @@ func (s *service) Save(ctx context.Context, from, to, container, metadata string
 	if err != nil {
 		return "", err
 	}
-	if container == "" {
-		container = "mp4"
-	}
 	res, err := s.vs.Save(ctx, &videostore.SaveRequest{From: fromTS, To: toTS, Container: container, Metadata: metadata, Async: async})
 	if err != nil {
 		return "", err
@@ -288,9 +282,6 @@ func (s *service) FetchStream(ctx context.Context, from, to, container string, w
 	toTS, err := vsutils.ParseDateTimeString(to)
 	if err != nil {
 		return err
-	}
-	if container == "" {
-		container = "mp4"
 	}
 	s.logger.Info(fmt.Sprintf("Fetching video stream from %s to %s in container %s", fromTS, toTS, container))
 	req := &videostore.FetchRequest{From: fromTS, To: toTS, Container: container}
