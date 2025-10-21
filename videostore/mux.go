@@ -496,7 +496,7 @@ func (m *rawSegmenterMux) writeH264(au [][]byte, pts int64) error {
 
 	packed, err := h264.AnnexBMarshal(au)
 	if err != nil {
-		m.logger.Errorf("failed to marshal avcc: %s", err)
+		m.logger.Errorf("AnnexBMarshal err: %s", err.Error())
 		return err
 	}
 
