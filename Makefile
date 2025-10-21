@@ -296,7 +296,7 @@ generate: videostore/src/videostore_api_go/grpc/videostore.pb.go $(BUF_BIN)
 
 module: $(BIN_VIAMRTSP)
 	cp $(BIN_VIAMRTSP) bin/viamrtsp$(BIN_SUFFIX)
-	tar czf module.tar.gz bin/viamrtsp$(BIN_S	UFFIX)
+	tar czf module.tar.gz bin/viamrtsp$(BIN_SUFFIX)
 	rm bin/viamrtsp$(BIN_SUFFIX)
 
 clean:
