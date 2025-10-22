@@ -8,6 +8,7 @@ package videostore_api
 
 import (
 	context "context"
+	v1 "go.viam.com/api/common/v1"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -23,6 +24,7 @@ const (
 	VideostoreService_Fetch_FullMethodName           = "/viammodules.service.videostore.v1.videostoreService/Fetch"
 	VideostoreService_FetchStream_FullMethodName     = "/viammodules.service.videostore.v1.videostoreService/FetchStream"
 	VideostoreService_GetStorageState_FullMethodName = "/viammodules.service.videostore.v1.videostoreService/GetStorageState"
+	VideostoreService_DoCommand_FullMethodName       = "/viammodules.service.videostore.v1.videostoreService/DoCommand"
 )
 
 // VideostoreServiceClient is the client API for VideostoreService service.
@@ -33,6 +35,7 @@ type VideostoreServiceClient interface {
 	Fetch(ctx context.Context, in *FetchRequest, opts ...grpc.CallOption) (*FetchResponse, error)
 	FetchStream(ctx context.Context, in *FetchStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[FetchStreamResponse], error)
 	GetStorageState(ctx context.Context, in *GetStorageStateRequest, opts ...grpc.CallOption) (*GetStorageStateResponse, error)
+	DoCommand(ctx context.Context, in *v1.DoCommandRequest, opts ...grpc.CallOption) (*v1.DoCommandResponse, error)
 }
 
 type videostoreServiceClient struct {
@@ -92,6 +95,16 @@ func (c *videostoreServiceClient) GetStorageState(ctx context.Context, in *GetSt
 	return out, nil
 }
 
+func (c *videostoreServiceClient) DoCommand(ctx context.Context, in *v1.DoCommandRequest, opts ...grpc.CallOption) (*v1.DoCommandResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.DoCommandResponse)
+	err := c.cc.Invoke(ctx, VideostoreService_DoCommand_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // VideostoreServiceServer is the server API for VideostoreService service.
 // All implementations must embed UnimplementedVideostoreServiceServer
 // for forward compatibility.
@@ -100,6 +113,7 @@ type VideostoreServiceServer interface {
 	Fetch(context.Context, *FetchRequest) (*FetchResponse, error)
 	FetchStream(*FetchStreamRequest, grpc.ServerStreamingServer[FetchStreamResponse]) error
 	GetStorageState(context.Context, *GetStorageStateRequest) (*GetStorageStateResponse, error)
+	DoCommand(context.Context, *v1.DoCommandRequest) (*v1.DoCommandResponse, error)
 	mustEmbedUnimplementedVideostoreServiceServer()
 }
 
@@ -121,6 +135,9 @@ func (UnimplementedVideostoreServiceServer) FetchStream(*FetchStreamRequest, grp
 }
 func (UnimplementedVideostoreServiceServer) GetStorageState(context.Context, *GetStorageStateRequest) (*GetStorageStateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetStorageState not implemented")
+}
+func (UnimplementedVideostoreServiceServer) DoCommand(context.Context, *v1.DoCommandRequest) (*v1.DoCommandResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DoCommand not implemented")
 }
 func (UnimplementedVideostoreServiceServer) mustEmbedUnimplementedVideostoreServiceServer() {}
 func (UnimplementedVideostoreServiceServer) testEmbeddedByValue()                           {}
@@ -208,6 +225,24 @@ func _VideostoreService_GetStorageState_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _VideostoreService_DoCommand_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.DoCommandRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VideostoreServiceServer).DoCommand(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: VideostoreService_DoCommand_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VideostoreServiceServer).DoCommand(ctx, req.(*v1.DoCommandRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // VideostoreService_ServiceDesc is the grpc.ServiceDesc for VideostoreService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -226,6 +261,10 @@ var VideostoreService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetStorageState",
 			Handler:    _VideostoreService_GetStorageState_Handler,
+		},
+		{
+			MethodName: "DoCommand",
+			Handler:    _VideostoreService_DoCommand_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

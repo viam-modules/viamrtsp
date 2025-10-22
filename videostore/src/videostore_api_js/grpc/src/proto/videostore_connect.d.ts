@@ -5,6 +5,7 @@
 
 import { FetchRequest, FetchResponse, FetchStreamRequest, FetchStreamResponse, GetStorageStateRequest, GetStorageStateResponse, SaveRequest, SaveResponse } from "./videostore_pb.js";
 import { MethodKind } from "@bufbuild/protobuf";
+import { DoCommandRequest, DoCommandResponse } from "../../common/v1/common_pb.js";
 
 /**
  * @generated from service viammodules.service.videostore.v1.videostoreService
@@ -46,6 +47,15 @@ export declare const videostoreService: {
       readonly name: "GetStorageState",
       readonly I: typeof GetStorageStateRequest,
       readonly O: typeof GetStorageStateResponse,
+      readonly kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc viammodules.service.videostore.v1.videostoreService.DoCommand
+     */
+    readonly doCommand: {
+      readonly name: "DoCommand",
+      readonly I: typeof DoCommandRequest,
+      readonly O: typeof DoCommandResponse,
       readonly kind: MethodKind.Unary,
     },
   }

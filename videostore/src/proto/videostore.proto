@@ -4,11 +4,14 @@ package viammodules.service.videostore.v1;
 
 option go_package = "./videostore-api";
 
+import "common/v1/common.proto";
+
 service videostoreService {
   rpc Save(SaveRequest) returns (SaveResponse);
   rpc Fetch(FetchRequest) returns (FetchResponse);
   rpc FetchStream(FetchStreamRequest) returns (stream FetchStreamResponse);
   rpc GetStorageState(GetStorageStateRequest) returns (GetStorageStateResponse);
+  rpc DoCommand(viam.common.v1.DoCommandRequest) returns (viam.common.v1.DoCommandResponse);
 }
 
 message SaveRequest {

@@ -15,6 +15,7 @@ import 'dart:core' as $core;
 import 'package:grpc/service_api.dart' as $grpc;
 import 'package:protobuf/protobuf.dart' as $pb;
 
+import '../../common/v1/common.pb.dart' as $1;
 import 'videostore.pb.dart' as $0;
 
 export 'videostore.pb.dart';
@@ -37,6 +38,10 @@ class videostoreServiceClient extends $grpc.Client {
       '/viammodules.service.videostore.v1.videostoreService/GetStorageState',
       ($0.GetStorageStateRequest value) => value.writeToBuffer(),
       ($core.List<$core.int> value) => $0.GetStorageStateResponse.fromBuffer(value));
+  static final _$doCommand = $grpc.ClientMethod<$1.DoCommandRequest, $1.DoCommandResponse>(
+      '/viammodules.service.videostore.v1.videostoreService/DoCommand',
+      ($1.DoCommandRequest value) => value.writeToBuffer(),
+      ($core.List<$core.int> value) => $1.DoCommandResponse.fromBuffer(value));
 
   videostoreServiceClient($grpc.ClientChannel channel,
       {$grpc.CallOptions? options,
@@ -58,6 +63,10 @@ class videostoreServiceClient extends $grpc.Client {
 
   $grpc.ResponseFuture<$0.GetStorageStateResponse> getStorageState($0.GetStorageStateRequest request, {$grpc.CallOptions? options}) {
     return $createUnaryCall(_$getStorageState, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$1.DoCommandResponse> doCommand($1.DoCommandRequest request, {$grpc.CallOptions? options}) {
+    return $createUnaryCall(_$doCommand, request, options: options);
   }
 }
 
@@ -94,6 +103,13 @@ abstract class videostoreServiceBase extends $grpc.Service {
         false,
         ($core.List<$core.int> value) => $0.GetStorageStateRequest.fromBuffer(value),
         ($0.GetStorageStateResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$1.DoCommandRequest, $1.DoCommandResponse>(
+        'DoCommand',
+        doCommand_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $1.DoCommandRequest.fromBuffer(value),
+        ($1.DoCommandResponse value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.SaveResponse> save_Pre($grpc.ServiceCall call, $async.Future<$0.SaveRequest> request) async {
@@ -112,8 +128,13 @@ abstract class videostoreServiceBase extends $grpc.Service {
     return getStorageState(call, await request);
   }
 
+  $async.Future<$1.DoCommandResponse> doCommand_Pre($grpc.ServiceCall call, $async.Future<$1.DoCommandRequest> request) async {
+    return doCommand(call, await request);
+  }
+
   $async.Future<$0.SaveResponse> save($grpc.ServiceCall call, $0.SaveRequest request);
   $async.Future<$0.FetchResponse> fetch($grpc.ServiceCall call, $0.FetchRequest request);
   $async.Stream<$0.FetchStreamResponse> fetchStream($grpc.ServiceCall call, $0.FetchStreamRequest request);
   $async.Future<$0.GetStorageStateResponse> getStorageState($grpc.ServiceCall call, $0.GetStorageStateRequest request);
+  $async.Future<$1.DoCommandResponse> doCommand($grpc.ServiceCall call, $1.DoCommandRequest request);
 }
