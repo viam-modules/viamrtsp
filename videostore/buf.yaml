@@ -1,4 +1,6 @@
 version: v1
+deps:
+  - buf.build/viamrobotics/api
 breaking:
   use:
     - FILE
