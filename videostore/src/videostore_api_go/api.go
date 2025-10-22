@@ -100,11 +100,11 @@ func (s *videostoreServer) FetchStream(req *videostorepb.FetchStreamRequest, str
 }
 
 func (s *videostoreServer) DoCommand(ctx context.Context, req *commonpb.DoCommandRequest) (*commonpb.DoCommandResponse, error) {
-	audioIn, err := s.coll.Resource(req.GetName())
+	vs, err := s.coll.Resource(req.GetName())
 	if err != nil {
 		return nil, err
 	}
-	return protoutils.DoFromResourceServer(ctx, audioIn, req)
+	return protoutils.DoFromResourceServer(ctx, vs, req)
 }
 
 type streamWriter struct {
