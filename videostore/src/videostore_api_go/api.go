@@ -207,3 +207,7 @@ func (nvc *namedVideostoreClient) FetchStream(ctx context.Context, from, to, con
 		}
 	}
 }
+
+func (nvc *namedVideostoreClient) DoCommand(ctx context.Context, cmd map[string]interface{}) (map[string]interface{}, error) {
+	return protoutils.DoFromResourceClient(ctx, nvc.client, nvc.name, cmd)
+}
