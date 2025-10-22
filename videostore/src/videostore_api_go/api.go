@@ -6,7 +6,9 @@ import (
 
 	"github.com/google/uuid"
 	videostorepb "github.com/viam-modules/viamrtsp/videostore/src/videostore_api_go/grpc/src/proto"
+	commonpb "go.viam.com/api/common/v1"
 	"go.viam.com/rdk/logging"
+	"go.viam.com/rdk/protoutils"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/robot"
 	"go.viam.com/utils/rpc"
@@ -95,6 +97,14 @@ func (s *videostoreServer) FetchStream(req *videostorepb.FetchStreamRequest, str
 	}
 	// Stream directly via the interface to avoid buffering.
 	return vs.FetchStream(stream.Context(), req.From, req.To, req.Container, streamWriter{stream: stream, requestID: req.RequestId})
+}
+
+func (s *videostoreServer) DoCommand(ctx context.Context, req *commonpb.DoCommandRequest) (*commonpb.DoCommandResponse, error) {
+	audioIn, err := s.coll.Resource(req.GetName())
+	if err != nil {
+		return nil, err
+	}
+	return protoutils.DoFromResourceServer(ctx, audioIn, req)
 }
 
 type streamWriter struct {
