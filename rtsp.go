@@ -241,8 +241,6 @@ type rtspCamera struct {
 	subsMu       sync.RWMutex
 	bufAndCBByID map[rtppassthrough.SubscriptionID]bufAndCB
 
-	discoverySvc discovery.Service
-
 	name resource.Name
 
 	preferredTransports []*gortsplib.Transport
@@ -345,22 +343,6 @@ func (rc *rtspCamera) reconnectClientWithFallbackTransports(codecInfo videoCodec
 	return fmt.Errorf("all attempts to reconnect to rtsp server failed: %w", lastErr)
 }
 
-func discoverResourcesExtra(u *base.URL) map[string]any {
-	if u == nil {
-		return nil
-	}
-	if u.User == nil {
-		return nil
-	}
-
-	extra := map[string]any{"User": u.User.Username()}
-	password, ok := u.User.Password()
-	if ok {
-		extra["Pass"] = password
-	}
-	return extra
-}
-
 // reconnectClient reconnects the RTSP client to the streaming server by closing the old one and starting a new one.
 func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib.Transport) error {
 	rc.logger.Warnf("reconnectClient called with codec: %s and transport: %s", codecInfo, transport.String())
@@ -388,13 +370,6 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib
 	var clientSuccessful bool
 	defer func() {
 		if !clientSuccessful {
-			if rc.discoverySvc != nil {
-				rc.logger.Debug("Running discovery to update IP addresses.")
-				extra := discoverResourcesExtra(rc.u)
-				if _, err := rc.discoverySvc.DiscoverResources(rc.cancelCtx, extra); err != nil {
-					rc.logger.Debug("Error discovering resources to update IP addresses:", err)
-				}
-			}
 			rc.closeConnection()
 		}
 	}()
@@ -1127,14 +1102,12 @@ func NewRTSPCamera(ctx context.Context, deps resource.Dependencies, conf resourc
 		preferredTransports = []*gortsplib.Transport{&tcp}
 	}
 
-	var discSvc discovery.Service
 	if newConf.DiscoveryDep != "" {
 		// Some camera configs may rely on an mDNS server running that is managed by the (viamrtsp)
 		// discovery service.
-		discSvc, err = discovery.FromDependencies(deps, newConf.DiscoveryDep)
+		_, err := discovery.FromDependencies(deps, newConf.DiscoveryDep)
 		if err != nil {
-			logger.Error("Error finding discovery service dependency:", err)
-			return nil, err
+			logger.Warn("Error finding discovery service dependency:", err)
 		}
 	}
 
@@ -1163,7 +1136,6 @@ func NewRTSPCamera(ctx context.Context, deps resource.Dependencies, conf resourc
 		rtpPassthroughCancelCauseFn: rtpPassthroughCancelCauseFn,
 		avFramePool:                 framePool,
 		mimeHandler:                 mimeHandler,
-		discoverySvc:                discSvc,
 		cancelCtx:                   cancelCtx,
 		cancelFunc:                  cancel,
 		logger:                      logger,
