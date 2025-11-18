@@ -281,7 +281,7 @@ endif
 
 module: $(BIN_VIAMRTSP)
 	cp $(BIN_VIAMRTSP) bin/viamrtsp$(BIN_SUFFIX)
-	tar czf module.tar.gz bin/viamrtsp$(BIN_SUFFIX)
+	tar czf module.tar.gz meta.json bin/viamrtsp$(BIN_SUFFIX)
 	rm bin/viamrtsp$(BIN_SUFFIX)
 
 clean:
@@ -291,3 +291,6 @@ clean-all:
 	rm -rf FFmpeg
 	rm -rf x264
 	git clean -fxd
+
+setup:
+	go mod tidy
