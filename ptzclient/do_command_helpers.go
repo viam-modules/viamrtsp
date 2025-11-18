@@ -77,5 +77,5 @@ func getOptionalDuration(cmd map[string]interface{}, key string, defaultVal stri
 	if !ok {
 		return defaultVal
 	}
-	return string(durationVal)
+	return durationVal
 }
