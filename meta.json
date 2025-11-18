@@ -59,5 +59,16 @@
       "short_description": "An experimental generic component that lets you control an Onvif PTZ camera"
     }
   ],
-  "entrypoint": "bin/viamrtsp"
+  "entrypoint": "bin/viamrtsp",
+  "build": {
+    "build": "make module",
+    "setup": "make setup",
+    "path": "module.tar.gz",
+    "arch": [
+      "linux/amd64",
+      "linux/arm64",
+      "darwin/arm64",
+      "windows/amd64"
+    ]
+  }
 }
