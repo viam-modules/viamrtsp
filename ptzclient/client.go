@@ -219,7 +219,36 @@ func (s *onvifPtzClient) handleGetServiceCapabilities() (map[string]interface{},
 	return map[string]interface{}{"service_capabilities": convertedCapabilities}, nil
 }
 
-// handleGetStatus implements the get-status command logic.
+// handleGetConfiguration implements the get-configuration command logic.
+func (s *onvifPtzClient) handleGetConfiguration(cmd map[string]interface{}) (map[string]interface{}, error) {
+	if s.cfg.ProfileToken == "" {
+		return nil, errors.New("profile_token is not configured for this component")
+	}
+	profileToken := onvifxsd.ReferenceToken(s.cfg.ProfileToken)
+	req := ptz.GetConfiguration{ProfileToken: profileToken}
+	res, err := s.dev.CallMethod(req, s.logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call GetConfiguration: %w", err)
+	}
+	defer res.Body.Close()
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read GetConfiguration response body: %w", err)
+	}
+	s.logger.Debugf("GetConfiguration raw response body: %s", string(bodyBytes))
+	var configurationEnvelope ptz.GetConfigurationResponse
+	err = xml.Unmarshal(bodyBytes, &configurationEnvelope)
+	if err != nil {
+		s.logger.Warnf("Failed to unmarshal GetConfiguration response using custom structs. Raw XML:\n%s", string(bodyBytes))
+		return nil, fmt.Errorf("failed to unmarshal GetConfiguration response: %w", err)
+	}
+	configuration := configurationEnvelope.PTZConfiguration
+	return map[string]interface{}{
+		"configuration": configuration,
+	}, nil
+}
+
+// handleGetConfigurations implements the get-configurations command logic.
 func (s *onvifPtzClient) handleGetConfigurations() (map[string]interface{}, error) {
 	if s.cfg.ProfileToken == "" {
 		return nil, errors.New("profile_token is not configured for this component")
@@ -593,6 +622,8 @@ func (s *onvifPtzClient) DoCommand(_ context.Context, cmd map[string]interface{}
 		return s.handleGetStatus()
 	case "get-configurations":
 		return s.handleGetConfigurations()
+	case "get-configuration":
+		return s.handleGetConfiguration(cmd)
 	case "get-service-capabilities":
 		return s.handleGetServiceCapabilities()
 	case "stop":
