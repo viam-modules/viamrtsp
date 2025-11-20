@@ -220,7 +220,7 @@ func (s *onvifPtzClient) handleGetServiceCapabilities() (map[string]interface{},
 }
 
 // handleGetConfiguration implements the get-configuration command logic.
-func (s *onvifPtzClient) handleGetConfiguration(cmd map[string]interface{}) (map[string]interface{}, error) {
+func (s *onvifPtzClient) handleGetConfiguration() (map[string]interface{}, error) {
 	if s.cfg.ProfileToken == "" {
 		return nil, errors.New("profile_token is not configured for this component")
 	}
@@ -623,7 +623,7 @@ func (s *onvifPtzClient) DoCommand(_ context.Context, cmd map[string]interface{}
 	case "get-configurations":
 		return s.handleGetConfigurations()
 	case "get-configuration":
-		return s.handleGetConfiguration(cmd)
+		return s.handleGetConfiguration()
 	case "get-service-capabilities":
 		return s.handleGetServiceCapabilities()
 	case "stop":
