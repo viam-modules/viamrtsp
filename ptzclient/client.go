@@ -184,6 +184,105 @@ func (s *onvifPtzClient) handleGetProfiles() (map[string]interface{}, error) {
 	return map[string]interface{}{"profiles": tokens}, nil
 }
 
+func (s *onvifPtzClient) handleGetServiceCapabilities() (map[string]interface{}, error) {
+	req := ptz.GetServiceCapabilities{}
+	s.logger.Debugf("Sending GetServiceCapabilities request")
+
+	res, err := s.dev.CallMethod(req, s.logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call GetServiceCapabilities: %w", err)
+	}
+	defer res.Body.Close()
+
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read GetServiceCapabilities response body: %w", err)
+	}
+	s.logger.Debugf("GetServiceCapabilities raw response body: %s", string(bodyBytes))
+
+	var serviceCapabilitiesEnvelope ptz.GetServiceCapabilitiesResponse
+	err = xml.Unmarshal(bodyBytes, &serviceCapabilitiesEnvelope)
+	if err != nil {
+		s.logger.Warnf("Failed to unmarshal GetServiceCapabilities response using custom structs. Raw XML:\n%s", string(bodyBytes))
+		return nil, fmt.Errorf("failed to unmarshal GetServiceCapabilities response: %w", err)
+	}
+
+	serviceCapabilities := serviceCapabilitiesEnvelope.Capabilities
+	// Convert xsd.Boolean values to Go bool for protobuf compatibility
+	convertedCapabilities := map[string]interface{}{
+		"EFlip":                       bool(serviceCapabilities.EFlip),
+		"Reverse":                     bool(serviceCapabilities.Reverse),
+		"GetCompatibleConfigurations": bool(serviceCapabilities.GetCompatibleConfigurations),
+		"MoveStatus":                  bool(serviceCapabilities.MoveStatus),
+		"StatusPosition":              bool(serviceCapabilities.StatusPosition),
+	}
+	return map[string]interface{}{"service_capabilities": convertedCapabilities}, nil
+}
+
+// handleGetConfiguration implements the get-configuration command logic.
+func (s *onvifPtzClient) handleGetConfiguration() (map[string]interface{}, error) {
+	if s.cfg.ProfileToken == "" {
+		return nil, errors.New("profile_token is not configured for this component")
+	}
+	profileToken := onvifxsd.ReferenceToken(s.cfg.ProfileToken)
+	req := ptz.GetConfiguration{ProfileToken: profileToken}
+	res, err := s.dev.CallMethod(req, s.logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call GetConfiguration: %w", err)
+	}
+	defer res.Body.Close()
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read GetConfiguration response body: %w", err)
+	}
+	s.logger.Debugf("GetConfiguration raw response body: %s", string(bodyBytes))
+	var configurationEnvelope ptz.GetConfigurationResponse
+	err = xml.Unmarshal(bodyBytes, &configurationEnvelope)
+	if err != nil {
+		s.logger.Warnf("Failed to unmarshal GetConfiguration response using custom structs. Raw XML:\n%s", string(bodyBytes))
+		return nil, fmt.Errorf("failed to unmarshal GetConfiguration response: %w", err)
+	}
+	configuration := configurationEnvelope.PTZConfiguration
+	return map[string]interface{}{
+		"configuration": configuration,
+	}, nil
+}
+
+// handleGetConfigurations implements the get-configurations command logic.
+func (s *onvifPtzClient) handleGetConfigurations() (map[string]interface{}, error) {
+	if s.cfg.ProfileToken == "" {
+		return nil, errors.New("profile_token is not configured for this component")
+	}
+
+	req := ptz.GetConfigurations{}
+	s.logger.Debugf("Sending GetConfigurations request")
+
+	res, err := s.dev.CallMethod(req, s.logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call GetConfigurations: %w", err)
+	}
+	defer res.Body.Close()
+
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read GetConfigurations response body: %w", err)
+	}
+	s.logger.Debugf("GetConfigurations raw response body: %s", string(bodyBytes))
+
+	var configurationsEnvelope ptz.GetConfigurationsResponse
+	err = xml.Unmarshal(bodyBytes, &configurationsEnvelope)
+	if err != nil {
+		s.logger.Warnf("Failed to unmarshal GetConfigurations response using custom structs. Raw XML:\n%s", string(bodyBytes))
+		return nil, fmt.Errorf("failed to unmarshal GetConfigurations response: %w", err)
+	}
+
+	configurations := configurationsEnvelope.PTZConfiguration
+
+	return map[string]interface{}{
+		"configurations": configurations,
+	}, nil
+}
+
 // handleGetStatus implements the get-status command logic.
 func (s *onvifPtzClient) handleGetStatus() (map[string]interface{}, error) {
 	if s.cfg.ProfileToken == "" {
@@ -278,6 +377,7 @@ func (s *onvifPtzClient) handleContinuousMove(cmd map[string]interface{}) (map[s
 	panSpeed := getOptionalFloat64(cmd, "pan_speed", 0.0)
 	tiltSpeed := getOptionalFloat64(cmd, "tilt_speed", 0.0)
 	zoomSpeed := getOptionalFloat64(cmd, "zoom_speed", 0.0)
+	timeout := getOptionalDuration(cmd, "timeout", maxContinuousMovementTimeout)
 
 	if panSpeed < -1.0 || panSpeed > 1.0 || tiltSpeed < -1.0 || tiltSpeed > 1.0 || zoomSpeed < -1.0 || zoomSpeed > 1.0 {
 		return nil, errors.New("speed values (pan_speed, tilt_speed, zoom_speed) must be between -1.0 and 1.0")
@@ -296,12 +396,12 @@ func (s *onvifPtzClient) handleContinuousMove(cmd map[string]interface{}) (map[s
 				Space: ContinuousZoomVelocityGenericSpace,
 			},
 		},
-		Timeout: xsd.Duration(maxContinuousMovementTimeout),
+		Timeout: xsd.Duration(timeout),
 	}
 
 	s.logger.Debugf(
-		"Sending ContinuousMove (PanSpeed: %.2f, TiltSpeed: %.2f, ZoomSpeed: %.2f) for profile %s...",
-		panSpeed, tiltSpeed, zoomSpeed, profileToken,
+		"Sending ContinuousMove (PanSpeed: %.2f, TiltSpeed: %.2f, ZoomSpeed: %.2f, Timeout: %s) for profile %s...",
+		panSpeed, tiltSpeed, zoomSpeed, timeout, profileToken,
 	)
 	res, err := s.dev.CallMethod(req, s.logger)
 	if err != nil {
@@ -520,6 +620,12 @@ func (s *onvifPtzClient) DoCommand(_ context.Context, cmd map[string]interface{}
 		return s.handleGetProfiles()
 	case "get-status":
 		return s.handleGetStatus()
+	case "get-configurations":
+		return s.handleGetConfigurations()
+	case "get-configuration":
+		return s.handleGetConfiguration()
+	case "get-service-capabilities":
+		return s.handleGetServiceCapabilities()
 	case "stop":
 		return s.handleStop(cmd)
 	case "continuous-move":
