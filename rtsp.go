@@ -1451,7 +1451,7 @@ func (rc *rtspCamera) Geometries(_ context.Context, _ map[string]interface{}) ([
 	return nil, errors.New("not implemented")
 }
 
-func (rc *rtspCamera) NextPointCloud(_ context.Context) (pointcloud.PointCloud, error) {
+func (rc *rtspCamera) NextPointCloud(_ context.Context, _ map[string]interface{}) (pointcloud.PointCloud, error) {
 	return nil, errors.New("not implemented")
 }
 
