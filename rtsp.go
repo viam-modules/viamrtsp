@@ -19,7 +19,6 @@ import (
 	"github.com/bluenviron/gortsplib/v4/pkg/format"
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtph264"
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtph265"
-	"github.com/bluenviron/gortsplib/v4/pkg/liberrors"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h265"
 	"github.com/erh/viamupnp"
@@ -279,32 +278,14 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 	rc.activeBackgroundWorkers.Add(1)
 	utils.ManagedGo(func() {
 		for utils.SelectContextOrWait(rc.cancelCtx, reconnectIntervalSeconds*time.Second) {
-			badState := false
+			// Previously we did an explicit OPTIONS health check here.
+			// This was causing spurious EOF / connection issues on some hardware.
+			// Now we rely solely on gortsplib's internal mechanisms
+			// TODO (seanp): Figure out how to check gortsplib internally for connection health
 
-			// use an OPTIONS request to see if the server is still responding to requests
+			// Sanity check on the client
 			if rc.client == nil {
-				badState = true
-			} else {
-				res, err := rc.client.Options(rc.u)
-				// Nick S:
-				// This error happens all the time on hardware we need to support & does not affect
-				// the performance of camera streaming. As a result, we ignore this error specifically
-				var errClientInvalidState liberrors.ErrClientInvalidState
-				if err != nil && !errors.As(err, &errClientInvalidState) {
-					rc.logger.Warnf("The rtsp client encountered an error, trying to reconnect to %s, err: %s", rc.u, err)
-					badState = true
-				} else if res != nil && res.StatusCode != base.StatusOK {
-					rc.logger.Warnf("The rtsp server responded with non-OK status url: %s, status_code: %d", rc.u, res.StatusCode)
-					badState = true
-				}
-			}
-
-			if badState {
-				if err := rc.reconnectClientWithFallbackTransports(codecInfo); err != nil {
-					rc.logger.Warnf("cannot reconnect to rtsp server err: %s", err.Error())
-				} else {
-					rc.logger.Infof("reconnected to rtsp server url: %s", rc.u)
-				}
+				rc.logger.Debugf("rtsp client is nil for url: %s (waiting for reconnect logic elsewhere)", rc.u)
 			}
 		}
 	}, rc.activeBackgroundWorkers.Done)
