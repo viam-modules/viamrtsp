@@ -11,9 +11,9 @@ import (
 	"github.com/viam-modules/video-store/videostore"
 	vsutils "github.com/viam-modules/video-store/videostore/utils"
 	"go.viam.com/rdk/components/camera"
-	"go.viam.com/rdk/components/generic"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
+	"go.viam.com/rdk/services/video"
 )
 
 const (
@@ -32,7 +32,10 @@ var (
 var Model = resource.ModelNamespace("viam").WithFamily("viamrtsp").WithModel("video-store")
 
 func init() {
-	resource.RegisterComponent(generic.API, Model, resource.Registration[resource.Resource, *Config]{
+	// resource.RegisterComponent(generic.API, Model, resource.Registration[resource.Resource, *Config]{
+	// 	Constructor: New,
+	// })
+	resource.RegisterComponent(video.API, Model, resource.Registration[resource.Resource, *Config]{
 		Constructor: New,
 	})
 }

@@ -335,7 +335,7 @@ require (
 	go.uber.org/automaxprocs v1.5.3 // indirect
 	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.viam.com/api v0.1.485 // indirect
+	go.viam.com/api v0.1.487 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.2 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20230525183740-e7c30c78aeb2 // indirect
 	goji.io v2.0.2+incompatible // indirect
@@ -375,3 +375,6 @@ require (
 
 // replace video-store with ./video-store for local development
 replace github.com/viam-modules/video-store => ./video-store
+
+// replace rdk with latest git commit for local development
+replace go.viam.com/rdk => ./rdk
