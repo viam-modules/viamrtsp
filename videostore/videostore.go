@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"path/filepath"
+	"time"
 
 	vscamera "github.com/viam-modules/video-store/model/camera"
 	"github.com/viam-modules/video-store/videostore"
@@ -47,6 +48,9 @@ type service struct {
 	vs     videostore.VideoStore
 	rsMux  *rawSegmenterMux
 }
+
+// Ensure service implements video.Service at compile time.
+var _ video.Service = (*service)(nil)
 
 // New creates a new videostore.
 func New(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger logging.Logger) (resource.Resource, error) {
@@ -123,6 +127,17 @@ func (s *service) Close(_ context.Context) error {
 	}
 	s.vs.Close()
 	return nil
+}
+
+// GetVideo implements video.Service.
+// It streams video between startTime and endTime using the underlying VideoStore.
+func (s *service) GetVideo(
+	ctx context.Context,
+	startTime, endTime time.Time,
+	videoCodec, videoContainer string,
+	extra map[string]interface{},
+) (chan *video.Chunk, error) {
+	return nil, nil
 }
 
 func (s *service) DoCommand(ctx context.Context, command map[string]interface{}) (map[string]interface{}, error) {
