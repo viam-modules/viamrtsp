@@ -170,7 +170,7 @@ func (s *service) GetVideo(
 		}
 	}()
 
-	return nil, nil
+	return ch, nil
 }
 
 func (s *service) DoCommand(ctx context.Context, command map[string]interface{}) (map[string]interface{}, error) {
