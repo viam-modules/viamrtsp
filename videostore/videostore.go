@@ -33,10 +33,7 @@ var (
 var Model = resource.ModelNamespace("viam").WithFamily("viamrtsp").WithModel("video-store")
 
 func init() {
-	// resource.RegisterComponent(generic.API, Model, resource.Registration[resource.Resource, *Config]{
-	// 	Constructor: New,
-	// })
-	resource.RegisterComponent(video.API, Model, resource.Registration[resource.Resource, *Config]{
+	resource.RegisterService(video.API, Model, resource.Registration[resource.Resource, *Config]{
 		Constructor: New,
 	})
 }
