@@ -13,6 +13,7 @@ import (
 	"go.viam.com/rdk/components/generic"
 	"go.viam.com/rdk/module"
 	"go.viam.com/rdk/services/discovery"
+	"go.viam.com/rdk/services/video"
 )
 
 func main() {
@@ -35,7 +36,7 @@ func realMain(ctx context.Context) error {
 		}
 	}
 
-	err = myMod.AddModelFromRegistry(ctx, generic.API, videostore.Model)
+	err = myMod.AddModelFromRegistry(ctx, video.API, videostore.Model)
 	if err != nil {
 		return err
 	}
