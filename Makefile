@@ -168,7 +168,6 @@ $(BIN_DISCOVERY): build-ffmpeg *.go cmd/discovery/*.go
 tool-install:
 	GOBIN=`pwd`/$(TOOL_BIN) go install \
 		github.com/edaniels/golinters/cmd/combined \
-		github.com/golangci/golangci-lint/cmd/golangci-lint \
 		github.com/rhysd/actionlint/cmd/actionlint
 
 gofmt:
