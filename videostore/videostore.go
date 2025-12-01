@@ -137,6 +137,42 @@ func (s *service) GetVideo(
 	videoCodec, videoContainer string,
 	extra map[string]interface{},
 ) (chan *video.Chunk, error) {
+	s.logger.Debugf(
+		"GetVideo called with startTime: %s, endTime: %s, videoCodec: %s, videoContainer: %s",
+		startTime.Format(time.RFC3339),
+		endTime.Format(time.RFC3339),
+		videoCodec,
+		videoContainer,
+	)
+
+	req := &videostore.FetchRequest{
+		From: startTime,
+		To:   endTime,
+	}
+	ch := make(chan *video.Chunk)
+
+	go func() {
+		defer close(ch)
+
+		emit := func(b []byte) error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case ch <- &video.Chunk{
+				Data: b,
+				// Optionally fill other fields on Chunk:
+				// Codec:     videoCodec,
+				// Container: container,
+			}:
+				return nil
+			}
+		}
+
+		if err := s.vs.FetchStream(ctx, req, emit); err != nil {
+			s.logger.Error("GetVideo FetchStream failed: ", err)
+		}
+	}()
+
 	return nil, nil
 }
 
