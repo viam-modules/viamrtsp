@@ -51,7 +51,7 @@ func run() error {
 	logger.Info("Resources:")
 	logger.Info(robot.ResourceNames())
 
-	ipCam, err := camera.FromRobot(robot, "ip-cam")
+	ipCam, err := camera.FromProvider(robot, "ip-cam")
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			return fmt.Errorf("%w: this likely means viam-server could not register/start the resource properly; check logs to verify", err)

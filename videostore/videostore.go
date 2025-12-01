@@ -63,7 +63,7 @@ func New(ctx context.Context, deps resource.Dependencies, conf resource.Config, 
 	var vs videostore.VideoStore
 	var mux *rawSegmenterMux
 	if newConf.Camera != nil {
-		c, err := camera.FromDependencies(deps, *newConf.Camera)
+		c, err := camera.FromProvider(deps, *newConf.Camera)
 		if err != nil {
 			return nil, err
 		}
@@ -132,7 +132,7 @@ func (s *service) GetVideo(
 	ctx context.Context,
 	startTime, endTime time.Time,
 	videoCodec, videoContainer string,
-	extra map[string]interface{},
+	_ map[string]interface{},
 ) (chan *video.Chunk, error) {
 	s.logger.Debugf(
 		"GetVideo called with startTime: %s, endTime: %s, videoCodec: %s, videoContainer: %s",
