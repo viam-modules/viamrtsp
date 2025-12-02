@@ -15,6 +15,7 @@ import (
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/services/video"
+	"go.viam.com/utils"
 )
 
 const (
@@ -40,10 +41,11 @@ func init() {
 
 type service struct {
 	resource.AlwaysRebuild
-	name   resource.Name
-	logger logging.Logger
-	vs     videostore.VideoStore
-	rsMux  *rawSegmenterMux
+	name    resource.Name
+	logger  logging.Logger
+	vs      videostore.VideoStore
+	rsMux   *rawSegmenterMux
+	workers *utils.StoppableWorkers
 }
 
 // Ensure service implements video.Service at compile time.
@@ -106,10 +108,11 @@ func New(ctx context.Context, deps resource.Dependencies, conf resource.Config, 
 	}
 
 	s := &service{
-		name:   conf.ResourceName(),
-		logger: logger,
-		vs:     vs,
-		rsMux:  mux,
+		name:    conf.ResourceName(),
+		logger:  logger,
+		vs:      vs,
+		rsMux:   mux,
+		workers: utils.NewStoppableWorkers(ctx),
 	}
 	return s, nil
 }
@@ -123,6 +126,7 @@ func (s *service) Close(_ context.Context) error {
 		return err
 	}
 	s.vs.Close()
+	s.workers.Stop()
 	return nil
 }
 
@@ -147,7 +151,8 @@ func (s *service) GetVideo(
 	}
 	ch := make(chan *video.Chunk)
 
-	go func() {
+	// go func() {
+	s.workers.Add(func(workerCtx context.Context) {
 		defer close(ch)
 
 		emit := func(chunk video.Chunk) error {
@@ -165,7 +170,7 @@ func (s *service) GetVideo(
 		if err := s.vs.FetchStream(ctx, req, emit); err != nil {
 			s.logger.Error("GetVideo FetchStream failed: ", err)
 		}
-	}()
+	})
 
 	return ch, nil
 }
