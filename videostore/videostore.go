@@ -158,7 +158,6 @@ func (s *service) GetVideo(
 	}
 	ch := make(chan *video.Chunk)
 
-	// go func() {
 	s.workers.Add(func(workerCtx context.Context) {
 		defer close(ch)
 
