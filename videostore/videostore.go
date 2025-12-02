@@ -12,6 +12,7 @@ import (
 	"github.com/viam-modules/video-store/videostore"
 	vsutils "github.com/viam-modules/video-store/videostore/utils"
 	"go.viam.com/rdk/components/camera"
+	"go.viam.com/rdk/components/generic"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/services/video"
@@ -30,11 +31,17 @@ var (
 	defaultUploadPath  = filepath.Join(".viam", "capture", "video-upload")
 )
 
-// Model is videostore's Viam model.
-var Model = resource.ModelNamespace("viam").WithFamily("viamrtsp").WithModel("video-store")
+// ComponentModel is a component model that uses the generic API.
+var ComponentModel = resource.ModelNamespace("viam").WithFamily("viamrtsp").WithModel("video-store")
+
+// ServiceModel is a service modle that uses the video service API.j
+var ServiceModel = resource.ModelNamespace("viam").WithFamily("viamrtsp").WithModel("video-service")
 
 func init() {
-	resource.RegisterService(video.API, Model, resource.Registration[resource.Resource, *Config]{
+	resource.RegisterComponent(generic.API, ComponentModel, resource.Registration[resource.Resource, *Config]{
+		Constructor: New,
+	})
+	resource.RegisterService(video.API, ServiceModel, resource.Registration[resource.Resource, *Config]{
 		Constructor: New,
 	})
 }
