@@ -126,8 +126,7 @@ func (s *service) Close(_ context.Context) error {
 	return nil
 }
 
-// GetVideo implements video.Service.
-// It streams video between startTime and endTime using the underlying VideoStore.
+// GetVideo streams video chunks between the given timestamps.
 func (s *service) GetVideo(
 	ctx context.Context,
 	startTime, endTime time.Time,
