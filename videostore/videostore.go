@@ -150,15 +150,13 @@ func (s *service) GetVideo(
 	go func() {
 		defer close(ch)
 
-		emit := func(b []byte) error {
+		emit := func(chunk video.Chunk) error {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
 			case ch <- &video.Chunk{
-				Data: b,
-				// Optionally fill other fields on Chunk:
-				// Codec:     videoCodec,
-				// Container: container,
+				Data:      chunk.Data,
+				Container: chunk.Container,
 			}:
 				return nil
 			}
