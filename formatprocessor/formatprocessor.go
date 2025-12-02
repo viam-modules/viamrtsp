@@ -475,7 +475,7 @@ func (t *formatProcessorH264) ProcessRTPPacket(
 
 	if t.encoder == nil {
 		// remove padding
-		pkt.Header.Padding = false
+		pkt.Padding = false
 		pkt.PaddingSize = 0
 
 		// RTP packets exceed maximum size: start re-encoding them

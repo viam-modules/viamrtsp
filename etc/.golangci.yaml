@@ -1,5 +1,4 @@
-service:
-  golangci-lint-version: 1.51.x
+version: "2"
 run:
   deadline: 900s
   modules-download-mode: readonly
@@ -19,9 +18,6 @@ linters:
     - gochecknoglobals
     - gochecknoinits
     - gocyclo
-    - gofmt
-    - goimports
-    - gomnd
     - importas
     - interfacebloat
     - ireturn

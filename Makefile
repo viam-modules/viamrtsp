@@ -169,6 +169,7 @@ tool-install:
 	GOBIN=`pwd`/$(TOOL_BIN) go install \
 		github.com/edaniels/golinters/cmd/combined \
 		github.com/rhysd/actionlint/cmd/actionlint
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(TOOL_BIN) v2.6.2
 
 gofmt:
 	gofmt -w -s .
