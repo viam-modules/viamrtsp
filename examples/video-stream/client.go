@@ -69,8 +69,8 @@ func main() {
 	}
 
 	// // Example: fetch last 30 seconds of video.
-	end := time.Now().UTC()
-	start := end.Add(-30 * time.Second)
+	end := time.Now().UTC().Add(-50 * time.Second)
+	start := end.Add(-10 * time.Second)
 
 	logger.Infof("Calling GetVideo from %s to %s", start.Format(time.RFC3339), end.Format(time.RFC3339))
 

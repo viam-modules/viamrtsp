@@ -119,7 +119,7 @@ func New(ctx context.Context, deps resource.Dependencies, conf resource.Config, 
 		logger:  logger,
 		vs:      vs,
 		rsMux:   mux,
-		workers: utils.NewStoppableWorkers(ctx),
+		workers: utils.NewBackgroundStoppableWorkers(),
 	}
 	return s, nil
 }
