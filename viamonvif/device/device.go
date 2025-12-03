@@ -347,15 +347,15 @@ func (dev *Device) GetEndpoint(name string) string {
 	return dev.endpoints[name]
 }
 
-func (dev Device) callMedia(ctx context.Context, method interface{}) ([]byte, error) {
+func (dev *Device) callMedia(ctx context.Context, method interface{}) ([]byte, error) {
 	return dev.callOnvifServiceMethod(ctx, dev.endpoints["media"], method)
 }
 
-func (dev Device) callDevice(ctx context.Context, method interface{}) ([]byte, error) {
+func (dev *Device) callDevice(ctx context.Context, method interface{}) ([]byte, error) {
 	return dev.callOnvifServiceMethod(ctx, dev.endpoints["device"], method)
 }
 
-func (dev Device) callOnvifServiceMethod(ctx context.Context, endpoint string, method interface{}) ([]byte, error) {
+func (dev *Device) callOnvifServiceMethod(ctx context.Context, endpoint string, method interface{}) ([]byte, error) {
 	output, err := xml.MarshalIndent(method, "  ", "    ")
 	if err != nil {
 		return nil, err

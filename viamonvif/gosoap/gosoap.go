@@ -35,8 +35,8 @@ func NewEmptySOAP() (SoapMessage, error) {
 	return SoapMessage(res), nil
 }
 
-func (msg SoapMessage) String() string {
-	return string(msg)
+func (msg *SoapMessage) String() string {
+	return string(*msg)
 }
 
 // AddBodyContent for Envelope.
