@@ -62,20 +62,16 @@ func main() {
 	defer machine.Close(ctx)
 
 	// Get the video service (your videostore-backed implementation).
-	// _, err = video.FromRobot(machine, resourceName)
 	vs, err := video.FromProvider(machine, resourceName)
 	if err != nil {
 		logger.Fatalf("failed to get video service %q: %v", resourceName, err)
 	}
 
-	// // Example: fetch last 30 seconds of video.
 	end := time.Now().UTC().Add(-50 * time.Second)
 	start := end.Add(-10 * time.Second)
 
 	logger.Infof("Calling GetVideo from %s to %s", start.Format(time.RFC3339), end.Format(time.RFC3339))
 
-	// videoCodec / videoContainer are hints; your service currently ignores codec
-	// and uses container (optionally) through extra["container"] or videoContainer.
 	videoCodec := ""     // let server decide
 	videoContainer := "" // or "mp4"/"fmp4" if you want to force it
 
