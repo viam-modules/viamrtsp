@@ -176,7 +176,7 @@ gofmt:
 GOVERSION = $(shell grep '^go .\..' go.mod | head -n1 | cut -d' ' -f2)
 lint: gofmt tool-install build-ffmpeg
 	go mod tidy
-	GOTOOLCHAIN=go$(GOVERSION) GOGC=50 CGO_CFLAGS=$(CGO_CFLAGS) GOFLAGS=$(GOFLAGS) go run github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.2 run -v --fix --config=./etc/.golangci.yaml --timeout=2m
+	GOTOOLCHAIN=go$(GOVERSION) GOGC=50 CGO_CFLAGS=$(CGO_CFLAGS) GOFLAGS=$(GOFLAGS) go run github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.2 run -v --fix --config=./etc/.golangci.yaml --timeout=5m
 
 test: build-ffmpeg
 	CGO_CFLAGS="$(CGO_CFLAGS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" go test -ldflags="-checklinkname=0" -race -v ./...
