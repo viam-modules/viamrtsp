@@ -34,7 +34,7 @@ var (
 // ComponentModel is a component model that uses the generic API.
 var ComponentModel = resource.ModelNamespace("viam").WithFamily("viamrtsp").WithModel("video-store")
 
-// ServiceModel is a service modle that uses the video service API.j
+// ServiceModel is a service model that uses the video service API.
 var ServiceModel = resource.ModelNamespace("viam").WithFamily("viamrtsp").WithModel("video-service")
 
 func init() {
