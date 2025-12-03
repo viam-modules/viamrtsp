@@ -161,19 +161,26 @@ func (s *service) GetVideo(
 	s.workers.Add(func(workerCtx context.Context) {
 		defer close(ch)
 
+		// Cancel on either request ctx or worker shutdown
+		mergedCtx, cancel := context.WithCancel(workerCtx)
+		defer cancel()
+		stop := context.AfterFunc(ctx, cancel)
+		defer stop()
+
 		emit := func(chunk video.Chunk) error {
 			select {
-			case <-ctx.Done():
-				return ctx.Err()
+			case <-mergedCtx.Done():
+				return mergedCtx.Err()
 			case ch <- &video.Chunk{
 				Data:      chunk.Data,
 				Container: chunk.Container,
+				// RequestID fill is handled by the GoSDK
 			}:
 				return nil
 			}
 		}
 
-		if err := s.vs.FetchStream(ctx, req, emit); err != nil {
+		if err := s.vs.FetchStream(mergedCtx, req, emit); err != nil {
 			s.logger.Error("GetVideo FetchStream failed: ", err)
 		}
 	})

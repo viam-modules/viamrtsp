@@ -61,12 +61,12 @@ func main() {
 	}
 	defer machine.Close(ctx)
 
-	// Get the video service (your videostore-backed implementation).
 	vs, err := video.FromProvider(machine, resourceName)
 	if err != nil {
 		logger.Fatalf("failed to get video service %q: %v", resourceName, err)
 	}
 
+	// Get video from 50 to 60 seconds ago
 	end := time.Now().UTC().Add(-50 * time.Second)
 	start := end.Add(-10 * time.Second)
 
