@@ -80,9 +80,9 @@ func createTestService(t *testing.T, mockVS *mockVideoStore) *service {
 
 func TestGetVideoReturnsChannel(t *testing.T) {
 	mockVS := &mockVideoStore{
-		fetchStreamFunc: func(ctx context.Context, req *videostore.FetchRequest, emit func(video.Chunk) error) error {
+		fetchStreamFunc: func(_ context.Context, _ *videostore.FetchRequest, emit func(video.Chunk) error) error {
 			// Emit a few chunks
-			for i := 0; i < 3; i++ {
+			for range 3 {
 				if err := emit(video.Chunk{
 					Data:      []byte("test chunk data"),
 					Container: "mp4",
@@ -119,7 +119,7 @@ func TestGetVideoReturnsChannel(t *testing.T) {
 
 func TestGetVideoChannelCloseOnCompletion(t *testing.T) {
 	mockVS := &mockVideoStore{
-		fetchStreamFunc: func(ctx context.Context, req *videostore.FetchRequest, emit func(video.Chunk) error) error {
+		fetchStreamFunc: func(_ context.Context, _ *videostore.FetchRequest, emit func(video.Chunk) error) error {
 			return emit(video.Chunk{
 				Data:      []byte("single chunk"),
 				Container: "mp4",
@@ -154,7 +154,7 @@ func TestGetVideoContextCancellation(t *testing.T) {
 	ctxCancelled := make(chan struct{})
 
 	mockVS := &mockVideoStore{
-		fetchStreamFunc: func(ctx context.Context, req *videostore.FetchRequest, emit func(video.Chunk) error) error {
+		fetchStreamFunc: func(_ context.Context, _ *videostore.FetchRequest, emit func(video.Chunk) error) error {
 			close(emitStarted)
 			// Wait for context to be cancelled
 			<-ctxCancelled
@@ -196,7 +196,7 @@ func TestGetVideoFetchStreamError(t *testing.T) {
 	expectedErr := errors.New("fetch stream error")
 
 	mockVS := &mockVideoStore{
-		fetchStreamFunc: func(ctx context.Context, req *videostore.FetchRequest, emit func(video.Chunk) error) error {
+		fetchStreamFunc: func(_ context.Context, _ *videostore.FetchRequest, emit func(video.Chunk) error) error {
 			// Emit one chunk before error
 			if err := emit(video.Chunk{
 				Data:      []byte("chunk before error"),
@@ -234,7 +234,7 @@ func TestGetVideoTimeRangePassedCorrectly(t *testing.T) {
 	var capturedReq *videostore.FetchRequest
 
 	mockVS := &mockVideoStore{
-		fetchStreamFunc: func(ctx context.Context, req *videostore.FetchRequest, emit func(video.Chunk) error) error {
+		fetchStreamFunc: func(_ context.Context, req *videostore.FetchRequest, _ func(video.Chunk) error) error {
 			capturedReq = req
 			return nil
 		},
@@ -247,6 +247,7 @@ func TestGetVideoTimeRangePassedCorrectly(t *testing.T) {
 	test.That(t, err, test.ShouldBeNil)
 
 	// Drain channel to ensure worker completes
+	//nolint:revive // intentionally draining channel
 	for range ch {
 	}
 
@@ -260,7 +261,7 @@ func TestGetVideoWorkerShutdown(t *testing.T) {
 	workerBlocked := make(chan struct{})
 
 	mockVS := &mockVideoStore{
-		fetchStreamFunc: func(ctx context.Context, req *videostore.FetchRequest, emit func(video.Chunk) error) error {
+		fetchStreamFunc: func(ctx context.Context, _ *videostore.FetchRequest, _ func(video.Chunk) error) error {
 			close(workerStarted)
 			// Block until context is cancelled (worker shutdown)
 			<-ctx.Done()
@@ -309,8 +310,8 @@ func TestGetVideoEmitBlocksUntilReceived(t *testing.T) {
 	var mu sync.Mutex
 
 	mockVS := &mockVideoStore{
-		fetchStreamFunc: func(ctx context.Context, req *videostore.FetchRequest, emit func(video.Chunk) error) error {
-			for i := 0; i < numChunks; i++ {
+		fetchStreamFunc: func(_ context.Context, _ *videostore.FetchRequest, emit func(video.Chunk) error) error {
+			for range numChunks {
 				if err := emit(video.Chunk{
 					Data:      []byte("chunk"),
 					Container: "mp4",
@@ -352,8 +353,8 @@ func TestGetVideoLargeChunks(t *testing.T) {
 	}
 
 	mockVS := &mockVideoStore{
-		fetchStreamFunc: func(ctx context.Context, req *videostore.FetchRequest, emit func(video.Chunk) error) error {
-			for i := 0; i < 10; i++ {
+		fetchStreamFunc: func(_ context.Context, _ *videostore.FetchRequest, emit func(video.Chunk) error) error {
+			for range 10 {
 				if err := emit(video.Chunk{
 					Data:      largeData,
 					Container: "mp4",
@@ -385,7 +386,7 @@ func TestGetVideoLargeChunks(t *testing.T) {
 
 func TestGetVideoEmptyResult(t *testing.T) {
 	mockVS := &mockVideoStore{
-		fetchStreamFunc: func(ctx context.Context, req *videostore.FetchRequest, emit func(video.Chunk) error) error {
+		fetchStreamFunc: func(_ context.Context, _ *videostore.FetchRequest, _ func(video.Chunk) error) error {
 			// No chunks emitted
 			return nil
 		},
@@ -407,7 +408,7 @@ func TestGetVideoEmptyResult(t *testing.T) {
 
 func TestGetVideoContextDeadline(t *testing.T) {
 	mockVS := &mockVideoStore{
-		fetchStreamFunc: func(ctx context.Context, req *videostore.FetchRequest, emit func(video.Chunk) error) error {
+		fetchStreamFunc: func(ctx context.Context, _ *videostore.FetchRequest, _ func(video.Chunk) error) error {
 			// Simulate slow operation
 			select {
 			case <-time.After(5 * time.Second):
@@ -428,6 +429,7 @@ func TestGetVideoContextDeadline(t *testing.T) {
 
 	// Channel should close after timeout
 	start := time.Now()
+	//nolint:revive // intentionally draining channel
 	for range ch {
 	}
 	elapsed := time.Since(start)
@@ -441,7 +443,7 @@ func TestGetVideoConcurrentRequests(t *testing.T) {
 	callCount := 0
 
 	mockVS := &mockVideoStore{
-		fetchStreamFunc: func(ctx context.Context, req *videostore.FetchRequest, emit func(video.Chunk) error) error {
+		fetchStreamFunc: func(_ context.Context, _ *videostore.FetchRequest, emit func(video.Chunk) error) error {
 			mu.Lock()
 			callCount++
 			mu.Unlock()
@@ -460,7 +462,7 @@ func TestGetVideoConcurrentRequests(t *testing.T) {
 
 	// Start multiple concurrent GetVideo requests
 	channels := make([]chan *video.Chunk, numRequests)
-	for i := 0; i < numRequests; i++ {
+	for i := range numRequests {
 		ch, err := svc.GetVideo(ctx, time.Now().Add(-time.Hour), time.Now(), "h264", "mp4", nil)
 		test.That(t, err, test.ShouldBeNil)
 		channels[i] = ch
@@ -468,6 +470,7 @@ func TestGetVideoConcurrentRequests(t *testing.T) {
 
 	// Drain all channels
 	for _, ch := range channels {
+		//nolint:revive // intentionally draining channel
 		for range ch {
 		}
 	}
