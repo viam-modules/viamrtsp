@@ -16,7 +16,7 @@ require (
 	github.com/pion/rtp v1.8.21
 	github.com/rhysd/actionlint v1.7.8
 	github.com/stretchr/testify v1.10.0
-	github.com/viam-modules/video-store v0.0.8-rc4
+	github.com/viam-modules/video-store v0.0.8-rc6
 	github.com/viamrobotics/zeroconf v1.0.13
 	go.uber.org/zap v1.27.0
 	go.viam.com/rdk v0.103.0
@@ -232,6 +232,3 @@ require (
 	gorgonia.org/vecf64 v0.9.0 // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 )
-
-// replace video-store with ./video-store for local development
-replace github.com/viam-modules/video-store => ./video-store
