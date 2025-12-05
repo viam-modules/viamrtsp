@@ -151,15 +151,12 @@ func TestGetVideoChannelCloseOnCompletion(t *testing.T) {
 
 func TestGetVideoContextCancellation(t *testing.T) {
 	emitStarted := make(chan struct{})
-	ctxCancelled := make(chan struct{})
 
 	mockVS := &mockVideoStore{
-		fetchStreamFunc: func(_ context.Context, _ *videostore.FetchRequest, emit func(video.Chunk) error) error {
+		fetchStreamFunc: func(ctx context.Context, _ *videostore.FetchRequest, emit func(video.Chunk) error) error {
 			close(emitStarted)
 			// Wait for context to be cancelled
-			<-ctxCancelled
-			// Give time for the cancellation to propagate
-			time.Sleep(10 * time.Millisecond)
+			<-ctx.Done()
 			// Try to emit after context is cancelled - should fail
 			err := emit(video.Chunk{
 				Data:      []byte("chunk after cancel"),
@@ -180,7 +177,6 @@ func TestGetVideoContextCancellation(t *testing.T) {
 
 	<-emitStarted
 	cancel()
-	close(ctxCancelled)
 
 	// Drain the channel - it should close without the cancelled chunk
 	var chunks []*video.Chunk
