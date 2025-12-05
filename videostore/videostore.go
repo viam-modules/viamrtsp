@@ -161,16 +161,12 @@ func (s *service) GetVideo(
 	s.workers.Add(func(workerCtx context.Context) {
 		defer close(ch)
 
-		// Cancel on either request ctx or worker shutdown
-		mergedCtx, cancel := context.WithCancel(workerCtx)
-		defer cancel()
-		stop := context.AfterFunc(ctx, cancel)
-		defer stop()
-
 		emit := func(chunk video.Chunk) error {
 			select {
-			case <-mergedCtx.Done():
-				return mergedCtx.Err()
+			case <-workerCtx.Done():
+				return workerCtx.Err()
+			case <-ctx.Done():
+				return ctx.Err()
 			case ch <- &video.Chunk{
 				Data:      chunk.Data,
 				Container: chunk.Container,
@@ -180,7 +176,7 @@ func (s *service) GetVideo(
 			}
 		}
 
-		if err := s.vs.FetchStream(mergedCtx, req, emit); err != nil {
+		if err := s.vs.FetchStream(workerCtx, req, emit); err != nil {
 			s.logger.Error("GetVideo FetchStream failed: ", err)
 		}
 	})
