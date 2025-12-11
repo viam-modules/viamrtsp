@@ -168,14 +168,15 @@ $(BIN_DISCOVERY): build-ffmpeg *.go cmd/discovery/*.go
 tool-install:
 	GOBIN=`pwd`/$(TOOL_BIN) go install \
 		github.com/edaniels/golinters/cmd/combined \
-		github.com/golangci/golangci-lint/cmd/golangci-lint \
 		github.com/rhysd/actionlint/cmd/actionlint
 
 gofmt:
 	gofmt -w -s .
 
+GOVERSION = $(shell grep '^go .\..' go.mod | head -n1 | cut -d' ' -f2)
 lint: gofmt tool-install build-ffmpeg
-	CGO_CFLAGS=$(CGO_CFLAGS) GOFLAGS=$(GOFLAGS) $(TOOL_BIN)/golangci-lint run -v --fix --config=./etc/.golangci.yaml --timeout=2m
+	go mod tidy
+	GOTOOLCHAIN=go$(GOVERSION) GOGC=50 CGO_CFLAGS=$(CGO_CFLAGS) GOFLAGS=$(GOFLAGS) go run github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.2 run -v --fix --config=./etc/.golangci.yaml --timeout=5m
 
 test: build-ffmpeg
 	CGO_CFLAGS="$(CGO_CFLAGS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" go test -ldflags="-checklinkname=0" -race -v ./...

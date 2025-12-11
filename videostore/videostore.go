@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"path/filepath"
+	"time"
 
 	vscamera "github.com/viam-modules/video-store/model/camera"
 	"github.com/viam-modules/video-store/videostore"
@@ -14,6 +15,8 @@ import (
 	"go.viam.com/rdk/components/generic"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
+	"go.viam.com/rdk/services/video"
+	"go.viam.com/utils"
 )
 
 const (
@@ -28,22 +31,32 @@ var (
 	defaultUploadPath  = filepath.Join(".viam", "capture", "video-upload")
 )
 
-// Model is videostore's Viam model.
-var Model = resource.ModelNamespace("viam").WithFamily("viamrtsp").WithModel("video-store")
+// ComponentModel is a component model that uses the generic API.
+var ComponentModel = resource.ModelNamespace("viam").WithFamily("viamrtsp").WithModel("video-store")
+
+// ServiceModel is a service model that uses the video service API.
+var ServiceModel = resource.ModelNamespace("viam").WithFamily("viamrtsp").WithModel("video-service")
 
 func init() {
-	resource.RegisterComponent(generic.API, Model, resource.Registration[resource.Resource, *Config]{
+	resource.RegisterComponent(generic.API, ComponentModel, resource.Registration[resource.Resource, *Config]{
+		Constructor: New,
+	})
+	resource.RegisterService(video.API, ServiceModel, resource.Registration[resource.Resource, *Config]{
 		Constructor: New,
 	})
 }
 
 type service struct {
 	resource.AlwaysRebuild
-	name   resource.Name
-	logger logging.Logger
-	vs     videostore.VideoStore
-	rsMux  *rawSegmenterMux
+	name    resource.Name
+	logger  logging.Logger
+	vs      videostore.VideoStore
+	rsMux   *rawSegmenterMux
+	workers *utils.StoppableWorkers
 }
+
+// Ensure service implements video.Service at compile time.
+var _ video.Service = (*service)(nil)
 
 // New creates a new videostore.
 func New(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger logging.Logger) (resource.Resource, error) {
@@ -59,7 +72,7 @@ func New(ctx context.Context, deps resource.Dependencies, conf resource.Config, 
 	var vs videostore.VideoStore
 	var mux *rawSegmenterMux
 	if newConf.Camera != nil {
-		c, err := camera.FromDependencies(deps, *newConf.Camera)
+		c, err := camera.FromProvider(deps, *newConf.Camera)
 		if err != nil {
 			return nil, err
 		}
@@ -102,10 +115,11 @@ func New(ctx context.Context, deps resource.Dependencies, conf resource.Config, 
 	}
 
 	s := &service{
-		name:   conf.ResourceName(),
-		logger: logger,
-		vs:     vs,
-		rsMux:  mux,
+		name:    conf.ResourceName(),
+		logger:  logger,
+		vs:      vs,
+		rsMux:   mux,
+		workers: utils.NewBackgroundStoppableWorkers(),
 	}
 	return s, nil
 }
@@ -119,7 +133,59 @@ func (s *service) Close(_ context.Context) error {
 		return err
 	}
 	s.vs.Close()
+	s.workers.Stop()
 	return nil
+}
+
+// GetVideo streams video chunks between the given timestamps.
+func (s *service) GetVideo(
+	ctx context.Context,
+	startTime, endTime time.Time,
+	videoCodec, videoContainer string,
+	_ map[string]interface{},
+) (chan *video.Chunk, error) {
+	s.logger.Debugf(
+		"GetVideo called with startTime: %s, endTime: %s, videoCodec: %s, videoContainer: %s",
+		startTime.Format(time.RFC3339),
+		endTime.Format(time.RFC3339),
+		videoCodec,
+		videoContainer,
+	)
+
+	req := &videostore.FetchRequest{
+		From: startTime,
+		To:   endTime,
+	}
+	ch := make(chan *video.Chunk)
+
+	s.workers.Add(func(workerCtx context.Context) {
+		defer close(ch)
+
+		// Merge request ctx and worker ctx
+		mergedCtx, cancel := context.WithCancel(workerCtx)
+		defer cancel()
+		stopAfterFunc := context.AfterFunc(ctx, cancel)
+		defer stopAfterFunc()
+
+		emit := func(chunk video.Chunk) error {
+			select {
+			case <-mergedCtx.Done():
+				return mergedCtx.Err()
+			case ch <- &video.Chunk{
+				Data:      chunk.Data,
+				Container: chunk.Container,
+				// RequestID fill is handled by the GoSDK
+			}:
+				return nil
+			}
+		}
+
+		if err := s.vs.FetchStream(mergedCtx, req, emit); err != nil {
+			s.logger.Error("GetVideo FetchStream failed: ", err)
+		}
+	})
+
+	return ch, nil
 }
 
 func (s *service) DoCommand(ctx context.Context, command map[string]interface{}) (map[string]interface{}, error) {

@@ -1105,7 +1105,7 @@ func NewRTSPCamera(ctx context.Context, deps resource.Dependencies, conf resourc
 	if newConf.DiscoveryDep != "" {
 		// Some camera configs may rely on an mDNS server running that is managed by the (viamrtsp)
 		// discovery service.
-		_, err := discovery.FromDependencies(deps, newConf.DiscoveryDep)
+		_, err := discovery.FromProvider(deps, newConf.DiscoveryDep)
 		if err != nil {
 			logger.Warn("Error finding discovery service dependency:", err)
 		}
@@ -1451,7 +1451,7 @@ func (rc *rtspCamera) Geometries(_ context.Context, _ map[string]interface{}) ([
 	return nil, errors.New("not implemented")
 }
 
-func (rc *rtspCamera) NextPointCloud(_ context.Context) (pointcloud.PointCloud, error) {
+func (rc *rtspCamera) NextPointCloud(_ context.Context, _ map[string]interface{}) (pointcloud.PointCloud, error) {
 	return nil, errors.New("not implemented")
 }
 
