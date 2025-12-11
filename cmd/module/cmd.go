@@ -61,6 +61,9 @@ func realMain(ctx context.Context) error {
 	}
 
 	err = myMod.AddModelFromRegistry(ctx, discovery.API, unifi.Model)
+	if err != nil {
+		return err
+	}
 
 	err = myMod.Start(ctx)
 	defer myMod.Close(ctx)

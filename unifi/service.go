@@ -115,7 +115,7 @@ func (dis *unifiDiscovery) DiscoverResources(ctx context.Context, _ map[string]a
 		cfg := resource.Config{
 			API:   camera.API,
 			Model: viamrtsp.ModelAgnostic,
-			Name:  sanitizeName(cam.Name),
+			Name:  sanitizeName(cam.Name, cam.ID),
 			Attributes: map[string]any{
 				"rtsp_address": rtspURL,
 			},
@@ -226,7 +226,10 @@ func convertRTSPStoRTSP(rtspsURL string) string {
 	return rtspURL
 }
 
-const httpClientTimeout = 30 * time.Second
+const (
+	httpClientTimeout = 30 * time.Second
+	idSuffixLength    = 6
+)
 
 func defaultHTTPClient() *http.Client {
 	return &http.Client{
@@ -243,9 +246,15 @@ func (dis *unifiDiscovery) httpClient() *http.Client {
 	return dis.httpClientFunc()
 }
 
-// sanitizeName converts a camera name to a valid resource name.
-func sanitizeName(name string) string {
+// sanitizeName converts a camera name to a valid resource name with ID suffix for uniqueness.
+func sanitizeName(name, id string) string {
 	name = strings.ToLower(name)
 	name = strings.ReplaceAll(name, " ", "_")
+	// Add last 6 chars of ID as suffix to ensure uniqueness
+	if len(id) >= idSuffixLength {
+		name = name + "_" + id[len(id)-idSuffixLength:]
+	} else if id != "" {
+		name = name + "_" + id
+	}
 	return name
 }

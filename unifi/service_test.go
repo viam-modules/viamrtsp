@@ -84,24 +84,43 @@ func TestConvertRTSPStoRTSP(t *testing.T) {
 }
 
 func TestSanitizeName(t *testing.T) {
-	t.Run("Test lowercase and spaces", func(t *testing.T) {
+	t.Run("Test lowercase and spaces with ID", func(t *testing.T) {
 		name := "G5 Turret Ultra"
-		expected := "g5_turret_ultra"
-		result := sanitizeName(name)
+		id := "692f41440040a303e405534c"
+		expected := "g5_turret_ultra_05534c"
+		result := sanitizeName(name, id)
 		test.That(t, result, test.ShouldEqual, expected)
 	})
 
-	t.Run("Test already lowercase", func(t *testing.T) {
+	t.Run("Test already lowercase with ID", func(t *testing.T) {
 		name := "camera_1"
-		expected := "camera_1"
-		result := sanitizeName(name)
+		id := "abc123def456"
+		expected := "camera_1_def456"
+		result := sanitizeName(name, id)
 		test.That(t, result, test.ShouldEqual, expected)
 	})
 
-	t.Run("Test multiple spaces", func(t *testing.T) {
+	t.Run("Test multiple spaces with ID", func(t *testing.T) {
 		name := "Front Door Camera"
-		expected := "front_door_camera"
-		result := sanitizeName(name)
+		id := "cam123"
+		expected := "front_door_camera_cam123"
+		result := sanitizeName(name, id)
+		test.That(t, result, test.ShouldEqual, expected)
+	})
+
+	t.Run("Test short ID", func(t *testing.T) {
+		name := "Camera"
+		id := "abc"
+		expected := "camera_abc"
+		result := sanitizeName(name, id)
+		test.That(t, result, test.ShouldEqual, expected)
+	})
+
+	t.Run("Test empty ID", func(t *testing.T) {
+		name := "Camera"
+		id := ""
+		expected := "camera"
+		result := sanitizeName(name, id)
 		test.That(t, result, test.ShouldEqual, expected)
 	})
 }
@@ -164,15 +183,15 @@ func TestDiscoverResources(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 		test.That(t, len(configs), test.ShouldEqual, 2)
 
-		// Check first camera
-		test.That(t, configs[0].Name, test.ShouldEqual, "front_door")
+		// Check first camera (ID: cam1 -> last 6 chars is "1" but ID is short, so full ID used)
+		test.That(t, configs[0].Name, test.ShouldEqual, "front_door_cam1")
 		rtspAddr, ok := configs[0].Attributes["rtsp_address"]
 		test.That(t, ok, test.ShouldBeTrue)
 		test.That(t, rtspAddr, test.ShouldContainSubstring, "rtsp://")
 		test.That(t, rtspAddr, test.ShouldContainSubstring, ":7447/")
 
-		// Check second camera
-		test.That(t, configs[1].Name, test.ShouldEqual, "backyard")
+		// Check second camera (ID: cam2)
+		test.That(t, configs[1].Name, test.ShouldEqual, "backyard_cam2")
 	})
 
 	t.Run("Test camera with no RTSP stream", func(t *testing.T) {
