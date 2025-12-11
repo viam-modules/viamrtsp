@@ -6,6 +6,7 @@ import (
 
 	"github.com/viam-modules/viamrtsp"
 	"github.com/viam-modules/viamrtsp/ptzclient"
+	"github.com/viam-modules/viamrtsp/unifi"
 	"github.com/viam-modules/viamrtsp/upnpdiscovery"
 	"github.com/viam-modules/viamrtsp/viamonvif"
 	"github.com/viam-modules/viamrtsp/videostore"
@@ -58,6 +59,8 @@ func realMain(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	err = myMod.AddModelFromRegistry(ctx, discovery.API, unifi.Model)
 
 	err = myMod.Start(ctx)
 	defer myMod.Close(ctx)
