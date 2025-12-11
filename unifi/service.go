@@ -18,6 +18,11 @@ import (
 	"go.viam.com/rdk/services/discovery"
 )
 
+const (
+	httpClientTimeout = 30 * time.Second
+	idSuffixLength    = 6
+)
+
 // Model is the model for the Unifi discovery service.
 var Model = viamrtsp.Family.WithModel("unifi")
 
@@ -25,6 +30,31 @@ var Model = viamrtsp.Family.WithModel("unifi")
 type Config struct {
 	NVRAddress string `json:"nvr_address"`
 	UnifiToken string `json:"unifi_token"`
+}
+
+// unifiCamera represents a camera from the UniFi Protect API.
+type unifiCamera struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	State string `json:"state"`
+}
+
+// rtspStreamResponse represents the RTSPS stream response from the API.
+type rtspStreamResponse struct {
+	High    string `json:"high"`
+	Medium  string `json:"medium"`
+	Low     string `json:"low"`
+	Package string `json:"package"`
+}
+
+type unifiDiscovery struct {
+	resource.Named
+	resource.AlwaysRebuild
+	resource.TriviallyCloseable
+	logger         logging.Logger
+	unifToken      string
+	nvrAddr        string
+	httpClientFunc func() *http.Client
 }
 
 // Validate validates the Unifi discovery service configuration.
@@ -45,16 +75,6 @@ func init() {
 		resource.Registration[discovery.Service, *Config]{
 			Constructor: newUnifiDiscovery,
 		})
-}
-
-type unifiDiscovery struct {
-	resource.Named
-	resource.AlwaysRebuild
-	resource.TriviallyCloseable
-	logger         logging.Logger
-	unifToken      string
-	nvrAddr        string
-	httpClientFunc func() *http.Client
 }
 
 // NewUnifiDiscovery creates a new Unifi discovery service (exported for testing).
@@ -124,21 +144,6 @@ func (dis *unifiDiscovery) DiscoverResources(ctx context.Context, _ map[string]a
 	}
 
 	return configs, nil
-}
-
-// unifiCamera represents a camera from the UniFi Protect API.
-type unifiCamera struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	State string `json:"state"`
-}
-
-// rtspStreamResponse represents the RTSPS stream response from the API.
-type rtspStreamResponse struct {
-	High    string `json:"high"`
-	Medium  string `json:"medium"`
-	Low     string `json:"low"`
-	Package string `json:"package"`
 }
 
 func (dis *unifiDiscovery) getCameras(ctx context.Context) ([]unifiCamera, error) {
@@ -225,11 +230,6 @@ func convertRTSPStoRTSP(rtspsURL string) string {
 
 	return rtspURL
 }
-
-const (
-	httpClientTimeout = 30 * time.Second
-	idSuffixLength    = 6
-)
 
 func defaultHTTPClient() *http.Client {
 	return &http.Client{
