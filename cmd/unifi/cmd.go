@@ -3,13 +3,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 
+	"github.com/viam-modules/viamrtsp/unifi"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
-
-	"github.com/viam-modules/viamrtsp/unifi"
 )
 
 func main() {
@@ -37,10 +37,10 @@ func realMain() error {
 	}
 
 	if nvrIP == "" {
-		return fmt.Errorf("nvr IP address is required (-nvr)")
+		return errors.New("nvr IP address is required (-nvr)")
 	}
 	if token == "" {
-		return fmt.Errorf("unifi API token is required (-token)")
+		return errors.New("unifi API token is required (-token)")
 	}
 
 	logger.Infof("Testing Unifi discovery with NVR: %s", nvrIP)
@@ -66,10 +66,10 @@ func realMain() error {
 
 	logger.Infof("Discovered %d camera(s)", len(configs))
 	for i, cfg := range configs {
-		fmt.Printf("\n[%d] Camera: %s\n", i+1, cfg.Name)
-		fmt.Printf("    Model: %s\n", cfg.Model)
+		logger.Infof("[%d] Camera: %s", i+1, cfg.Name)
+		logger.Infof("    Model: %s", cfg.Model)
 		if attrs, ok := cfg.Attributes["rtsp_address"]; ok {
-			fmt.Printf("    RTSP: %s\n", attrs)
+			logger.Infof("    RTSP: %s", attrs)
 		}
 	}
 

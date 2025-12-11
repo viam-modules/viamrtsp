@@ -5,34 +5,35 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/viam-modules/viamrtsp"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/services/discovery"
-
-	"github.com/viam-modules/viamrtsp"
 )
 
-var (
-	Model = viamrtsp.Family.WithModel("unifi")
-)
+// Model is the model for the Unifi discovery service.
+var Model = viamrtsp.Family.WithModel("unifi")
 
+// Config is the configuration for the Unifi discovery service.
 type Config struct {
 	NVRAddress string `json:"nvr_address"`
 	UnifiToken string `json:"unifi_token"`
 }
 
+// Validate validates the Unifi discovery service configuration.
 func (cfg *Config) Validate(_ string) ([]string, []string, error) {
 	if cfg.NVRAddress == "" {
-		return nil, nil, fmt.Errorf("nvr_address is required")
+		return nil, nil, errors.New("nvr_address is required")
 	}
 	if cfg.UnifiToken == "" {
-		return nil, nil, fmt.Errorf("unifi_token is required")
+		return nil, nil, errors.New("unifi_token is required")
 	}
 	return nil, nil, nil
 }
@@ -82,7 +83,7 @@ func newUnifiDiscovery(_ context.Context, _ resource.Dependencies,
 	return dis, nil
 }
 
-func (dis *unifiDiscovery) DiscoverResources(ctx context.Context, extra map[string]any) ([]resource.Config, error) {
+func (dis *unifiDiscovery) DiscoverResources(ctx context.Context, _ map[string]any) ([]resource.Config, error) {
 	// Get list of cameras from NVR
 	cameras, err := dis.getCameras(ctx)
 	if err != nil {
@@ -146,7 +147,7 @@ func (dis *unifiDiscovery) getCameras(ctx context.Context) ([]unifiCamera, error
 		return nil, err
 	}
 
-	req.Header.Set("X-API-KEY", dis.unifToken)
+	req.Header.Set("X-Api-Key", dis.unifToken)
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := dis.httpClient().Do(req)
@@ -175,7 +176,7 @@ func (dis *unifiDiscovery) getRTSPStream(ctx context.Context, cameraID string) (
 		return "", err
 	}
 
-	req.Header.Set("X-API-KEY", dis.unifToken)
+	req.Header.Set("X-Api-Key", dis.unifToken)
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := dis.httpClient().Do(req)
@@ -223,9 +224,11 @@ func convertRTSPStoRTSP(rtspsURL string) string {
 	return rtspURL
 }
 
+const httpClientTimeout = 30 * time.Second
+
 func (dis *unifiDiscovery) httpClient() *http.Client {
 	return &http.Client{
-		Timeout: 30 * time.Second,
+		Timeout: httpClientTimeout,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: true, //nolint:gosec // UniFi NVRs use self-signed certs
