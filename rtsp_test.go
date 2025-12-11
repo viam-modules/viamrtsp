@@ -302,7 +302,7 @@ func TestUPNPStuff(t *testing.T) {
 	ctx = context.WithValue(ctx,
 		viamupnp.FindAllTestKey,
 		[]viamupnp.UPNPDevice{
-			{ssdp.Service{Location: "http://eliot:12312/asd.xml"}, nil},
+			{Service: ssdp.Service{Location: "http://eliot:12312/asd.xml"}, Desc: nil},
 		},
 	)
 
