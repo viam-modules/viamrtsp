@@ -51,9 +51,10 @@ type unifiDiscovery struct {
 	resource.Named
 	resource.AlwaysRebuild
 	resource.TriviallyCloseable
-	logger    logging.Logger
-	unifToken string
-	nvrAddr   string
+	logger         logging.Logger
+	unifToken      string
+	nvrAddr        string
+	httpClientFunc func() *http.Client
 }
 
 // NewUnifiDiscovery creates a new Unifi discovery service (exported for testing).
@@ -74,10 +75,11 @@ func newUnifiDiscovery(_ context.Context, _ resource.Dependencies,
 	}
 
 	dis := &unifiDiscovery{
-		Named:     conf.ResourceName().AsNamed(),
-		unifToken: cfg.UnifiToken,
-		nvrAddr:   cfg.NVRAddress,
-		logger:    logger,
+		Named:          conf.ResourceName().AsNamed(),
+		unifToken:      cfg.UnifiToken,
+		nvrAddr:        cfg.NVRAddress,
+		logger:         logger,
+		httpClientFunc: defaultHTTPClient,
 	}
 
 	return dis, nil
@@ -226,7 +228,7 @@ func convertRTSPStoRTSP(rtspsURL string) string {
 
 const httpClientTimeout = 30 * time.Second
 
-func (dis *unifiDiscovery) httpClient() *http.Client {
+func defaultHTTPClient() *http.Client {
 	return &http.Client{
 		Timeout: httpClientTimeout,
 		Transport: &http.Transport{
@@ -235,6 +237,10 @@ func (dis *unifiDiscovery) httpClient() *http.Client {
 			},
 		},
 	}
+}
+
+func (dis *unifiDiscovery) httpClient() *http.Client {
+	return dis.httpClientFunc()
 }
 
 // sanitizeName converts a camera name to a valid resource name.
