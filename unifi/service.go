@@ -116,7 +116,6 @@ func (dis *unifiDiscovery) DiscoverResources(ctx context.Context, _ map[string]a
 
 	var configs []resource.Config
 
-	// For each camera, get the RTSPS stream URL and convert to RTSP
 	for _, cam := range cameras {
 		rtspURL, err := dis.getRTSPStream(ctx, cam.ID)
 		if err != nil {
