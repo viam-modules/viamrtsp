@@ -263,10 +263,11 @@ func newHTTPClient() *http.Client {
 func sanitizeName(name, id string) string {
 	name = strings.ToLower(name)
 	name = strings.ReplaceAll(name, " ", "_")
-	// Add last 6 chars of ID as suffix to ensure uniqueness
-	if len(id) >= idSuffixLength {
-		name = name + "_" + id[len(id)-idSuffixLength:]
-	} else if id != "" {
+	// Add first 6 chars of ID as suffix to ensure uniqueness
+	if len(id) > idSuffixLength {
+		id = id[:idSuffixLength]
+	}
+	if id != "" {
 		name = name + "_" + id
 	}
 	return name

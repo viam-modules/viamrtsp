@@ -87,7 +87,7 @@ func TestSanitizeName(t *testing.T) {
 	t.Run("Test lowercase and spaces with ID", func(t *testing.T) {
 		name := "G5 Turret Ultra"
 		id := "692f41440040a303e405534c"
-		expected := "g5_turret_ultra_05534c"
+		expected := "g5_turret_ultra_692f41"
 		result := sanitizeName(name, id)
 		test.That(t, result, test.ShouldEqual, expected)
 	})
@@ -95,14 +95,14 @@ func TestSanitizeName(t *testing.T) {
 	t.Run("Test already lowercase with ID", func(t *testing.T) {
 		name := "camera_1"
 		id := "abc123def456"
-		expected := "camera_1_def456"
+		expected := "camera_1_abc123"
 		result := sanitizeName(name, id)
 		test.That(t, result, test.ShouldEqual, expected)
 	})
 
 	t.Run("Test multiple spaces with ID", func(t *testing.T) {
 		name := "Front Door Camera"
-		id := "cam123"
+		id := "cam1234567"
 		expected := "front_door_camera_cam123"
 		result := sanitizeName(name, id)
 		test.That(t, result, test.ShouldEqual, expected)
