@@ -404,3 +404,63 @@ func testStreamFallback(ctx context.Context, t *testing.T, logger logging.Logger
 	test.That(t, err, test.ShouldBeNil)
 	test.That(t, rtspURL, test.ShouldEqual, expected)
 }
+
+func TestCheckResponse(t *testing.T) {
+	t.Run("Test 200 OK with JSON", func(t *testing.T) {
+		resp := &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+		}
+		err := checkResponse(resp)
+		test.That(t, err, test.ShouldBeNil)
+	})
+
+	t.Run("Test 200 OK with JSON charset", func(t *testing.T) {
+		resp := &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+		}
+		err := checkResponse(resp)
+		test.That(t, err, test.ShouldBeNil)
+	})
+
+	t.Run("Test 401 Unauthorized", func(t *testing.T) {
+		resp := &http.Response{
+			StatusCode: http.StatusUnauthorized,
+			Header:     http.Header{},
+		}
+		err := checkResponse(resp)
+		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "authentication failed")
+	})
+
+	t.Run("Test 500 Internal Server Error", func(t *testing.T) {
+		resp := &http.Response{
+			StatusCode: http.StatusInternalServerError,
+			Header:     http.Header{},
+		}
+		err := checkResponse(resp)
+		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "500")
+	})
+
+	t.Run("Test 200 with HTML content type", func(t *testing.T) {
+		resp := &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"text/html"}},
+		}
+		err := checkResponse(resp)
+		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "unexpected content type")
+	})
+
+	t.Run("Test 200 with empty content type", func(t *testing.T) {
+		resp := &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{},
+		}
+		err := checkResponse(resp)
+		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "unexpected content type")
+	})
+}

@@ -162,8 +162,8 @@ func (dis *unifiDiscovery) getCameras(ctx context.Context) ([]unifiCamera, error
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
+	if err := checkResponse(resp); err != nil {
+		return nil, err
 	}
 
 	var cameras []unifiCamera
@@ -191,8 +191,8 @@ func (dis *unifiDiscovery) getRTSPStream(ctx context.Context, cameraID string) (
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("API returned status %d", resp.StatusCode)
+	if err := checkResponse(resp); err != nil {
+		return "", err
 	}
 
 	var streamResp rtspStreamResponse
@@ -228,6 +228,24 @@ func convertRTSPStoRTSP(rtspsURL string) string {
 	}
 
 	return rtspURL
+}
+
+// checkResponse validates the HTTP response status and content type.
+func checkResponse(resp *http.Response) error {
+	if resp.StatusCode == http.StatusUnauthorized {
+		return errors.New("authentication failed: invalid or expired API token")
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("API returned status %d", resp.StatusCode)
+	}
+
+	// Check content type to catch HTML error pages
+	contentType := resp.Header.Get("Content-Type")
+	if !strings.Contains(contentType, "application/json") {
+		return fmt.Errorf("unexpected content type %q (expected application/json), check API token", contentType)
+	}
+
+	return nil
 }
 
 func newHTTPClient() *http.Client {
