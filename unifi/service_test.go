@@ -177,7 +177,7 @@ func TestDiscoverResources(t *testing.T) {
 			logger:    logger,
 		}
 		// Override httpClient to use test server's client
-		dis.httpClientFunc = func() *http.Client { return server.Client() }
+		dis.httpClient = server.Client()
 
 		configs, err := dis.DiscoverResources(ctx, nil)
 		test.That(t, err, test.ShouldBeNil)
@@ -224,7 +224,7 @@ func TestDiscoverResources(t *testing.T) {
 			nvrAddr:   host,
 			logger:    logger,
 		}
-		dis.httpClientFunc = func() *http.Client { return server.Client() }
+		dis.httpClient = server.Client()
 
 		configs, err := dis.DiscoverResources(ctx, nil)
 		test.That(t, err, test.ShouldBeNil)
@@ -255,7 +255,7 @@ func testAPIError(ctx context.Context, t *testing.T, logger logging.Logger, stat
 		nvrAddr:   host,
 		logger:    logger,
 	}
-	dis.httpClientFunc = func() *http.Client { return server.Client() }
+	dis.httpClient = server.Client()
 
 	configs, err := dis.DiscoverResources(ctx, nil)
 	test.That(t, err, test.ShouldNotBeNil)
@@ -292,7 +292,7 @@ func TestGetCameras(t *testing.T) {
 			nvrAddr:   host,
 			logger:    logger,
 		}
-		dis.httpClientFunc = func() *http.Client { return server.Client() }
+		dis.httpClient = server.Client()
 
 		cameras, err := dis.getCameras(ctx)
 		test.That(t, err, test.ShouldBeNil)
@@ -318,7 +318,7 @@ func TestGetCameras(t *testing.T) {
 			nvrAddr:   host,
 			logger:    logger,
 		}
-		dis.httpClientFunc = func() *http.Client { return server.Client() }
+		dis.httpClient = server.Client()
 
 		cameras, err := dis.getCameras(ctx)
 		test.That(t, err, test.ShouldBeNil)
@@ -353,7 +353,7 @@ func TestGetRTSPStream(t *testing.T) {
 			nvrAddr:   host,
 			logger:    logger,
 		}
-		dis.httpClientFunc = func() *http.Client { return server.Client() }
+		dis.httpClient = server.Client()
 
 		rtspURL, err := dis.getRTSPStream(ctx, "cam123")
 		test.That(t, err, test.ShouldBeNil)
@@ -398,7 +398,7 @@ func testStreamFallback(ctx context.Context, t *testing.T, logger logging.Logger
 		nvrAddr:   host,
 		logger:    logger,
 	}
-	dis.httpClientFunc = func() *http.Client { return server.Client() }
+	dis.httpClient = server.Client()
 
 	rtspURL, err := dis.getRTSPStream(ctx, "cam123")
 	test.That(t, err, test.ShouldBeNil)

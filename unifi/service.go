@@ -51,10 +51,10 @@ type unifiDiscovery struct {
 	resource.Named
 	resource.AlwaysRebuild
 	resource.TriviallyCloseable
-	logger         logging.Logger
-	unifToken      string
-	nvrAddr        string
-	httpClientFunc func() *http.Client
+	logger     logging.Logger
+	unifToken  string
+	nvrAddr    string
+	httpClient *http.Client
 }
 
 // Validate validates the Unifi discovery service configuration.
@@ -95,11 +95,11 @@ func newUnifiDiscovery(_ context.Context, _ resource.Dependencies,
 	}
 
 	dis := &unifiDiscovery{
-		Named:          conf.ResourceName().AsNamed(),
-		unifToken:      cfg.UnifiToken,
-		nvrAddr:        cfg.NVRAddress,
-		logger:         logger,
-		httpClientFunc: defaultHTTPClient,
+		Named:      conf.ResourceName().AsNamed(),
+		unifToken:  cfg.UnifiToken,
+		nvrAddr:    cfg.NVRAddress,
+		logger:     logger,
+		httpClient: newHTTPClient(),
 	}
 
 	return dis, nil
@@ -157,7 +157,7 @@ func (dis *unifiDiscovery) getCameras(ctx context.Context) ([]unifiCamera, error
 	req.Header.Set("X-Api-Key", dis.unifToken)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := dis.httpClient().Do(req)
+	resp, err := dis.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +186,7 @@ func (dis *unifiDiscovery) getRTSPStream(ctx context.Context, cameraID string) (
 	req.Header.Set("X-Api-Key", dis.unifToken)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := dis.httpClient().Do(req)
+	resp, err := dis.httpClient.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -231,7 +231,7 @@ func convertRTSPStoRTSP(rtspsURL string) string {
 	return rtspURL
 }
 
-func defaultHTTPClient() *http.Client {
+func newHTTPClient() *http.Client {
 	return &http.Client{
 		Timeout: httpClientTimeout,
 		Transport: &http.Transport{
@@ -240,10 +240,6 @@ func defaultHTTPClient() *http.Client {
 			},
 		},
 	}
-}
-
-func (dis *unifiDiscovery) httpClient() *http.Client {
-	return dis.httpClientFunc()
 }
 
 // sanitizeName converts a camera name to a valid resource name with ID suffix for uniqueness.
