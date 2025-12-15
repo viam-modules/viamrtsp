@@ -236,7 +236,7 @@ func TestDiscoverResources(t *testing.T) {
 	})
 
 	t.Run("Test unauthorized error", func(t *testing.T) {
-		testAPIError(ctx, t, logger, http.StatusUnauthorized, "bad-token", "API returned status 401")
+		testAPIError(ctx, t, logger, http.StatusUnauthorized, "bad-token", "authentication failed: invalid or expired API token")
 	})
 }
 
