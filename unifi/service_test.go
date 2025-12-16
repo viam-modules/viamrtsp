@@ -377,7 +377,27 @@ func TestGetRTSPStream(t *testing.T) {
 	})
 
 	t.Run("Test no streams available", func(t *testing.T) {
-		testStreamFallback(ctx, t, logger, rtspStreamResponse{}, "")
+		server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			err := json.NewEncoder(w).Encode(rtspStreamResponse{})
+			test.That(t, err, test.ShouldBeNil)
+		}))
+		defer server.Close()
+
+		host := server.URL[8:]
+
+		dis := &unifiDiscovery{
+			Named:     resource.NewName(discovery.API, "test").AsNamed(),
+			unifToken: "test-token",
+			nvrAddr:   host,
+			logger:    logger,
+		}
+		dis.httpClient = server.Client()
+
+		rtspURL, err := dis.getRTSPStream(ctx, "cam123")
+		test.That(t, err, test.ShouldNotBeNil)
+		test.That(t, err.Error(), test.ShouldContainSubstring, "no RTSP stream URL available")
+		test.That(t, rtspURL, test.ShouldEqual, "")
 	})
 }
 

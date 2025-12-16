@@ -123,11 +123,6 @@ func (dis *unifiDiscovery) DiscoverResources(ctx context.Context, _ map[string]a
 			continue
 		}
 
-		if rtspURL == "" {
-			dis.logger.Warnf("No RTSP stream available for camera %s (%s)", cam.Name, cam.ID)
-			continue
-		}
-
 		dis.logger.Infof("Camera %s: %s", cam.Name, rtspURL)
 
 		// Create a camera config for this discovered camera
@@ -209,7 +204,7 @@ func (dis *unifiDiscovery) getRTSPStream(ctx context.Context, cameraID string) (
 		rtspsURL = streamResp.Low
 	}
 	if rtspsURL == "" {
-		return "", nil
+		return "", errors.New("no RTSP stream URL available")
 	}
 
 	// Convert RTSPS to RTSP: change port 7441 to 7447 and remove ?enableSrtp
