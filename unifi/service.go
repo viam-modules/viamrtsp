@@ -195,15 +195,15 @@ func (dis *unifiDiscovery) getRTSPStream(ctx context.Context, cameraID string) (
 		return "", fmt.Errorf("failed to decode stream response: %w", err)
 	}
 
-	// Use high quality stream, fall back to medium/low if not available
-	rtspsURL := streamResp.High
-	if rtspsURL == "" {
+	// Use the first available stream: high, medium, then low
+	var rtspsURL string
+	if streamResp.High != "" {
+		rtspsURL = streamResp.High
+	} else if streamResp.Medium != "" {
 		rtspsURL = streamResp.Medium
-	}
-	if rtspsURL == "" {
+	} else if streamResp.Low != "" {
 		rtspsURL = streamResp.Low
-	}
-	if rtspsURL == "" {
+	} else {
 		return "", errors.New("no RTSP stream URL available")
 	}
 
