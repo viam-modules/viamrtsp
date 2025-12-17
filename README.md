@@ -9,6 +9,7 @@ Four models are provided:
 * `viam:viamrtsp:rtsp-mpeg4` - Only supports the MPEG4 codec.
 This module also implements the `"rdk:service:discovery"` API, to surface rtsp cameras based on their communication protocol. The following models are implemented:
 * `viam:viamrtsp:onvif` - discovers cameras using the [onvif interface](https://www.onvif.org/).
+* `viam:viamrtsp:unifi` - discovers cameras connected to a [UniFi Protect](https://ui.com/camera-security) NVR.
 
 
 Navigate to the [**CONFIGURE** tab](https://docs.viam.com/build/configure/) of your [machine](https://docs.viam.com/fleet/machines/) in the [Viam app](https://app.viam.com/).
@@ -331,6 +332,54 @@ Currently specifying endpoints is not supported through the extras field.
 ## UPnP Host Discovery
 If in your rtsp_address your hostname is UPNP_DISCOVER then we will try to find a UPnP host that matches.
 You can filter the results by filling out the `query` field in the configuration. See `viamupnp.DeviceQuery` for supported filters.
+
+## Configure the `viamrtsp:unifi` discovery service
+
+This model is used to discover RTSP cameras connected to a [UniFi Protect](https://ui.com/camera-security) NVR. It uses the UniFi Protect Integration API to enumerate cameras and retrieve their RTSP stream URLs.
+
+```json
+{
+   "nvr_address": "<NVR_IP_OR_HOSTNAME>",
+   "unifi_token": "<API_TOKEN>"
+}
+```
+
+### Attributes
+
+| Name    | Type   | Inclusion    | Description |
+| ------- | ------ | ------------ | ----------- |
+| `nvr_address` | string | **Required** | The IP address or hostname of the UniFi Protect NVR (e.g., `"10.1.14.106"`). |
+| `unifi_token` | string | **Required** | API token for authenticating with the UniFi Protect NVR. Generate this in UniFi Protect under Settings > API Token. |
+
+### Example Configuration
+
+```json
+{
+   "nvr_address": "10.1.14.106",
+   "unifi_token": "aBcDeFgHiJkLmNoPqRsTuVwXyZ123456"
+}
+```
+
+### Camera Metadata
+
+The `DiscoverResources` API returns a list of cameras discovered from the NVR with their component configurations:
+
+```json
+{
+  "api": "rdk:component:camera",
+  "attributes": {
+    "rtsp_address": "rtsp://10.1.14.106:7447/abc123DEF456"
+  },
+  "model": "viam:viamrtsp:rtsp",
+  "name": "front_door_abc123"
+}
+```
+
+**Note:** Camera names are derived from the UniFi Protect camera name (lowercased, spaces replaced with underscores) with a unique ID suffix appended for disambiguation.
+
+### RTSP URL Conversion
+
+The UniFi Protect API returns RTSPS (secure) URLs on port 7441. This discovery service automatically converts them to plain RTSP on port 7447, which is more widely compatible with video clients.
 
 ## Configure the `viamrtsp:video-store` generic component for video storage
 This model implements the [`"rdk:component:generic"` API](https://docs.viam.com/components/generic/) for storing video data from RTSP cameras. It allows you to save video stream to a local file system. You can later upload clips to cloud storage with `save`, or fetch the video bytes directly with `fetch`.
