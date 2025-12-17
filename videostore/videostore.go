@@ -167,16 +167,24 @@ func (s *service) GetVideo(
 		stopAfterFunc := context.AfterFunc(ctx, cancel)
 		defer stopAfterFunc()
 
+		// emit sends a chunk to the channel, respecting context cancellation.
+		// The outer select with default ensures we check for cancellation first,
+		// avoiding Go's select non-determinism when both cases are ready.
 		emit := func(chunk video.Chunk) error {
 			select {
 			case <-mergedCtx.Done():
 				return mergedCtx.Err()
-			case ch <- &video.Chunk{
-				Data:      chunk.Data,
-				Container: chunk.Container,
-				// RequestID fill is handled by the GoSDK
-			}:
-				return nil
+			default:
+				select {
+				case <-mergedCtx.Done():
+					return mergedCtx.Err()
+				case ch <- &video.Chunk{
+					Data:      chunk.Data,
+					Container: chunk.Container,
+					// RequestID fill is handled by the GoSDK
+				}:
+					return nil
+				}
 			}
 		}
 
