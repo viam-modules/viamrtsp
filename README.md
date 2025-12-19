@@ -349,7 +349,7 @@ This model is used to discover RTSP cameras connected to a [UniFi Protect](https
 | Name    | Type   | Inclusion    | Description |
 | ------- | ------ | ------------ | ----------- |
 | `nvr_address` | string | **Required** | The IP address or hostname of the UniFi Protect NVR (e.g., `"10.1.14.106"`). |
-| `unifi_token` | string | **Required** | API token for authenticating with the UniFi Protect NVR. See [UniFi API Getting Started](https://developer.ui.com/site-manager-api/gettingstarted) for how to generate a token. |
+| `unifi_token` | string | **Required** | API token for authenticating with the UniFi Protect NVR. See [UniFi API Getting Started](https://developer.ui.com/site-manager-api/gettingstarted#obtaining-an-api-key) for how to generate a token. |
 
 ### Example Configuration
 
