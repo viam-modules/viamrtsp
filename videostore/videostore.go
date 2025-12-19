@@ -152,9 +152,18 @@ func (s *service) GetVideo(
 		videoContainer,
 	)
 
+	container := videostore.ContainerDefault
+	switch videoContainer {
+	case "mp4":
+		container = videostore.ContainerMP4
+	case "fmp4":
+		container = videostore.ContainerFMP4
+	}
+
 	req := &videostore.FetchRequest{
-		From: startTime,
-		To:   endTime,
+		From:      startTime,
+		To:        endTime,
+		Container: container,
 	}
 	ch := make(chan *video.Chunk)
 
@@ -308,5 +317,14 @@ func toFetchCommand(command map[string]interface{}) (*videostore.FetchRequest, e
 	if err != nil {
 		return nil, err
 	}
-	return &videostore.FetchRequest{From: from, To: to}, nil
+	container := videostore.ContainerDefault
+	if containerStr, ok := command["container"].(string); ok {
+		switch containerStr {
+		case "mp4":
+			container = videostore.ContainerMP4
+		case "fmp4":
+			container = videostore.ContainerFMP4
+		}
+	}
+	return &videostore.FetchRequest{From: from, To: to, Container: container}, nil
 }
