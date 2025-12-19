@@ -109,7 +109,7 @@ The `DiscoverResources` API can also take a credential as `extra`s fields. To di
 ```
 
 
-### Camera Configuration
+### Camera Configs
 
 The `DiscoverResources` API will return a list of cameras discovered by the service and their component configurations. Note that the metadata fields `resolution`, `codec`, and `frame_rate` are descriptive and will not change the behavior of the camera.
 
@@ -360,7 +360,7 @@ This model is used to discover RTSP cameras connected to a [UniFi Protect](https
 }
 ```
 
-### Camera Configuration
+### Camera Configs
 
 The `DiscoverResources` API returns a list of cameras discovered from the NVR with their component configurations:
 
