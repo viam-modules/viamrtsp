@@ -47,6 +47,12 @@
       "short_description": "A discovery service to find rtsp cameras that use the onvif interface."
     },
     {
+      "api": "rdk:service:discovery",
+      "model": "viam:viamrtsp:unifi",
+      "markdown_link": "README.md#configure-the-viamrtspunifi-discovery-service",
+      "short_description": "A discovery service to find rtsp cameras connected to a UniFi Protect NVR."
+    },
+    {
       "api": "rdk:component:generic",
       "model": "viam:viamrtsp:video-store",
       "markdown_link": "README.md#configure-the-viamrtspvideo-store-generic-component-for-video-storage",
