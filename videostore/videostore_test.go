@@ -252,6 +252,101 @@ func TestGetVideoTimeRangePassedCorrectly(t *testing.T) {
 	test.That(t, capturedReq.To.Equal(endTime), test.ShouldBeTrue)
 }
 
+func TestGetVideoContainerFormatPassedCorrectly(t *testing.T) {
+	testCases := []struct {
+		name              string
+		videoContainer    string
+		expectedContainer videostore.ContainerFormat
+	}{
+		{"default empty", "", videostore.ContainerDefault},
+		{"mp4", "mp4", videostore.ContainerMP4},
+		{"fmp4", "fmp4", videostore.ContainerFMP4},
+		{"unknown defaults", "unknown", videostore.ContainerDefault},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var capturedReq *videostore.FetchRequest
+
+			mockVS := &mockVideoStore{
+				fetchStreamFunc: func(_ context.Context, req *videostore.FetchRequest, _ func(video.Chunk) error) error {
+					capturedReq = req
+					return nil
+				},
+			}
+
+			svc := createTestService(t, mockVS)
+
+			ctx := context.Background()
+			startTime := time.Date(2024, 9, 6, 15, 0, 33, 0, time.UTC)
+			endTime := time.Date(2024, 9, 6, 15, 0, 50, 0, time.UTC)
+
+			ch, err := svc.GetVideo(ctx, startTime, endTime, "h264", tc.videoContainer, nil)
+			test.That(t, err, test.ShouldBeNil)
+
+			// Drain channel to ensure worker completes
+			//nolint:revive // intentionally draining channel
+			for range ch {
+			}
+
+			test.That(t, capturedReq, test.ShouldNotBeNil)
+			test.That(t, capturedReq.Container, test.ShouldEqual, tc.expectedContainer)
+		})
+	}
+}
+
+func TestToFetchCommandContainer(t *testing.T) {
+	testCases := []struct {
+		name              string
+		command           map[string]interface{}
+		expectedContainer videostore.ContainerFormat
+	}{
+		{
+			name: "no container field",
+			command: map[string]interface{}{
+				"from": "2024-09-06_15-00-33",
+				"to":   "2024-09-06_15-00-50",
+			},
+			expectedContainer: videostore.ContainerDefault,
+		},
+		{
+			name: "mp4 container",
+			command: map[string]interface{}{
+				"from":      "2024-09-06_15-00-33",
+				"to":        "2024-09-06_15-00-50",
+				"container": "mp4",
+			},
+			expectedContainer: videostore.ContainerMP4,
+		},
+		{
+			name: "fmp4 container",
+			command: map[string]interface{}{
+				"from":      "2024-09-06_15-00-33",
+				"to":        "2024-09-06_15-00-50",
+				"container": "fmp4",
+			},
+			expectedContainer: videostore.ContainerFMP4,
+		},
+		{
+			name: "unknown container defaults",
+			command: map[string]interface{}{
+				"from":      "2024-09-06_15-00-33",
+				"to":        "2024-09-06_15-00-50",
+				"container": "unknown",
+			},
+			expectedContainer: videostore.ContainerDefault,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req, err := toFetchCommand(tc.command)
+			test.That(t, err, test.ShouldBeNil)
+			test.That(t, req.Container, test.ShouldEqual, tc.expectedContainer)
+		})
+	}
+}
+
 func TestGetVideoWorkerShutdown(t *testing.T) {
 	workerStarted := make(chan struct{})
 	workerBlocked := make(chan struct{})
