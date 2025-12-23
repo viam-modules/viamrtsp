@@ -152,9 +152,15 @@ func (s *service) GetVideo(
 		videoContainer,
 	)
 
+	container, err := parseContainerFormat(videoContainer)
+	if err != nil {
+		return nil, err
+	}
+
 	req := &videostore.FetchRequest{
-		From: startTime,
-		To:   endTime,
+		From:      startTime,
+		To:        endTime,
+		Container: container,
 	}
 	ch := make(chan *video.Chunk)
 
@@ -308,5 +314,26 @@ func toFetchCommand(command map[string]interface{}) (*videostore.FetchRequest, e
 	if err != nil {
 		return nil, err
 	}
-	return &videostore.FetchRequest{From: from, To: to}, nil
+	container := videostore.ContainerDefault
+	if containerStr, ok := command["container"].(string); ok {
+		container, err = parseContainerFormat(containerStr)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &videostore.FetchRequest{From: from, To: to, Container: container}, nil
+}
+
+// parseContainerFormat parses a container format string and returns the corresponding ContainerFormat.
+func parseContainerFormat(s string) (videostore.ContainerFormat, error) {
+	switch s {
+	case "", "default":
+		return videostore.ContainerDefault, nil
+	case "mp4":
+		return videostore.ContainerMP4, nil
+	case "fmp4":
+		return videostore.ContainerFMP4, nil
+	default:
+		return videostore.ContainerDefault, errors.New("invalid container format: must be 'mp4', 'fmp4', or empty")
+	}
 }
