@@ -257,11 +257,13 @@ func TestGetVideoContainerFormatPassedCorrectly(t *testing.T) {
 		name              string
 		videoContainer    string
 		expectedContainer videostore.ContainerFormat
+		expectError       bool
 	}{
-		{"default empty", "", videostore.ContainerDefault},
-		{"mp4", "mp4", videostore.ContainerMP4},
-		{"fmp4", "fmp4", videostore.ContainerFMP4},
-		{"unknown defaults", "unknown", videostore.ContainerDefault},
+		{"default empty", "", videostore.ContainerDefault, false},
+		{"default keyword", "default", videostore.ContainerDefault, false},
+		{"mp4", "mp4", videostore.ContainerMP4, false},
+		{"fmp4", "fmp4", videostore.ContainerFMP4, false},
+		{"invalid container", "invalid", videostore.ContainerDefault, true},
 	}
 
 	for _, tc := range testCases {
@@ -282,6 +284,13 @@ func TestGetVideoContainerFormatPassedCorrectly(t *testing.T) {
 			endTime := time.Date(2024, 9, 6, 15, 0, 50, 0, time.UTC)
 
 			ch, err := svc.GetVideo(ctx, startTime, endTime, "h264", tc.videoContainer, nil)
+
+			if tc.expectError {
+				test.That(t, err, test.ShouldNotBeNil)
+				test.That(t, err.Error(), test.ShouldContainSubstring, "invalid container format")
+				return
+			}
+
 			test.That(t, err, test.ShouldBeNil)
 
 			// Drain channel to ensure worker completes
@@ -300,6 +309,7 @@ func TestToFetchCommandContainer(t *testing.T) {
 		name              string
 		command           map[string]interface{}
 		expectedContainer videostore.ContainerFormat
+		expectError       bool
 	}{
 		{
 			name: "no container field",
@@ -308,6 +318,27 @@ func TestToFetchCommandContainer(t *testing.T) {
 				"to":   "2024-09-06_15-00-50",
 			},
 			expectedContainer: videostore.ContainerDefault,
+			expectError:       false,
+		},
+		{
+			name: "empty container",
+			command: map[string]interface{}{
+				"from":      "2024-09-06_15-00-33",
+				"to":        "2024-09-06_15-00-50",
+				"container": "",
+			},
+			expectedContainer: videostore.ContainerDefault,
+			expectError:       false,
+		},
+		{
+			name: "default container",
+			command: map[string]interface{}{
+				"from":      "2024-09-06_15-00-33",
+				"to":        "2024-09-06_15-00-50",
+				"container": "default",
+			},
+			expectedContainer: videostore.ContainerDefault,
+			expectError:       false,
 		},
 		{
 			name: "mp4 container",
@@ -317,6 +348,7 @@ func TestToFetchCommandContainer(t *testing.T) {
 				"container": "mp4",
 			},
 			expectedContainer: videostore.ContainerMP4,
+			expectError:       false,
 		},
 		{
 			name: "fmp4 container",
@@ -326,21 +358,30 @@ func TestToFetchCommandContainer(t *testing.T) {
 				"container": "fmp4",
 			},
 			expectedContainer: videostore.ContainerFMP4,
+			expectError:       false,
 		},
 		{
-			name: "unknown container defaults",
+			name: "invalid container returns error",
 			command: map[string]interface{}{
 				"from":      "2024-09-06_15-00-33",
 				"to":        "2024-09-06_15-00-50",
-				"container": "unknown",
+				"container": "invalid",
 			},
 			expectedContainer: videostore.ContainerDefault,
+			expectError:       true,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			req, err := toFetchCommand(tc.command)
+
+			if tc.expectError {
+				test.That(t, err, test.ShouldNotBeNil)
+				test.That(t, err.Error(), test.ShouldContainSubstring, "invalid container format")
+				return
+			}
+
 			test.That(t, err, test.ShouldBeNil)
 			test.That(t, req.Container, test.ShouldEqual, tc.expectedContainer)
 		})
@@ -569,4 +610,37 @@ func TestGetVideoConcurrentRequests(t *testing.T) {
 	mu.Lock()
 	test.That(t, callCount, test.ShouldEqual, numRequests)
 	mu.Unlock()
+}
+
+func TestParseContainerFormat(t *testing.T) {
+	testCases := []struct {
+		name           string
+		input          string
+		expectedFormat videostore.ContainerFormat
+		expectError    bool
+	}{
+		{"empty string", "", videostore.ContainerDefault, false},
+		{"default keyword", "default", videostore.ContainerDefault, false},
+		{"mp4", "mp4", videostore.ContainerMP4, false},
+		{"fmp4", "fmp4", videostore.ContainerFMP4, false},
+		{"invalid format", "avi", videostore.ContainerDefault, true},
+		{"uppercase MP4", "MP4", videostore.ContainerDefault, true},
+		{"mixed case", "Mp4", videostore.ContainerDefault, true},
+		{"whitespace", " mp4 ", videostore.ContainerDefault, true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			format, err := parseContainerFormat(tc.input)
+
+			if tc.expectError {
+				test.That(t, err, test.ShouldNotBeNil)
+				test.That(t, err.Error(), test.ShouldContainSubstring, "invalid container format")
+				return
+			}
+
+			test.That(t, err, test.ShouldBeNil)
+			test.That(t, format, test.ShouldEqual, tc.expectedFormat)
+		})
+	}
 }
