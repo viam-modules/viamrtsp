@@ -1,15 +1,19 @@
 # [`viamrtsp` module](https://app.viam.com/module/viam/viamrtsp)
 
 This module implements the [`"rdk:component:camera"` API](https://docs.viam.com/components/camera/) for real-time streaming protocol (RTSP) enabled cameras.
-Four models are provided:
+Five camera models are provided:
 * `viam:viamrtsp:rtsp` - Codec agnostic. Will auto detect the codec of the `rtsp_address`.
 * `viam:viamrtsp:rtsp-h264` - Only supports the H264 codec.
 * `viam:viamrtsp:rtsp-h265` - Only supports the H265 codec.
 * `viam:viamrtsp:rtsp-mjpeg` - Only supports the M-JPEG codec.
 * `viam:viamrtsp:rtsp-mpeg4` - Only supports the MPEG4 codec.
-This module also implements the `"rdk:service:discovery"` API, to surface rtsp cameras based on their communication protocol. The following models are implemented:
+
+This module also implements the `"rdk:service:discovery"` API to surface RTSP cameras based on their communication protocol:
 * `viam:viamrtsp:onvif` - discovers cameras using the [onvif interface](https://www.onvif.org/).
 * `viam:viamrtsp:unifi` - discovers cameras connected to a [UniFi Protect](https://ui.com/camera-security) NVR.
+
+This module also implements the `"rdk:service:video"` API for streaming stored video:
+* `viam:viamrtsp:video-service` - streams stored video from RTSP cameras using the `GetVideo` API.
 
 
 Navigate to the [**CONFIGURE** tab](https://docs.viam.com/build/configure/) of your [machine](https://docs.viam.com/fleet/machines/) in the [Viam app](https://app.viam.com/).
@@ -381,7 +385,101 @@ The `DiscoverResources` API returns a list of cameras discovered from the NVR wi
 
 The UniFi Protect API returns RTSPS (secure) URLs on port 7441. This discovery service automatically converts them to plain RTSP on port 7447, which is more widely compatible with video clients.
 
+## Configure the `viamrtsp:video-service` video service
+
+This model implements the `"rdk:service:video"` API for streaming stored video from RTSP cameras. It provides the `GetVideo` method for streaming video chunks between specified timestamps.
+
+> [!NOTE]
+> This is the recommended model for video retrieval. It supports the `GetVideo` streaming API, which efficiently streams video chunks to clients. The legacy `viamrtsp:video-store` generic component only supports `DoCommand` operations (`save`, `fetch`, `get-storage-state`) and does not support streaming.
+
+1. Add a viamrtsp camera component (e.g., `viam:viamrtsp:rtsp`).
+2. Configure the `viamrtsp:video-service` service attributes:
+
+```json
+{
+  "camera": "<rtsp_cam_name>",
+  "storage": {
+    "size_gb": 1
+  }
+}
+```
+
+### Attributes
+
+| Name                | Type    | Inclusion    | Description |
+| ------------------- | ------- | ------------ | ----------- |
+| `camera`            | string  | Optional     | Name of the camera component to use as the video source. If omitted, operates in read-only mode for existing stored video. |
+| `storage`           | object  | Required     | Storage configuration settings |
+| `storage.size_gb`   | integer | Required     | Maximum storage size in gigabytes |
+| `storage.upload_path` | string | Optional    | Path where uploaded video segments are saved |
+| `storage.storage_path` | string | Optional   | Path where video segments are stored |
+| `video`             | object  | Optional     | Video encoding configuration settings (only used when re-encoding is required) |
+| `video.bitrate`     | integer | Optional     | Bitrate for video encoding (bits per second) - only applies to MPEG4 and MJPEG inputs |
+| `video.preset`      | string  | Optional     | Encoding preset (e.g., ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow) - only applies to MPEG4 and MJPEG inputs |
+| `framerate`         | integer | Optional     | Frame rate to capture video at (frames per second) - only applies to MPEG4 and MJPEG inputs |
+
+### Example Configuration
+
+```json
+{
+  "name": "video-service-1",
+  "api": "rdk:service:video",
+  "model": "viam:viamrtsp:video-service",
+  "attributes": {
+    "camera": "rtsp-cam-1",
+    "storage": {
+      "size_gb": 10
+    }
+  }
+}
+```
+
+### GetVideo API
+
+The `GetVideo` method streams video chunks between specified timestamps. It returns a channel of video chunks that can be consumed by the client.
+
+#### Parameters
+
+| Parameter       | Type      | Required/Optional | Description |
+|-----------------|-----------|-------------------|-------------|
+| `start_time`    | timestamp | Required          | Start timestamp for the video range (RFC3339 format) |
+| `end_time`      | timestamp | Required          | End timestamp for the video range (RFC3339 format) |
+| `video_codec`   | string    | Optional          | Requested video codec (currently ignored, server determines codec) |
+| `video_container` | string  | Optional          | Container format: `"mp4"` for progressive playback or `"fmp4"` for streaming playback. Defaults to `"mp4"` |
+
+#### Container Formats
+
+| Format | Description |
+|--------|-------------|
+| `mp4`  | Standard MP4 with `faststart` flag. Moov atom placed at beginning for progressive playback. Best for downloading complete files. |
+| `fmp4` | Fragmented MP4 with `frag_keyframe+default_base_moof` flags. Optimized for streaming playback. Best for live/real-time consumption. |
+
+#### Response
+
+The method returns a channel of `video.Chunk` objects:
+
+| Field       | Type   | Description |
+|-------------|--------|-------------|
+| `data`      | []byte | Video chunk data |
+| `container` | string | Container format of the chunk (`"mp4"` or `"fmp4"`) |
+
+### DoCommand API
+
+The video service also supports `DoCommand` for additional operations. These commands work identically to the [`video-store` DoCommand API](#docommand-api-1):
+
+- **`save`** - Concatenate and save video clips to cloud storage
+- **`fetch`** - Retrieve video bytes directly  
+- **`get-storage-state`** - Get storage status and available video ranges
+
+See the [video-store DoCommand documentation](#docommand-api-1) for detailed request/response formats.
+
+---
+
 ## Configure the `viamrtsp:video-store` generic component for video storage
+
+> [!NOTE]
+> This is a legacy component. For new implementations, consider using the `viamrtsp:video-service` which supports the `GetVideo` streaming API in addition to the `DoCommand` operations below.
+
 This model implements the [`"rdk:component:generic"` API](https://docs.viam.com/components/generic/) for storing video data from RTSP cameras. It allows you to save video stream to a local file system. You can later upload clips to cloud storage with `save`, or fetch the video bytes directly with `fetch`.
 
 1. Add a viamrtsp camera component (e.g., `viam:viamrtsp:rtsp`).
