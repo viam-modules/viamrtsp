@@ -569,6 +569,7 @@ We support building this module using the Makefile for the following host/target
         * Linux/Amd64: `canon -profile viam-rtsp-antique -arch amd64`
     * Build binary: `make`
 * Build for MacOS target:
+    * Requires [Homebrew](https://brew.sh/) (x264 will be installed automatically)
     * Build binary: `make`
 * Build for Android target:
     * Cross-compile from Linux/Amd64 or Darwin/Arm64 host.
