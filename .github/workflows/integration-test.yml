@@ -68,21 +68,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Go (Darwin)
-      if: matrix.platform.os == 'darwin'
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.23'
-
-    - name: Build module (Darwin)
-      if: matrix.platform.os == 'darwin'
-      run: make module
-
-    - name: Build module (Linux)
-      if: matrix.platform.os == 'linux'
+    - name: Build module
       uses: ./.github/actions/build-module
       with:
-        target_os: linux
+        target_os: ${{ matrix.platform.os }}
         target_arch: ${{ matrix.platform.arch }}
         docker_image: ${{ matrix.platform.docker_image }}
 
