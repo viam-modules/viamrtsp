@@ -1,5 +1,5 @@
 name: 'Build Module'
-description: 'Builds the viamrtsp module using Docker'
+description: 'Builds the viamrtsp module using Docker or natively'
 inputs:
   target_os:
     description: 'Target OS'
@@ -8,22 +8,20 @@ inputs:
     description: 'Target architecture'
     required: true
   docker_image:
-    description: 'Docker image to use for building'
-    required: true
+    description: 'Docker image to use for building (optional - if not provided, builds natively)'
+    required: false
 runs:
   using: 'composite'
   steps:
     - name: Set up Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v5
       with:
-        go-version: 1.23 # match go.mod
+        go-version: '1.23'
 
-    - name: Pull Docker image
-      run: docker pull ${{ inputs.docker_image }}
-      shell: bash
-
-    - name: Build and package using Docker
+    - name: Build using Docker
+      if: inputs.docker_image != ''
       run: |
+        docker pull ${{ inputs.docker_image }}
         docker run --rm \
           -e TARGET_OS=${{ inputs.target_os }} \
           -e TARGET_ARCH=${{ inputs.target_arch }} \
@@ -33,7 +31,12 @@ runs:
           sh -c "make module"
       shell: bash
 
-    - name: Verify module.tar.gz exists recursively
+    - name: Build natively
+      if: inputs.docker_image == ''
+      run: make module
+      shell: bash
+
+    - name: Verify module.tar.gz exists
       run: |
         if find . -name module.tar.gz | grep -q .; then
           echo "module.tar.gz exists"
