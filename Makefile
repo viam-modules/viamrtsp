@@ -151,9 +151,36 @@ endif
 endif
 endif
 
-.PHONY: build-ffmpeg tool-install gofmt lint test profile-cpu profile-memory update-rdk module clean clean-all
+.PHONY: build-ffmpeg tool-install gofmt lint test profile-cpu profile-memory update-rdk module clean clean-all install-deps viam-server
 
 all: $(BIN_VIAMRTSP) $(BIN_DISCOVERY)
+
+install-deps:
+ifeq ($(SOURCE_OS),linux)
+	sudo apt-get update
+	sudo add-apt-repository universe
+	sudo apt-get install -y libfuse2 ffmpeg
+endif
+ifeq ($(SOURCE_OS),darwin)
+	brew install ffmpeg
+endif
+
+viam-server:
+ifeq ($(SOURCE_OS),linux)
+	@echo "Downloading viam-server for Linux $(SOURCE_ARCH)..."
+ifeq ($(SOURCE_ARCH),amd64)
+	wget https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-x86_64.AppImage -O viam-server
+endif
+ifeq ($(SOURCE_ARCH),arm64)
+	wget https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-aarch64.AppImage -O viam-server
+endif
+	chmod 755 viam-server
+	sudo ./viam-server --aix-install
+endif
+ifeq ($(SOURCE_OS),darwin)
+	brew tap viamrobotics/brews
+	brew install viam-server
+endif
 
 # We set GOOS, GOARCH, GO_TAGS, and GO_LDFLAGS to support cross-compilation for android targets.
 $(BIN_VIAMRTSP): build-ffmpeg *.go cmd/module/*.go
