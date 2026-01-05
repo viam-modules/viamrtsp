@@ -17,13 +17,11 @@ jobs:
             os: linux
             arch: amd64
             mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_linux_amd64.tar.gz
-            viam_server_url: https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-x86_64.AppImage
             docker_image: ghcr.io/viamrobotics/antique2:amd64-cache
           - runner: buildjet-8vcpu-ubuntu-2204-arm
             os: linux
             arch: arm64
             mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_linux_arm64v8.tar.gz
-            viam_server_url: https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-aarch64.AppImage
             docker_image: ghcr.io/viamrobotics/antique2:arm64-cache
           - runner: macos-14
             os: darwin
@@ -88,16 +86,8 @@ jobs:
         target_arch: ${{ matrix.platform.arch }}
         docker_image: ${{ matrix.platform.docker_image }}
 
-    - name: Install dependencies (Linux)
-      if: matrix.platform.os == 'linux'
-      run: |
-        sudo apt-get update
-        sudo add-apt-repository universe &&
-        sudo apt-get install -y libfuse2 ffmpeg
-
-    - name: Install dependencies (Darwin)
-      if: matrix.platform.os == 'darwin'
-      run: brew install ffmpeg
+    - name: Install dependencies
+      run: make install-deps
         
     - name: Download and extract mediamtx
       run: |
@@ -110,18 +100,8 @@ jobs:
     - name: Run fake RTSP camera
       run: ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec ${{ matrix.config.codec }} ${{ matrix.config.extra_ffmpeg_args }} -pix_fmt ${{ matrix.config.pix_fmt }} -f rtsp -rtsp_transport ${{ matrix.config.transport }} rtsp://0.0.0.0:8554/live.stream &
       
-    - name: Install viam-server (Linux)
-      if: matrix.platform.os == 'linux'
-      run: |
-        wget ${{ matrix.platform.viam_server_url }} -O viam-server
-        chmod 755 viam-server
-        sudo ./viam-server --aix-install
-
-    - name: Install viam-server (Darwin)
-      if: matrix.platform.os == 'darwin'
-      run: |
-        brew tap viamrobotics/brews
-        brew install viam-server
+    - name: Install viam-server
+      run: make viam-server
 
     # Find the viamrtsp binary dynamically and generate the config
     - name: Generate viam-server config
