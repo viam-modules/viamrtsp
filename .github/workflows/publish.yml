@@ -20,7 +20,7 @@ jobs:
             target_arch: arm64
             docker_image: ghcr.io/viamrobotics/antique2:arm64-cache
           - platform: darwin/arm64
-            runner: macos-14
+            runner: macos-13
             target_os: darwin
             target_arch: arm64
           - platform: windows/amd64
