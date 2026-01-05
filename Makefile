@@ -98,11 +98,6 @@ CGO_LDFLAGS = $(subst -lx264, $(SUBST),$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH
 ifeq ($(TARGET_OS),windows)
 	CGO_LDFLAGS += -static -static-libgcc -static-libstdc++
 endif
-ifeq ($(SOURCE_OS),darwin)
-ifeq ($(shell brew list | grep -w x264 > /dev/null; echo $$?), 1)
-	brew update && brew install x264
-endif
-endif
 
 # If we are building for android, we need to set the correct flags
 # and toolchain paths for FFMPEG and go binary cross-compilation.
@@ -227,6 +222,11 @@ endif
 	cd $(FFMPEG_VERSION_PLATFORM) && ./configure $(FFMPEG_OPTS) && $(MAKE) -j$(NPROC) && $(MAKE) install
 
 build-ffmpeg: $(NDK_ROOT) $(X264_BUILD_DIR)
+# Install x264 via Homebrew on Darwin if not present
+ifeq ($(SOURCE_OS),darwin)
+	@which brew > /dev/null || (echo "Homebrew is required on macOS" && exit 1)
+	@brew list x264 > /dev/null 2>&1 || (echo "Installing x264 via Homebrew..." && brew install x264)
+endif
 # Only need nasm to build assembly kernels for amd64 targets.
 ifeq ($(SOURCE_OS),linux)
 ifeq ($(SOURCE_ARCH),amd64)
