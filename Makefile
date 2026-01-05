@@ -76,6 +76,15 @@ FFMPEG_OPTS ?= --prefix=$(FFMPEG_BUILD) \
 --enable-protocol=crypto \
 --enable-protocol=file \
 
+# Darwin-specific: add x264 paths for FFmpeg configure
+ifeq ($(SOURCE_OS),darwin)
+    X264_PREFIX := $(shell brew --prefix x264 2>/dev/null)
+    ifneq ($(X264_PREFIX),)
+        FFMPEG_OPTS += --extra-cflags="-I$(X264_PREFIX)/include" \
+                       --extra-ldflags="-L$(X264_PREFIX)/lib"
+    endif
+endif
+
 # Add linker flag -checklinkname=0 for anet https://github.com/wlynxg/anet?tab=readme-ov-file#how-to-build-with-go-1230-or-later.
 PKG_CONFIG_PATH = $(FFMPEG_BUILD)/lib/pkgconfig
 CGO_CFLAGS = $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags $(FFMPEG_LIBS))
