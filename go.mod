@@ -19,7 +19,7 @@ require (
 	github.com/viam-modules/video-store v0.0.8-rc8
 	github.com/viamrobotics/zeroconf v1.0.13
 	go.uber.org/zap v1.27.0
-	go.viam.com/rdk v0.108.0
+	go.viam.com/rdk v0.108.2
 	go.viam.com/test v1.2.4
 	go.viam.com/utils v0.4.3
 	golang.org/x/net v0.47.0
