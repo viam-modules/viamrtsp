@@ -30,6 +30,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/components/camera/rtppassthrough"
+	"go.viam.com/rdk/data"
 	"go.viam.com/rdk/gostream"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/pointcloud"
@@ -1437,7 +1438,7 @@ func (rc *rtspCamera) Images(
 		return nil, resource.ResponseMetadata{}, err
 	}
 
-	namedImage, err := camera.NamedImageFromBytes(imgBytes, "", metadata.MimeType)
+	namedImage, err := camera.NamedImageFromBytes(imgBytes, "", metadata.MimeType, data.Annotations{})
 	if err != nil {
 		return nil, resource.ResponseMetadata{}, err
 	}
