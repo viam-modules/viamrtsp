@@ -66,7 +66,7 @@ func TestRTSPCamera(t *testing.T) {
 			defer imageTimeoutCancel()
 			var im image.Image
 			for imageTimeoutCtx.Err() == nil {
-				img, err := camera.DecodeImageFromCamera(imageTimeoutCtx, rutils.MimeTypeJPEG, nil, rtspCam)
+				img, err := camera.DecodeImageFromCamera(imageTimeoutCtx, rtspCam, nil, nil)
 				if err != nil {
 					continue
 				}
@@ -95,7 +95,7 @@ func TestRTSPCamera(t *testing.T) {
 			imgCount := 0
 			for imageTimeoutCtx.Err() == nil {
 				time.Sleep(100 * time.Millisecond)
-				img, err := camera.DecodeImageFromCamera(imageTimeoutCtx, rutils.MimeTypeJPEG, nil, rtspCam)
+				img, err := camera.DecodeImageFromCamera(imageTimeoutCtx, rtspCam, nil, nil)
 				if err != nil {
 					continue
 				}
@@ -257,7 +257,7 @@ func TestRTSPCameraPerformance(t *testing.T) {
 
 		// A loop to keep trying to get the first image until a frame is available.
 		for {
-			img, err := camera.DecodeImageFromCamera(imageTimeoutCtx, rutils.MimeTypeJPEG, nil, rtspCam)
+			img, err := camera.DecodeImageFromCamera(imageTimeoutCtx, rtspCam, nil, nil)
 			if err == nil && img != nil {
 				im = img
 				frameAvailable = true

@@ -12,7 +12,6 @@ import (
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/robot/client"
-	rutils "go.viam.com/rdk/utils"
 )
 
 const (
@@ -60,7 +59,7 @@ func run() error {
 	}
 
 	for range maxRetries {
-		_, err = camera.DecodeImageFromCamera(ctx, rutils.MimeTypeJPEG, nil, ipCam)
+		_, err = camera.DecodeImageFromCamera(ctx, ipCam, nil, nil)
 		if err == nil {
 			return nil
 		}
