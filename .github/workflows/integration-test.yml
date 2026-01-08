@@ -23,7 +23,7 @@ jobs:
             arch: arm64
             mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_linux_arm64v8.tar.gz
             docker_image: ghcr.io/viamrobotics/antique2:arm64-cache
-          - runner: macos-13
+          - runner: macos-14
             os: darwin
             arch: arm64
             mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_darwin_arm64.tar.gz
