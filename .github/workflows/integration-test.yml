@@ -162,7 +162,12 @@ jobs:
     - name: Run fake RTSP camera (Windows)
       if: runner.os == 'Windows'
       run: |
-        Start-Process -NoNewWindow -FilePath "ffmpeg" -ArgumentList "-re", "-f", "lavfi", "-i", "testsrc=size=640x480:rate=30", "-vcodec", "${{ matrix.config.codec }}", "${{ matrix.config.extra_ffmpeg_args }}", "-pix_fmt", "${{ matrix.config.pix_fmt }}", "-f", "rtsp", "-rtsp_transport", "${{ matrix.config.transport }}", "rtsp://0.0.0.0:8554/live.stream"
+        $args = @("-re", "-f", "lavfi", "-i", "testsrc=size=640x480:rate=30", "-vcodec", "${{ matrix.config.codec }}")
+        if ("${{ matrix.config.extra_ffmpeg_args }}" -ne "") {
+          $args += "${{ matrix.config.extra_ffmpeg_args }}".Split(" ")
+        }
+        $args += @("-pix_fmt", "${{ matrix.config.pix_fmt }}", "-f", "rtsp", "-rtsp_transport", "${{ matrix.config.transport }}", "rtsp://0.0.0.0:8554/live.stream")
+        Start-Process -NoNewWindow -FilePath "ffmpeg" -ArgumentList $args
         Start-Sleep -Seconds 5
       shell: powershell
 
