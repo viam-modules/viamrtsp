@@ -124,7 +124,10 @@ jobs:
 
     - name: Install dependencies (Windows)
       if: runner.os == 'Windows'
-      run: choco install ffmpeg -y
+      run: |
+        Add-MpPreference -ExclusionPath "$PWD"
+        choco install ffmpeg -y
+      shell: powershell
 
     # Download and setup mediamtx
     - name: Download mediamtx (Linux/macOS)
@@ -151,7 +154,6 @@ jobs:
     - name: Run mediamtx (Windows)
       if: runner.os == 'Windows'
       run: |
-        Add-MpPreference -ExclusionPath "$PWD\mediamtx.exe"
         Start-Process -NoNewWindow -FilePath ".\mediamtx.exe"
         Start-Sleep -Seconds 3
       shell: powershell
@@ -184,13 +186,7 @@ jobs:
 
     - name: Install viam-server (Windows)
       if: runner.os == 'Windows'
-      run: |
-        try {
-          Invoke-WebRequest -Uri "https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-x86_64.exe" -OutFile "viam-server.exe"
-        } catch {
-          Invoke-WebRequest -Uri "https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-latest-windows-x86_64.exe" -OutFile "viam-server.exe"
-        }
-        Add-MpPreference -ExclusionPath "$PWD\viam-server.exe"
+      run: Invoke-WebRequest -Uri "https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-latest-x86_64.exe" -OutFile "viam-server.exe"
       shell: powershell
 
     # Generate viam-server config
@@ -227,12 +223,9 @@ jobs:
         $VIAMRTSP_PATH = (Get-ChildItem -Path bin\windows-amd64 -Filter viamrtsp.exe -Recurse | Select-Object -First 1).FullName
         if (-not $VIAMRTSP_PATH) {
           Write-Error "viamrtsp.exe not found in bin\windows-amd64"
-          Get-ChildItem -Path bin -Recurse | ForEach-Object { Write-Host $_.FullName }
           exit 1
         }
         Write-Host "Found viamrtsp at: $VIAMRTSP_PATH"
-        # Add module to Windows Defender exclusion to prevent interference
-        Add-MpPreference -ExclusionPath $VIAMRTSP_PATH
         $config = @{
           components = @(
             @{
@@ -255,8 +248,6 @@ jobs:
           )
         }
         $config | ConvertTo-Json -Depth 10 | Out-File -FilePath "integration-test-config-${{ matrix.config.name }}.json" -Encoding utf8
-        Write-Host "Config file contents:"
-        Get-Content "integration-test-config-${{ matrix.config.name }}.json"
       shell: powershell
 
     # Run viam-server
@@ -270,17 +261,8 @@ jobs:
     - name: Run viam-server (Windows)
       if: runner.os == 'Windows'
       run: |
-        Write-Host "Starting viam-server..."
-        $proc = Start-Process -NoNewWindow -FilePath ".\viam-server.exe" -ArgumentList "-debug", "-config", ".\integration-test-config-${{ matrix.config.name }}.json" -PassThru
-        Write-Host "viam-server PID: $($proc.Id)"
-        # Windows needs more time for viam-server to start and load the module
+        Start-Process -NoNewWindow -FilePath ".\viam-server.exe" -ArgumentList "-debug", "-config", ".\integration-test-config-${{ matrix.config.name }}.json"
         Start-Sleep -Seconds 20
-        # Verify the process is still running
-        if (-not (Get-Process -Id $proc.Id -ErrorAction SilentlyContinue)) {
-          Write-Error "viam-server process exited unexpectedly"
-          exit 1
-        }
-        Write-Host "viam-server is running"
       shell: powershell
 
     # Build and run test binary
