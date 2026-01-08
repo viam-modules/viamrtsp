@@ -10,7 +10,13 @@ on:
 
 jobs:
   build-windows:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            build_method: cross-compile
+            docker_image: ghcr.io/viamrobotics/rdk-devenv:amd64-cache
+    runs-on: ${{ matrix.runner }}
     steps:
     - uses: actions/checkout@v3
 
@@ -19,4 +25,15 @@ jobs:
       with:
         target_os: windows
         target_arch: amd64
-        docker_image: ghcr.io/viamrobotics/rdk-devenv:amd64-cache
+        docker_image: ${{ matrix.docker_image }}
+
+    - name: Verify Windows binary exists
+      run: |
+        if [ -f bin/windows-amd64/viamrtsp.exe ]; then
+          echo "Windows binary found"
+          file bin/windows-amd64/viamrtsp.exe
+        else
+          echo "Windows binary not found"
+          exit 1
+        fi
+      shell: bash

@@ -77,18 +77,18 @@ jobs:
 
     - name: Install dependencies
       run: make install-deps
-        
+
     - name: Download and extract mediamtx
       run: |
         wget ${{ matrix.platform.mediamtx_url }}
         tar -xzf $(basename ${{ matrix.platform.mediamtx_url }})
-        
+
     - name: Run mediamtx
       run: ./mediamtx &
-      
+
     - name: Run fake RTSP camera
       run: ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec ${{ matrix.config.codec }} ${{ matrix.config.extra_ffmpeg_args }} -pix_fmt ${{ matrix.config.pix_fmt }} -f rtsp -rtsp_transport ${{ matrix.config.transport }} rtsp://0.0.0.0:8554/live.stream &
-      
+
     - name: Install viam-server
       run: make viam-server
 
@@ -129,3 +129,143 @@ jobs:
         go build -o testBinary ./test/client.go
         chmod +x ./testBinary
         ./testBinary
+
+  build-windows:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build Windows module
+      uses: ./.github/actions/build-module
+      with:
+        target_os: windows
+        target_arch: amd64
+        docker_image: ghcr.io/viamrobotics/rdk-devenv:amd64-cache
+
+    - name: Upload Windows binaries
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-binaries
+        path: bin/windows-amd64/
+
+  test-windows:
+    needs: build-windows
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        config:
+          - name: "h264"
+            codec: "libx264"
+            pix_fmt: "yuv420p"
+            transport: "tcp"
+          - name: "h265"
+            codec: "libx265"
+            pix_fmt: "yuv420p"
+            transport: "tcp"
+          - name: "mjpeg"
+            codec: "mjpeg"
+            extra_ffmpeg_args: "-huffman 0"
+            pix_fmt: "yuvj420p"
+            transport: "tcp"
+          - name: "mpeg4"
+            codec: "mpeg4"
+            pix_fmt: "yuv420p"
+            transport: "tcp"
+          - name: "h264-udp"
+            codec: "libx264"
+            pix_fmt: "yuv420p"
+            transport: "udp"
+          - name: "h265-udp"
+            codec: "libx265"
+            pix_fmt: "yuv420p"
+            transport: "udp"
+          - name: "mjpeg-udp"
+            codec: "mjpeg"
+            extra_ffmpeg_args: "-huffman 0"
+            pix_fmt: "yuvj420p"
+            transport: "udp"
+          - name: "mpeg4-udp"
+            codec: "mpeg4"
+            pix_fmt: "yuv420p"
+            transport: "udp"
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+
+    - name: Download Windows binaries
+      uses: actions/download-artifact@v4
+      with:
+        name: windows-binaries
+        path: bin/windows-amd64/
+
+    - name: Install FFmpeg
+      run: choco install ffmpeg -y
+
+    - name: Download and extract mediamtx
+      run: |
+        curl -L -o mediamtx.zip https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_windows_amd64.zip
+        Expand-Archive -Path mediamtx.zip -DestinationPath .
+      shell: powershell
+
+    - name: Run mediamtx
+      run: Start-Process -NoNewWindow -FilePath ".\mediamtx.exe"
+      shell: powershell
+
+    - name: Run fake RTSP camera
+      run: |
+        Start-Process -NoNewWindow -FilePath "ffmpeg" -ArgumentList "-re", "-f", "lavfi", "-i", "testsrc=size=640x480:rate=30", "-vcodec", "${{ matrix.config.codec }}", "${{ matrix.config.extra_ffmpeg_args }}", "-pix_fmt", "${{ matrix.config.pix_fmt }}", "-f", "rtsp", "-rtsp_transport", "${{ matrix.config.transport }}", "rtsp://0.0.0.0:8554/live.stream"
+        Start-Sleep -Seconds 5
+      shell: powershell
+
+    - name: Install viam-server
+      run: |
+        curl -o viam-server.exe https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-x86_64.exe
+        if ($LASTEXITCODE -ne 0) {
+          curl -o viam-server.exe https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-latest-windows-x86_64.exe
+        }
+        Add-MpPreference -ExclusionPath "$PWD\viam-server.exe"
+      shell: powershell
+
+    - name: Generate viam-server config
+      run: |
+        $VIAMRTSP_PATH = (Get-ChildItem -Path bin\windows-amd64 -Filter viamrtsp.exe -Recurse | Select-Object -First 1).FullName
+        $config = @{
+          components = @(
+            @{
+              name = "ip-cam"
+              namespace = "rdk"
+              type = "camera"
+              model = "viam:viamrtsp:rtsp"
+              attributes = @{
+                rtsp_address = "rtsp://localhost:8554/live.stream"
+              }
+              depends_on = @()
+            }
+          )
+          modules = @(
+            @{
+              type = "local"
+              name = "viamrtsp"
+              executable_path = $VIAMRTSP_PATH
+            }
+          )
+        }
+        $config | ConvertTo-Json -Depth 10 | Out-File -FilePath "integration-test-config-${{ matrix.config.name }}.json" -Encoding utf8
+      shell: powershell
+
+    - name: Run viam-server
+      run: |
+        Start-Process -NoNewWindow -FilePath ".\viam-server.exe" -ArgumentList "-debug", "-config", ".\integration-test-config-${{ matrix.config.name }}.json"
+        Start-Sleep -Seconds 10
+      shell: powershell
+
+    - name: Build and run test binary
+      run: |
+        go build -o testBinary.exe ./test/client.go
+        .\testBinary.exe
+      shell: powershell
