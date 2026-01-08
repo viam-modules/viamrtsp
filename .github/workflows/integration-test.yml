@@ -9,7 +9,27 @@ on:
       - 'README.md' 
 
 jobs:
+  build-windows:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build Windows module
+      uses: ./.github/actions/build-module
+      with:
+        target_os: windows
+        target_arch: amd64
+        docker_image: ghcr.io/viamrobotics/rdk-devenv:amd64-cache
+
+    - name: Upload Windows binaries
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-binaries
+        path: bin/windows-amd64/
+
   build-and-test:
+    needs: [build-windows]
+    if: always()
     strategy:
       matrix:
         platform:
@@ -17,16 +37,24 @@ jobs:
             os: linux
             arch: amd64
             mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_linux_amd64.tar.gz
+            mediamtx_extract: tar -xzf
             docker_image: ghcr.io/viamrobotics/antique2:amd64-cache
           - runner: buildjet-8vcpu-ubuntu-2204-arm
             os: linux
             arch: arm64
             mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_linux_arm64v8.tar.gz
+            mediamtx_extract: tar -xzf
             docker_image: ghcr.io/viamrobotics/antique2:arm64-cache
           - runner: macos-14
             os: darwin
             arch: arm64
             mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_darwin_arm64.tar.gz
+            mediamtx_extract: tar -xzf
+          - runner: windows-latest
+            os: windows
+            arch: amd64
+            mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_windows_amd64.zip
+            mediamtx_extract: unzip
         config:
           - name: "h264"
             codec: "libx264"
@@ -68,170 +96,121 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+
+    # Build module (Linux/macOS) or download artifact (Windows)
     - name: Build module
+      if: matrix.platform.os != 'windows'
       uses: ./.github/actions/build-module
       with:
         target_os: ${{ matrix.platform.os }}
         target_arch: ${{ matrix.platform.arch }}
         docker_image: ${{ matrix.platform.docker_image }}
 
-    - name: Install dependencies
-      run: make install-deps
-
-    - name: Download and extract mediamtx
-      run: |
-        wget ${{ matrix.platform.mediamtx_url }}
-        tar -xzf $(basename ${{ matrix.platform.mediamtx_url }})
-
-    - name: Run mediamtx
-      run: ./mediamtx &
-
-    - name: Run fake RTSP camera
-      run: ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec ${{ matrix.config.codec }} ${{ matrix.config.extra_ffmpeg_args }} -pix_fmt ${{ matrix.config.pix_fmt }} -f rtsp -rtsp_transport ${{ matrix.config.transport }} rtsp://0.0.0.0:8554/live.stream &
-
-    - name: Install viam-server
-      run: make viam-server
-
-    # Find the viamrtsp binary dynamically and generate the config
-    - name: Generate viam-server config
-      run: |
-        VIAMRTSP_PATH=$(find $(pwd) -name viamrtsp -type f) && \
-        echo '{
-          "components": [
-            {
-              "name": "ip-cam",
-              "namespace": "rdk",
-              "type": "camera",
-              "model": "viam:viamrtsp:rtsp",
-              "attributes": {
-                "rtsp_address": "rtsp://localhost:8554/live.stream"
-              },
-              "depends_on": []
-            }
-          ],
-          "modules": [
-            {
-              "type": "local",
-              "name": "viamrtsp",
-              "executable_path": "'$VIAMRTSP_PATH'"
-            }
-          ]
-        }' > "integration-test-config-${{ matrix.config.name }}.json"
-
-    # Sleep to give time for server to start
-    - name: Run viam-server
-      run: |
-        viam-server -debug -config "./integration-test-config-${{ matrix.config.name }}.json" &
-        sleep 10
-
-    - name: Build and run test binary
-      run: |
-        go build -o testBinary ./test/client.go
-        chmod +x ./testBinary
-        ./testBinary
-
-  build-windows:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Build Windows module
-      uses: ./.github/actions/build-module
-      with:
-        target_os: windows
-        target_arch: amd64
-        docker_image: ghcr.io/viamrobotics/rdk-devenv:amd64-cache
-
-    - name: Upload Windows binaries
-      uses: actions/upload-artifact@v4
-      with:
-        name: windows-binaries
-        path: bin/windows-amd64/
-
-  test-windows:
-    needs: build-windows
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        config:
-          - name: "h264"
-            codec: "libx264"
-            pix_fmt: "yuv420p"
-            transport: "tcp"
-          - name: "h265"
-            codec: "libx265"
-            pix_fmt: "yuv420p"
-            transport: "tcp"
-          - name: "mjpeg"
-            codec: "mjpeg"
-            extra_ffmpeg_args: "-huffman 0"
-            pix_fmt: "yuvj420p"
-            transport: "tcp"
-          - name: "mpeg4"
-            codec: "mpeg4"
-            pix_fmt: "yuv420p"
-            transport: "tcp"
-          - name: "h264-udp"
-            codec: "libx264"
-            pix_fmt: "yuv420p"
-            transport: "udp"
-          - name: "h265-udp"
-            codec: "libx265"
-            pix_fmt: "yuv420p"
-            transport: "udp"
-          - name: "mjpeg-udp"
-            codec: "mjpeg"
-            extra_ffmpeg_args: "-huffman 0"
-            pix_fmt: "yuvj420p"
-            transport: "udp"
-          - name: "mpeg4-udp"
-            codec: "mpeg4"
-            pix_fmt: "yuv420p"
-            transport: "udp"
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.23'
-
     - name: Download Windows binaries
+      if: matrix.platform.os == 'windows'
       uses: actions/download-artifact@v4
       with:
         name: windows-binaries
         path: bin/windows-amd64/
 
-    - name: Install FFmpeg
+    # Install platform dependencies
+    - name: Install dependencies (Linux/macOS)
+      if: runner.os != 'Windows'
+      run: make install-deps
+
+    - name: Install dependencies (Windows)
+      if: runner.os == 'Windows'
       run: choco install ffmpeg -y
 
-    - name: Download and extract mediamtx
+    # Download and setup mediamtx
+    - name: Download mediamtx (Linux/macOS)
+      if: runner.os != 'Windows'
       run: |
-        curl -L -o mediamtx.zip https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_windows_amd64.zip
+        wget ${{ matrix.platform.mediamtx_url }}
+        ${{ matrix.platform.mediamtx_extract }} $(basename ${{ matrix.platform.mediamtx_url }})
+      shell: bash
+
+    - name: Download mediamtx (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        Invoke-WebRequest -Uri "${{ matrix.platform.mediamtx_url }}" -OutFile "mediamtx.zip"
         Expand-Archive -Path mediamtx.zip -DestinationPath .
       shell: powershell
 
-    - name: Run mediamtx
+    # Run mediamtx
+    - name: Run mediamtx (Linux/macOS)
+      if: runner.os != 'Windows'
+      run: ./mediamtx &
+      shell: bash
+
+    - name: Run mediamtx (Windows)
+      if: runner.os == 'Windows'
       run: Start-Process -NoNewWindow -FilePath ".\mediamtx.exe"
       shell: powershell
 
-    - name: Run fake RTSP camera
+    # Run fake RTSP camera
+    - name: Run fake RTSP camera (Linux/macOS)
+      if: runner.os != 'Windows'
+      run: ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec ${{ matrix.config.codec }} ${{ matrix.config.extra_ffmpeg_args }} -pix_fmt ${{ matrix.config.pix_fmt }} -f rtsp -rtsp_transport ${{ matrix.config.transport }} rtsp://0.0.0.0:8554/live.stream &
+      shell: bash
+
+    - name: Run fake RTSP camera (Windows)
+      if: runner.os == 'Windows'
       run: |
         Start-Process -NoNewWindow -FilePath "ffmpeg" -ArgumentList "-re", "-f", "lavfi", "-i", "testsrc=size=640x480:rate=30", "-vcodec", "${{ matrix.config.codec }}", "${{ matrix.config.extra_ffmpeg_args }}", "-pix_fmt", "${{ matrix.config.pix_fmt }}", "-f", "rtsp", "-rtsp_transport", "${{ matrix.config.transport }}", "rtsp://0.0.0.0:8554/live.stream"
         Start-Sleep -Seconds 5
       shell: powershell
 
-    - name: Install viam-server
+    # Install viam-server
+    - name: Install viam-server (Linux/macOS)
+      if: runner.os != 'Windows'
+      run: make viam-server
+
+    - name: Install viam-server (Windows)
+      if: runner.os == 'Windows'
       run: |
-        curl -o viam-server.exe https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-x86_64.exe
-        if ($LASTEXITCODE -ne 0) {
-          curl -o viam-server.exe https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-latest-windows-x86_64.exe
+        try {
+          Invoke-WebRequest -Uri "https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-x86_64.exe" -OutFile "viam-server.exe"
+        } catch {
+          Invoke-WebRequest -Uri "https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-latest-windows-x86_64.exe" -OutFile "viam-server.exe"
         }
         Add-MpPreference -ExclusionPath "$PWD\viam-server.exe"
       shell: powershell
 
-    - name: Generate viam-server config
+    # Generate viam-server config
+    - name: Generate viam-server config (Linux/macOS)
+      if: runner.os != 'Windows'
+      run: |
+        VIAMRTSP_PATH=$(find $(pwd) -name viamrtsp -type f | head -n 1)
+        echo "{
+          \"components\": [
+            {
+              \"name\": \"ip-cam\",
+              \"namespace\": \"rdk\",
+              \"type\": \"camera\",
+              \"model\": \"viam:viamrtsp:rtsp\",
+              \"attributes\": {
+                \"rtsp_address\": \"rtsp://localhost:8554/live.stream\"
+              },
+              \"depends_on\": []
+            }
+          ],
+          \"modules\": [
+            {
+              \"type\": \"local\",
+              \"name\": \"viamrtsp\",
+              \"executable_path\": \"$VIAMRTSP_PATH\"
+            }
+          ]
+        }" > "integration-test-config-${{ matrix.config.name }}.json"
+      shell: bash
+
+    - name: Generate viam-server config (Windows)
+      if: runner.os == 'Windows'
       run: |
         $VIAMRTSP_PATH = (Get-ChildItem -Path bin\windows-amd64 -Filter viamrtsp.exe -Recurse | Select-Object -First 1).FullName
         $config = @{
@@ -258,13 +237,32 @@ jobs:
         $config | ConvertTo-Json -Depth 10 | Out-File -FilePath "integration-test-config-${{ matrix.config.name }}.json" -Encoding utf8
       shell: powershell
 
-    - name: Run viam-server
+    # Run viam-server
+    - name: Run viam-server (Linux/macOS)
+      if: runner.os != 'Windows'
+      run: |
+        viam-server -debug -config "./integration-test-config-${{ matrix.config.name }}.json" &
+        sleep 10
+      shell: bash
+
+    - name: Run viam-server (Windows)
+      if: runner.os == 'Windows'
       run: |
         Start-Process -NoNewWindow -FilePath ".\viam-server.exe" -ArgumentList "-debug", "-config", ".\integration-test-config-${{ matrix.config.name }}.json"
         Start-Sleep -Seconds 10
       shell: powershell
 
-    - name: Build and run test binary
+    # Build and run test binary
+    - name: Build and run test binary (Linux/macOS)
+      if: runner.os != 'Windows'
+      run: |
+        go build -o testBinary ./test/client.go
+        chmod +x ./testBinary
+        ./testBinary
+      shell: bash
+
+    - name: Build and run test binary (Windows)
+      if: runner.os == 'Windows'
       run: |
         go build -o testBinary.exe ./test/client.go
         .\testBinary.exe
