@@ -150,7 +150,10 @@ jobs:
 
     - name: Run mediamtx (Windows)
       if: runner.os == 'Windows'
-      run: Start-Process -NoNewWindow -FilePath ".\mediamtx.exe"
+      run: |
+        Add-MpPreference -ExclusionPath "$PWD\mediamtx.exe"
+        Start-Process -NoNewWindow -FilePath ".\mediamtx.exe"
+        Start-Sleep -Seconds 3
       shell: powershell
 
     # Run fake RTSP camera
@@ -167,8 +170,11 @@ jobs:
           $args += "${{ matrix.config.extra_ffmpeg_args }}".Split(" ")
         }
         $args += @("-pix_fmt", "${{ matrix.config.pix_fmt }}", "-f", "rtsp", "-rtsp_transport", "${{ matrix.config.transport }}", "rtsp://0.0.0.0:8554/live.stream")
+        Write-Host "Starting ffmpeg with args: $($args -join ' ')"
         Start-Process -NoNewWindow -FilePath "ffmpeg" -ArgumentList $args
-        Start-Sleep -Seconds 5
+        # Give ffmpeg time to start streaming
+        Start-Sleep -Seconds 10
+        Write-Host "RTSP stream should be available at rtsp://localhost:8554/live.stream"
       shell: powershell
 
     # Install viam-server
@@ -219,6 +225,14 @@ jobs:
       if: runner.os == 'Windows'
       run: |
         $VIAMRTSP_PATH = (Get-ChildItem -Path bin\windows-amd64 -Filter viamrtsp.exe -Recurse | Select-Object -First 1).FullName
+        if (-not $VIAMRTSP_PATH) {
+          Write-Error "viamrtsp.exe not found in bin\windows-amd64"
+          Get-ChildItem -Path bin -Recurse | ForEach-Object { Write-Host $_.FullName }
+          exit 1
+        }
+        Write-Host "Found viamrtsp at: $VIAMRTSP_PATH"
+        # Add module to Windows Defender exclusion to prevent interference
+        Add-MpPreference -ExclusionPath $VIAMRTSP_PATH
         $config = @{
           components = @(
             @{
@@ -241,6 +255,8 @@ jobs:
           )
         }
         $config | ConvertTo-Json -Depth 10 | Out-File -FilePath "integration-test-config-${{ matrix.config.name }}.json" -Encoding utf8
+        Write-Host "Config file contents:"
+        Get-Content "integration-test-config-${{ matrix.config.name }}.json"
       shell: powershell
 
     # Run viam-server
@@ -254,8 +270,17 @@ jobs:
     - name: Run viam-server (Windows)
       if: runner.os == 'Windows'
       run: |
-        Start-Process -NoNewWindow -FilePath ".\viam-server.exe" -ArgumentList "-debug", "-config", ".\integration-test-config-${{ matrix.config.name }}.json"
-        Start-Sleep -Seconds 10
+        Write-Host "Starting viam-server..."
+        $proc = Start-Process -NoNewWindow -FilePath ".\viam-server.exe" -ArgumentList "-debug", "-config", ".\integration-test-config-${{ matrix.config.name }}.json" -PassThru
+        Write-Host "viam-server PID: $($proc.Id)"
+        # Windows needs more time for viam-server to start and load the module
+        Start-Sleep -Seconds 20
+        # Verify the process is still running
+        if (-not (Get-Process -Id $proc.Id -ErrorAction SilentlyContinue)) {
+          Write-Error "viam-server process exited unexpectedly"
+          exit 1
+        }
+        Write-Host "viam-server is running"
       shell: powershell
 
     # Build and run test binary

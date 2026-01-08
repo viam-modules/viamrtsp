@@ -142,7 +142,7 @@ endif
 endif
 endif
 
-.PHONY: build-ffmpeg tool-install gofmt lint test profile-cpu profile-memory update-rdk module clean clean-all install-deps viam-server
+.PHONY: build-ffmpeg tool-install gofmt lint test profile-cpu profile-memory update-rdk module clean clean-all install-deps viam-server install-test-deps
 
 all: $(BIN_VIAMRTSP) $(BIN_DISCOVERY)
 
