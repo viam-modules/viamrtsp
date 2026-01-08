@@ -22,7 +22,7 @@ import (
 func TestRTSPCamera(t *testing.T) {
 	SetLibAVLogLevelFatal()
 	logger := logging.NewTestLogger(t)
-	bURL, err := base.ParseURL("rtsp://127.0.0.1:32512")
+	bURL, err := base.ParseURL("rtsp://127.0.0.1:32513")
 	test.That(t, err, test.ShouldBeNil)
 
 	t.Run("H264", func(t *testing.T) {
@@ -220,7 +220,7 @@ func TestRTSPConfig(t *testing.T) {
 func TestRTSPCameraPerformance(t *testing.T) {
 	SetLibAVLogLevelFatal()
 	logger := logging.NewTestLogger(t)
-	bURL, err := base.ParseURL("rtsp://127.0.0.1:32512")
+	bURL, err := base.ParseURL("rtsp://127.0.0.1:32513")
 	test.That(t, err, test.ShouldBeNil)
 
 	t.Run("PerformanceTestGetImage", func(t *testing.T) {

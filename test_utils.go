@@ -130,7 +130,7 @@ func NewMockH264ServerHandler(
 
 	h.S = &gortsplib.Server{
 		Handler:     h,
-		RTSPAddress: "127.0.0.1:32512",
+		RTSPAddress: "127.0.0.1:32513",
 	}
 	return h, func() {
 		stopFunc()
