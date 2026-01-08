@@ -138,7 +138,8 @@ jobs:
       if: runner.os == 'Windows'
       run: |
         Invoke-WebRequest -Uri "${{ matrix.platform.mediamtx_url }}" -OutFile "mediamtx.zip"
-        Expand-Archive -Path mediamtx.zip -DestinationPath .
+        Expand-Archive -Path mediamtx.zip -DestinationPath mediamtx_dir -Force
+        Move-Item -Path mediamtx_dir\mediamtx.exe -Destination . -Force
       shell: powershell
 
     # Run mediamtx
