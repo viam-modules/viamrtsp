@@ -238,7 +238,7 @@ func TestDoCommandPreview(t *testing.T) {
 	t.Run("Test successful preview command with broken snapshot URI and valid streaming URI", func(t *testing.T) {
 		logger := logging.NewTestLogger(t)
 
-		bURL, err := base.ParseURL("rtsp://127.0.0.1:32512")
+		bURL, err := base.ParseURL("rtsp://127.0.0.1:32513")
 		test.That(t, err, test.ShouldBeNil)
 		forma := &format.H264{
 			PayloadTyp:        96,

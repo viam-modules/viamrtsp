@@ -14,15 +14,19 @@ jobs:
       matrix:
         platform:
           - runner: ubuntu-latest
+            os: linux
             arch: amd64
             mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_linux_amd64.tar.gz
-            viam_server_url: https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-x86_64.AppImage
             docker_image: ghcr.io/viamrobotics/antique2:amd64-cache
           - runner: buildjet-8vcpu-ubuntu-2204-arm
+            os: linux
             arch: arm64
             mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_linux_arm64v8.tar.gz
-            viam_server_url: https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-aarch64.AppImage
             docker_image: ghcr.io/viamrobotics/antique2:arm64-cache
+          - runner: macos-14
+            os: darwin
+            arch: arm64
+            mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_darwin_arm64.tar.gz
         config:
           - name: "h264"
             codec: "libx264"
@@ -62,20 +66,17 @@ jobs:
     runs-on: ${{ matrix.platform.runner }}
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Build module
       uses: ./.github/actions/build-module
       with:
-        target_os: linux
+        target_os: ${{ matrix.platform.os }}
         target_arch: ${{ matrix.platform.arch }}
         docker_image: ${{ matrix.platform.docker_image }}
 
     - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo add-apt-repository universe &&
-        sudo apt-get install -y libfuse2 ffmpeg
+      run: make install-deps
         
     - name: Download and extract mediamtx
       run: |
@@ -89,10 +90,7 @@ jobs:
       run: ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec ${{ matrix.config.codec }} ${{ matrix.config.extra_ffmpeg_args }} -pix_fmt ${{ matrix.config.pix_fmt }} -f rtsp -rtsp_transport ${{ matrix.config.transport }} rtsp://0.0.0.0:8554/live.stream &
       
     - name: Install viam-server
-      run: |
-        wget ${{ matrix.platform.viam_server_url }} -O viam-server
-        chmod 755 viam-server
-        sudo ./viam-server --aix-install
+      run: make viam-server
 
     # Find the viamrtsp binary dynamically and generate the config
     - name: Generate viam-server config

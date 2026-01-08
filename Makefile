@@ -89,11 +89,6 @@ CGO_LDFLAGS = $(subst -lx264, $(SUBST),$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH
 ifeq ($(TARGET_OS),windows)
 	CGO_LDFLAGS += -static -static-libgcc -static-libstdc++
 endif
-ifeq ($(SOURCE_OS),darwin)
-ifeq ($(shell brew list | grep -w x264 > /dev/null; echo $$?), 1)
-	brew update && brew install x264
-endif
-endif
 
 # If we are building for android, we need to set the correct flags
 # and toolchain paths for FFMPEG and go binary cross-compilation.
@@ -147,9 +142,36 @@ endif
 endif
 endif
 
-.PHONY: build-ffmpeg tool-install gofmt lint test profile-cpu profile-memory update-rdk module clean clean-all
+.PHONY: build-ffmpeg tool-install gofmt lint test profile-cpu profile-memory update-rdk module clean clean-all install-deps viam-server
 
 all: $(BIN_VIAMRTSP) $(BIN_DISCOVERY)
+
+install-deps:
+ifeq ($(SOURCE_OS),linux)
+	sudo apt-get update
+	sudo add-apt-repository universe
+	sudo apt-get install -y libfuse2 ffmpeg
+endif
+ifeq ($(SOURCE_OS),darwin)
+	brew install ffmpeg
+endif
+
+viam-server:
+ifeq ($(SOURCE_OS),linux)
+	@echo "Downloading viam-server for Linux $(SOURCE_ARCH)..."
+ifeq ($(SOURCE_ARCH),amd64)
+	wget https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-x86_64.AppImage -O viam-server
+endif
+ifeq ($(SOURCE_ARCH),arm64)
+	wget https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-aarch64.AppImage -O viam-server
+endif
+	chmod 755 viam-server
+	sudo ./viam-server --aix-install
+endif
+ifeq ($(SOURCE_OS),darwin)
+	brew tap viamrobotics/brews
+	brew install viam-server
+endif
 
 # We set GOOS, GOARCH, GO_TAGS, and GO_LDFLAGS to support cross-compilation for android targets.
 $(BIN_VIAMRTSP): build-ffmpeg *.go cmd/module/*.go
@@ -218,6 +240,11 @@ endif
 	cd $(FFMPEG_VERSION_PLATFORM) && ./configure $(FFMPEG_OPTS) && $(MAKE) -j$(NPROC) && $(MAKE) install
 
 build-ffmpeg: $(NDK_ROOT) $(X264_BUILD_DIR)
+# Install x264 via Homebrew on Darwin if not present
+ifeq ($(SOURCE_OS),darwin)
+	@which brew > /dev/null || (echo "Homebrew is required on macOS" && exit 1)
+	@brew list x264 > /dev/null 2>&1 || (echo "Installing x264 via Homebrew..." && brew install x264)
+endif
 # Only need nasm to build assembly kernels for amd64 targets.
 ifeq ($(SOURCE_OS),linux)
 ifeq ($(SOURCE_ARCH),amd64)
