@@ -59,6 +59,12 @@
       "short_description": "A video-store that will store video from a viamrtsp camera."
     },
     {
+      "api": "rdk:service:video",
+      "model": "viam:viamrtsp:video-service",
+      "markdown_link": "README.md#configure-the-viamrtspvideo-service-video-service",
+      "short_description": "A video service that streams stored video from a viamrtsp camera using the GetVideo API."
+    },
+    {
       "api": "rdk:component:generic",
       "model": "viam:viamrtsp:onvif-ptz-client",
       "markdown_link": "README.md#experimental-ptz-model",
