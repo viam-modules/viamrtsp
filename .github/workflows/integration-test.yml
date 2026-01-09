@@ -247,7 +247,8 @@ jobs:
             }
           )
         }
-        $config | ConvertTo-Json -Depth 10 | Out-File -FilePath "integration-test-config-${{ matrix.config.name }}.json" -Encoding utf8
+        $json = $config | ConvertTo-Json -Depth 10
+        [System.IO.File]::WriteAllText("integration-test-config-${{ matrix.config.name }}.json", $json)
       shell: powershell
 
     # Run viam-server
@@ -262,7 +263,7 @@ jobs:
       if: runner.os == 'Windows'
       run: |
         Write-Host "Starting viam-server..."
-        Start-Process -FilePath ".\viam-server.exe" -ArgumentList "-debug", "-config", ".\integration-test-config-${{ matrix.config.name }}.json" -RedirectStandardOutput "viam-server-stdout.log" -RedirectStandardError "viam-server-stderr.log"
+        Start-Process -NoNewWindow -FilePath ".\viam-server.exe" -ArgumentList "-debug", "-config", ".\integration-test-config-${{ matrix.config.name }}.json"
         Start-Sleep -Seconds 20
         Write-Host "Checking if viam-server is running..."
         $proc = Get-Process -Name "viam-server" -ErrorAction SilentlyContinue
@@ -270,10 +271,6 @@ jobs:
           Write-Host "viam-server is running (PID: $($proc.Id))"
         } else {
           Write-Host "viam-server is NOT running!"
-          Write-Host "=== STDOUT ==="
-          Get-Content "viam-server-stdout.log" -ErrorAction SilentlyContinue
-          Write-Host "=== STDERR ==="
-          Get-Content "viam-server-stderr.log" -ErrorAction SilentlyContinue
           exit 1
         }
       shell: powershell
