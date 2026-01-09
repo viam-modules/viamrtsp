@@ -186,7 +186,7 @@ jobs:
 
     - name: Install viam-server (Windows)
       if: runner.os == 'Windows'
-      run: Invoke-WebRequest -Uri "https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-latest-x86_64.exe" -OutFile "viam-server.exe"
+      run: Invoke-WebRequest -Uri "https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-v0.74.0-windows-x86_64" -OutFile "viam-server.exe"
       shell: powershell
 
     # Generate viam-server config
