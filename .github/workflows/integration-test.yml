@@ -261,8 +261,21 @@ jobs:
     - name: Run viam-server (Windows)
       if: runner.os == 'Windows'
       run: |
-        Start-Process -NoNewWindow -FilePath ".\viam-server.exe" -ArgumentList "-debug", "-config", ".\integration-test-config-${{ matrix.config.name }}.json"
+        Write-Host "Starting viam-server..."
+        Start-Process -FilePath ".\viam-server.exe" -ArgumentList "-debug", "-config", ".\integration-test-config-${{ matrix.config.name }}.json" -RedirectStandardOutput "viam-server-stdout.log" -RedirectStandardError "viam-server-stderr.log"
         Start-Sleep -Seconds 20
+        Write-Host "Checking if viam-server is running..."
+        $proc = Get-Process -Name "viam-server" -ErrorAction SilentlyContinue
+        if ($proc) {
+          Write-Host "viam-server is running (PID: $($proc.Id))"
+        } else {
+          Write-Host "viam-server is NOT running!"
+          Write-Host "=== STDOUT ==="
+          Get-Content "viam-server-stdout.log" -ErrorAction SilentlyContinue
+          Write-Host "=== STDERR ==="
+          Get-Content "viam-server-stderr.log" -ErrorAction SilentlyContinue
+          exit 1
+        }
       shell: powershell
 
     # Build and run test binary
