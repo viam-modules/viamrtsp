@@ -1,22 +1,27 @@
+# Windows build is now handled by build.yml
+# This file is kept for backwards compatibility but can be removed
+
 name: Build viamrtsp for Windows
 
 on:
-  push:
-    paths-ignore:
-      - 'README.md'
-  pull_request:
-    paths-ignore:
-      - 'README.md' 
+  workflow_dispatch:  # Manual trigger only, no longer runs automatically
 
 jobs:
   build-windows:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Build module
       uses: ./.github/actions/build-module
       with:
         target_os: windows
         target_arch: amd64
-        docker_image: ghcr.io/viamrobotics/rdk-devenv:amd64-cache
+        docker_image: ghcr.io/viamrobotics/antique2:amd64-cache
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: viamrtsp-windows-amd64
+        path: module.tar.gz
+        retention-days: 7

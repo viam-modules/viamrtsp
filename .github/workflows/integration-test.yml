@@ -6,23 +6,62 @@ on:
       - 'README.md'
   pull_request:
     paths-ignore:
-      - 'README.md' 
+      - 'README.md'
 
 jobs:
-  build-and-test:
+  # Job 1: Build module for each platform (runs once per platform)
+  build:
     strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            os: linux
+            arch: amd64
+            docker_image: ghcr.io/viamrobotics/antique2:amd64-cache
+          - runner: buildjet-8vcpu-ubuntu-2204-arm
+            os: linux
+            arch: arm64
+            docker_image: ghcr.io/viamrobotics/antique2:arm64-cache
+          - runner: macos-14
+            os: darwin
+            arch: arm64
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build module
+      uses: ./.github/actions/build-module
+      with:
+        target_os: ${{ matrix.os }}
+        target_arch: ${{ matrix.arch }}
+        docker_image: ${{ matrix.docker_image }}
+
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: viamrtsp-${{ matrix.os }}-${{ matrix.arch }}
+        path: module.tar.gz
+        retention-days: 1
+        if-no-files-found: error
+
+  # Job 2: Run integration tests (runs for each platform × config combination)
+  test:
+    needs: build
+    strategy:
+      fail-fast: false
       matrix:
         platform:
           - runner: ubuntu-latest
             os: linux
             arch: amd64
             mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_linux_amd64.tar.gz
-            docker_image: ghcr.io/viamrobotics/antique2:amd64-cache
           - runner: buildjet-8vcpu-ubuntu-2204-arm
             os: linux
             arch: arm64
             mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_linux_arm64v8.tar.gz
-            docker_image: ghcr.io/viamrobotics/antique2:arm64-cache
           - runner: macos-14
             os: darwin
             arch: arm64
@@ -68,34 +107,39 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Build module
-      uses: ./.github/actions/build-module
+    - name: Download build artifact
+      uses: actions/download-artifact@v4
       with:
-        target_os: ${{ matrix.platform.os }}
-        target_arch: ${{ matrix.platform.arch }}
-        docker_image: ${{ matrix.platform.docker_image }}
+        name: viamrtsp-${{ matrix.platform.os }}-${{ matrix.platform.arch }}
+
+    - name: Extract module
+      run: tar -xzf module.tar.gz
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
 
     - name: Install dependencies
       run: make install-deps
-        
+
     - name: Download and extract mediamtx
       run: |
         wget ${{ matrix.platform.mediamtx_url }}
         tar -xzf $(basename ${{ matrix.platform.mediamtx_url }})
-        
+
     - name: Run mediamtx
       run: ./mediamtx &
-      
+
     - name: Run fake RTSP camera
       run: ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec ${{ matrix.config.codec }} ${{ matrix.config.extra_ffmpeg_args }} -pix_fmt ${{ matrix.config.pix_fmt }} -f rtsp -rtsp_transport ${{ matrix.config.transport }} rtsp://0.0.0.0:8554/live.stream &
-      
+
     - name: Install viam-server
       run: make viam-server
 
-    # Find the viamrtsp binary dynamically and generate the config
     - name: Generate viam-server config
       run: |
-        VIAMRTSP_PATH=$(find $(pwd) -name viamrtsp -type f) && \
+        VIAMRTSP_PATH=$(find $(pwd) -name viamrtsp -type f | head -1) && \
         echo '{
           "components": [
             {
@@ -118,7 +162,6 @@ jobs:
           ]
         }' > "integration-test-config-${{ matrix.config.name }}.json"
 
-    # Sleep to give time for server to start
     - name: Run viam-server
       run: |
         viam-server -debug -config "./integration-test-config-${{ matrix.config.name }}.json" &

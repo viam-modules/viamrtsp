@@ -1,0 +1,53 @@
+name: Build Module
+
+on:
+  # Reusable workflow - can be called from other workflows
+  workflow_call:
+  # Manual trigger for ad-hoc builds
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+            target_os: linux
+            target_arch: amd64
+            docker_image: ghcr.io/viamrobotics/antique2:amd64-cache
+          - platform: linux/arm64
+            runner: buildjet-8vcpu-ubuntu-2204-arm
+            target_os: linux
+            target_arch: arm64
+            docker_image: ghcr.io/viamrobotics/antique2:arm64-cache
+          - platform: darwin/arm64
+            runner: macos-14
+            target_os: darwin
+            target_arch: arm64
+          - platform: windows/amd64
+            runner: ubuntu-latest
+            target_os: windows
+            target_arch: amd64
+            docker_image: ghcr.io/viamrobotics/antique2:amd64-cache
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build module
+      uses: ./.github/actions/build-module
+      with:
+        target_os: ${{ matrix.target_os }}
+        target_arch: ${{ matrix.target_arch }}
+        docker_image: ${{ matrix.docker_image }}
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: viamrtsp-${{ matrix.target_os }}-${{ matrix.target_arch }}
+        path: module.tar.gz
+        retention-days: 7
+        if-no-files-found: error
