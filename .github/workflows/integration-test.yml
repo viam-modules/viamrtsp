@@ -9,8 +9,8 @@ on:
       - 'README.md'
 
 jobs:
-  # Job 1: Build module for each platform (runs once per platform)
   build:
+    name: Build (${{ matrix.os }}/${{ matrix.arch }})
     strategy:
       fail-fast: false
       matrix:
@@ -47,8 +47,8 @@ jobs:
         retention-days: 1
         if-no-files-found: error
 
-  # Job 2: Run integration tests (runs for each platform × config combination)
   test:
+    name: Test ${{ matrix.config.name }}/${{ matrix.config.transport }} (${{ matrix.platform.os }}/${{ matrix.platform.arch }})
     needs: build
     strategy:
       fail-fast: false
