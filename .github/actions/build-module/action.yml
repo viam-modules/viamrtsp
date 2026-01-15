@@ -28,7 +28,7 @@ runs:
           -v "${{ github.workspace }}:/workspace" \
           -w /workspace \
           ${{ inputs.docker_image }} \
-          sh -c "make module && file bin/*viamrtsp*"
+          sh -c "make module"
       shell: bash
 
     - name: Build natively

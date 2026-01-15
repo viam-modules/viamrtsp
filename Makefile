@@ -316,6 +316,7 @@ endif
 
 module: $(BIN_VIAMRTSP)
 	cp $(BIN_VIAMRTSP) bin/viamrtsp$(BIN_SUFFIX)
+	@echo "=== Binary type ===" && file bin/viamrtsp$(BIN_SUFFIX)
 	tar czf module.tar.gz meta.json bin/viamrtsp$(BIN_SUFFIX)
 	rm bin/viamrtsp$(BIN_SUFFIX)
 
