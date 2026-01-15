@@ -156,6 +156,9 @@ jobs:
     - name: Generate viam-server config
       run: ./etc/generate-config.sh "${{ matrix.config.name }}"
 
+    - name: Debug - Show config
+      run: cat "integration-test-config-${{ matrix.config.name }}.json"
+
     - name: Run viam-server
       run: ./etc/run-viam-server.sh "./integration-test-config-${{ matrix.config.name }}.json" 15
 

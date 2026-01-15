@@ -37,3 +37,5 @@ else
         exit 1
     fi
 fi
+
+sleep "$WAIT_TIME"
