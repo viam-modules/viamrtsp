@@ -155,6 +155,9 @@ endif
 ifeq ($(SOURCE_OS),darwin)
 	brew install ffmpeg
 endif
+ifeq ($(SOURCE_OS),windows)
+	choco install ffmpeg -y
+endif
 
 viam-server:
 ifeq ($(SOURCE_OS),linux)
@@ -171,6 +174,10 @@ endif
 ifeq ($(SOURCE_OS),darwin)
 	brew tap viamrobotics/brews
 	brew install viam-server
+endif
+ifeq ($(SOURCE_OS),windows)
+	@echo "Downloading viam-server for Windows..."
+	curl -o viam-server.exe https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-x86_64.exe
 endif
 
 # We set GOOS, GOARCH, GO_TAGS, and GO_LDFLAGS to support cross-compilation for android targets.

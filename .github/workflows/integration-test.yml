@@ -61,15 +61,15 @@ jobs:
           - runner: ubuntu-latest
             os: linux
             arch: amd64
-            mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_linux_amd64.tar.gz
           - runner: buildjet-8vcpu-ubuntu-2204-arm
             os: linux
             arch: arm64
-            mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_linux_arm64v8.tar.gz
           - runner: macos-14
             os: darwin
             arch: arm64
-            mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_darwin_arm64.tar.gz
+          - runner: windows-latest
+            os: windows
+            arch: amd64
         config:
           - name: "h264"
             codec: "libx264"
@@ -108,6 +108,10 @@ jobs:
 
     runs-on: ${{ matrix.platform.runner }}
 
+    defaults:
+      run:
+        shell: bash
+
     steps:
     - uses: actions/checkout@v4
 
@@ -125,54 +129,43 @@ jobs:
         go-version: '1.25'
 
     - name: Install dependencies
-      run: make install-deps
-
-    - name: Download and extract mediamtx
       run: |
-        wget ${{ matrix.platform.mediamtx_url }}
-        tar -xzf $(basename ${{ matrix.platform.mediamtx_url }})
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
+          choco install ffmpeg -y
+        else
+          make install-deps
+        fi
+
+    - name: Download mediamtx
+      run: ./etc/download-mediamtx.sh
 
     - name: Run mediamtx
-      run: ./mediamtx &
+      run: ./etc/run-mediamtx.sh
 
     - name: Run fake RTSP camera
-      run: ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec ${{ matrix.config.codec }} ${{ matrix.config.extra_ffmpeg_args }} -pix_fmt ${{ matrix.config.pix_fmt }} -f rtsp -rtsp_transport ${{ matrix.config.transport }} rtsp://0.0.0.0:8554/live.stream &
+      run: ./etc/run-fake-camera.sh "${{ matrix.config.codec }}" "${{ matrix.config.pix_fmt }}" "${{ matrix.config.transport }}" "${{ matrix.config.extra_ffmpeg_args }}"
 
     - name: Install viam-server
-      run: make viam-server
+      run: |
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
+          curl -o viam-server.exe https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-x86_64.exe
+        else
+          make viam-server
+        fi
 
     - name: Generate viam-server config
-      run: |
-        VIAMRTSP_PATH=$(find $(pwd) -name viamrtsp -type f | head -1) && \
-        echo '{
-          "components": [
-            {
-              "name": "ip-cam",
-              "namespace": "rdk",
-              "type": "camera",
-              "model": "viam:viamrtsp:rtsp",
-              "attributes": {
-                "rtsp_address": "rtsp://localhost:8554/live.stream"
-              },
-              "depends_on": []
-            }
-          ],
-          "modules": [
-            {
-              "type": "local",
-              "name": "viamrtsp",
-              "executable_path": "'$VIAMRTSP_PATH'"
-            }
-          ]
-        }' > "integration-test-config-${{ matrix.config.name }}.json"
+      run: ./etc/generate-config.sh "${{ matrix.config.name }}"
 
     - name: Run viam-server
-      run: |
-        viam-server -debug -config "./integration-test-config-${{ matrix.config.name }}.json" &
-        sleep 10
+      run: ./etc/run-viam-server.sh "./integration-test-config-${{ matrix.config.name }}.json" 15
 
     - name: Build and run test binary
       run: |
-        go build -o testBinary ./test/client.go
-        chmod +x ./testBinary
-        ./testBinary
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
+          go build -o testBinary.exe ./test/client.go
+          ./testBinary.exe
+        else
+          go build -o testBinary ./test/client.go
+          chmod +x ./testBinary
+          ./testBinary
+        fi
