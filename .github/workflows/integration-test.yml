@@ -148,7 +148,7 @@ jobs:
     - name: Install viam-server
       run: |
         if [[ "$RUNNER_OS" == "Windows" ]]; then
-          curl -o viam-server.exe https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-stable-x86_64.exe
+          curl -o viam-server.exe https://storage.googleapis.com/packages.viam.com/apps/viam-server/viam-server-v0.109.0-windows-x86_64
         else
           make viam-server
         fi
