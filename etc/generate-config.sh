@@ -23,6 +23,11 @@ fi
 # Convert to absolute path
 VIAMRTSP_PATH=$(cd "$(dirname "$VIAMRTSP_PATH")" && pwd)/$(basename "$VIAMRTSP_PATH")
 
+# On Windows, convert Unix-style path to Windows-style path
+if [[ "$OS" == "mingw"* ]] || [[ "$OS" == "msys"* ]] || [[ "$OS" == "cygwin"* ]] || [[ -n "$WINDIR" ]]; then
+    VIAMRTSP_PATH=$(cygpath -w "$VIAMRTSP_PATH")
+fi
+
 echo "Found viamrtsp at: $VIAMRTSP_PATH"
 
 cat > "integration-test-config-${CONFIG_NAME}.json" << EOF
