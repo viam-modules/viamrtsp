@@ -275,6 +275,14 @@ func strToHostName(inp string) string {
 	return consecutiveDashesRegexp.ReplaceAllLiteralString(sb.String(), "-")
 }
 
+// parseIPFromHost parses an IP address from a host string, stripping the port if present.
+func parseIPFromHost(host string) net.IP {
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	return net.ParseIP(host)
+}
+
 // GetCameraInfo uses the ONVIF Media service to get the RTSP stream URLs and camera details.
 func GetCameraInfo(
 	ctx context.Context,
@@ -307,8 +315,8 @@ func GetCameraInfo(
 		HardwareID:      resp.HardwareID,
 		PTZEndpoints:    ptzInfos,
 
-		// Will be nil if there's an error.
-		deviceIP: net.ParseIP(xaddr.Host),
+		// Will be nil if there's an error parsing.
+		deviceIP: parseIPFromHost(xaddr.Host),
 	}
 
 	return cameraInfo, nil
