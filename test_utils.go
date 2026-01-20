@@ -44,13 +44,16 @@ func NewMockH264ServerHandler(
 
 			sh.mu.Lock()
 			defer sh.mu.Unlock()
-			d := &description.Session{
-				BaseURL: bURL,
-				Title:   "123456",
-				Medias:  []*description.Media{sh.media},
+			// Only create stream once - reuse for concurrent connections
+			if sh.stream == nil {
+				d := &description.Session{
+					BaseURL: bURL,
+					Title:   "123456",
+					Medias:  []*description.Media{sh.media},
+				}
+				sh.stream = gortsplib.NewServerStream(sh.S, d)
+				logger.Debug("sh.stream.Description().Medias[0].Formats[0]: %#v ", sh.stream.Description().Medias[0].Formats[0])
 			}
-			sh.stream = gortsplib.NewServerStream(sh.S, d)
-			logger.Debug("sh.stream.Description().Medias[0].Formats[0]: %#v ", sh.stream.Description().Medias[0].Formats[0])
 			return &base.Response{StatusCode: base.StatusOK}, sh.stream, nil
 		},
 		OnAnnounceFunc: func(_ *gortsplib.ServerHandlerOnAnnounceCtx, _ *ServerHandler) (*base.Response, error) {
@@ -63,12 +66,14 @@ func NewMockH264ServerHandler(
 			logger.Debug("OnSetupFunc")
 			return &base.Response{StatusCode: base.StatusOK}, sh.stream, nil
 		},
-		// This will play an MJpeg video which only has frames which are red squares
-		// This is so that the result of GetImage is determanistic
+		// This will play an H264 video which only has frames which are red squares
+		// This is so that the result of GetImage is deterministic
 		OnPlayFunc: func(_ *gortsplib.ServerHandlerOnPlayCtx, sh *ServerHandler) (*base.Response, error) {
 			logger.Debug("OnPlayFunc")
-			sh.wg.Add(1)
-			utils.ManagedGo(func() {
+			// Only start the packet writer goroutine once, even with concurrent connections
+			sh.playOnce.Do(func() {
+				sh.wg.Add(1)
+				utils.ManagedGo(func() {
 				rtpEnc, err := forma.CreateEncoder()
 				if err != nil {
 					t.Log(err.Error())
@@ -117,7 +122,8 @@ func NewMockH264ServerHandler(
 						}
 					}
 				}
-			}, sh.wg.Done)
+				}, sh.wg.Done)
+			})
 			return &base.Response{StatusCode: base.StatusOK}, nil
 		},
 		OnRecordFunc: func(_ *gortsplib.ServerHandlerOnRecordCtx, _ *ServerHandler) (*base.Response, error) {
@@ -156,6 +162,7 @@ type ServerHandler struct {
 	OnRecordFunc       func(*gortsplib.ServerHandlerOnRecordCtx, *ServerHandler) (*base.Response, error)
 	mu                 sync.Mutex
 	stream             *gortsplib.ServerStream
+	playOnce           sync.Once
 }
 
 // OnConnOpen called when a connection is opened.
