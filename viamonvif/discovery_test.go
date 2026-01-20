@@ -390,6 +390,15 @@ func TestStrToHostName(t *testing.T) {
 	test.That(t, strToHostName("$$__$$A$$__$$3$$__$$"), test.ShouldEqual, "-A-3-")
 }
 
+func TestParseIPFromHost(t *testing.T) {
+	// net.ParseIP fails on host:port strings
+	test.That(t, net.ParseIP("192.168.10.89:80"), test.ShouldBeNil)
+	// parseIPFromHost strips the port and parses correctly
+	test.That(t, parseIPFromHost("192.168.10.89:80").String(), test.ShouldEqual, "192.168.10.89")
+	// Hostnames return nil
+	test.That(t, parseIPFromHost("example.com:80"), test.ShouldBeNil)
+}
+
 func TestMDNSMapping(t *testing.T) {
 	// This test relies on having access to multicast network interfaces. Cloud instances often
 	// disable multicast capabilities. We skip this test by default as we can't expect CI testing to
