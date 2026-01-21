@@ -27,15 +27,16 @@ Repeat for each camera you want to use.
 
 The discovery service uses the UniFi Protect Integration API, which requires an API token.
 
-1. Log in to your UniFi OS console (https://your-nvr-ip)
-2. Click on your profile icon in the bottom-left corner
-3. Select **Control Plane** (or navigate to unifi.ui.com and sign in)
-4. Go to **API** > **API Keys**
-5. Click **Create API Key**
-6. Give it a descriptive name (e.g., "Viam RTSP Discovery")
-7. Copy the generated token - you won't be able to see it again
+1. Go to [unifi.ui.com](https://unifi.ui.com) and sign in with your Ubiquiti account
+2. Select your site/console from the list
+3. Click the **Integrations** button in the bottom-left corner
+4. Click **Create New API Key**
+5. Give it a descriptive name (e.g., "Viam RTSP Discovery")
+6. Copy the generated token immediately - it will only be shown once
 
-For more details, see the [official UniFi API documentation](https://developer.ui.com/site-manager-api/gettingstarted#obtaining-an-api-key).
+> **Note:** API keys are generated through the cloud Site Manager, not the local NVR interface. Your NVR must be linked to your Ubiquiti account.
+
+For more details, see the [official UniFi API documentation](https://developer.ui.com/site-manager-api/gettingstarted).
 
 ## Step 3: Configure the Discovery Service
 
