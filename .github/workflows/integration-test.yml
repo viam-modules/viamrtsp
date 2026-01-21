@@ -121,6 +121,7 @@ jobs:
         name: viamrtsp-${{ matrix.platform.os }}-${{ matrix.platform.arch }}
 
     - name: Extract module
+      if: runner.os != 'Windows'
       run: tar -xzf module.tar.gz
 
     - name: Set up Go
