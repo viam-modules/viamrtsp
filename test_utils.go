@@ -64,21 +64,18 @@ func NewMockH264ServerHandler(
 		},
 		OnSetupFunc: func(_ *gortsplib.ServerHandlerOnSetupCtx, sh *ServerHandler) (*base.Response, *gortsplib.ServerStream, error) {
 			logger.Debug("OnSetupFunc")
+
+			sh.mu.Lock()
+			defer sh.mu.Unlock()
+
+			// In tests we expect DESCRIBE to have initialized the stream.
+			// If not, fail loudly so races are caught early.
+			if sh.stream == nil {
+				return &base.Response{StatusCode: base.StatusBadRequest}, nil, errors.New("stream not initialized before SETUP")
+			}
+
 			return &base.Response{StatusCode: base.StatusOK}, sh.stream, nil
-OnSetupFunc: func(_ *gortsplib.ServerHandlerOnSetupCtx, sh *ServerHandler) (*base.Response, *gortsplib.ServerStream, error) {
-    logger.Debug("OnSetupFunc")
-
-    sh.mu.Lock()
-    defer sh.mu.Unlock()
-
-    // In tests we expect DESCRIBE to have initialized the stream.
-    // If not, fail loudly so races are caught early.
-    if sh.stream == nil {
-        return &base.Response{StatusCode: base.StatusBadRequest}, nil, errors.New("stream not initialized before SETUP")
-    }
-
-    return &base.Response{StatusCode: base.StatusOK}, sh.stream, nil
-},
+		},
 		// This will play an H264 video which only has frames which are red squares
 		// This is so that the result of GetImage is deterministic
 		OnPlayFunc: func(_ *gortsplib.ServerHandlerOnPlayCtx, sh *ServerHandler) (*base.Response, error) {
@@ -87,54 +84,54 @@ OnSetupFunc: func(_ *gortsplib.ServerHandlerOnSetupCtx, sh *ServerHandler) (*bas
 			sh.playOnce.Do(func() {
 				sh.wg.Add(1)
 				utils.ManagedGo(func() {
-				rtpEnc, err := forma.CreateEncoder()
-				if err != nil {
-					t.Log(err.Error())
-					t.FailNow()
-				}
-
-				start := time.Now()
-				// setup a ticker to sleep between frames
-				//nolint:all
-				ticker := time.NewTicker(200 * time.Millisecond)
-				defer ticker.Stop()
-				b, err := base64.StdEncoding.DecodeString(h264Base64)
-				test.That(t, err, test.ShouldBeNil)
-				aus, err := h264.AnnexBUnmarshal(b)
-				test.That(t, err, test.ShouldBeNil)
-
-				// Continuously send packets until the server is stopped
-				for range ticker.C {
-					if stopCtx.Err() != nil {
-						return
-					}
-					sh.mu.Lock()
-					if sh.stream == nil {
-						sh.mu.Unlock()
-						return
-					}
-					sh.mu.Unlock()
-
-					pkts, err := rtpEnc.Encode(aus)
+					rtpEnc, err := forma.CreateEncoder()
 					if err != nil {
 						t.Log(err.Error())
 						t.FailNow()
 					}
 
-					// write packets to the server
-					for _, pkt := range pkts {
-						// #nosec
-						pkt.Timestamp = uint32(multiplyAndDivide(int64(time.Since(start)), int64(forma.ClockRate()), int64(time.Second)))
+					start := time.Now()
+					// setup a ticker to sleep between frames
+					//nolint:all
+					ticker := time.NewTicker(200 * time.Millisecond)
+					defer ticker.Stop()
+					b, err := base64.StdEncoding.DecodeString(h264Base64)
+					test.That(t, err, test.ShouldBeNil)
+					aus, err := h264.AnnexBUnmarshal(b)
+					test.That(t, err, test.ShouldBeNil)
 
-						sh.mu.Lock()
-						err = sh.stream.WritePacketRTP(sh.media, pkt)
-						sh.mu.Unlock()
-						if err != nil {
-							logger.Debug(err.Error())
+					// Continuously send packets until the server is stopped
+					for range ticker.C {
+						if stopCtx.Err() != nil {
 							return
 						}
+						sh.mu.Lock()
+						if sh.stream == nil {
+							sh.mu.Unlock()
+							return
+						}
+						sh.mu.Unlock()
+
+						pkts, err := rtpEnc.Encode(aus)
+						if err != nil {
+							t.Log(err.Error())
+							t.FailNow()
+						}
+
+						// write packets to the server
+						for _, pkt := range pkts {
+							// #nosec
+							pkt.Timestamp = uint32(multiplyAndDivide(int64(time.Since(start)), int64(forma.ClockRate()), int64(time.Second)))
+
+							sh.mu.Lock()
+							err = sh.stream.WritePacketRTP(sh.media, pkt)
+							sh.mu.Unlock()
+							if err != nil {
+								logger.Debug(err.Error())
+								return
+							}
+						}
 					}
-				}
 				}, sh.wg.Done)
 			})
 			return &base.Response{StatusCode: base.StatusOK}, nil
