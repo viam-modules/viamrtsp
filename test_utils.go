@@ -65,7 +65,20 @@ func NewMockH264ServerHandler(
 		OnSetupFunc: func(_ *gortsplib.ServerHandlerOnSetupCtx, sh *ServerHandler) (*base.Response, *gortsplib.ServerStream, error) {
 			logger.Debug("OnSetupFunc")
 			return &base.Response{StatusCode: base.StatusOK}, sh.stream, nil
-		},
+OnSetupFunc: func(_ *gortsplib.ServerHandlerOnSetupCtx, sh *ServerHandler) (*base.Response, *gortsplib.ServerStream, error) {
+    logger.Debug("OnSetupFunc")
+
+    sh.mu.Lock()
+    defer sh.mu.Unlock()
+
+    // In tests we expect DESCRIBE to have initialized the stream.
+    // If not, fail loudly so races are caught early.
+    if sh.stream == nil {
+        return &base.Response{StatusCode: base.StatusBadRequest}, nil, errors.New("stream not initialized before SETUP")
+    }
+
+    return &base.Response{StatusCode: base.StatusOK}, sh.stream, nil
+},
 		// This will play an H264 video which only has frames which are red squares
 		// This is so that the result of GetImage is deterministic
 		OnPlayFunc: func(_ *gortsplib.ServerHandlerOnPlayCtx, sh *ServerHandler) (*base.Response, error) {
