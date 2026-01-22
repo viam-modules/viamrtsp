@@ -14,7 +14,7 @@ import (
 )
 
 // isLocalIP checks if the given IP address is a local/private network address.
-// This includes private ranges (10.x, 172.16-31.x, 192.168.x) and loopback (127.x).
+// This includes private ranges (10.x, 172.16-31.x, 192.168.x, fc00::/7) and loopback (127.x, ::1).
 func isLocalIP(ip net.IP) bool {
 	return ip.IsPrivate() || ip.IsLoopback()
 }

@@ -416,28 +416,31 @@ func TestExtractXAddrsFromProbeMatch(t *testing.T) {
 	})
 
 	t.Run("Allows private IPs", func(t *testing.T) {
-		// All RFC1918 ranges plus loopback should work.
+		// All RFC1918 ranges plus loopback should work (v4 and v6).
 		response := `
 			<Envelope>
 				<Body>
 					<ProbeMatches>
 						<ProbeMatch>
-							<XAddrs>http://10.0.0.1/onvif http://172.16.0.1/onvif http://192.168.0.1/onvif http://127.0.0.1/onvif</XAddrs>
+							<XAddrs>http://10.0.0.1/onvif http://172.16.0.1/onvif http://192.168.0.1/onvif http://127.0.0.1/onvif http://[::1]/onvif http://[fc00::1]/onvif</XAddrs>
 						</ProbeMatch>
 					</ProbeMatches>
 				</Body>
 			</Envelope>`
 
 		xaddrs := extractXAddrsFromProbeMatch(response, logging.NewTestLogger(t))
-		test.That(t, len(xaddrs), test.ShouldEqual, 4)
+		test.That(t, len(xaddrs), test.ShouldEqual, 6)
 	})
 }
 
 func TestIsLocalIP(t *testing.T) {
 	test.That(t, isLocalIP(net.ParseIP("192.168.1.1")), test.ShouldBeTrue)
 	test.That(t, isLocalIP(net.ParseIP("10.0.0.1")), test.ShouldBeTrue)
+	test.That(t, isLocalIP(net.ParseIP("::1")), test.ShouldBeTrue)       // ipv6 loopback
+	test.That(t, isLocalIP(net.ParseIP("fc00::1")), test.ShouldBeTrue) // ipv6 private
 	test.That(t, isLocalIP(net.ParseIP("8.8.8.8")), test.ShouldBeFalse)
 	test.That(t, isLocalIP(net.ParseIP("112.112.220.108")), test.ShouldBeFalse)
+	test.That(t, isLocalIP(net.ParseIP("2607:f8b0:4004:800::200e")), test.ShouldBeFalse)
 }
 
 func TestStrToHostName(t *testing.T) {
