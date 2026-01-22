@@ -341,6 +341,8 @@ You can filter the results by filling out the `query` field in the configuration
 
 This model is used to discover RTSP cameras connected to a [UniFi Protect](https://ui.com/camera-security) NVR. It uses the UniFi Protect Integration API to enumerate cameras and retrieve their RTSP stream URLs.
 
+> **Setup Guide:** For detailed setup instructions including how to enable RTSP on your cameras and generate an API token, see the [UniFi Setup Guide](unifi/README.md).
+
 ```json
 {
    "nvr_address": "<NVR_IP_OR_HOSTNAME>",
