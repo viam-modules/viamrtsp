@@ -95,7 +95,7 @@ func extractXAddrsFromProbeMatch(response string, logger logging.Logger) []*url.
 				continue
 			}
 
-			// Extract the hostname (stripping port if present) and validate it's a local IP
+			// Only allow private/loopback IPs
 			hostname := parsedURL.Hostname()
 			ip := net.ParseIP(hostname)
 			if ip == nil {

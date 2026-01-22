@@ -379,7 +379,7 @@ func TestExtractXAddrsFromProbeMatch(t *testing.T) {
 	})
 
 	t.Run("Filters external IPs", func(t *testing.T) {
-		// Camera advertised a Chinese IP (112.112.220.108) alongside local IP.
+		// Camera advertised an external IP alongside a local IP.
 		// Only the local one should be returned.
 		response := `
 			<Envelope>
@@ -434,8 +434,6 @@ func TestExtractXAddrsFromProbeMatch(t *testing.T) {
 }
 
 func TestIsLocalIP(t *testing.T) {
-	// Sanity check that our helper does what we expect.
-	// We're wrapping stdlib so don't need exhaustive tests.
 	test.That(t, isLocalIP(net.ParseIP("192.168.1.1")), test.ShouldBeTrue)
 	test.That(t, isLocalIP(net.ParseIP("10.0.0.1")), test.ShouldBeTrue)
 	test.That(t, isLocalIP(net.ParseIP("8.8.8.8")), test.ShouldBeFalse)
