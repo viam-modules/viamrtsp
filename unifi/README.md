@@ -4,7 +4,7 @@ This guide explains how to configure your UniFi Protect NVR and cameras to work 
 
 ## Prerequisites
 
-- UniFi Protect NVR (UNVR, UNVR Pro, Cloud Key Gen2 Plus, or UDM Pro)
+- UniFi Protect NVR (any device running UniFi Protect, including UNVR, UNVR Pro, Cloud Key Gen2 Plus, UDM Pro, UDM Pro Max, UDM SE, or UDM)
 - UniFi Protect cameras connected to the NVR
 - Network access from your Viam machine to the NVR
 
@@ -21,7 +21,7 @@ RTSP streaming must be enabled on each camera you want to discover.
 
 Repeat for each camera you want to use.
 
-> **Note:** The discovery service will prefer the highest quality stream available (High > Medium > Low).
+> **Note:** When multiple quality levels are enabled on a camera, the discovery service will return the RTSP URL for the highest available quality stream. For example, if you enable both High and Medium quality streams, the discovery service will return the High quality stream URL.
 
 ## Step 2: Generate an API Token
 
@@ -34,7 +34,7 @@ The discovery service uses the UniFi Protect Integration API, which requires an 
 5. Give it a descriptive name (e.g., "Viam RTSP Discovery")
 6. Copy the generated token immediately - it will only be shown once
 
-> **Note:** API keys are generated through the cloud Site Manager, not the local NVR interface. Your NVR must be linked to your Ubiquiti account.
+> **Note:** API keys are generated through the Cloud Site Manager, not the local NVR interface. Your NVR must be linked to your Ubiquiti account.
 
 For more details, see the [official UniFi API documentation](https://developer.ui.com/site-manager-api/gettingstarted).
 
