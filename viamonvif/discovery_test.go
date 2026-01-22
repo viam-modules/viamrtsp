@@ -422,7 +422,7 @@ func TestExtractXAddrsFromProbeMatch(t *testing.T) {
 				<Body>
 					<ProbeMatches>
 						<ProbeMatch>
-							<XAddrs>http://10.0.0.1/onvif http://172.16.0.1/onvif http://192.168.0.1/onvif http://127.0.0.1/onvif http://[::1]/onvif http://[fc00::1]/onvif</XAddrs>
+							<XAddrs>http://10.0.0.1 http://172.16.0.1 http://192.168.0.1 http://127.0.0.1 http://[::1] http://[fc00::1]</XAddrs>
 						</ProbeMatch>
 					</ProbeMatches>
 				</Body>
@@ -436,7 +436,7 @@ func TestExtractXAddrsFromProbeMatch(t *testing.T) {
 func TestIsLocalIP(t *testing.T) {
 	test.That(t, isLocalIP(net.ParseIP("192.168.1.1")), test.ShouldBeTrue)
 	test.That(t, isLocalIP(net.ParseIP("10.0.0.1")), test.ShouldBeTrue)
-	test.That(t, isLocalIP(net.ParseIP("::1")), test.ShouldBeTrue)       // ipv6 loopback
+	test.That(t, isLocalIP(net.ParseIP("::1")), test.ShouldBeTrue)     // ipv6 loopback
 	test.That(t, isLocalIP(net.ParseIP("fc00::1")), test.ShouldBeTrue) // ipv6 private
 	test.That(t, isLocalIP(net.ParseIP("8.8.8.8")), test.ShouldBeFalse)
 	test.That(t, isLocalIP(net.ParseIP("112.112.220.108")), test.ShouldBeFalse)
