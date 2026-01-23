@@ -13,6 +13,12 @@ import (
 	"go.viam.com/rdk/logging"
 )
 
+// isLocalIP checks if the given IP address is a local/private network address.
+// This includes private ranges (10.x, 172.16-31.x, 192.168.x, fc00::/7) and loopback (127.x, ::1).
+func isLocalIP(ip net.IP) bool {
+	return ip.IsPrivate() || ip.IsLoopback()
+}
+
 // WSDiscovery runs WS-Discovery on the network interface.
 func WSDiscovery(ctx context.Context, logger logging.Logger, iface net.Interface) ([]*url.URL, error) {
 	logger.Debugf("WS-Discovery starting on interface: %s\n", iface.Name)
@@ -60,6 +66,8 @@ func WSDiscovery(ctx context.Context, logger logging.Logger, iface net.Interface
 }
 
 // extractXAddrsFromProbeMatch extracts XAddrs from the WS-Discovery ProbeMatch response.
+// It filters out any XAddrs that point to non-local IP addresses to prevent
+// reaching out to external/public IPs that may be maliciously advertised by cameras.
 func extractXAddrsFromProbeMatch(response string, logger logging.Logger) []*url.URL {
 	type ProbeMatch struct {
 		XMLName xml.Name `xml:"Envelope"`
@@ -84,6 +92,19 @@ func extractXAddrsFromProbeMatch(response string, logger logging.Logger) []*url.
 			parsedURL, err := url.Parse(xaddr)
 			if err != nil {
 				logger.Warnf("failed to parse XAddr %s: %w", xaddr, err)
+				continue
+			}
+
+			// Only allow private/loopback IPs
+			hostname := parsedURL.Hostname()
+			ip := net.ParseIP(hostname)
+			if ip == nil {
+				logger.Warnf("skipping XAddr with non-IP hostname %s: only local IP addresses are allowed", xaddr)
+				continue
+			}
+
+			if !isLocalIP(ip) {
+				logger.Warnf("skipping XAddr with external IP address %s: only local/private network addresses are allowed", xaddr)
 				continue
 			}
 
