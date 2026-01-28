@@ -167,6 +167,7 @@ func (s *onvifPtzClient) callMethod(req interface{}, result interface{}) ([]byte
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
+	s.logger.Debugf("Raw response: %s", string(bodyBytes))
 
 	if result != nil {
 		if err := xml.Unmarshal(bodyBytes, result); err != nil {
