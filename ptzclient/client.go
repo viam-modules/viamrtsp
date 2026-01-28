@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 
 	onvif "github.com/hexbabe/sean-onvif"
@@ -167,7 +168,7 @@ func (s *onvifPtzClient) callMethod(req interface{}, result interface{}) ([]byte
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
-	s.logger.Debugf("Raw response: %s", string(bodyBytes))
+	s.logger.Debugf("%s raw response: %s", reflect.TypeOf(req).Name(), string(bodyBytes))
 
 	if result != nil {
 		if err := xml.Unmarshal(bodyBytes, result); err != nil {
@@ -309,8 +310,6 @@ func (s *onvifPtzClient) handleStop(cmd map[string]interface{}) (map[string]inte
 	if err != nil {
 		return nil, fmt.Errorf("stop failed: %w", err)
 	}
-
-	s.logger.Debugf("Stop raw response body: %s", string(bodyBytes))
 	return map[string]interface{}{"response": string(bodyBytes)}, nil
 }
 
@@ -344,8 +343,6 @@ func (s *onvifPtzClient) handleContinuousMove(cmd map[string]interface{}) (map[s
 	if err != nil {
 		return nil, fmt.Errorf("continuous move failed: %w", err)
 	}
-
-	s.logger.Debugf("ContinuousMove raw response body: %s", string(bodyBytes))
 	return map[string]interface{}{"response": string(bodyBytes)}, nil
 }
 
@@ -400,8 +397,6 @@ func (s *onvifPtzClient) handleRelativeMove(cmd map[string]interface{}) (map[str
 	if err != nil {
 		return nil, fmt.Errorf("relative move failed: %w", err)
 	}
-
-	s.logger.Debugf("RelativeMove raw response body: %s", string(bodyBytes))
 	return map[string]interface{}{"response": string(bodyBytes)}, nil
 }
 
@@ -458,8 +453,6 @@ func (s *onvifPtzClient) handleAbsoluteMove(cmd map[string]interface{}) (map[str
 	if err != nil {
 		return nil, fmt.Errorf("absolute move failed: %w", err)
 	}
-
-	s.logger.Debugf("AbsoluteMove raw response body: %s", string(bodyBytes))
 	return map[string]interface{}{"response": string(bodyBytes)}, nil
 }
 
