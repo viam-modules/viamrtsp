@@ -19,8 +19,8 @@ import (
 	"strings"
 
 	"github.com/beevik/etree"
-	"github.com/hexbabe/sean-onvif/ptz"
 	"github.com/viam-modules/viamrtsp/viamonvif/gosoap"
+	"github.com/viam-modules/viamrtsp/viamonvif/ptz"
 	"github.com/viam-modules/viamrtsp/viamonvif/xsd/onvif"
 	"go.viam.com/rdk/logging"
 )
@@ -443,4 +443,9 @@ func (dev *Device) GetPTZNodes(ctx context.Context) ([]onvif.PTZNode, error) {
 	}
 
 	return env.Body.GetNodesResponse.Nodes, nil
+}
+
+// CallPTZMethod calls a PTZ service method and returns the raw response bytes.
+func (dev *Device) CallPTZMethod(ctx context.Context, method interface{}) ([]byte, error) {
+	return dev.callOnvifServiceMethod(ctx, dev.endpoints["ptz"], method)
 }
