@@ -363,9 +363,11 @@ func (s *onvifPtzClient) handleRelativeMove(cmd map[string]interface{}) (map[str
 		zoomTranslation = getOptionalFloat64(cmd, "zoom_translation", 0.0)
 	}
 
-	useDegrees := getOptionalBool(cmd, "degrees", false)
 	panTiltSpace := RelativePanTiltTranslationGenericSpace
-	if useDegrees {
+	if space, ok := getOptionalString(cmd, "pan_tilt_space"); ok && space != "" {
+		panTiltSpace = space
+		s.logger.Debugf("Using custom space for relative Pan/Tilt: %s", panTiltSpace)
+	} else if useDegrees := getOptionalBool(cmd, "degrees", false); useDegrees {
 		panTiltSpace = RelativePanTiltTranslationSphericalDegrees
 		s.logger.Debug("Using Spherical Degrees space for relative Pan/Tilt.")
 	} else {

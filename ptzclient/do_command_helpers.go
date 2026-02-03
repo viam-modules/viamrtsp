@@ -105,6 +105,19 @@ func getOptionalBool(cmd map[string]interface{}, key string, defaultVal bool) bo
 	return boolVal
 }
 
+// getOptionalString extracts an optional string argument.
+func getOptionalString(cmd map[string]interface{}, key string) (string, bool) {
+	val, ok := cmd[key]
+	if !ok {
+		return "", false
+	}
+	strVal, ok := val.(string)
+	if !ok {
+		return "", false
+	}
+	return strVal, true
+}
+
 // getOptionalDuration extracts an optional duration argument.
 func getOptionalDuration(cmd map[string]interface{}, key string, defaultVal string) string {
 	val, ok := cmd[key]
