@@ -695,7 +695,11 @@ We support building this module using the Makefile for the following host/target
     
 # Experimental PTZ model
 
-This experimental model implements the [`"rdk:component:generic"` API](https://docs.viam.com/components/generic/) for controlling ONVIF-compliant PTZ (Pan-Tilt-Zoom) cameras. The generic component supports core PTZ operations through the DoCommand method.
+This module includes PTZ support with two models:
+- `viam:viamrtsp:onvif-ptz` implements the PTZ gRPC API (`rdk:component:ptz`) for standardized PTZ control.
+- `viam:viamrtsp:onvif-ptz-client` implements the legacy [`"rdk:component:generic"` API](https://docs.viam.com/components/generic/) and supports PTZ control through DoCommand.
+
+Use `onvif-ptz` for new integrations and keep `onvif-ptz-client` for backwards compatibility.
 
 ## Configure your `onvif-ptz-client`
 
