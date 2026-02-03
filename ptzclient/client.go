@@ -358,7 +358,10 @@ func (s *onvifPtzClient) handleRelativeMove(cmd map[string]interface{}) (map[str
 
 	panRelative := getOptionalFloat64(cmd, "pan", 0.0)
 	tiltRelative := getOptionalFloat64(cmd, "tilt", 0.0)
-	zoomTranslation := getOptionalFloat64(cmd, "zoom_translation", 0.0)
+	zoomTranslation := getOptionalFloat64(cmd, "zoom", 0.0)
+	if _, ok := cmd["zoom"]; !ok {
+		zoomTranslation = getOptionalFloat64(cmd, "zoom_translation", 0.0)
+	}
 
 	useDegrees := getOptionalBool(cmd, "degrees", false)
 	panTiltSpace := RelativePanTiltTranslationGenericSpace
