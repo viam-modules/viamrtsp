@@ -6,16 +6,15 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
-	"io"
+	"net/url"
 	"reflect"
 	"strings"
 
-	onvif "github.com/hexbabe/sean-onvif"
-	"github.com/hexbabe/sean-onvif/media"
-	"github.com/hexbabe/sean-onvif/ptz"
-	"github.com/hexbabe/sean-onvif/xsd"
-	onvifxsd "github.com/hexbabe/sean-onvif/xsd/onvif"
 	"github.com/viam-modules/viamrtsp"
+	"github.com/viam-modules/viamrtsp/viamonvif/device"
+	"github.com/viam-modules/viamrtsp/viamonvif/ptz"
+	"github.com/viam-modules/viamrtsp/viamonvif/xsd"
+	"github.com/viam-modules/viamrtsp/viamonvif/xsd/onvif"
 	"go.viam.com/rdk/components/generic"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
@@ -90,7 +89,7 @@ type onvifPtzClient struct {
 	name   resource.Name
 	logger logging.Logger
 	cfg    *Config
-	dev    *onvif.Device
+	dev    *device.Device
 
 	cancelCtx  context.Context
 	cancelFunc func()
@@ -112,7 +111,7 @@ func newOnvifPtzClientClient(
 
 // NewClient creates a new ONVIF PTZ client.
 func NewClient(
-	_ context.Context,
+	ctx context.Context,
 	_ resource.Dependencies,
 	name resource.Name,
 	conf *Config,
@@ -121,7 +120,17 @@ func NewClient(
 	cancelCtx, cancelFunc := context.WithCancel(context.Background())
 
 	logger.Debugf("Attempting to connect to ONVIF device at %s", conf.Address)
-	params := onvif.DeviceParams{Xaddr: conf.Address}
+
+	xaddr, err := url.Parse(conf.Address)
+	if err != nil {
+		cancelFunc()
+		return nil, fmt.Errorf("failed to parse ONVIF address %s: %w", conf.Address, err)
+	}
+
+	params := device.Params{
+		Xaddr:                    xaddr,
+		SkipLocalTLSVerification: true,
+	}
 	// Credentials are optional for unauthenticated cameras
 	if conf.Username != "" {
 		params.Username = conf.Username
@@ -129,7 +138,7 @@ func NewClient(
 	if conf.Password != "" {
 		params.Password = conf.Password
 	}
-	dev, err := onvif.NewDevice(params)
+	dev, err := device.NewDevice(ctx, params, logger)
 	if err != nil {
 		cancelFunc()
 		return nil, fmt.Errorf("failed to create ONVIF device for %s: %w", conf.Address, err)
@@ -155,18 +164,12 @@ func (s *onvifPtzClient) Name() resource.Name {
 	return s.name
 }
 
-// callMethod calls an ONVIF method and unmarshals the response into result.
+// callPTZMethod calls an ONVIF PTZ method and unmarshals the response into result.
 // If result is nil, unmarshaling is skipped and raw bytes are returned.
-func (s *onvifPtzClient) callMethod(req interface{}, result interface{}) ([]byte, error) {
-	res, err := s.dev.CallMethod(req, s.logger)
+func (s *onvifPtzClient) callPTZMethod(req interface{}, result interface{}) ([]byte, error) {
+	bodyBytes, err := s.dev.CallPTZMethod(s.cancelCtx, req)
 	if err != nil {
 		return nil, err
-	}
-	defer res.Body.Close()
-
-	bodyBytes, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 	s.logger.Debugf("%s raw response: %s", reflect.TypeOf(req).Name(), string(bodyBytes))
 
@@ -180,25 +183,25 @@ func (s *onvifPtzClient) callMethod(req interface{}, result interface{}) ([]byte
 }
 
 // profileToken returns the configured profile token or an error if not set.
-func (s *onvifPtzClient) profileToken() (onvifxsd.ReferenceToken, error) {
+func (s *onvifPtzClient) profileToken() (onvif.ReferenceToken, error) {
 	if s.cfg.ProfileToken == "" {
 		return "", errors.New("profile_token is not configured for this component")
 	}
-	return onvifxsd.ReferenceToken(s.cfg.ProfileToken), nil
+	return onvif.ReferenceToken(s.cfg.ProfileToken), nil
 }
 
 // handleGetProfiles retrieves available media profiles from the camera and implements the get-profiles command logic.
 func (s *onvifPtzClient) handleGetProfiles() (map[string]interface{}, error) {
 	s.logger.Debug("Fetching media profiles...")
 
-	var envelope ProfilesEnvelope
-	if _, err := s.callMethod(media.GetProfiles{}, &envelope); err != nil {
+	resp, err := s.dev.GetProfiles(s.cancelCtx)
+	if err != nil {
 		return nil, fmt.Errorf("get profiles failed: %w", err)
 	}
 
 	var tokens []string
-	for _, p := range envelope.Body.GetProfilesResponse.Profiles {
-		tokens = append(tokens, p.Token)
+	for _, p := range resp.Profiles {
+		tokens = append(tokens, string(p.Token))
 	}
 	s.logger.Debugf("Found profiles: %v", tokens)
 	return map[string]interface{}{"profiles": tokens}, nil
@@ -207,12 +210,12 @@ func (s *onvifPtzClient) handleGetProfiles() (map[string]interface{}, error) {
 func (s *onvifPtzClient) handleGetServiceCapabilities() (map[string]interface{}, error) {
 	s.logger.Debug("Sending GetServiceCapabilities request")
 
-	var envelope ptz.GetServiceCapabilitiesResponse
-	if _, err := s.callMethod(ptz.GetServiceCapabilities{}, &envelope); err != nil {
+	var envelope GetServiceCapabilitiesEnvelope
+	if _, err := s.callPTZMethod(ptz.GetServiceCapabilities{}, &envelope); err != nil {
 		return nil, fmt.Errorf("get service capabilities failed: %w", err)
 	}
 
-	caps := envelope.Capabilities
+	caps := envelope.Body.GetServiceCapabilitiesResponse.Capabilities
 	return map[string]interface{}{
 		"service_capabilities": map[string]interface{}{
 			"EFlip":                       bool(caps.EFlip),
@@ -231,12 +234,12 @@ func (s *onvifPtzClient) handleGetConfiguration() (map[string]interface{}, error
 		return nil, err
 	}
 
-	var envelope ptz.GetConfigurationResponse
-	if _, err := s.callMethod(ptz.GetConfiguration{ProfileToken: profileToken}, &envelope); err != nil {
+	var envelope GetConfigurationEnvelope
+	if _, err := s.callPTZMethod(ptz.GetConfiguration{ProfileToken: profileToken}, &envelope); err != nil {
 		return nil, fmt.Errorf("get configuration failed: %w", err)
 	}
 
-	return map[string]interface{}{"configuration": envelope.PTZConfiguration}, nil
+	return map[string]interface{}{"configuration": envelope.Body.GetConfigurationResponse.PTZConfiguration}, nil
 }
 
 // handleGetConfigurations implements the get-configurations command logic.
@@ -247,12 +250,12 @@ func (s *onvifPtzClient) handleGetConfigurations() (map[string]interface{}, erro
 
 	s.logger.Debug("Sending GetConfigurations request")
 
-	var envelope ptz.GetConfigurationsResponse
-	if _, err := s.callMethod(ptz.GetConfigurations{}, &envelope); err != nil {
+	var envelope GetConfigurationsEnvelope
+	if _, err := s.callPTZMethod(ptz.GetConfigurations{}, &envelope); err != nil {
 		return nil, fmt.Errorf("get configurations failed: %w", err)
 	}
 
-	return map[string]interface{}{"configurations": envelope.PTZConfiguration}, nil
+	return map[string]interface{}{"configurations": envelope.Body.GetConfigurationsResponse.PTZConfiguration}, nil
 }
 
 // handleGetStatus implements the get-status command logic.
@@ -265,7 +268,7 @@ func (s *onvifPtzClient) handleGetStatus() (map[string]interface{}, error) {
 	s.logger.Debugf("Sending GetStatus request for profile: %s", profileToken)
 
 	var envelope CustomGetStatusEnvelope
-	if _, err := s.callMethod(ptz.GetStatus{ProfileToken: profileToken}, &envelope); err != nil {
+	if _, err := s.callPTZMethod(ptz.GetStatus{ProfileToken: profileToken}, &envelope); err != nil {
 		return nil, fmt.Errorf("get status failed: %w", err)
 	}
 
@@ -302,7 +305,7 @@ func (s *onvifPtzClient) handleStop(cmd map[string]interface{}) (map[string]inte
 
 	s.logger.Debugf("Sending Stop command (PanTilt: %v, Zoom: %v) for profile %s...", stopPanTilt, stopZoom, profileToken)
 
-	bodyBytes, err := s.callMethod(ptz.Stop{
+	bodyBytes, err := s.callPTZMethod(ptz.Stop{
 		ProfileToken: profileToken,
 		PanTilt:      xsd.Boolean(stopPanTilt),
 		Zoom:         xsd.Boolean(stopZoom),
@@ -332,11 +335,11 @@ func (s *onvifPtzClient) handleContinuousMove(cmd map[string]interface{}) (map[s
 	s.logger.Debugf("Sending ContinuousMove (Pan: %.2f, Tilt: %.2f, Zoom: %.2f, Timeout: %s) for profile %s...",
 		panSpeed, tiltSpeed, zoomSpeed, timeout, profileToken)
 
-	bodyBytes, err := s.callMethod(ptz.ContinuousMove{
+	bodyBytes, err := s.callPTZMethod(ptz.ContinuousMove{
 		ProfileToken: profileToken,
-		Velocity: onvifxsd.PTZSpeed{
-			PanTilt: onvifxsd.Vector2D{X: panSpeed, Y: tiltSpeed, Space: ContinuousPanTiltVelocityGenericSpace},
-			Zoom:    onvifxsd.Vector1D{X: zoomSpeed, Space: ContinuousZoomVelocityGenericSpace},
+		Velocity: onvif.PTZSpeed{
+			PanTilt: onvif.Vector2D{X: panSpeed, Y: tiltSpeed, Space: xsd.AnyURI(ContinuousPanTiltVelocityGenericSpace)},
+			Zoom:    onvif.Vector1D{X: zoomSpeed, Space: xsd.AnyURI(ContinuousZoomVelocityGenericSpace)},
 		},
 		Timeout: xsd.Duration(timeout),
 	}, nil)
@@ -355,9 +358,9 @@ func (s *onvifPtzClient) handleRelativeMove(cmd map[string]interface{}) (map[str
 
 	panRelative := getOptionalFloat64(cmd, "pan", 0.0)
 	tiltRelative := getOptionalFloat64(cmd, "tilt", 0.0)
-	zoomTranslation, err := getFloat64(cmd, "zoom_translation")
-	if err != nil {
-		return nil, err
+	zoomTranslation := getOptionalFloat64(cmd, "zoom", 0.0)
+	if _, ok := cmd["zoom"]; !ok {
+		zoomTranslation = getOptionalFloat64(cmd, "zoom_translation", 0.0)
 	}
 
 	useDegrees := getOptionalBool(cmd, "degrees", false)
@@ -371,9 +374,9 @@ func (s *onvifPtzClient) handleRelativeMove(cmd map[string]interface{}) (map[str
 
 	req := ptz.RelativeMove{
 		ProfileToken: profileToken,
-		Translation: onvifxsd.PTZVector{
-			PanTilt: onvifxsd.Vector2D{X: panRelative, Y: tiltRelative, Space: xsd.AnyURI(panTiltSpace)},
-			Zoom:    onvifxsd.Vector1D{X: zoomTranslation, Space: RelativeZoomTranslationGenericSpace},
+		Translation: onvif.PTZVector{
+			PanTilt: onvif.Vector2D{X: panRelative, Y: tiltRelative, Space: xsd.AnyURI(panTiltSpace)},
+			Zoom:    onvif.Vector1D{X: zoomTranslation, Space: xsd.AnyURI(RelativeZoomTranslationGenericSpace)},
 		},
 	}
 
@@ -382,9 +385,9 @@ func (s *onvifPtzClient) handleRelativeMove(cmd map[string]interface{}) (map[str
 		if err := validateSpeeds(spd.pan, spd.tilt, spd.zoom, false); err != nil {
 			return nil, err
 		}
-		req.Speed = onvifxsd.PTZSpeed{
-			PanTilt: onvifxsd.Vector2D{X: spd.pan, Y: spd.tilt, Space: xsd.AnyURI(panTiltSpace)},
-			Zoom:    onvifxsd.Vector1D{X: spd.zoom, Space: RelativeZoomTranslationGenericSpace},
+		req.Speed = onvif.PTZSpeed{
+			PanTilt: onvif.Vector2D{X: spd.pan, Y: spd.tilt, Space: xsd.AnyURI(panTiltSpace)},
+			Zoom:    onvif.Vector1D{X: spd.zoom, Space: xsd.AnyURI(RelativeZoomTranslationGenericSpace)},
 		}
 		s.logger.Debugf("Sending RelativeMove (P: %.3f, T: %.3f, Z: %.3f) with Speed (%.2f, %.2f, %.2f) for profile %s...",
 			panRelative, tiltRelative, zoomTranslation, spd.pan, spd.tilt, spd.zoom, profileToken)
@@ -393,7 +396,7 @@ func (s *onvifPtzClient) handleRelativeMove(cmd map[string]interface{}) (map[str
 			panRelative, tiltRelative, zoomTranslation, profileToken)
 	}
 
-	bodyBytes, err := s.callMethod(req, nil)
+	bodyBytes, err := s.callPTZMethod(req, nil)
 	if err != nil {
 		return nil, fmt.Errorf("relative move failed: %w", err)
 	}
@@ -427,9 +430,9 @@ func (s *onvifPtzClient) handleAbsoluteMove(cmd map[string]interface{}) (map[str
 
 	req := ptz.AbsoluteMove{
 		ProfileToken: profileToken,
-		Position: onvifxsd.PTZVector{
-			PanTilt: onvifxsd.Vector2D{X: panPos, Y: tiltPos, Space: AbsolutePanTiltPositionGenericSpace},
-			Zoom:    onvifxsd.Vector1D{X: zoomPos, Space: AbsoluteZoomPositionGenericSpace},
+		Position: onvif.PTZVector{
+			PanTilt: onvif.Vector2D{X: panPos, Y: tiltPos, Space: xsd.AnyURI(AbsolutePanTiltPositionGenericSpace)},
+			Zoom:    onvif.Vector1D{X: zoomPos, Space: xsd.AnyURI(AbsoluteZoomPositionGenericSpace)},
 		},
 	}
 
@@ -438,9 +441,9 @@ func (s *onvifPtzClient) handleAbsoluteMove(cmd map[string]interface{}) (map[str
 		if err := validateSpeeds(spd.pan, spd.tilt, spd.zoom, false); err != nil {
 			return nil, err
 		}
-		req.Speed = onvifxsd.PTZSpeed{
-			PanTilt: onvifxsd.Vector2D{X: spd.pan, Y: spd.tilt, Space: AbsolutePanTiltPositionGenericSpace},
-			Zoom:    onvifxsd.Vector1D{X: spd.zoom, Space: AbsoluteZoomPositionGenericSpace},
+		req.Speed = onvif.PTZSpeed{
+			PanTilt: onvif.Vector2D{X: spd.pan, Y: spd.tilt, Space: xsd.AnyURI(AbsolutePanTiltPositionGenericSpace)},
+			Zoom:    onvif.Vector1D{X: spd.zoom, Space: xsd.AnyURI(AbsoluteZoomPositionGenericSpace)},
 		}
 		s.logger.Debugf("Sending AbsoluteMove (P: %.3f, T: %.3f, Z: %.3f) with Speed (%.2f, %.2f, %.2f) for profile %s...",
 			panPos, tiltPos, zoomPos, spd.pan, spd.tilt, spd.zoom, profileToken)
@@ -449,7 +452,7 @@ func (s *onvifPtzClient) handleAbsoluteMove(cmd map[string]interface{}) (map[str
 			panPos, tiltPos, zoomPos, profileToken)
 	}
 
-	bodyBytes, err := s.callMethod(req, nil)
+	bodyBytes, err := s.callPTZMethod(req, nil)
 	if err != nil {
 		return nil, fmt.Errorf("absolute move failed: %w", err)
 	}

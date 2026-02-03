@@ -2,6 +2,8 @@ package ptzclient
 
 import (
 	"encoding/xml"
+
+	"github.com/viam-modules/viamrtsp/viamonvif/ptz"
 )
 
 // --- Constants for Space URIs ---.
@@ -66,14 +68,27 @@ type CustomMoveStatus struct {
 	Zoom    string `xml:"http://www.onvif.org/ver10/schema Zoom"`
 }
 
-// ProfilesEnvelope is a custom struct for the GetProfiles response.
-type ProfilesEnvelope struct {
+// GetServiceCapabilitiesEnvelope is the envelope for GetServiceCapabilities response.
+type GetServiceCapabilitiesEnvelope struct {
 	XMLName xml.Name `xml:"http://www.w3.org/2003/05/soap-envelope Envelope"`
 	Body    struct {
-		GetProfilesResponse struct {
-			Profiles []struct {
-				Token string `xml:"token,attr"`
-			} `xml:"Profiles"`
-		} `xml:"GetProfilesResponse"`
-	} `xml:"Body"`
+		//nolint:lll
+		GetServiceCapabilitiesResponse ptz.GetServiceCapabilitiesResponse `xml:"http://www.onvif.org/ver20/ptz/wsdl GetServiceCapabilitiesResponse"`
+	} `xml:"http://www.w3.org/2003/05/soap-envelope Body"`
+}
+
+// GetConfigurationEnvelope is the envelope for GetConfiguration response.
+type GetConfigurationEnvelope struct {
+	XMLName xml.Name `xml:"http://www.w3.org/2003/05/soap-envelope Envelope"`
+	Body    struct {
+		GetConfigurationResponse ptz.GetConfigurationResponse `xml:"http://www.onvif.org/ver20/ptz/wsdl GetConfigurationResponse"`
+	} `xml:"http://www.w3.org/2003/05/soap-envelope Body"`
+}
+
+// GetConfigurationsEnvelope is the envelope for GetConfigurations response.
+type GetConfigurationsEnvelope struct {
+	XMLName xml.Name `xml:"http://www.w3.org/2003/05/soap-envelope Envelope"`
+	Body    struct {
+		GetConfigurationsResponse ptz.GetConfigurationsResponse `xml:"http://www.onvif.org/ver20/ptz/wsdl GetConfigurationsResponse"`
+	} `xml:"http://www.w3.org/2003/05/soap-envelope Body"`
 }

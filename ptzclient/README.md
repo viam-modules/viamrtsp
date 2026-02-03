@@ -49,11 +49,29 @@ This model implements the [`"rdk:component:generic"` API](https://docs.viam.com/
 ```
 Returns list of available media profile tokens.
 
-#### Get Status  
+#### Get Status
 ```json
 {"command": "get-status"}
 ```
 Returns current PTZ position, movement state, and UTC timestamp.
+
+#### Get Configuration
+```json
+{"command": "get-configuration"}
+```
+Returns PTZ configuration for the current profile.
+
+#### Get Configurations
+```json
+{"command": "get-configurations"}
+```
+Returns all available PTZ configurations.
+
+#### Get Service Capabilities
+```json
+{"command": "get-service-capabilities"}
+```
+Returns PTZ service capabilities (EFlip, Reverse, MoveStatus, StatusPosition, etc.).
 
 #### Stop Movement
 ```json
