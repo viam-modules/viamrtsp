@@ -3,6 +3,7 @@ package ptzclient
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -119,7 +120,11 @@ func (s *onvifPtzClient) moveContinuous(req *ptzpb.ContinuousMove) error {
 		cmd["zoom_speed"] = req.Velocity.Zoom
 	}
 	if req.Timeout != nil {
-		cmd["timeout"] = req.GetTimeout()
+		timeout, err := durationToXSD(req.Timeout.AsDuration())
+		if err != nil {
+			return err
+		}
+		cmd["timeout"] = timeout
 	}
 	_, err := s.handleContinuousMove(cmd)
 	return err
@@ -251,4 +256,34 @@ func parseOnvifTime(raw string) *timestamppb.Timestamp {
 		return timestamppb.New(t)
 	}
 	return nil
+}
+
+func durationToXSD(d time.Duration) (string, error) {
+	if d < 0 {
+		return "", errors.New("timeout must be non-negative")
+	}
+	totalSeconds := int64(d / time.Second)
+	nanos := int64(d % time.Second)
+	hours := totalSeconds / 3600
+	minutes := (totalSeconds % 3600) / 60
+	seconds := totalSeconds % 60
+
+	var sb strings.Builder
+	sb.WriteString("PT")
+	if hours > 0 {
+		sb.WriteString(fmt.Sprintf("%dH", hours))
+	}
+	if minutes > 0 {
+		sb.WriteString(fmt.Sprintf("%dM", minutes))
+	}
+	if seconds > 0 || nanos > 0 || (hours == 0 && minutes == 0) {
+		if nanos == 0 {
+			sb.WriteString(fmt.Sprintf("%dS", seconds))
+		} else {
+			frac := fmt.Sprintf("%09d", nanos)
+			frac = strings.TrimRight(frac, "0")
+			sb.WriteString(fmt.Sprintf("%d.%sS", seconds, frac))
+		}
+	}
+	return sb.String(), nil
 }
