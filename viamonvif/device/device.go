@@ -111,11 +111,12 @@ func NewDevice(ctx context.Context, params Params, logger logging.Logger) (*Devi
 	if dev.params.HTTPClient == nil {
 		var skipVerify bool
 		if params.SkipLocalTLSVerification {
-			ip, err := netip.ParseAddr(params.Xaddr.Hostname())
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse xaddr hostname %s: %w", params.Xaddr.Hostname(), err)
+			hostname := strings.ToLower(params.Xaddr.Hostname())
+			if strings.HasSuffix(hostname, ".local") {
+				skipVerify = true
+			} else if ip, err := netip.ParseAddr(hostname); err == nil {
+				skipVerify = ip.IsPrivate() || ip.IsLoopback()
 			}
-			skipVerify = ip.IsPrivate() || ip.IsLoopback()
 		}
 		transport := &http.Transport{
 			TLSClientConfig: &tls.Config{
