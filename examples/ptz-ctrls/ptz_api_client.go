@@ -63,11 +63,9 @@ func main() {
 		resourceName = os.Args[1]
 	}
 
-	ptzClient, err := ptz.FromRobot(machine, resourceName)
+	ptzClient, err := ptz.FromProvider(machine, resourceName)
 	if err != nil {
 		logger.Error(err)
-		logger.Info("Resources:")
-		logger.Info(machine.ResourceNames())
 		return
 	}
 
