@@ -454,17 +454,14 @@ func GetMediaInfoFromProfiles(
 			movements["continuous"] = m
 		}
 
-		var host string
 		xaddr := dev.GetXaddr()
-		if xaddr != nil {
-			host = xaddr.Host
-		} else {
+		if xaddr == nil {
 			logger.Debugf("Could not get XAddr from device, skipping the PTZ profile %s", profile.Name)
 			continue
 		}
 
 		ptzInfos = append(ptzInfos, PTZInfo{
-			Address:      host,
+			Address:      xaddr.String(),
 			RTSPAddress:  streamURI.String(),
 			Username:     creds.User,
 			Password:     creds.Pass,

@@ -262,6 +262,23 @@ func TestDeviceFlowWithTLSServer(t *testing.T) {
 	}
 }
 
+func TestNewDeviceMDNSHostname(t *testing.T) {
+	logger := logging.NewTestLogger(t)
+	// Verify that NewDevice does not fail to parse .local mDNS hostnames.
+	// Before the fix, netip.ParseAddr("mydevice.local") would error and NewDevice would return
+	// "failed to parse xaddr hostname mydevice.local".
+	u, err := url.Parse("http://mydevice.local:8000")
+	test.That(t, err, test.ShouldBeNil)
+
+	_, err = NewDevice(context.Background(), Params{
+		Xaddr:                    u,
+		SkipLocalTLSVerification: true,
+	}, logger)
+	// Will fail on GetCapabilities (no server), but must not fail on hostname parsing.
+	test.That(t, err, test.ShouldNotBeNil)
+	test.That(t, strings.Contains(err.Error(), "failed to parse xaddr hostname"), test.ShouldBeFalse)
+}
+
 func TestGetProfiles(t *testing.T) {
 	logger := logging.NewTestLogger(t)
 
