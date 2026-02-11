@@ -290,7 +290,7 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 			// use an OPTIONS request to see if the server is still responding to requests
 			now := time.Now().UTC().Format(time.RFC3339)
 			if rc.client == nil {
-				errMsg := fmt.Sprintf("RTSP client is not connected; at timestamp: %s", now)
+				errMsg := "RTSP client is not connected; at timestamp: " + now
 				rc.streamErrMsg.Store(&errMsg)
 			} else {
 				res, err := rc.client.Options(rc.u)
