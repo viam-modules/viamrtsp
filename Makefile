@@ -142,7 +142,7 @@ endif
 endif
 endif
 
-.PHONY: build-ffmpeg tool-install gofmt lint test profile-cpu profile-memory update-rdk module clean clean-all install-deps viam-server
+.PHONY: build-ffmpeg tool-install gofmt lint lint-ci test profile-cpu profile-memory update-rdk module clean clean-all install-deps viam-server
 
 all: $(BIN_VIAMRTSP) $(BIN_DISCOVERY)
 
@@ -199,6 +199,11 @@ GOVERSION = $(shell grep '^go .\..' go.mod | head -n1 | cut -d' ' -f2)
 lint: gofmt tool-install build-ffmpeg
 	go mod tidy
 	GOTOOLCHAIN=go$(GOVERSION) GOGC=50 CGO_CFLAGS=$(CGO_CFLAGS) GOFLAGS=$(GOFLAGS) go run github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.2 run -v --fix --config=./etc/.golangci.yaml --timeout=5m
+
+lint-ci: build-ffmpeg
+	@test -z "$$(gofmt -l -s .)" || (echo "gofmt needed on:" && gofmt -l -s . && exit 1)
+	go mod tidy -diff
+	GOTOOLCHAIN=go$(GOVERSION) GOGC=50 CGO_CFLAGS=$(CGO_CFLAGS) GOFLAGS=$(GOFLAGS) go run github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.2 run -v --config=./etc/.golangci.yaml --timeout=5m
 
 test: build-ffmpeg
 	CGO_CFLAGS="$(CGO_CFLAGS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" go test -ldflags="-checklinkname=0" -race -v ./...
