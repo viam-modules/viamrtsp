@@ -558,6 +558,7 @@ The save command retrieves video from local storage, concatenates and trims unde
 | `to`        | timestamp           | required          | End timestamp.                   |
 | `metadata`  | string              | optional          | Arbitrary metadata string that is appended to filename `<component_name>_<timestamp>_<metadata>.mp4`       |
 | `async`     | boolean             | optional          | Whether the operation is async.  |
+| `tags`      | []string            | optional          | List of tags to associate with the uploaded video in data manager. |
 
 > [!NOTE]
 > Review the [Work with data](https://docs.viam.com/data-ai/data/) documentation for more information on retrieving the saved video file from[Viam Data](https://www.viam.com/product/data).
@@ -571,7 +572,8 @@ The save command retrieves video from local storage, concatenates and trims unde
   "command": "save",
   "from": <start_timestamp>,
   "to": <end_timestamp>,
-  "metadata": <arbitrary_metadata_string>
+  "metadata": <arbitrary_metadata_string>,
+  "tags": ["tag1", "tag2"]
 }
 ```
 
@@ -600,7 +602,8 @@ The async save command performs the same operation as the save command, but does
   "from": <start_timestamp>,
   "to": <end_timestamp>,
   "metadata": <arbitrary_metadata_string>,
-  "async": true
+  "async": true,
+  "tags": ["tag1", "tag2"]
 }
 ```
 
