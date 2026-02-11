@@ -287,14 +287,11 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 	rc.activeBackgroundWorkers.Add(1)
 	utils.ManagedGo(func() {
 		for utils.SelectContextOrWait(rc.cancelCtx, reconnectIntervalDuration) {
-			badState := false
-
 			// use an OPTIONS request to see if the server is still responding to requests
 			now := time.Now().UTC().Format(time.RFC3339)
 			if rc.client == nil {
-				errMsg := fmt.Sprintf("RTSP client is not connected; at timestamp: %s)", now)
+				errMsg := fmt.Sprintf("RTSP client is not connected; at timestamp: %s", now)
 				rc.streamErrMsg.Store(&errMsg)
-				badState = true
 			} else {
 				res, err := rc.client.Options(rc.u)
 				// Nick S:
@@ -305,16 +302,14 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 					rc.logger.Warnf("The rtsp client encountered an error, trying to reconnect to %s, err: %s", rc.u, err)
 					errMsg := fmt.Sprintf("%s; at timestamp: %s", err.Error(), now)
 					rc.streamErrMsg.Store(&errMsg)
-					badState = true
 				} else if res != nil && res.StatusCode != base.StatusOK {
 					rc.logger.Warnf("The rtsp server responded with non-OK status url: %s, status_code: %d", rc.u, res.StatusCode)
 					errMsg := fmt.Sprintf("RTSP server responded with status code: %d; at timestamp: %s", res.StatusCode, now)
 					rc.streamErrMsg.Store(&errMsg)
-					badState = true
 				}
 			}
 
-			if badState {
+			if rc.streamErrMsg.Load() != nil {
 				if err := rc.reconnectClientWithFallbackTransports(codecInfo); err != nil {
 					rc.logger.Warnf("cannot reconnect to rtsp server err: %s", err.Error())
 				} else {
