@@ -61,6 +61,8 @@ const (
 	transportUDPMulticast = "udp-multicast"
 )
 
+var reconnectIntervalDuration = reconnectIntervalSeconds * time.Second
+
 var (
 	// Family is the namespace family for the viamrtsp module.
 	Family = resource.ModelNamespace("viam").WithFamily("viamrtsp")
@@ -284,7 +286,7 @@ func (rc *rtspCamera) Close(_ context.Context) error {
 func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 	rc.activeBackgroundWorkers.Add(1)
 	utils.ManagedGo(func() {
-		for utils.SelectContextOrWait(rc.cancelCtx, reconnectIntervalSeconds*time.Second) {
+		for utils.SelectContextOrWait(rc.cancelCtx, reconnectIntervalDuration) {
 			badState := false
 
 			// use an OPTIONS request to see if the server is still responding to requests
@@ -1377,7 +1379,9 @@ func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]int
 		return nil, camera.ImageMetadata{}, err
 	}
 	if msg := rc.streamErrMsg.Load(); msg != nil {
-		return nil, camera.ImageMetadata{}, fmt.Errorf("camera is not streaming, last error: %s", *msg)
+		err := fmt.Errorf("camera is not streaming, last error: %s", *msg)
+		rc.logger.Error(err.Error())
+		return nil, camera.ImageMetadata{}, err
 	}
 	if videoCodec(rc.currentCodec.Load()) == MJPEG {
 		mjpegBytes := rc.latestMJPEGBytes.Load()
