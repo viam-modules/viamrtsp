@@ -323,11 +323,11 @@ func TestGetCameraInfo(t *testing.T) {
 			test.That(t, cameraInfo.PTZEndpoints[0].PTZNodeToken, test.ShouldEqual, "PTZNode1")
 			test.That(t, cameraInfo.PTZEndpoints[0].ProfileToken, test.ShouldEqual, "profile1")
 			test.That(t, cameraInfo.PTZEndpoints[0].RTSPAddress, test.ShouldEqual, "rtsp://192.168.1.100/stream1")
-			test.That(t, cameraInfo.PTZEndpoints[0].Address, test.ShouldEqual, "http://192.168.1.100")
+			test.That(t, cameraInfo.PTZEndpoints[0].Address, test.ShouldEqual, "http://192.168.1.100:80")
 			test.That(t, cameraInfo.PTZEndpoints[1].PTZNodeToken, test.ShouldEqual, "PTZNode2")
 			test.That(t, cameraInfo.PTZEndpoints[1].ProfileToken, test.ShouldEqual, "profile2")
 			test.That(t, cameraInfo.PTZEndpoints[1].RTSPAddress, test.ShouldEqual, "rtsp://192.168.1.100/stream2")
-			test.That(t, cameraInfo.PTZEndpoints[1].Address, test.ShouldEqual, "http://192.168.1.100")
+			test.That(t, cameraInfo.PTZEndpoints[1].Address, test.ShouldEqual, "http://192.168.1.100:80")
 		})
 	})
 }
