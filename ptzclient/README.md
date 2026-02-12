@@ -1,6 +1,10 @@
 # PTZ model
 
-This model implements the [`"rdk:component:generic"` API](https://docs.viam.com/components/generic/) for controlling ONVIF-compliant PTZ (Pan-Tilt-Zoom) cameras. The generic component supports core PTZ operations through the DoCommand method.
+This module exposes two PTZ models:
+- `viam:viamrtsp:onvif-ptz` implements the PTZ gRPC API (`rdk:component:ptz`) for standardized PTZ control.
+- `viam:viamrtsp:onvif-ptz-client` implements the legacy [`"rdk:component:generic"` API](https://docs.viam.com/components/generic/) and supports PTZ control through DoCommand.
+
+Use `onvif-ptz` for new integrations and keep `onvif-ptz-client` for backwards compatibility.
 
 ## Configure your `onvif-ptz-client`
 
@@ -13,6 +17,24 @@ This model implements the [`"rdk:component:generic"` API](https://docs.viam.com/
   "username": "admin",
   "password": "yourpassword",
   "profile_token": "000"
+}
+```
+
+## Configure your `onvif-ptz`
+
+`onvif-ptz` uses the same configuration fields as `onvif-ptz-client`, but exposes the PTZ gRPC API.
+
+```json
+{
+  "name": "ptz-1",
+  "api": "rdk:component:ptz",
+  "model": "viam:viamrtsp:onvif-ptz",
+  "attributes": {
+    "address": "http://192.168.1.10/onvif/device_service",
+    "username": "admin",
+    "password": "password",
+    "profile_token": "MainStream"
+  }
 }
 ```
 
@@ -101,7 +123,7 @@ Continuous motion at specified speeds (-1.0 to 1.0).
   "pan": 0.1,
   "tilt": -0.05,
   "zoom": 0.1,
-  "degrees": false,
+  "pan_tilt_space": "http://www.onvif.org/ver10/tptz/PanTiltSpaces/TranslationGenericSpace",
   "pan_speed": 0.5,
   "tilt_speed": 0.5,
   "zoom_speed": 0.5
@@ -116,7 +138,7 @@ Relative move using normalized coordinates. Speed parameters are optional.
   "pan": 10,
   "tilt": -5,
   "zoom": 1,
-  "degrees": true,
+  "pan_tilt_space": "http://www.onvif.org/ver10/tptz/PanTiltSpaces/SphericalTranslationSpaceDegrees",
   "pan_speed": 0.2,
   "tilt_speed": 0.2,
   "zoom_speed": 0.5
@@ -147,8 +169,9 @@ Absolute position move. Speed parameters are optional.
    - Degrees: -180° to 180° (pan), -90° to 90° (tilt)
    - Absolute Moves: Use normalized coordinates (-1.0 to 1.0 for pan/tilt, 0.0 to 1.0 for zoom).
    - Relative Moves:
-     - Normalized (`degrees: false`): -1.0 to 1.0 (pan/tilt/zoom).
-     - Degrees (`degrees: true`): -180° to 180° (pan), -90° to 90° (tilt). Zoom remains normalized.
+     - Normalized (`pan_tilt_space` generic space or omitted): -1.0 to 1.0 (pan/tilt/zoom).
+     - Degrees (`pan_tilt_space` spherical degrees): -180° to 180° (pan), -90° to 90° (tilt). Zoom remains normalized.
+   - Deprecated: `degrees` is still accepted by DoCommand for backwards compatibility, but prefer `pan_tilt_space`.
 3. **Movement Speeds**:
    - Continuous: -1.0 (full reverse) to 1.0 (full forward).
    - Relative/Absolute: Speed parameters (`pan_speed`, `tilt_speed`, `zoom_speed` between 0.0 and 1.0) are optional. If **no** speed parameters are provided, the camera uses its default speed. If **any** speed parameter is provided, the `Speed` element is included in the request (using defaults of 0.5 for Relative or 1.0 for Absolute for any *unspecified* speed components).

@@ -2,6 +2,10 @@ module github.com/viam-modules/viamrtsp
 
 go 1.25.1
 
+replace go.viam.com/rdk => ./rdk
+
+replace go.viam.com/api => ./api
+
 require (
 	github.com/beevik/etree v1.1.0
 	github.com/bluenviron/gortsplib/v4 v4.12.2
@@ -18,10 +22,12 @@ require (
 	github.com/viam-modules/video-store v0.0.9-rc1
 	github.com/viamrobotics/zeroconf v1.0.13
 	go.uber.org/zap v1.27.0
+	go.viam.com/api v0.1.519
 	go.viam.com/rdk v0.111.0
 	go.viam.com/test v1.2.4
 	go.viam.com/utils v0.4.3
 	golang.org/x/net v0.47.0
+	google.golang.org/protobuf v1.36.10
 )
 
 require (
@@ -238,7 +244,6 @@ require (
 	go.opentelemetry.io/proto/otlp v1.9.0 // indirect
 	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.viam.com/api v0.1.511 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.2 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20230525183740-e7c30c78aeb2 // indirect
 	goji.io v2.0.2+incompatible // indirect
@@ -260,7 +265,6 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20250825161204-c5933d9347a5 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250825161204-c5933d9347a5 // indirect
 	google.golang.org/grpc v1.75.1 // indirect
-	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorgonia.org/tensor v0.9.24 // indirect
