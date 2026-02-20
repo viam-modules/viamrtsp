@@ -289,11 +289,20 @@ func toSaveCommand(command map[string]interface{}) (*videostore.SaveRequest, err
 	if !ok {
 		async = false
 	}
+	var tags []string
+	if rawTags, ok := command["tags"].([]interface{}); ok {
+		for _, t := range rawTags {
+			if s, ok := t.(string); ok {
+				tags = append(tags, s)
+			}
+		}
+	}
 	return &videostore.SaveRequest{
 		From:     from,
 		To:       to,
 		Metadata: metadata,
 		Async:    async,
+		Tags:     tags,
 	}, nil
 }
 

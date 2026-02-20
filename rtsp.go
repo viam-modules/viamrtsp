@@ -61,6 +61,8 @@ const (
 	transportUDPMulticast = "udp-multicast"
 )
 
+var reconnectIntervalDuration = reconnectIntervalSeconds * time.Second
+
 var (
 	// Family is the namespace family for the viamrtsp module.
 	Family = resource.ModelNamespace("viam").WithFamily("viamrtsp")
@@ -234,6 +236,11 @@ type rtspCamera struct {
 
 	logger logging.Logger
 
+	// streamErrMsg is set by the reconnect worker when the camera is detected as disconnected.
+	// It is cleared when new frames arrive or reconnection succeeds.
+	// Image() checks this field to avoid returning stale frames.
+	streamErrMsg atomic.Pointer[string]
+
 	rtpPassthrough              bool
 	currentCodec                atomic.Int64
 	rtpPassthroughCtx           context.Context
@@ -279,12 +286,12 @@ func (rc *rtspCamera) Close(_ context.Context) error {
 func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 	rc.activeBackgroundWorkers.Add(1)
 	utils.ManagedGo(func() {
-		for utils.SelectContextOrWait(rc.cancelCtx, reconnectIntervalSeconds*time.Second) {
-			badState := false
-
+		for utils.SelectContextOrWait(rc.cancelCtx, reconnectIntervalDuration) {
 			// use an OPTIONS request to see if the server is still responding to requests
+			now := time.Now().UTC().Format(time.RFC3339)
 			if rc.client == nil {
-				badState = true
+				errMsg := "RTSP client is not connected; at timestamp: " + now
+				rc.streamErrMsg.Store(&errMsg)
 			} else {
 				res, err := rc.client.Options(rc.u)
 				// Nick S:
@@ -293,18 +300,21 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 				var errClientInvalidState liberrors.ErrClientInvalidState
 				if err != nil && !errors.As(err, &errClientInvalidState) {
 					rc.logger.Warnf("The rtsp client encountered an error, trying to reconnect to %s, err: %s", rc.u, err)
-					badState = true
+					errMsg := fmt.Sprintf("%s; at timestamp: %s", err.Error(), now)
+					rc.streamErrMsg.Store(&errMsg)
 				} else if res != nil && res.StatusCode != base.StatusOK {
 					rc.logger.Warnf("The rtsp server responded with non-OK status url: %s, status_code: %d", rc.u, res.StatusCode)
-					badState = true
+					errMsg := fmt.Sprintf("RTSP server responded with status code: %d; at timestamp: %s", res.StatusCode, now)
+					rc.streamErrMsg.Store(&errMsg)
 				}
 			}
 
-			if badState {
+			if rc.streamErrMsg.Load() != nil {
 				if err := rc.reconnectClientWithFallbackTransports(codecInfo); err != nil {
 					rc.logger.Warnf("cannot reconnect to rtsp server err: %s", err.Error())
 				} else {
 					rc.logger.Infof("reconnected to rtsp server url: %s", rc.u)
+					rc.streamErrMsg.Store(nil)
 				}
 			}
 		}
@@ -806,6 +816,7 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 		}
 
 		rc.latestMJPEGBytes.Store(&frame)
+		rc.streamErrMsg.Store(nil)
 	})
 
 	return nil
@@ -1325,6 +1336,9 @@ func (rc *rtspCamera) decodeAndStore(nalu []byte) error {
 // the previous frame by trying to put it back in the pool. It might not make
 // it back into the pool immediately or at all depending on its state.
 func (rc *rtspCamera) handleLatestFrame(newFrame *avFrameWrapper) {
+	// A new frame arriving means the stream is healthy. Clear any error set by the
+	// reconnect worker to stop returning stale frame errors.
+	rc.streamErrMsg.Store(nil)
 	rc.latestFrameMu.Lock()
 	defer rc.latestFrameMu.Unlock()
 
@@ -1358,6 +1372,11 @@ func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]int
 			videoCodec(rc.currentCodec.Load()), rc.lazyDecode, rc.iframeOnlyDecode, time.Since(start))
 	}()
 	if err := rc.cancelCtx.Err(); err != nil {
+		return nil, camera.ImageMetadata{}, err
+	}
+	if msg := rc.streamErrMsg.Load(); msg != nil {
+		err := fmt.Errorf("camera is not streaming, last error: %s", *msg)
+		rc.logger.Error(err.Error())
 		return nil, camera.ImageMetadata{}, err
 	}
 	if videoCodec(rc.currentCodec.Load()) == MJPEG {

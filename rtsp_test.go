@@ -51,7 +51,7 @@ func TestRTSPCamera(t *testing.T) {
 			closeFunc()
 		})
 
-		t.Run("GetImage", func(t *testing.T) {
+		t.Run("GetImages", func(t *testing.T) {
 			h, closeFunc := NewMockH264ServerHandler(t, forma, bURL, logger)
 			defer closeFunc()
 			test.That(t, h.S.Start(), test.ShouldBeNil)
@@ -111,6 +111,58 @@ func TestRTSPCamera(t *testing.T) {
 			test.That(t, imageTimeoutCtx.Err(), test.ShouldBeNil)
 			totalPoolFramesSeen := rtspCam.(*rtspCamera).avFramePool.newCount + rtspCam.(*rtspCamera).avFramePool.getCount
 			test.That(t, rtspCam.(*rtspCamera).avFramePool.putCount, test.ShouldEqual, totalPoolFramesSeen)
+		})
+
+		t.Run("GetImages returns error when camera disconnects", func(t *testing.T) {
+			// Speeds up the reconnect worker for this test to avoid long sleeps.
+			originalReconnectDuration := reconnectIntervalDuration
+			reconnectIntervalDuration = 10 * time.Millisecond
+			defer func() {
+				reconnectIntervalDuration = originalReconnectDuration
+			}()
+
+			h, closeFunc := NewMockH264ServerHandler(t, forma, bURL, logger)
+			test.That(t, h.S.Start(), test.ShouldBeNil)
+			timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
+			defer timeoutCancel()
+			config := resource.NewEmptyConfig(camera.Named("foo"), ModelAgnostic)
+			config.ConvertedAttributes = &Config{Address: "rtsp://" + h.S.RTSPAddress + "/stream1"}
+			rtspCam, err := NewRTSPCamera(timeoutCtx, nil, config, logger)
+			test.That(t, err, test.ShouldBeNil)
+			defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
+
+			// Verify GetImages works normally by waiting for a frame
+			imageTimeoutCtx, imageTimeoutCancel := context.WithTimeout(context.Background(), time.Second*10)
+			defer imageTimeoutCancel()
+			for imageTimeoutCtx.Err() == nil {
+				img, err := camera.DecodeImageFromCamera(imageTimeoutCtx, rtspCam, nil, nil)
+				if err != nil {
+					continue
+				}
+				if img != nil {
+					break
+				}
+			}
+			test.That(t, imageTimeoutCtx.Err(), test.ShouldBeNil)
+
+			// Shut down the mock server to simulate disconnect
+			closeFunc()
+
+			// Wait, with a timeout, for the reconnect worker to detect the bad state.
+			waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second)
+			defer waitCancel()
+			for waitCtx.Err() == nil {
+				_, _, err = rtspCam.Images(context.Background(), nil, nil)
+				if err != nil {
+					break
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
+			test.That(t, waitCtx.Err(), test.ShouldBeNil)
+
+			// Verify GetImages returned an error instead of a stale frame
+			test.That(t, err, test.ShouldNotBeNil)
+			test.That(t, err.Error(), test.ShouldContainSubstring, "not streaming")
 		})
 
 		t.Run("SubscribeRTP", func(t *testing.T) {
@@ -223,7 +275,7 @@ func TestRTSPCameraPerformance(t *testing.T) {
 	bURL, err := base.ParseURL("rtsp://127.0.0.1:32513")
 	test.That(t, err, test.ShouldBeNil)
 
-	t.Run("PerformanceTestGetImage", func(t *testing.T) {
+	t.Run("PerformanceTestGetImages", func(t *testing.T) {
 		forma := &format.H264{
 			PayloadTyp:        96,
 			PacketizationMode: 1,
@@ -276,7 +328,7 @@ func TestRTSPCameraPerformance(t *testing.T) {
 			t.Fatal("No frame became available before starting the performance test")
 		}
 
-		// Performance testing: Loop over multiple GetImage calls
+		// Performance testing: Loop over multiple calls
 		for range make([]int, iterations) {
 			start := time.Now()
 			namedImages, metadata, err := rtspCam.Images(timeoutCtx, nil, nil)

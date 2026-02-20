@@ -41,3 +41,6 @@ bin
 
 # Env files
 *.env
+
+# AI agent files
+CLAUDE.md

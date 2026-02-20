@@ -34,7 +34,7 @@ jobs:
         sudo add-apt-repository universe && sudo apt-get install -y libfuse2
 
     - name: Run linter and static checks
-      run: make lint
+      run: make lint-ci
 
     - name: Run unit tests
       run: make test

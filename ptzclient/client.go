@@ -121,7 +121,11 @@ func NewClient(
 
 	logger.Debugf("Attempting to connect to ONVIF device at %s", conf.Address)
 
-	xaddr, err := url.Parse(conf.Address)
+	addr := conf.Address
+	if !strings.Contains(addr, "://") {
+		addr = "http://" + addr
+	}
+	xaddr, err := url.Parse(addr)
 	if err != nil {
 		cancelFunc()
 		return nil, fmt.Errorf("failed to parse ONVIF address %s: %w", conf.Address, err)
