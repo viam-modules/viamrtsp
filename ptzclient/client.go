@@ -131,6 +131,13 @@ func NewClient(
 		return nil, fmt.Errorf("failed to parse ONVIF address %s: %w", conf.Address, err)
 	}
 
+	// Older configs or cameras may only provide host:port without a service path.
+	// The standard ONVIF device service path is /onvif/device_service.
+	if xaddr.Path == "" || xaddr.Path == "/" {
+		xaddr.Path = "/onvif/device_service"
+		logger.Debugf("No service path in address %s, defaulting to /onvif/device_service", conf.Address)
+	}
+
 	params := device.Params{
 		Xaddr:                    xaddr,
 		SkipLocalTLSVerification: true,
