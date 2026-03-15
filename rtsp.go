@@ -215,6 +215,8 @@ type rtspCamera struct {
 	au           [][]byte
 	client       *gortsplib.Client
 	rawDecoder   *decoder
+	// h264Media is the RTSP media track for H264, used to send RTCP PLI requests to the camera.
+	h264Media *description.Media
 
 	cancelCtx  context.Context
 	cancelFunc context.CancelFunc
@@ -249,9 +251,6 @@ type rtspCamera struct {
 
 	subsMu       sync.RWMutex
 	bufAndCBByID map[rtppassthrough.SubscriptionID]bufAndCB
-
-	// h264Media is the RTSP media track for H264, used to send RTCP PLI requests to the camera.
-	h264Media *description.Media
 
 	name resource.Name
 
