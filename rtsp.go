@@ -64,6 +64,7 @@ const (
 	transportTCP          = "tcp"
 	transportUDP          = "udp"
 	transportUDPMulticast = "udp-multicast"
+	injectedHeaderVersion = 2
 )
 
 var reconnectIntervalDuration = reconnectIntervalSeconds * time.Second
@@ -1169,7 +1170,7 @@ func (rc *rtspCamera) SubscribeRTP(
 						Base: formatprocessor.Base{
 							RTPPackets: []*rtp.Packet{{
 								Header: rtp.Header{
-									Version:   2,
+									Version:   injectedHeaderVersion,
 									Timestamp: tunit.RTPPackets[0].Timestamp,
 								},
 							}},
