@@ -1123,55 +1123,68 @@ func (rc *rtspCamera) SubscribeRTP(
 		packetsCB(pkts)
 	}
 
-	rc.subsMu.Lock()
-
-	rc.bufAndCBByID[sub.ID] = bufAndCB{
-		cb:  unitSubscriberFunc,
-		buf: buf,
-	}
-
-	// Pre-queue the cached IDR (if fresh) so this subscriber receives a decodable frame
-	// immediately, before any live RTP packets are processed.
+	// Wrap unitSubscriberFunc to inject the cached IDR on the first live packet.
 	//
-	// Ordering guarantee: we still hold subsMu.Lock() here. publishToWebRTC acquires
-	// subsMu.RLock() before publishing to subscribers, so it cannot reach this subscriber
-	// until after Unlock() below. The pre-queued IDR is therefore always the first item
-	// the subscriber's goroutine processes — live packets queue behind it.
+	// Why not pre-queue immediately:
+	// RTP packets sent before the WebRTC DTLS handshake completes are dropped by the
+	// transport. A new subscriber's encoder emits the cached IDR within ~3ms of joining,
+	// which is before ICE/DTLS finishes (~100-500ms). The IDR gets dropped and the client
+	// waits for the next natural IDR — no improvement over the baseline.
 	//
-	// buf.Publish pre-Start() safety: ringbuffer.Push is a mutex+cond write independent
-	// of the consumer goroutine. Start() launches the goroutine that drains in FIFO order.
-	// We pre-queue exactly one closure, so there is no ring buffer overflow risk.
+	// Why inject on first live packet instead:
+	// When the first live packet arrives through publishToWebRTC, the WebRTC transport is
+	// established (packets are flowing). Injecting the cached IDR immediately before that
+	// first packet guarantees: (1) the transport is ready, (2) the decoder gets a complete
+	// IDR → P-frame sequence with correct timestamps, and (3) no magic timing constants.
 	//
-	// PTS monotonicity: the cached IDR sets firstReceived=true and lastPTS=cached.pts.
-	// Live packets arrive with pts >= cached.pts (the live stream is at least as far along),
-	// so the B-frame monotonicity check (tunit.PTS < lastPTS → error) does not false-trigger.
+	// Timestamp: we use the live packet's RTP timestamp for the cached IDR. This ensures
+	// the jitter buffer sees a contiguous timestamp sequence (IDR at T, live at T+delta)
+	// rather than a stale T_cached followed by a large jump to T_live.
 	//
-	// RTPPackets: unitSubscriberFunc only accesses tunit.RTPPackets[0].Timestamp
-	// (pkt.Timestamp += tunit.RTPPackets[0].Timestamp). A single synthetic entry suffices.
+	// PTS monotonicity: cached IDR sets firstReceived=true and lastPTS=cached.pts. The
+	// live packet has pts > cached.pts (stream is always moving forward), so the B-frame
+	// check (tunit.PTS < lastPTS → error) does not false-trigger.
 	rc.idrCacheMu.RLock()
 	cached := rc.idrCache
 	rc.idrCacheMu.RUnlock()
 
 	if cached != nil && time.Since(cached.cachedAt) <= maxIDRCacheAge {
-		cachedUnit := &formatprocessor.H264{
-			Base: formatprocessor.Base{
-				RTPPackets: []*rtp.Packet{{
-					Header: rtp.Header{
-						Version:   2,
-						Timestamp: cached.rtpTimestamp,
+		originalSubscriberFunc := unitSubscriberFunc
+		cachedEntry := cached // capture for closure
+		var injectOnce sync.Once
+		unitSubscriberFunc = func(u formatprocessor.Unit) {
+			injectOnce.Do(func() {
+				tunit, ok := u.(*formatprocessor.H264)
+				if !ok || tunit == nil || len(tunit.RTPPackets) == 0 {
+					return
+				}
+				// Build a synthetic unit carrying the cached IDR AU with the live packet's
+				// current RTP timestamp. The encoder adds this timestamp to its own counter,
+				// producing a timestamp just before the live packet's — a normal one-frame gap.
+				cachedUnit := &formatprocessor.H264{
+					Base: formatprocessor.Base{
+						RTPPackets: []*rtp.Packet{{
+							Header: rtp.Header{
+								Version:   2,
+								Timestamp: tunit.RTPPackets[0].Timestamp,
+							},
+						}},
+						NTP: tunit.NTP,
+						PTS: cachedEntry.pts,
 					},
-				}},
-				NTP: time.Now(), // NTP is not read by unitSubscriberFunc; present for struct completeness
-				PTS: cached.pts,
-			},
-			AU: cached.au, // immutable deep copy — safe to share across concurrent pre-queues
-		}
-		if err := buf.Publish(func() { unitSubscriberFunc(cachedUnit) }); err != nil {
-			rc.logger.Warnw("failed to pre-queue cached IDR to new subscriber, TTFF may be degraded",
-				"err", err)
+					AU: cachedEntry.au, // immutable deep copy
+				}
+				originalSubscriberFunc(cachedUnit)
+			})
+			originalSubscriberFunc(u)
 		}
 	}
 
+	rc.subsMu.Lock()
+	rc.bufAndCBByID[sub.ID] = bufAndCB{
+		cb:  unitSubscriberFunc,
+		buf: buf,
+	}
 	buf.Start()
 	g.Success()
 	rc.subsMu.Unlock()
