@@ -441,17 +441,6 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib
 	}
 	clientSuccessful = true
 	rc.currentCodec.Store(int64(codecInfo))
-
-	// Send PLI after reconnect so any active passthrough subscribers receive a keyframe quickly.
-	if rc.h264Media != nil {
-		if err := rc.client.WritePacketRTCP(rc.h264Media, &rtcp.PictureLossIndication{
-			SenderSSRC: 0,
-			MediaSSRC:  0,
-		}); err != nil {
-			rc.logger.Debugw("failed to send RTCP PLI on reconnect", "err", err)
-		}
-	}
-
 	// if after reconnecting we no longer support rtp_passthrough
 	// terminate all subscription
 	// otherwise, let any remaining subscriptions continue
