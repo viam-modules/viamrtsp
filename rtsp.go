@@ -1151,31 +1151,36 @@ func (rc *rtspCamera) SubscribeRTP(
 	if cached != nil && time.Since(cached.cachedAt) <= maxIDRCacheAge {
 		originalSubscriberFunc := unitSubscriberFunc
 		cachedEntry := cached // capture for closure
-		var injectOnce sync.Once
+		// injected is only ever accessed from the single buffer goroutine — no mutex needed.
+		injected := false
 		unitSubscriberFunc = func(u formatprocessor.Unit) {
-			injectOnce.Do(func() {
+			if !injected {
 				tunit, ok := u.(*formatprocessor.H264)
-				if !ok || tunit == nil || len(tunit.RTPPackets) == 0 {
-					return
+				// Only inject on a valid, complete unit with RTP packets. Nil or partial units
+				// (e.g. intermediate FU-A fragments returned as nil by ProcessRTPPacket) must
+				// not trigger injection — they would cause sync.Once-style early-fire with no
+				// IDR actually sent, permanently skipping the injection for this subscriber.
+				if ok && tunit != nil && tunit.AU != nil && len(tunit.RTPPackets) > 0 {
+					injected = true
+					// Build a synthetic unit carrying the cached IDR AU with the live packet's
+					// current RTP timestamp. The encoder adds this timestamp to its own counter,
+					// producing a timestamp just before the live packet's — a normal one-frame gap.
+					cachedUnit := &formatprocessor.H264{
+						Base: formatprocessor.Base{
+							RTPPackets: []*rtp.Packet{{
+								Header: rtp.Header{
+									Version:   2,
+									Timestamp: tunit.RTPPackets[0].Timestamp,
+								},
+							}},
+							NTP: tunit.NTP,
+							PTS: cachedEntry.pts,
+						},
+						AU: cachedEntry.au, // immutable deep copy
+					}
+					originalSubscriberFunc(cachedUnit)
 				}
-				// Build a synthetic unit carrying the cached IDR AU with the live packet's
-				// current RTP timestamp. The encoder adds this timestamp to its own counter,
-				// producing a timestamp just before the live packet's — a normal one-frame gap.
-				cachedUnit := &formatprocessor.H264{
-					Base: formatprocessor.Base{
-						RTPPackets: []*rtp.Packet{{
-							Header: rtp.Header{
-								Version:   2,
-								Timestamp: tunit.RTPPackets[0].Timestamp,
-							},
-						}},
-						NTP: tunit.NTP,
-						PTS: cachedEntry.pts,
-					},
-					AU: cachedEntry.au, // immutable deep copy
-				}
-				originalSubscriberFunc(cachedUnit)
-			})
+			}
 			originalSubscriberFunc(u)
 		}
 	}
