@@ -250,10 +250,7 @@ type rtspCamera struct {
 	subsMu       sync.RWMutex
 	bufAndCBByID map[rtppassthrough.SubscriptionID]bufAndCB
 
-	// h264Media is the RTSP media track for H264, stored during initH264 so that
-	// SubscribeRTP and reconnectClient can send RTCP PLI requests to the camera.
-	// Written only by initH264 (called from reconnectClient, single-threaded per reconnect).
-	// Cleared by closeConnection. Read under closeMu.RLock() in SubscribeRTP.
+	// h264Media is the RTSP media track for H264, used to send RTCP PLI requests to the camera.
 	h264Media *description.Media
 
 	name resource.Name
@@ -445,9 +442,7 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib
 	clientSuccessful = true
 	rc.currentCodec.Store(int64(codecInfo))
 
-	// Send PLI after reconnect so any active passthrough subscribers receive a keyframe
-	// quickly rather than waiting for the camera's natural keyframe interval.
-	// rc.client and rc.h264Media were just assigned above in this goroutine — no lock needed.
+	// Send PLI after reconnect so any active passthrough subscribers receive a keyframe quickly.
 	if rc.h264Media != nil {
 		if err := rc.client.WritePacketRTCP(rc.h264Media, &rtcp.PictureLossIndication{
 			SenderSSRC: 0,
@@ -1079,15 +1074,9 @@ func (rc *rtspCamera) SubscribeRTP(
 	g.Success()
 	rc.subsMu.Unlock()
 
-	// Send an RTCP PLI (Picture Loss Indication) to request an IDR keyframe from the camera.
-	// This ensures the new subscriber receives a decodable frame immediately rather than
-	// waiting for the camera's natural keyframe interval (which can be 3–8 seconds).
-	//
-	// Lock ordering: Close() acquires closeMu then subsMu; we must not hold subsMu while
-	// acquiring closeMu, so the PLI is sent after subsMu is released above.
-	//
-	// This is best-effort: if the camera ignores PLI or the client is mid-reconnect,
-	// we log at Debug and continue — the subscriber will eventually receive an IDR naturally.
+	// Send an RTCP PLI to request an IDR keyframe from the camera so the new subscriber
+	// receives a decodable frame immediately. This is best-effort: if the camera ignores PLI
+	// or the client is mid-reconnect, the subscriber will receive an IDR naturally.
 	rc.closeMu.RLock()
 	client := rc.client
 	media := rc.h264Media
