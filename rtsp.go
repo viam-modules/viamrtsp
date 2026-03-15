@@ -52,6 +52,11 @@ const (
 	h264NALUTypeMask = 0x1F
 	// initialFramePoolSize is the initial size of the frame pool.
 	initialFramePoolSize = 5
+	// maxIDRCacheAge is the maximum age of a cached IDR frame before it is considered too stale to
+	// pre-deliver to a new subscriber. A frame older than this indicates the stream has been idle or
+	// keyframe-starved for an abnormally long time; showing a freeze-frame that old is worse than
+	// waiting the few seconds for the next live IDR.
+	maxIDRCacheAge = 30 * time.Second
 	// defaultMPEG4ProfileLevelID is the default profile-level-id value for MPEG4 video
 	// as specified in RFC 6416 Section 7.1 https://datatracker.ietf.org/doc/html/rfc6416#section-7.1
 	defaultMPEG4ProfileLevelID = 1
@@ -193,6 +198,24 @@ type (
 	}
 )
 
+// idrCacheEntry holds an immutable snapshot of the most recently received complete H264 IDR
+// access unit for passthrough. All fields are written once at creation and never modified
+// afterward — callers must not mutate au or its elements.
+type idrCacheEntry struct {
+	// au contains [SPS, PPS, IDR_NALU(s)...], deep-copied from the formatprocessor unit.
+	// SPS+PPS prepend is guaranteed by formatProcessorH264.remuxAccessUnit when
+	// generateRTPPackets=true and format params are available.
+	au [][]byte
+	// pts is the presentation timestamp from gortsplib PacketPTS2 — used to seed the
+	// per-subscriber PTS monotonicity check (firstReceived/lastPTS).
+	pts time.Duration
+	// rtpTimestamp is tunit.RTPPackets[0].Timestamp — the only RTPPackets field accessed
+	// by unitSubscriberFunc (pkt.Timestamp += tunit.RTPPackets[0].Timestamp).
+	rtpTimestamp uint32
+	// cachedAt is the wall-clock time this entry was created, used for staleness TTL.
+	cachedAt time.Time
+}
+
 type cache struct {
 	mimeType      string
 	bytes         []byte
@@ -248,6 +271,11 @@ type rtspCamera struct {
 
 	subsMu       sync.RWMutex
 	bufAndCBByID map[rtppassthrough.SubscriptionID]bufAndCB
+
+	// idrCacheMu guards idrCache.
+	// Lock ordering: closeMu → subsMu → idrCacheMu.
+	idrCacheMu sync.RWMutex
+	idrCache   *idrCacheEntry
 
 	name resource.Name
 
@@ -333,6 +361,39 @@ func (rc *rtspCamera) closeConnection() {
 		rc.rawDecoder = nil
 	}
 	rc.videoRequest.stop()
+	// Clear the IDR cache so a subscriber joining after reconnect does not receive a stale frame
+	// from a previous RTSP session, which may have different SPS/PPS or a reset PTS clock.
+	rc.idrCacheMu.Lock()
+	rc.idrCache = nil
+	rc.idrCacheMu.Unlock()
+}
+
+// updateIDRCache stores a deep copy of the given IDR access unit for pre-delivery to new
+// passthrough subscribers. It is called from publishToWebRTC on every complete IDR unit.
+//
+// Deep-copy rationale: formatProcessorH264.remuxAccessUnit places t.format.SPS and t.format.PPS
+// slice headers (not copies) at au[0] and au[1]; IDR NALUs reference RTP packet payload memory.
+// Both may be concurrently replaced or freed. We own the cache entry, so we copy every NALU.
+//
+// encoder.Encode (pion/rtph264) reads NALUs to produce new RTP payloads and does not write back
+// to tunit.AU, so the single deep copy here is sufficient — callers of idrCacheEntry.au must
+// treat it as read-only.
+func (rc *rtspCamera) updateIDRCache(tunit *formatprocessor.H264) {
+	au := make([][]byte, len(tunit.AU))
+	for i, nalu := range tunit.AU {
+		cp := make([]byte, len(nalu))
+		copy(cp, nalu)
+		au[i] = cp
+	}
+	entry := &idrCacheEntry{
+		au:           au,
+		pts:          tunit.PTS,
+		rtpTimestamp: tunit.RTPPackets[0].Timestamp,
+		cachedAt:     time.Now(),
+	}
+	rc.idrCacheMu.Lock()
+	rc.idrCache = entry
+	rc.idrCacheMu.Unlock()
 }
 
 // reconnectClientWithFallbackTransports attempts to setup the RTSP client with the given codec
@@ -569,6 +630,20 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 				rc.logger.Debug(err.Error())
 				return
 			}
+
+			// Cache complete IDR AUs so new subscribers receive a decodable first frame
+			// without waiting for the camera's natural keyframe interval.
+			// remuxAccessUnit (generateRTPPackets=true) prepends SPS+PPS to IDR AUs, so
+			// the cached AU is always self-contained when format params are available.
+			// We update the cache before publishing to existing subscribers so a subscriber
+			// joining during this publish window gets the freshest possible cached IDR.
+			if tunit, ok := u.(*formatprocessor.H264); ok &&
+				tunit != nil && tunit.AU != nil &&
+				len(tunit.RTPPackets) > 0 &&
+				h264.IDRPresent(tunit.AU) {
+				rc.updateIDRCache(tunit)
+			}
+
 			rc.subsMu.RLock()
 			defer rc.subsMu.RUnlock()
 			if len(rc.bufAndCBByID) == 0 {
@@ -1049,14 +1124,57 @@ func (rc *rtspCamera) SubscribeRTP(
 	}
 
 	rc.subsMu.Lock()
-	defer rc.subsMu.Unlock()
 
 	rc.bufAndCBByID[sub.ID] = bufAndCB{
 		cb:  unitSubscriberFunc,
 		buf: buf,
 	}
+
+	// Pre-queue the cached IDR (if fresh) so this subscriber receives a decodable frame
+	// immediately, before any live RTP packets are processed.
+	//
+	// Ordering guarantee: we still hold subsMu.Lock() here. publishToWebRTC acquires
+	// subsMu.RLock() before publishing to subscribers, so it cannot reach this subscriber
+	// until after Unlock() below. The pre-queued IDR is therefore always the first item
+	// the subscriber's goroutine processes — live packets queue behind it.
+	//
+	// buf.Publish pre-Start() safety: ringbuffer.Push is a mutex+cond write independent
+	// of the consumer goroutine. Start() launches the goroutine that drains in FIFO order.
+	// We pre-queue exactly one closure, so there is no ring buffer overflow risk.
+	//
+	// PTS monotonicity: the cached IDR sets firstReceived=true and lastPTS=cached.pts.
+	// Live packets arrive with pts >= cached.pts (the live stream is at least as far along),
+	// so the B-frame monotonicity check (tunit.PTS < lastPTS → error) does not false-trigger.
+	//
+	// RTPPackets: unitSubscriberFunc only accesses tunit.RTPPackets[0].Timestamp
+	// (pkt.Timestamp += tunit.RTPPackets[0].Timestamp). A single synthetic entry suffices.
+	rc.idrCacheMu.RLock()
+	cached := rc.idrCache
+	rc.idrCacheMu.RUnlock()
+
+	if cached != nil && time.Since(cached.cachedAt) <= maxIDRCacheAge {
+		cachedUnit := &formatprocessor.H264{
+			Base: formatprocessor.Base{
+				RTPPackets: []*rtp.Packet{{
+					Header: rtp.Header{
+						Version:   2,
+						Timestamp: cached.rtpTimestamp,
+					},
+				}},
+				NTP: time.Now(), // NTP is not read by unitSubscriberFunc; present for struct completeness
+				PTS: cached.pts,
+			},
+			AU: cached.au, // immutable deep copy — safe to share across concurrent pre-queues
+		}
+		if err := buf.Publish(func() { unitSubscriberFunc(cachedUnit) }); err != nil {
+			rc.logger.Warnw("failed to pre-queue cached IDR to new subscriber, TTFF may be degraded",
+				"err", err)
+		}
+	}
+
 	buf.Start()
 	g.Success()
+	rc.subsMu.Unlock()
 	return sub, nil
 }
 
