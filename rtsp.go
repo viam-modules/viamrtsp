@@ -215,8 +215,11 @@ type rtspCamera struct {
 	au           [][]byte
 	client       *gortsplib.Client
 	rawDecoder   *decoder
-	// h264Media is the RTSP media track for H264, used to send RTCP PLI requests to the camera.
+	// h264Media is the RTSP media track for H264, used to send RTCP requests to the camera.
 	h264Media *description.Media
+	// firSeqNum is the monotonically increasing sequence number for RTCP FIR requests (RFC 5104).
+	// Accessed atomically.
+	firSeqNum atomic.Uint32
 
 	cancelCtx  context.Context
 	cancelFunc context.CancelFunc
@@ -1062,9 +1065,10 @@ func (rc *rtspCamera) SubscribeRTP(
 	g.Success()
 	rc.subsMu.Unlock()
 
-	// Send an RTCP PLI to request an IDR keyframe from the camera so the new subscriber
-	// receives a decodable frame immediately. This is best-effort: if the camera ignores PLI
-	// or the client is mid-reconnect, the subscriber will receive an IDR naturally.
+	// Send RTCP PLI and FIR to request an IDR keyframe from the camera so the new subscriber
+	// receives a decodable frame immediately. Some cameras respond to FIR (RFC 5104) but not
+	// PLI (RFC 4585), or vice versa, so we send both. This is best-effort: if the camera
+	// ignores both or the client is mid-reconnect, the subscriber will receive an IDR naturally.
 	rc.closeMu.RLock()
 	client := rc.client
 	media := rc.h264Media
@@ -1076,6 +1080,12 @@ func (rc *rtspCamera) SubscribeRTP(
 			MediaSSRC:  0,
 		}); err != nil {
 			rc.logger.Debugw("failed to send RTCP PLI on subscribe", "err", err)
+		}
+		if err := client.WritePacketRTCP(media, &rtcp.FullIntraRequest{
+			//nolint:gosec // FIR seq is uint8 per RFC 5104; wrapping at 256 is intentional.
+			FIR: []rtcp.FIREntry{{SequenceNumber: uint8(rc.firSeqNum.Add(1))}},
+		}); err != nil {
+			rc.logger.Debugw("failed to send RTCP FIR on subscribe", "err", err)
 		}
 	}
 	return sub, nil
