@@ -255,6 +255,12 @@ type rtspCamera struct {
 	subsMu       sync.RWMutex
 	bufAndCBByID map[rtppassthrough.SubscriptionID]bufAndCB
 
+	// h264Media is the RTSP media track for H264, stored during initH264 so that
+	// SubscribeRTP and reconnectClient can send RTCP PLI requests to the camera.
+	// Written only by initH264 (called from reconnectClient, single-threaded per reconnect).
+	// Cleared by closeConnection. Read under closeMu.RLock() in SubscribeRTP.
+	h264Media *description.Media
+
 	name resource.Name
 
 	preferredTransports []*gortsplib.Transport
@@ -443,6 +449,19 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib
 	}
 	clientSuccessful = true
 	rc.currentCodec.Store(int64(codecInfo))
+
+	// Send PLI after reconnect so any active passthrough subscribers receive a keyframe
+	// quickly rather than waiting for the camera's natural keyframe interval.
+	// rc.client and rc.h264Media were just assigned above in this goroutine — no lock needed.
+	if rc.h264Media != nil {
+		if err := rc.client.WritePacketRTCP(rc.h264Media, &rtcp.PictureLossIndication{
+			SenderSSRC: 0,
+			MediaSSRC:  0,
+		}); err != nil {
+			rc.logger.Debugw("failed to send RTCP PLI on reconnect", "err", err)
+		}
+	}
+
 	// if after reconnecting we no longer support rtp_passthrough
 	// terminate all subscription
 	// otherwise, let any remaining subscriptions continue
@@ -1065,9 +1084,15 @@ func (rc *rtspCamera) SubscribeRTP(
 	g.Success()
 	rc.subsMu.Unlock()
 
-	// Send an RTCP FIR to request an IDR keyframe from the camera so the new subscriber
-	// receives a decodable frame immediately. This is best-effort: if the camera ignores FIR
-	// or the client is mid-reconnect, the subscriber will receive an IDR naturally.
+	// Send RTCP FIR and PLI to request an IDR keyframe from the camera so the new subscriber
+	// receives a decodable frame immediately. Some cameras respond to FIR (RFC 5104) but not
+	// PLI (RFC 4585), or vice versa, so we send both.
+	//
+	// Lock ordering: Close() acquires closeMu then subsMu; we must not hold subsMu while
+	// acquiring closeMu, so these are sent after subsMu is released above.
+	//
+	// This is best-effort: if the camera ignores both or the client is mid-reconnect,
+	// the subscriber will receive an IDR naturally.
 	rc.closeMu.RLock()
 	client := rc.client
 	media := rc.h264Media
@@ -1082,6 +1107,12 @@ func (rc *rtspCamera) SubscribeRTP(
 			rc.logger.Debugw("failed to send RTCP FIR on subscribe", "err", err)
 		} else {
 			rc.firSeqNum.Store(uint32(nextSeq))
+		}
+		if err := client.WritePacketRTCP(media, &rtcp.PictureLossIndication{
+			SenderSSRC: 0,
+			MediaSSRC:  0,
+		}); err != nil {
+			rc.logger.Debugw("failed to send RTCP PLI on subscribe", "err", err)
 		}
 	}
 	return sub, nil
