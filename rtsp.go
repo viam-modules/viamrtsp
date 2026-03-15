@@ -23,6 +23,7 @@ import (
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h265"
 	"github.com/erh/viamupnp"
+	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
 	"github.com/viam-modules/viamrtsp/formatprocessor"
 	"github.com/viam-modules/viamrtsp/registry"
@@ -249,6 +250,12 @@ type rtspCamera struct {
 	subsMu       sync.RWMutex
 	bufAndCBByID map[rtppassthrough.SubscriptionID]bufAndCB
 
+	// h264Media is the RTSP media track for H264, stored during initH264 so that
+	// SubscribeRTP and reconnectClient can send RTCP PLI requests to the camera.
+	// Written only by initH264 (called from reconnectClient, single-threaded per reconnect).
+	// Cleared by closeConnection. Read under closeMu.RLock() in SubscribeRTP.
+	h264Media *description.Media
+
 	name resource.Name
 
 	preferredTransports []*gortsplib.Transport
@@ -326,6 +333,7 @@ func (rc *rtspCamera) closeConnection() {
 		rc.client.Close()
 		rc.client = nil
 	}
+	rc.h264Media = nil
 	rc.resetLazyAU([][]byte{})
 	rc.currentCodec.Store(0)
 	if rc.rawDecoder != nil {
@@ -436,6 +444,19 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib
 	}
 	clientSuccessful = true
 	rc.currentCodec.Store(int64(codecInfo))
+
+	// Send PLI after reconnect so any active passthrough subscribers receive a keyframe
+	// quickly rather than waiting for the camera's natural keyframe interval.
+	// rc.client and rc.h264Media were just assigned above in this goroutine — no lock needed.
+	if rc.h264Media != nil {
+		if err := rc.client.WritePacketRTCP(rc.h264Media, &rtcp.PictureLossIndication{
+			SenderSSRC: 0,
+			MediaSSRC:  0,
+		}); err != nil {
+			rc.logger.Debugw("failed to send RTCP PLI on reconnect", "err", err)
+		}
+	}
+
 	// if after reconnecting we no longer support rtp_passthrough
 	// terminate all subscription
 	// otherwise, let any remaining subscriptions continue
@@ -500,6 +521,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		}
 		return errors.New("h264 track not found")
 	}
+	rc.h264Media = media
 
 	// setup RTP/H264 -> H264 decoder
 	rtpDec, err := f.CreateDecoder()
@@ -1049,14 +1071,36 @@ func (rc *rtspCamera) SubscribeRTP(
 	}
 
 	rc.subsMu.Lock()
-	defer rc.subsMu.Unlock()
-
 	rc.bufAndCBByID[sub.ID] = bufAndCB{
 		cb:  unitSubscriberFunc,
 		buf: buf,
 	}
 	buf.Start()
 	g.Success()
+	rc.subsMu.Unlock()
+
+	// Send an RTCP PLI (Picture Loss Indication) to request an IDR keyframe from the camera.
+	// This ensures the new subscriber receives a decodable frame immediately rather than
+	// waiting for the camera's natural keyframe interval (which can be 3–8 seconds).
+	//
+	// Lock ordering: Close() acquires closeMu then subsMu; we must not hold subsMu while
+	// acquiring closeMu, so the PLI is sent after subsMu is released above.
+	//
+	// This is best-effort: if the camera ignores PLI or the client is mid-reconnect,
+	// we log at Debug and continue — the subscriber will eventually receive an IDR naturally.
+	rc.closeMu.RLock()
+	client := rc.client
+	media := rc.h264Media
+	rc.closeMu.RUnlock()
+
+	if client != nil && media != nil {
+		if err := client.WritePacketRTCP(media, &rtcp.PictureLossIndication{
+			SenderSSRC: 0,
+			MediaSSRC:  0,
+		}); err != nil {
+			rc.logger.Debugw("failed to send RTCP PLI on subscribe", "err", err)
+		}
+	}
 	return sub, nil
 }
 
