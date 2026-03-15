@@ -255,10 +255,7 @@ type rtspCamera struct {
 	subsMu       sync.RWMutex
 	bufAndCBByID map[rtppassthrough.SubscriptionID]bufAndCB
 
-	// h264Media is the RTSP media track for H264, stored during initH264 so that
-	// SubscribeRTP and reconnectClient can send RTCP PLI requests to the camera.
-	// Written only by initH264 (called from reconnectClient, single-threaded per reconnect).
-	// Cleared by closeConnection. Read under closeMu.RLock() in SubscribeRTP.
+	// h264Media is the RTSP media track for H264, used to send RTCP PLI requests to the camera.
 	h264Media *description.Media
 
 	name resource.Name
@@ -450,9 +447,7 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib
 	clientSuccessful = true
 	rc.currentCodec.Store(int64(codecInfo))
 
-	// Send PLI after reconnect so any active passthrough subscribers receive a keyframe
-	// quickly rather than waiting for the camera's natural keyframe interval.
-	// rc.client and rc.h264Media were just assigned above in this goroutine — no lock needed.
+	// Send PLI after reconnect so any active passthrough subscribers receive a keyframe quickly.
 	if rc.h264Media != nil {
 		if err := rc.client.WritePacketRTCP(rc.h264Media, &rtcp.PictureLossIndication{
 			SenderSSRC: 0,
