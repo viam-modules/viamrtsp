@@ -166,8 +166,8 @@ func (s *onvifPtzClient) EndPosition(ctx context.Context, extra map[string]inter
 // Only the position (X, Y, Z) of the pose is used; orientation is ignored.
 func (s *onvifPtzClient) MoveToPosition(ctx context.Context, pose spatialmath.Pose, extra map[string]interface{}) error {
 	pt := pose.Point()
-	pan := math.Atan2(pt.X, pt.Z)
-	tilt := math.Atan2(pt.Y, math.Sqrt(pt.X*pt.X+pt.Z*pt.Z))
+	pan := math.Atan2(pt.Y, pt.X)
+	tilt := math.Atan2(-pt.Z, math.Sqrt(pt.X*pt.X+pt.Y*pt.Y))
 	return s.MoveToJointPositions(ctx, []referenceframe.Input{pan, tilt}, extra)
 }
 
