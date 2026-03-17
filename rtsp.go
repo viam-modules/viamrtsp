@@ -23,6 +23,7 @@ import (
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h265"
 	"github.com/erh/viamupnp"
+	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
 	"github.com/viam-modules/viamrtsp/formatprocessor"
 	"github.com/viam-modules/viamrtsp/registry"
@@ -214,6 +215,11 @@ type rtspCamera struct {
 	au           [][]byte
 	client       *gortsplib.Client
 	rawDecoder   *decoder
+	// h264Media is the RTSP media track for H264, used to send RTCP FIR requests to the camera.
+	h264Media *description.Media
+	// firSeqNum is the monotonically increasing sequence number for RTCP FIR requests (RFC 5104).
+	// Accessed atomically.
+	firSeqNum atomic.Uint32
 
 	cancelCtx  context.Context
 	cancelFunc context.CancelFunc
@@ -326,6 +332,7 @@ func (rc *rtspCamera) closeConnection() {
 		rc.client.Close()
 		rc.client = nil
 	}
+	rc.h264Media = nil
 	rc.resetLazyAU([][]byte{})
 	rc.currentCodec.Store(0)
 	if rc.rawDecoder != nil {
@@ -500,6 +507,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		}
 		return errors.New("h264 track not found")
 	}
+	rc.h264Media = media
 
 	// setup RTP/H264 -> H264 decoder
 	rtpDec, err := f.CreateDecoder()
@@ -1056,14 +1064,30 @@ func (rc *rtspCamera) SubscribeRTP(
 	}
 
 	rc.subsMu.Lock()
-	defer rc.subsMu.Unlock()
-
 	rc.bufAndCBByID[sub.ID] = bufAndCB{
 		cb:  unitSubscriberFunc,
 		buf: buf,
 	}
 	buf.Start()
 	g.Success()
+	rc.subsMu.Unlock()
+
+	// Send an RTCP FIR to request an IDR keyframe from the camera so the new subscriber
+	// receives a decodable frame immediately. This is best-effort: if the camera ignores FIR
+	// or the client is mid-reconnect, the subscriber will receive an IDR naturally.
+	rc.closeMu.RLock()
+	client := rc.client
+	media := rc.h264Media
+	rc.closeMu.RUnlock()
+
+	if client != nil && media != nil {
+		if err := client.WritePacketRTCP(media, &rtcp.FullIntraRequest{
+			//nolint:gosec // FIR seq is uint8 per RFC 5104; wrapping at 256 is intentional.
+			FIR: []rtcp.FIREntry{{SequenceNumber: uint8(rc.firSeqNum.Add(1))}},
+		}); err != nil {
+			rc.logger.Debugw("failed to send RTCP FIR on subscribe", "err", err)
+		}
+	}
 	return sub, nil
 }
 

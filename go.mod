@@ -12,6 +12,7 @@ require (
 	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/icholy/digest v1.1.0
 	github.com/koron/go-ssdp v0.0.4
+	github.com/pion/rtcp v1.2.16
 	github.com/pion/rtp v1.8.26
 	github.com/rhysd/actionlint v1.7.8
 	github.com/stretchr/testify v1.11.1
@@ -176,7 +177,6 @@ require (
 	github.com/pion/mdns/v2 v2.1.0 // indirect
 	github.com/pion/mediadevices v0.9.0 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
-	github.com/pion/rtcp v1.2.16 // indirect
 	github.com/pion/sctp v1.8.41 // indirect
 	github.com/pion/sdp/v3 v3.0.16 // indirect
 	github.com/pion/srtp/v2 v2.0.20 // indirect
