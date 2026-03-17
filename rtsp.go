@@ -1074,11 +1074,14 @@ func (rc *rtspCamera) SubscribeRTP(
 	rc.closeMu.RUnlock()
 
 	if client != nil && media != nil {
+		//nolint:gosec // FIR seq is uint8 per RFC 5104; wrapping at 256 is intentional.
+		nextSeq := uint8(rc.firSeqNum.Load() + 1)
 		if err := client.WritePacketRTCP(media, &rtcp.FullIntraRequest{
-			//nolint:gosec // FIR seq is uint8 per RFC 5104; wrapping at 256 is intentional.
-			FIR: []rtcp.FIREntry{{SequenceNumber: uint8(rc.firSeqNum.Add(1))}},
+			FIR: []rtcp.FIREntry{{SequenceNumber: nextSeq}},
 		}); err != nil {
 			rc.logger.Debugw("failed to send RTCP FIR on subscribe", "err", err)
+		} else {
+			rc.firSeqNum.Store(uint32(nextSeq))
 		}
 	}
 	return sub, nil
