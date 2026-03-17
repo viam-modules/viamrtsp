@@ -215,10 +215,9 @@ type rtspCamera struct {
 	au           [][]byte
 	client       *gortsplib.Client
 	rawDecoder   *decoder
-	// h264Media is the RTSP media track for H264, used to send RTCP FIR requests to the camera.
+	// h264Media is the RTSP media track for H264.
 	h264Media *description.Media
-	// firSeqNum is the monotonically increasing sequence number for RTCP FIR requests (RFC 5104).
-	// Accessed atomically.
+	// firSeqNum holds the last FIR sequence number (0–255), wraps per RFC 5104.
 	firSeqNum atomic.Uint32
 
 	cancelCtx  context.Context
