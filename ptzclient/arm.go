@@ -163,7 +163,17 @@ func (s *onvifPtzClient) EndPosition(ctx context.Context, extra map[string]inter
 }
 
 // MoveToPosition points the camera at the given pose using analytical IK.
-// Only the position (X, Y, Z) of the pose is used; orientation is ignored.
+// Only the position (X, Y, Z) of the pose is used; orientation is ignored because
+// a 2-DOF pan-tilt gimbal cannot independently control roll.
+//
+// The gaze axis is +X at zero position. Inverting the forward kinematics:
+//
+//	direction = [cos(pan)·cos(tilt), sin(pan)·cos(tilt), -sin(tilt)]
+//
+// gives:
+//
+//	pan  = atan2(Y, X)           — angle in XY plane from +X
+//	tilt = atan2(-Z, √(X²+Y²))  — negative because +Z is up, tilting up is negative tilt
 func (s *onvifPtzClient) MoveToPosition(ctx context.Context, pose spatialmath.Pose, extra map[string]interface{}) error {
 	pt := pose.Point()
 	pan := math.Atan2(pt.Y, pt.X)
