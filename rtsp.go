@@ -1029,7 +1029,7 @@ func (rc *rtspCamera) SubscribeRTP(
 
 		if !gotFirstIDR && h264.IDRPresent(tunit.AU) {
 			gotFirstIDR = true
-			rc.logger.Debugw("pre-RTCP: first IDR frame received after SubscribeRTP", "elapsed", time.Since(subscribeTime).String())
+			rc.logger.Debugw("post-RTCP-FIR: first IDR frame received after SubscribeRTP", "elapsed", time.Since(subscribeTime).String())
 		}
 
 		if !firstReceived {
