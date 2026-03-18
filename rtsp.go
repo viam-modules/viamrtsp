@@ -982,6 +982,8 @@ func (rc *rtspCamera) SubscribeRTP(
 		return rtppassthrough.NilSubscription, err
 	}
 
+	subscribeTime := time.Now()
+	var gotFirstIDR bool
 	var firstReceived bool
 	var lastPTS time.Duration
 	// OnPacketRTP will call this unitSubscriberFunc for all subscribers.
@@ -1013,6 +1015,11 @@ func (rc *rtspCamera) SubscribeRTP(
 		// If we have no AUs we can't encode packets.
 		if tunit.AU == nil {
 			return
+		}
+
+		if !gotFirstIDR && h264.IDRPresent(tunit.AU) {
+			gotFirstIDR = true
+			rc.logger.Debugw("first IDR frame received after SubscribeRTP", "elapsed", time.Since(subscribeTime).String())
 		}
 
 		if !firstReceived {
