@@ -364,6 +364,9 @@ func (rc *rtspCamera) reconnectClientWithFallbackTransports(codecInfo videoCodec
 func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib.Transport) error {
 	rc.logger.Warnf("reconnectClient called with codec: %s and transport: %s", codecInfo, transport.String())
 
+	rc.closeMu.Lock()
+	defer rc.closeMu.Unlock()
+
 	rc.closeConnection()
 
 	// replace the client with a new one, but close it if setup is not successful
