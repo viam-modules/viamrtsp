@@ -25,6 +25,7 @@ import (
 // Used instead of onvif.Device to allow for mocking in tests.
 type OnvifDevice interface {
 	GetDeviceInformation(ctx context.Context) (device.GetDeviceInformationResponse, error)
+	GetNetworkInterfaces(ctx context.Context) (device.GetNetworkInterfacesResponse, error)
 	GetProfiles(ctx context.Context) (device.GetProfilesResponse, error)
 	GetStreamURI(ctx context.Context, token onvif.ReferenceToken, creds device.Credentials) (*url.URL, error)
 	GetSnapshotURI(ctx context.Context, token onvif.ReferenceToken, creds device.Credentials) (*url.URL, error)
@@ -137,6 +138,7 @@ type CameraInfo struct {
 	SerialNumber    string      `json:"serial_number"`
 	FirmwareVersion string      `json:"firmware_version"`
 	HardwareID      string      `json:"hardware_id"`
+	MACAddress      string      `json:"mac_address"`
 
 	deviceIP net.IP
 	mdnsName string
@@ -154,24 +156,48 @@ func (cam *CameraInfo) Name(urlNum int) string {
 }
 
 func (cam *CameraInfo) tryMDNS(mdnsServer *mdnsServer, logger logging.Logger) {
-	// Sanity check the input required to make an mdns mapping.
-	if cam.deviceIP == nil || cam.SerialNumber == "" {
-		logger.Debugf("Not making mdns mapping for device. Host: %v IP: %v SerialNumber: %v",
-			cam.Host, cam.deviceIP, cam.SerialNumber)
+	if cam.deviceIP == nil {
+		logger.Debugf("Not making mdns mapping for device, no IP. Host: %v", cam.Host)
 		return
 	}
 
-	// Clean the serial number to be dns compatible.
-	cleanedSerialNumber := strToHostName(cam.SerialNumber)
-	// Generate full .local hostname for the device.
-	cam.mdnsName = fmt.Sprintf("%v.local", cleanedSerialNumber)
-
-	// The mdns server expects a hostname without* the `.local` TLD suffix.
-	if err := mdnsServer.Add(cleanedSerialNumber, cam.deviceIP); err != nil {
-		logger.Debugf("Unable to make mdns mapping for device. Host: %v IP: %v SerialNumber: %v Err: %v",
-			cam.Host, cam.deviceIP, cam.SerialNumber, err)
+	if cam.MACAddress == "" && cam.SerialNumber == "" {
+		logger.Debugf("Not making mdns mapping for device, no MAC or serial. Host: %v IP: %v",
+			cam.Host, cam.deviceIP)
 		return
 	}
+
+	// Register MAC-based hostname (primary identifier).
+	var macHostname string
+	if cam.MACAddress != "" {
+		macHostname = macToHostName(cam.MACAddress)
+		if err := mdnsServer.Add(macHostname, cam.deviceIP); err != nil {
+			logger.Debugf("Unable to make mdns mapping for MAC. Host: %v IP: %v MAC: %v Err: %v",
+				cam.Host, cam.deviceIP, cam.MACAddress, err)
+			macHostname = ""
+		}
+	}
+
+	// Register serial-based hostname (backward compatibility).
+	var serialHostname string
+	if cam.SerialNumber != "" {
+		serialHostname = strToHostName(cam.SerialNumber)
+		if err := mdnsServer.Add(serialHostname, cam.deviceIP); err != nil {
+			logger.Debugf("Unable to make mdns mapping for serial. Host: %v IP: %v SerialNumber: %v Err: %v",
+				cam.Host, cam.deviceIP, cam.SerialNumber, err)
+			serialHostname = ""
+		}
+	}
+
+	// Prefer MAC-based hostname for URL rewriting; fall back to serial-based.
+	primaryHostname := macHostname
+	if primaryHostname == "" {
+		primaryHostname = serialHostname
+	}
+	if primaryHostname == "" {
+		return
+	}
+	cam.mdnsName = fmt.Sprintf("%v.local", primaryHostname)
 
 	wasIPFound := false
 	// Replace the URLs in-place such that configs generated from these objects will point to the
@@ -199,12 +225,13 @@ func (cam *CameraInfo) tryMDNS(mdnsServer *mdnsServer, logger logging.Logger) {
 	}
 
 	if !wasIPFound {
-		// If for some reason, the `deviceIP`/`xaddr.Host` IP was not found in any of the RTSP urls,
-		// stop serving mdns requests for that serial number.
-		//
-		// We have* observed a device returning RTSP urls with multiple IPs, but do not yet know of
-		// a case where none of the URLs contained an IP that matches where the response came from.
-		mdnsServer.Remove(cleanedSerialNumber)
+		// If the deviceIP was not found in any URLs, stop serving mdns for this device.
+		if macHostname != "" {
+			mdnsServer.Remove(macHostname)
+		}
+		if serialHostname != "" {
+			mdnsServer.Remove(serialHostname)
+		}
 	}
 }
 
@@ -255,6 +282,12 @@ func DiscoverCameraInfo(
 	return zero, fmt.Errorf("no credentials matched IP %s", xaddr)
 }
 
+// macToHostName converts a MAC address to a DNS-compatible hostname by stripping separators.
+// E.g. "aa:bb:cc:dd:ee:ff" -> "aabbccddeeff".
+func macToHostName(mac string) string {
+	return strings.NewReplacer(":", "", "-", "", ".", "").Replace(strings.ToLower(mac))
+}
+
 var consecutiveDashesRegexp = regexp.MustCompile(`\-\-+`)
 
 func strToHostName(inp string) string {
@@ -273,6 +306,71 @@ func strToHostName(inp string) string {
 	}
 
 	return consecutiveDashesRegexp.ReplaceAllLiteralString(sb.String(), "-")
+}
+
+// getMACFromNetworkInterfaces calls GetNetworkInterfaces on the device and returns the normalized
+// MAC address of the interface whose IP matches deviceIP. Returns empty string on any failure.
+func getMACFromNetworkInterfaces(ctx context.Context, dev OnvifDevice, deviceIP net.IP, logger logging.Logger) string {
+	if deviceIP == nil {
+		return ""
+	}
+
+	niResp, err := dev.GetNetworkInterfaces(ctx)
+	if err != nil {
+		logger.Debugf("Failed to get network interfaces: %v", err)
+		return ""
+	}
+
+	for _, ni := range niResp.NetworkInterfaces {
+		mac := strings.TrimSpace(string(ni.Info.HwAddress))
+		if mac == "" {
+			continue
+		}
+
+		// Check if any of the interface's IPv4 addresses match the device IP.
+		for _, addr := range []string{
+			string(ni.IPv4.Config.Manual.Address),
+			string(ni.IPv4.Config.FromDHCP.Address),
+			string(ni.IPv4.Config.LinkLocal.Address),
+		} {
+			addr = strings.TrimSpace(addr)
+			if addr != "" && net.ParseIP(addr).Equal(deviceIP) {
+				return normalizeMACAddress(mac)
+			}
+		}
+	}
+
+	// No interface matched the device IP. Fall back to the first interface with a MAC.
+	for _, ni := range niResp.NetworkInterfaces {
+		mac := strings.TrimSpace(string(ni.Info.HwAddress))
+		if mac != "" {
+			logger.Debugf("No interface IP matched %v, using first available MAC: %s", deviceIP, mac)
+			return normalizeMACAddress(mac)
+		}
+	}
+
+	return ""
+}
+
+// normalizeMACAddress converts a MAC address to lowercase colon-separated format (aa:bb:cc:dd:ee:ff).
+func normalizeMACAddress(mac string) string {
+	// Remove common separators and whitespace.
+	cleaned := strings.NewReplacer(":", "", "-", "", ".", "", " ", "").Replace(mac)
+	cleaned = strings.ToLower(cleaned)
+
+	// A valid MAC address has exactly 12 hex characters (6 octets).
+	const macHexLen = 12
+	const macOctets = 6
+	if len(cleaned) != macHexLen {
+		return strings.ToLower(mac)
+	}
+
+	// Re-insert colons every 2 characters.
+	parts := make([]string, macOctets)
+	for i := range macOctets {
+		parts[i] = cleaned[i*2 : i*2+2]
+	}
+	return strings.Join(parts, ":")
 }
 
 // parseIPFromHost parses an IP address from a host string, stripping the port if present.
@@ -305,6 +403,11 @@ func GetCameraInfo(
 		return zero, fmt.Errorf("failed to get stream info: %w", err)
 	}
 
+	deviceIP := parseIPFromHost(xaddr.Host)
+
+	// Fetch MAC address from the network interface matching the discovered IP.
+	macAddress := getMACFromNetworkInterfaces(ctx, dev, deviceIP, logger)
+
 	cameraInfo := CameraInfo{
 		Host:            xaddr.Host,
 		MediaEndpoints:  mediaInfos,
@@ -313,10 +416,11 @@ func GetCameraInfo(
 		SerialNumber:    resp.SerialNumber,
 		FirmwareVersion: resp.FirmwareVersion,
 		HardwareID:      resp.HardwareID,
+		MACAddress:      macAddress,
 		PTZEndpoints:    ptzInfos,
 
 		// Will be nil if there's an error parsing.
-		deviceIP: parseIPFromHost(xaddr.Host),
+		deviceIP: deviceIP,
 	}
 
 	return cameraInfo, nil
