@@ -283,7 +283,7 @@ func DiscoverCameraInfo(
 }
 
 // macToHostName converts a MAC address to a DNS-compatible hostname by stripping separators.
-// e.g. "aa:bb:cc:dd:ee:ff" -> "aabbccddeeff"
+// E.g. "aa:bb:cc:dd:ee:ff" -> "aabbccddeeff".
 func macToHostName(mac string) string {
 	return strings.NewReplacer(":", "", "-", "", ".", "").Replace(strings.ToLower(mac))
 }
@@ -357,13 +357,17 @@ func normalizeMACAddress(mac string) string {
 	// Remove common separators and whitespace.
 	cleaned := strings.NewReplacer(":", "", "-", "", ".", "", " ", "").Replace(mac)
 	cleaned = strings.ToLower(cleaned)
-	if len(cleaned) != 12 {
+
+	// A valid MAC address has exactly 12 hex characters (6 octets).
+	const macHexLen = 12
+	const macOctets = 6
+	if len(cleaned) != macHexLen {
 		return strings.ToLower(mac)
 	}
 
 	// Re-insert colons every 2 characters.
-	parts := make([]string, 6)
-	for i := 0; i < 6; i++ {
+	parts := make([]string, macOctets)
+	for i := range macOctets {
 		parts[i] = cleaned[i*2 : i*2+2]
 	}
 	return strings.Join(parts, ":")
