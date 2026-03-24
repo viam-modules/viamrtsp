@@ -156,24 +156,48 @@ func (cam *CameraInfo) Name(urlNum int) string {
 }
 
 func (cam *CameraInfo) tryMDNS(mdnsServer *mdnsServer, logger logging.Logger) {
-	// Sanity check the input required to make an mdns mapping.
-	if cam.deviceIP == nil || cam.SerialNumber == "" {
-		logger.Debugf("Not making mdns mapping for device. Host: %v IP: %v SerialNumber: %v",
-			cam.Host, cam.deviceIP, cam.SerialNumber)
+	if cam.deviceIP == nil {
+		logger.Debugf("Not making mdns mapping for device, no IP. Host: %v", cam.Host)
 		return
 	}
 
-	// Clean the serial number to be dns compatible.
-	cleanedSerialNumber := strToHostName(cam.SerialNumber)
-	// Generate full .local hostname for the device.
-	cam.mdnsName = fmt.Sprintf("%v.local", cleanedSerialNumber)
-
-	// The mdns server expects a hostname without* the `.local` TLD suffix.
-	if err := mdnsServer.Add(cleanedSerialNumber, cam.deviceIP); err != nil {
-		logger.Debugf("Unable to make mdns mapping for device. Host: %v IP: %v SerialNumber: %v Err: %v",
-			cam.Host, cam.deviceIP, cam.SerialNumber, err)
+	if cam.MACAddress == "" && cam.SerialNumber == "" {
+		logger.Debugf("Not making mdns mapping for device, no MAC or serial. Host: %v IP: %v",
+			cam.Host, cam.deviceIP)
 		return
 	}
+
+	// Register MAC-based hostname (primary identifier).
+	var macHostname string
+	if cam.MACAddress != "" {
+		macHostname = macToHostName(cam.MACAddress)
+		if err := mdnsServer.Add(macHostname, cam.deviceIP); err != nil {
+			logger.Debugf("Unable to make mdns mapping for MAC. Host: %v IP: %v MAC: %v Err: %v",
+				cam.Host, cam.deviceIP, cam.MACAddress, err)
+			macHostname = ""
+		}
+	}
+
+	// Register serial-based hostname (backward compatibility).
+	var serialHostname string
+	if cam.SerialNumber != "" {
+		serialHostname = strToHostName(cam.SerialNumber)
+		if err := mdnsServer.Add(serialHostname, cam.deviceIP); err != nil {
+			logger.Debugf("Unable to make mdns mapping for serial. Host: %v IP: %v SerialNumber: %v Err: %v",
+				cam.Host, cam.deviceIP, cam.SerialNumber, err)
+			serialHostname = ""
+		}
+	}
+
+	// Prefer MAC-based hostname for URL rewriting; fall back to serial-based.
+	primaryHostname := macHostname
+	if primaryHostname == "" {
+		primaryHostname = serialHostname
+	}
+	if primaryHostname == "" {
+		return
+	}
+	cam.mdnsName = fmt.Sprintf("%v.local", primaryHostname)
 
 	wasIPFound := false
 	// Replace the URLs in-place such that configs generated from these objects will point to the
@@ -201,12 +225,13 @@ func (cam *CameraInfo) tryMDNS(mdnsServer *mdnsServer, logger logging.Logger) {
 	}
 
 	if !wasIPFound {
-		// If for some reason, the `deviceIP`/`xaddr.Host` IP was not found in any of the RTSP urls,
-		// stop serving mdns requests for that serial number.
-		//
-		// We have* observed a device returning RTSP urls with multiple IPs, but do not yet know of
-		// a case where none of the URLs contained an IP that matches where the response came from.
-		mdnsServer.Remove(cleanedSerialNumber)
+		// If the deviceIP was not found in any URLs, stop serving mdns for this device.
+		if macHostname != "" {
+			mdnsServer.Remove(macHostname)
+		}
+		if serialHostname != "" {
+			mdnsServer.Remove(serialHostname)
+		}
 	}
 }
 
@@ -255,6 +280,12 @@ func DiscoverCameraInfo(
 		return cameraInfo, nil
 	}
 	return zero, fmt.Errorf("no credentials matched IP %s", xaddr)
+}
+
+// macToHostName converts a MAC address to a DNS-compatible hostname by stripping separators.
+// e.g. "aa:bb:cc:dd:ee:ff" -> "aabbccddeeff"
+func macToHostName(mac string) string {
+	return strings.NewReplacer(":", "", "-", "", ".", "").Replace(strings.ToLower(mac))
 }
 
 var consecutiveDashesRegexp = regexp.MustCompile(`\-\-+`)
