@@ -20,12 +20,12 @@ import (
 )
 
 type MockDevice struct {
-	GetProfilesFn            func(context.Context) (device.GetProfilesResponse, error)
-	GetPTZNodesFn            func(context.Context) ([]onvif.PTZNode, error)
-	GetStreamURIFn           func(context.Context, onvif.ReferenceToken, device.Credentials) (*url.URL, error)
-	GetSnapshotURIFn         func(context.Context, onvif.ReferenceToken, device.Credentials) (*url.URL, error)
-	GetNetworkInterfacesFn   func(context.Context) (device.GetNetworkInterfacesResponse, error)
-	GetXaddrFn               func() *url.URL
+	GetProfilesFn          func(context.Context) (device.GetProfilesResponse, error)
+	GetPTZNodesFn          func(context.Context) ([]onvif.PTZNode, error)
+	GetStreamURIFn         func(context.Context, onvif.ReferenceToken, device.Credentials) (*url.URL, error)
+	GetSnapshotURIFn       func(context.Context, onvif.ReferenceToken, device.Credentials) (*url.URL, error)
+	GetNetworkInterfacesFn func(context.Context) (device.GetNetworkInterfacesResponse, error)
+	GetXaddrFn             func() *url.URL
 }
 
 func NewMockDevice() *MockDevice {
