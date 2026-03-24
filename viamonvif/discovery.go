@@ -138,6 +138,7 @@ type CameraInfo struct {
 	SerialNumber    string      `json:"serial_number"`
 	FirmwareVersion string      `json:"firmware_version"`
 	HardwareID      string      `json:"hardware_id"`
+	MACAddress      string      `json:"mac_address"`
 
 	deviceIP net.IP
 	mdnsName string
@@ -276,6 +277,67 @@ func strToHostName(inp string) string {
 	return consecutiveDashesRegexp.ReplaceAllLiteralString(sb.String(), "-")
 }
 
+// getMACFromNetworkInterfaces calls GetNetworkInterfaces on the device and returns the normalized
+// MAC address of the interface whose IP matches deviceIP. Returns empty string on any failure.
+func getMACFromNetworkInterfaces(ctx context.Context, dev OnvifDevice, deviceIP net.IP, logger logging.Logger) string {
+	if deviceIP == nil {
+		return ""
+	}
+
+	niResp, err := dev.GetNetworkInterfaces(ctx)
+	if err != nil {
+		logger.Debugf("Failed to get network interfaces: %v", err)
+		return ""
+	}
+
+	for _, ni := range niResp.NetworkInterfaces {
+		mac := strings.TrimSpace(string(ni.Info.HwAddress))
+		if mac == "" {
+			continue
+		}
+
+		// Check if any of the interface's IPv4 addresses match the device IP.
+		for _, addr := range []string{
+			string(ni.IPv4.Config.Manual.Address),
+			string(ni.IPv4.Config.FromDHCP.Address),
+			string(ni.IPv4.Config.LinkLocal.Address),
+		} {
+			addr = strings.TrimSpace(addr)
+			if addr != "" && net.ParseIP(addr).Equal(deviceIP) {
+				return normalizeMACAddress(mac)
+			}
+		}
+	}
+
+	// No interface matched the device IP. Fall back to the first interface with a MAC.
+	for _, ni := range niResp.NetworkInterfaces {
+		mac := strings.TrimSpace(string(ni.Info.HwAddress))
+		if mac != "" {
+			logger.Debugf("No interface IP matched %v, using first available MAC: %s", deviceIP, mac)
+			return normalizeMACAddress(mac)
+		}
+	}
+
+	return ""
+}
+
+// normalizeMACAddress converts a MAC address to lowercase colon-separated format (aa:bb:cc:dd:ee:ff).
+func normalizeMACAddress(mac string) string {
+	// Remove common separators and whitespace.
+	cleaned := strings.NewReplacer(":", "", "-", "", ".", "", " ", "").Replace(mac)
+	cleaned = strings.ToLower(cleaned)
+	if len(cleaned) != 12 {
+		return strings.ToLower(mac)
+	}
+
+	// Re-insert colons every 2 characters.
+	parts := make([]string, 6)
+	for i := 0; i < 6; i++ {
+		parts[i] = cleaned[i*2 : i*2+2]
+	}
+	return strings.Join(parts, ":")
+}
+
 // parseIPFromHost parses an IP address from a host string, stripping the port if present.
 func parseIPFromHost(host string) net.IP {
 	if h, _, err := net.SplitHostPort(host); err == nil {
@@ -306,6 +368,11 @@ func GetCameraInfo(
 		return zero, fmt.Errorf("failed to get stream info: %w", err)
 	}
 
+	deviceIP := parseIPFromHost(xaddr.Host)
+
+	// Fetch MAC address from the network interface matching the discovered IP.
+	macAddress := getMACFromNetworkInterfaces(ctx, dev, deviceIP, logger)
+
 	cameraInfo := CameraInfo{
 		Host:            xaddr.Host,
 		MediaEndpoints:  mediaInfos,
@@ -314,10 +381,11 @@ func GetCameraInfo(
 		SerialNumber:    resp.SerialNumber,
 		FirmwareVersion: resp.FirmwareVersion,
 		HardwareID:      resp.HardwareID,
+		MACAddress:      macAddress,
 		PTZEndpoints:    ptzInfos,
 
 		// Will be nil if there's an error parsing.
-		deviceIP: parseIPFromHost(xaddr.Host),
+		deviceIP: deviceIP,
 	}
 
 	return cameraInfo, nil
