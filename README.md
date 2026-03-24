@@ -467,13 +467,13 @@ The method returns a channel of `video.Chunk` objects:
 
 ### DoCommand API
 
-The video service also supports `DoCommand` for additional operations. These commands work identically to the [`video-store` DoCommand API](#docommand-api-1):
+The video service also supports `DoCommand` for additional operations. These commands work identically to the [`video-store` DoCommand API](#video-store-docommand-api):
 
 - **`save`** - Concatenate and save video clips to cloud storage
 - **`fetch`** - Retrieve video bytes directly  
 - **`get-storage-state`** - Get storage status and available video ranges
 
-See the [video-store DoCommand documentation](#docommand-api-1) for detailed request/response formats.
+See the [video-store DoCommand documentation](#video-store-docommand-api) for detailed request/response formats.
 
 ---
 
@@ -520,7 +520,7 @@ The `viamrtsp:video-store` component supports the following codecs:
 | `MPEG4`     | H264         | Transcoded to H264 using configured bitrate, preset, and framerate attributes |
 | `MJPEG`     | H264         | Re-encoded from frame sequence to H264 video stream using configured bitrate, preset, and framerate attributes |
 
-### DoCommand API
+### video-store DoCommand API
 
 #### From/To
 

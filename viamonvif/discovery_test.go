@@ -58,6 +58,10 @@ func (m *MockDevice) GetDeviceInformation(_ context.Context) (device.GetDeviceIn
 	}, nil
 }
 
+func (m *MockDevice) GetNetworkInterfaces(_ context.Context) (device.GetNetworkInterfacesResponse, error) {
+	return device.GetNetworkInterfacesResponse{}, nil
+}
+
 func (m *MockDevice) GetProfiles(ctx context.Context) (device.GetProfilesResponse, error) {
 	return m.GetProfilesFn(ctx)
 }

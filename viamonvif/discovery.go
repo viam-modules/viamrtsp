@@ -25,6 +25,7 @@ import (
 // Used instead of onvif.Device to allow for mocking in tests.
 type OnvifDevice interface {
 	GetDeviceInformation(ctx context.Context) (device.GetDeviceInformationResponse, error)
+	GetNetworkInterfaces(ctx context.Context) (device.GetNetworkInterfacesResponse, error)
 	GetProfiles(ctx context.Context) (device.GetProfilesResponse, error)
 	GetStreamURI(ctx context.Context, token onvif.ReferenceToken, creds device.Credentials) (*url.URL, error)
 	GetSnapshotURI(ctx context.Context, token onvif.ReferenceToken, creds device.Credentials) (*url.URL, error)
