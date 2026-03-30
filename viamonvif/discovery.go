@@ -334,7 +334,7 @@ func getMACFromNetworkInterfaces(ctx context.Context, dev OnvifDevice, deviceIP 
 			string(ni.IPv4.Config.LinkLocal.Address),
 		} {
 			addr = strings.TrimSpace(addr)
-			if addr != "" && net.ParseIP(addr).Equal(deviceIP) {
+			if parsedAddr := net.ParseIP(addr); parsedAddr != nil && parsedAddr.Equal(deviceIP) {
 				return normalizeMACAddress(mac)
 			}
 		}
