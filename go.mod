@@ -268,3 +268,5 @@ require (
 	gorgonia.org/vecf64 v0.9.0 // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 )
+
+replace github.com/viamrobotics/zeroconf => github.com/seanavery/zeroconf v0.0.0-20260330211400-eaa90a59b51c
