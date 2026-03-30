@@ -157,12 +157,12 @@ func (cam *CameraInfo) Name(urlNum int) string {
 
 func (cam *CameraInfo) tryMDNS(mdnsServer *mdnsServer, logger logging.Logger) {
 	if cam.deviceIP == nil {
-		logger.Debugf("Not making mdns mapping for device, no IP. Host: %v", cam.Host)
+		logger.Debugf("skipping mDNS registration for camera %v: no device IP address available", cam.Host)
 		return
 	}
 
 	if cam.MACAddress == "" && cam.SerialNumber == "" {
-		logger.Debugf("Not making mdns mapping for device, no MAC or serial. Host: %v IP: %v",
+		logger.Debugf("skipping mDNS registration for camera %v (%v): neither MAC address nor serial number available",
 			cam.Host, cam.deviceIP)
 		return
 	}
@@ -172,8 +172,8 @@ func (cam *CameraInfo) tryMDNS(mdnsServer *mdnsServer, logger logging.Logger) {
 	if cam.MACAddress != "" {
 		macHostname = macToHostName(cam.MACAddress)
 		if err := mdnsServer.Add(macHostname, cam.deviceIP); err != nil {
-			logger.Debugf("Unable to make mdns mapping for MAC. Host: %v IP: %v MAC: %v Err: %v",
-				cam.Host, cam.deviceIP, cam.MACAddress, err)
+			logger.Debugf("failed to register mDNS hostname %v.local for camera %v (%v) using MAC address %v: %v",
+				macHostname, cam.Host, cam.deviceIP, cam.MACAddress, err)
 			macHostname = ""
 		}
 	}
@@ -183,8 +183,8 @@ func (cam *CameraInfo) tryMDNS(mdnsServer *mdnsServer, logger logging.Logger) {
 	if cam.SerialNumber != "" {
 		serialHostname = strToHostName(cam.SerialNumber)
 		if err := mdnsServer.Add(serialHostname, cam.deviceIP); err != nil {
-			logger.Debugf("Unable to make mdns mapping for serial. Host: %v IP: %v SerialNumber: %v Err: %v",
-				cam.Host, cam.deviceIP, cam.SerialNumber, err)
+			logger.Debugf("failed to register mDNS hostname %v.local for camera %v (%v) using serial number %v: %v",
+				serialHostname, cam.Host, cam.deviceIP, cam.SerialNumber, err)
 			serialHostname = ""
 		}
 	}
