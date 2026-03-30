@@ -193,9 +193,9 @@ func (cam *CameraInfo) tryMDNS(mdnsServer *mdnsServer, logger logging.Logger) {
 	primaryHostname := macHostname
 	if primaryHostname == "" {
 		primaryHostname = serialHostname
-	}
-	if primaryHostname == "" {
-		return
+		if primaryHostname == "" {
+			return
+		}
 	}
 	cam.mdnsName = fmt.Sprintf("%v.local", primaryHostname)
 
