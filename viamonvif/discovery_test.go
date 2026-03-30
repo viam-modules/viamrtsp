@@ -545,8 +545,8 @@ func TestFileCaching(t *testing.T) {
 	logger.Info("Second conjured DNS name:", nonSenseTwo)
 
 	// Add the two mappings to the mdns server.
-	mdnsServer.Add(nonSenseOne, net.ParseIP("127.0.0.1"))
-	mdnsServer.Add(nonSenseTwo, net.ParseIP("127.0.0.2"))
+	mdnsServer.Add(nonSenseOne, net.ParseIP("192.168.1.1"))
+	mdnsServer.Add(nonSenseTwo, net.ParseIP("192.168.1.2"))
 	test.That(t, len(mdnsServer.mappedDevices), test.ShouldEqual, 2)
 
 	// Write out a cache file that ought to contain both mappings.
@@ -567,17 +567,17 @@ func TestFileCaching(t *testing.T) {
 
 	// Leverage the sorting to safely assume the first entry represents `nonSenseOne`.
 	test.That(t, cachedDNSResults[0].DNSName, test.ShouldEqual, nonSenseOne)
-	test.That(t, cachedDNSResults[0].IP, test.ShouldEqual, "127.0.0.1")
+	test.That(t, cachedDNSResults[0].IP, test.ShouldEqual, "192.168.1.1")
 	test.That(t, cachedDNSResults[1].DNSName, test.ShouldEqual, nonSenseTwo)
-	test.That(t, cachedDNSResults[1].IP, test.ShouldEqual, "127.0.0.2")
+	test.That(t, cachedDNSResults[1].IP, test.ShouldEqual, "192.168.1.2")
 
 	// Start a new mdns server against the same file. This will load/apply the cache file. This test
 	// is not skipped, so we do not assert `ping`ing works. Just the existence of the expected
 	// entries in the `mappedDevices` map.
 	cleanMDNSServer := newMDNSServerFromCachedData(cachedMDNSMappingsFilename, logger)
 	test.That(t, len(cleanMDNSServer.mappedDevices), test.ShouldEqual, 2)
-	test.That(t, cleanMDNSServer.mappedDevices[nonSenseOne].ip.String(), test.ShouldEqual, "127.0.0.1")
-	test.That(t, cleanMDNSServer.mappedDevices[nonSenseTwo].ip.String(), test.ShouldEqual, "127.0.0.2")
+	test.That(t, cleanMDNSServer.mappedDevices[nonSenseOne].ip.String(), test.ShouldEqual, "192.168.1.1")
+	test.That(t, cleanMDNSServer.mappedDevices[nonSenseTwo].ip.String(), test.ShouldEqual, "192.168.1.2")
 }
 
 func TestNormalizeMACAddress(t *testing.T) {
