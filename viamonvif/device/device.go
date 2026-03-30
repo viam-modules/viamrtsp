@@ -93,6 +93,11 @@ type GetDeviceInformation struct {
 	XMLName string `xml:"tds:GetDeviceInformation"`
 }
 
+// GetNetworkInterfaces is a request to the GetNetworkInterfaces onvif endpoint.
+type GetNetworkInterfaces struct {
+	XMLName string `xml:"tds:GetNetworkInterfaces"`
+}
+
 // GetCapabilities is a request to the GetCapabilities onvif endpoint.
 type GetCapabilities struct {
 	XMLName  string                   `xml:"tds:GetCapabilities"`
@@ -196,6 +201,37 @@ func (dev *Device) GetDeviceInformation(ctx context.Context) (GetDeviceInformati
 	}
 	dev.logger.Debugf("GetDeviceInformation decoded: %#v", resp.Body.GetDeviceInformationResponse)
 	return resp.Body.GetDeviceInformationResponse, nil
+}
+
+// GetNetworkInterfacesResponse is the body of the response to the GetNetworkInterfaces endpoint.
+type GetNetworkInterfacesResponse struct {
+	NetworkInterfaces []onvif.NetworkInterface `xml:"NetworkInterfaces"`
+}
+
+// GetNetworkInterfacesResponseEnvelope is the envelope of the GetNetworkInterfacesResponse.
+type GetNetworkInterfacesResponseEnvelope struct {
+	XMLName xml.Name `xml:"Envelope"`
+	Body    struct {
+		GetNetworkInterfacesResponse GetNetworkInterfacesResponse `xml:"GetNetworkInterfacesResponse"`
+	} `xml:"Body"`
+}
+
+// GetNetworkInterfaces returns the device's network interfaces, including MAC addresses.
+func (dev *Device) GetNetworkInterfaces(ctx context.Context) (GetNetworkInterfacesResponse, error) {
+	var zero GetNetworkInterfacesResponse
+	b, err := dev.callOnvifServiceMethod(ctx, dev.endpoints["device"], GetNetworkInterfaces{})
+	if err != nil {
+		return zero, fmt.Errorf("failed to get network interfaces: %w", err)
+	}
+	dev.logger.Debugf("GetNetworkInterfaces response body: %s", string(b))
+
+	var resp GetNetworkInterfacesResponseEnvelope
+	err = xml.NewDecoder(bytes.NewReader(b)).Decode(&resp)
+	if err != nil {
+		return zero, fmt.Errorf("failed to decode network interfaces response: %w", err)
+	}
+	dev.logger.Debugf("GetNetworkInterfaces decoded: %#v", resp.Body.GetNetworkInterfacesResponse)
+	return resp.Body.GetNetworkInterfacesResponse, nil
 }
 
 // GetProfilesResponse is the body of the response to the GetProfiles endpoint.
