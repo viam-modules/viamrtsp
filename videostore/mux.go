@@ -32,7 +32,6 @@ type metadata struct {
 	firstTimeStampsSet bool
 	firstPTS           int64
 	firstDTS           int64
-	lastPTS            int64
 	lastDTS            int64
 	lastDTSSet         bool
 }
@@ -316,7 +315,6 @@ func (m *rawSegmenterMux) enforceMonotonicTimestamps(pts, dts int64) (int64, int
 	}
 
 	m.metadata.lastDTS = normDTS
-	m.metadata.lastPTS = normPTS
 	m.metadata.lastDTSSet = true
 	return normPTS, normDTS
 }
