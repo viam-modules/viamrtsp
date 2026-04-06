@@ -32,6 +32,8 @@ type metadata struct {
 	firstTimeStampsSet bool
 	firstPTS           int64
 	firstDTS           int64
+	lastDTS            int64
+	lastDTSSet         bool
 }
 type rawSegmenterMux struct {
 	// are valid for the lifetime of the rawSegmenterMux
@@ -293,6 +295,30 @@ func (m *rawSegmenterMux) Stop() error {
 	return nil
 }
 
+// enforceMonotonicTimestamps ensures DTS is strictly increasing and PTS >= DTS.
+// If DTS is non-monotonic, it is replaced with lastDTS + 1.
+func (m *rawSegmenterMux) enforceMonotonicTimestamps(pts, dts int64) (int64, int64) {
+	// We need to subtract the first pts & dts from the current one so that the
+	// first pts & dts are zero. Otherwise the ffmpeg segmenter will create an mp4 file
+	// that is a black screen for a few seconds (we believe the amount of time represented by the non zero
+	// timestamps).
+	normDTS := dts - m.metadata.firstDTS
+	normPTS := pts - m.metadata.firstPTS
+
+	if m.metadata.lastDTSSet && normDTS <= m.metadata.lastDTS {
+		m.logger.Debugf("non-monotonic DTS detected: %d <= %d, adjusting", normDTS, m.metadata.lastDTS)
+		normDTS = m.metadata.lastDTS + 1
+	}
+
+	if normPTS < normDTS {
+		normPTS = normDTS
+	}
+
+	m.metadata.lastDTS = normDTS
+	m.metadata.lastDTSSet = true
+	return normPTS, normDTS
+}
+
 func (m *rawSegmenterMux) writeH265(au [][]byte, pts int64) error {
 	var filteredAU [][]byte
 
@@ -396,11 +422,9 @@ func (m *rawSegmenterMux) writeH265(au [][]byte, pts int64) error {
 		m.metadata.firstDTS = dts
 		m.metadata.firstTimeStampsSet = true
 	}
-	// we need to subtract the first pts & dts from the current one so that the
-	// first pts & dts are zero. Otherwise the ffmpeg segmenter will create an mp4 file
-	// that is a black screen for a few seconds (we believe the amount of time represented by the non zero
-	// timestamps)
-	err = m.rawSeg.WritePacket(nalu, pts-m.metadata.firstPTS, dts-m.metadata.firstDTS, isRandomAccess)
+
+	normPTS, normDTS := m.enforceMonotonicTimestamps(pts, dts)
+	err = m.rawSeg.WritePacket(nalu, normPTS, normDTS, isRandomAccess)
 	if err != nil {
 		m.logger.Errorf("error writing packet to segmenter: %s", err)
 	}
@@ -505,11 +529,9 @@ func (m *rawSegmenterMux) writeH264(au [][]byte, pts int64) error {
 		m.metadata.firstDTS = dts
 		m.metadata.firstTimeStampsSet = true
 	}
-	// we need to subtract the first pts & dts from the current one so that the
-	// first pts & dts are zero. Otherwise the ffmpeg segmenter will create an mp4 file
-	// that is a black screen for a few seconds (we believe the amount of time represented by the non zero
-	// timestamps)
-	err = m.rawSeg.WritePacket(packed, pts-m.metadata.firstPTS, dts-m.metadata.firstDTS, idrPresent)
+
+	normPTS, normDTS := m.enforceMonotonicTimestamps(pts, dts)
+	err = m.rawSeg.WritePacket(packed, normPTS, normDTS, idrPresent)
 	if err != nil {
 		m.logger.Errorf("error writing packet to segmenter: %s", err)
 	}
