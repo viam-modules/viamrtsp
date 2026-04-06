@@ -17,7 +17,7 @@ jobs:
             target_arch: amd64
             docker_image: ghcr.io/viamrobotics/antique2:amd64-cache
           - platform: linux/arm64
-            runner: buildjet-8vcpu-ubuntu-2204-arm
+            runner: github-linux-arm64-8core
             target_os: linux
             target_arch: arm64
             docker_image: ghcr.io/viamrobotics/antique2:arm64-cache
