@@ -469,7 +469,7 @@ The method returns a channel of `video.Chunk` objects:
 
 The video service also supports `DoCommand` for additional operations. These commands work identically to the [`video-store` DoCommand API](#docommand-api-1):
 
-- **`save`** - Concatenate and save video clips to cloud storage
+- **`save`** - Concatenate and save video clips to the configured upload_path
 - **`fetch`** - Retrieve video bytes directly  
 - **`get-storage-state`** - Get storage status and available video ranges
 
@@ -482,7 +482,7 @@ See the [video-store DoCommand documentation](#docommand-api-1) for detailed req
 > [!NOTE]
 > This is a legacy component. For new implementations, consider using the `viamrtsp:video-service` which supports the `GetVideo` streaming API in addition to the `DoCommand` operations below.
 
-This model implements the [`"rdk:component:generic"` API](https://docs.viam.com/components/generic/) for storing video data from RTSP cameras. It allows you to save video stream to a local file system. You can later upload clips to cloud storage with `save`, or fetch the video bytes directly with `fetch`.
+This model implements the [`"rdk:component:generic"` API](https://docs.viam.com/components/generic/) for storing video data from RTSP cameras. It allows you to save video stream to a local file system. You can later save clips to the configured `upload_path` with `save`, or fetch the video bytes directly with `fetch`. To upload saved clips to the cloud, configure a [Data Manager Service](https://docs.viam.com/services/data/cloud-sync/) with sync enabled.
 
 1. Add a viamrtsp camera component (e.g., `viam:viamrtsp:rtsp`).
 2. For cloud upload support, configure a [Data Manager Service](https://docs.viam.com/services/data/cloud-sync/).
@@ -549,7 +549,7 @@ Where:
 
 #### `Save`
 
-The save command retrieves video from local storage, concatenates and trims underlying storage segments based on time range, and writes the clip to a subdirectory of .viam/capture so data manager can upload the clip to the cloud.
+The save command retrieves video from local storage, concatenates and trims underlying storage segments based on time range, and writes the clip to the configured `upload_path` (default: `~/.viam/capture/video-upload/<component-name>`). To upload saved clips to the cloud, configure a [Data Manager Service](https://docs.viam.com/services/data/cloud-sync/) with sync enabled. If using a custom `upload_path` outside `~/.viam/capture`, add it to the Data Manager's `additional_sync_paths`.
 
 | Attribute   | Type                | Required/Optional | Description                      |
 |-------------|---------------------|-------------------|----------------------------------|
