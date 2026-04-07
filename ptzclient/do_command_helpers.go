@@ -2,7 +2,40 @@ package ptzclient
 
 import (
 	"fmt"
+	"math"
 )
+
+// --- Angle ↔ ONVIF unit mapping ---
+
+// onvifToDegrees linearly maps a value from the ONVIF coordinate range
+// [onvifMin, onvifMax] to the degree range [degMin, degMax].
+func onvifToDegrees(val, onvifMin, onvifMax, degMin, degMax float64) float64 {
+	if onvifMax == onvifMin {
+		return degMin
+	}
+	t := (val - onvifMin) / (onvifMax - onvifMin)
+	return degMin + t*(degMax-degMin)
+}
+
+// degreesToOnvif linearly maps a value from the degree range [degMin, degMax]
+// to the ONVIF coordinate range [onvifMin, onvifMax].
+func degreesToOnvif(deg, degMin, degMax, onvifMin, onvifMax float64) float64 {
+	if degMax == degMin {
+		return onvifMin
+	}
+	t := (deg - degMin) / (degMax - degMin)
+	return onvifMin + t*(onvifMax-onvifMin)
+}
+
+// degreesToRadians converts degrees to radians.
+func degreesToRadians(deg float64) float64 {
+	return deg * math.Pi / 180.0
+}
+
+// radiansToDegrees converts radians to degrees.
+func radiansToDegrees(rad float64) float64 {
+	return rad * 180.0 / math.Pi
+}
 
 // --- Speed Helpers ---
 

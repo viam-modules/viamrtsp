@@ -10,6 +10,7 @@ import (
 	"github.com/viam-modules/viamrtsp/upnpdiscovery"
 	"github.com/viam-modules/viamrtsp/viamonvif"
 	"github.com/viam-modules/viamrtsp/videostore"
+	"go.viam.com/rdk/components/arm"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/components/generic"
 	"go.viam.com/rdk/module"
@@ -56,6 +57,10 @@ func realMain(ctx context.Context) error {
 		return err
 	}
 	err = myMod.AddModelFromRegistry(ctx, generic.API, ptzclient.Model)
+	if err != nil {
+		return err
+	}
+	err = myMod.AddModelFromRegistry(ctx, arm.API, ptzclient.PTZArmModel)
 	if err != nil {
 		return err
 	}
