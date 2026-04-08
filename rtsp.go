@@ -586,8 +586,15 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 
 	params := [][]byte{f.SPS, f.PPS}
 
-	// processPacket handles decoding and storing a single RTP packet.
-	processPacket := func(pkt *rtp.Packet, pts int64) {
+	onPacketRTP := wrapWithMarkerFromTimestamp(func(pkt *rtp.Packet) {
+		pts, ok := rc.client.PacketPTS2(media, pkt)
+		if !ok {
+			rc.logger.Debug("no pts found for packet")
+			return
+		}
+		if publishToWebRTC != nil {
+			publishToWebRTC(pkt, pts)
+		}
 		au, err := rtpDec.Decode(pkt)
 		if err != nil {
 			if !errors.Is(err, rtph264.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph264.ErrMorePacketsNeeded) {
@@ -597,35 +604,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		}
 		storeImage(au)
 		rc.videoRequest.write(videostore.CodecTypeH264, params, au, pts)
-	}
-
-	// Some cameras (e.g. Garmin with GStreamer) never set the RTP marker bit,
-	// which causes gortsplib's decoder to buffer NALUs indefinitely. We detect
-	// frame boundaries by watching for RTP timestamp changes: a new timestamp
-	// means the previous packet was the last of its access unit, so we force
-	// Marker=true on it before processing.
-	var pendingPkt *rtp.Packet
-	var pendingPTS int64
-	onPacketRTP := func(pkt *rtp.Packet) {
-		pts, ok := rc.client.PacketPTS2(media, pkt)
-		if !ok {
-			rc.logger.Debug("no pts found for packet")
-			return
-		}
-		if publishToWebRTC != nil {
-			publishToWebRTC(pkt, pts)
-		}
-
-		if pendingPkt != nil {
-			if pkt.Timestamp != pendingPkt.Timestamp {
-				// Timestamp changed — the pending packet is the last of its frame.
-				pendingPkt.Marker = true
-			}
-			processPacket(pendingPkt, pendingPTS)
-		}
-		pendingPkt = pkt
-		pendingPTS = pts
-	}
+	})
 
 	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
 	if err != nil {
@@ -723,8 +702,12 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 
 	params := [][]byte{f.VPS, f.SPS, f.PPS}
 
-	// processPacket handles decoding and storing a single RTP packet.
-	processPacket := func(pkt *rtp.Packet, pts int64) {
+	onPacketRTP := wrapWithMarkerFromTimestamp(func(pkt *rtp.Packet) {
+		pts, ok := rc.client.PacketPTS2(media, pkt)
+		if !ok {
+			rc.logger.Debug("no pts found for packet")
+			return
+		}
 		au, err := rtpDec.Decode(pkt)
 		if err != nil {
 			if !errors.Is(err, rtph265.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph265.ErrMorePacketsNeeded) {
@@ -734,34 +717,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		}
 		storeImage(au)
 		rc.videoRequest.write(videostore.CodecTypeH265, params, au, pts)
-	}
-
-	// Some cameras (e.g. Garmin with GStreamer) never set the RTP marker bit,
-	// which causes gortsplib's decoder to buffer NALUs indefinitely. We detect
-	// frame boundaries by watching for RTP timestamp changes: a new timestamp
-	// means the previous packet was the last of its access unit, so we force
-	// Marker=true on it before processing.
-	var pendingPkt *rtp.Packet
-	var pendingPTS int64
-	onPacketRTP := func(pkt *rtp.Packet) {
-		// we need to do this before calling Decode as apparently rtpDec.Decode mutates
-		// the packet such that one can't get the pts out after Decode is called
-		pts, ok := rc.client.PacketPTS2(media, pkt)
-		if !ok {
-			rc.logger.Debug("no pts found for packet")
-			return
-		}
-
-		if pendingPkt != nil {
-			if pkt.Timestamp != pendingPkt.Timestamp {
-				// Timestamp changed — the pending packet is the last of its frame.
-				pendingPkt.Marker = true
-			}
-			processPacket(pendingPkt, pendingPTS)
-		}
-		pendingPkt = pkt
-		pendingPTS = pts
-	}
+	})
 
 	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
 	if err != nil {
@@ -1526,4 +1482,21 @@ func (rc *rtspCamera) NextPointCloud(_ context.Context, _ map[string]interface{}
 
 func (rc *rtspCamera) DoCommand(_ context.Context, _ map[string]interface{}) (map[string]interface{}, error) {
 	return nil, errors.New("not implemented")
+}
+
+// wrapWithMarkerFromTimestamp wraps an RTP packet handler to force the marker bit
+// when the RTP timestamp changes. Some cameras (e.g. GStreamer-based) never set
+// the marker bit, causing gortsplib to buffer NALUs indefinitely. Timestamp
+// changes indicate a new access unit, so we mark the previous packet as complete.
+func wrapWithMarkerFromTimestamp(handler func(pkt *rtp.Packet)) func(pkt *rtp.Packet) {
+	var pendingPkt *rtp.Packet
+	return func(pkt *rtp.Packet) {
+		if pendingPkt != nil {
+			if pkt.Timestamp != pendingPkt.Timestamp {
+				pendingPkt.Marker = true
+			}
+			handler(pendingPkt)
+		}
+		pendingPkt = pkt
+	}
 }
