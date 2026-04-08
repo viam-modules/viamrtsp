@@ -722,16 +722,9 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 	}
 
 	params := [][]byte{f.VPS, f.SPS, f.PPS}
-	onPacketRTP := func(pkt *rtp.Packet) {
-		// we need to do this before calling Decode as apparently rtpDec.Decode mutates
-		// the packet such that one can't get the pts out after Decode is called
-		pts, ok := rc.client.PacketPTS2(media, pkt)
-		if !ok {
-			rc.logger.Debug("no pts found for packet")
-			return
-		}
 
-		// Extract access units from RTP packets
+	// processPacket handles decoding and storing a single RTP packet.
+	processPacket := func(pkt *rtp.Packet, pts int64) {
 		au, err := rtpDec.Decode(pkt)
 		if err != nil {
 			if !errors.Is(err, rtph265.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph265.ErrMorePacketsNeeded) {
@@ -741,6 +734,33 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		}
 		storeImage(au)
 		rc.videoRequest.write(videostore.CodecTypeH265, params, au, pts)
+	}
+
+	// Some cameras (e.g. Garmin with GStreamer) never set the RTP marker bit,
+	// which causes gortsplib's decoder to buffer NALUs indefinitely. We detect
+	// frame boundaries by watching for RTP timestamp changes: a new timestamp
+	// means the previous packet was the last of its access unit, so we force
+	// Marker=true on it before processing.
+	var pendingPkt *rtp.Packet
+	var pendingPTS int64
+	onPacketRTP := func(pkt *rtp.Packet) {
+		// we need to do this before calling Decode as apparently rtpDec.Decode mutates
+		// the packet such that one can't get the pts out after Decode is called
+		pts, ok := rc.client.PacketPTS2(media, pkt)
+		if !ok {
+			rc.logger.Debug("no pts found for packet")
+			return
+		}
+
+		if pendingPkt != nil {
+			if pkt.Timestamp != pendingPkt.Timestamp {
+				// Timestamp changed — the pending packet is the last of its frame.
+				pendingPkt.Marker = true
+			}
+			processPacket(pendingPkt, pendingPTS)
+		}
+		pendingPkt = pkt
+		pendingPTS = pts
 	}
 
 	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
