@@ -161,6 +161,11 @@ func (cam *CameraInfo) tryMDNS(mdnsServer *mdnsServer, logger logging.Logger) {
 		return
 	}
 
+	if cam.deviceIP.IsLoopback() {
+		logger.Warnf("skipping mDNS registration for camera %v: device IP is loopback (%v)", cam.Host, cam.deviceIP)
+		return
+	}
+
 	if cam.MACAddress == "" && cam.SerialNumber == "" {
 		logger.Debugf("skipping mDNS registration for camera %v (%v): neither MAC address nor serial number available",
 			cam.Host, cam.deviceIP)
