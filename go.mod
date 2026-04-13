@@ -16,7 +16,7 @@ require (
 	github.com/rhysd/actionlint v1.7.8
 	github.com/stretchr/testify v1.11.1
 	github.com/viam-modules/video-store v0.0.9-rc2
-	github.com/viamrobotics/zeroconf v1.0.13
+	github.com/viamrobotics/zeroconf v1.0.14
 	go.uber.org/zap v1.27.0
 	go.viam.com/rdk v0.111.0
 	go.viam.com/test v1.2.4
@@ -268,5 +268,3 @@ require (
 	gorgonia.org/vecf64 v0.9.0 // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 )
-
-replace github.com/viamrobotics/zeroconf => github.com/seanavery/zeroconf v0.0.0-20260330211400-eaa90a59b51c
