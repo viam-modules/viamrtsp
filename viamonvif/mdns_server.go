@@ -3,6 +3,7 @@ package viamonvif
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -50,6 +51,10 @@ func newMDNSServerFromCachedData(cacheFilepath string, logger logging.Logger) *m
 // the IP to be mapped to. An error is returned if the mdns mapping failed. Informing the caller
 // that doing an ip -> hostname substitution is not expected to work.
 func (server *mdnsServer) Add(serialNumber string, ip net.IP) error {
+	if ip.IsLoopback() {
+		return fmt.Errorf("refusing to register loopback IP %v for hostname %v", ip, serialNumber)
+	}
+
 	server.mu.Lock()
 	defer server.mu.Unlock()
 

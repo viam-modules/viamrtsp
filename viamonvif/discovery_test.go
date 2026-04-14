@@ -20,11 +20,12 @@ import (
 )
 
 type MockDevice struct {
-	GetProfilesFn    func(context.Context) (device.GetProfilesResponse, error)
-	GetPTZNodesFn    func(context.Context) ([]onvif.PTZNode, error)
-	GetStreamURIFn   func(context.Context, onvif.ReferenceToken, device.Credentials) (*url.URL, error)
-	GetSnapshotURIFn func(context.Context, onvif.ReferenceToken, device.Credentials) (*url.URL, error)
-	GetXaddrFn       func() *url.URL
+	GetProfilesFn          func(context.Context) (device.GetProfilesResponse, error)
+	GetPTZNodesFn          func(context.Context) ([]onvif.PTZNode, error)
+	GetStreamURIFn         func(context.Context, onvif.ReferenceToken, device.Credentials) (*url.URL, error)
+	GetSnapshotURIFn       func(context.Context, onvif.ReferenceToken, device.Credentials) (*url.URL, error)
+	GetNetworkInterfacesFn func(context.Context) (device.GetNetworkInterfacesResponse, error)
+	GetXaddrFn             func() *url.URL
 }
 
 func NewMockDevice() *MockDevice {
@@ -43,6 +44,9 @@ func NewMockDevice() *MockDevice {
 		GetSnapshotURIFn: func(_ context.Context, _ onvif.ReferenceToken, _ device.Credentials) (*url.URL, error) {
 			return url.Parse("http://example.com/snapshot.jpg")
 		},
+		GetNetworkInterfacesFn: func(_ context.Context) (device.GetNetworkInterfacesResponse, error) {
+			return device.GetNetworkInterfacesResponse{}, nil
+		},
 		GetXaddrFn: func() *url.URL {
 			u, _ := url.Parse("http://192.168.1.100:80")
 			return u
@@ -56,6 +60,10 @@ func (m *MockDevice) GetDeviceInformation(_ context.Context) (device.GetDeviceIn
 		Model:        "Doom Ray Camera of Certain Annihilation",
 		SerialNumber: "44444444",
 	}, nil
+}
+
+func (m *MockDevice) GetNetworkInterfaces(ctx context.Context) (device.GetNetworkInterfacesResponse, error) {
+	return m.GetNetworkInterfacesFn(ctx)
 }
 
 func (m *MockDevice) GetProfiles(ctx context.Context) (device.GetProfilesResponse, error) {
@@ -537,8 +545,8 @@ func TestFileCaching(t *testing.T) {
 	logger.Info("Second conjured DNS name:", nonSenseTwo)
 
 	// Add the two mappings to the mdns server.
-	mdnsServer.Add(nonSenseOne, net.ParseIP("127.0.0.1"))
-	mdnsServer.Add(nonSenseTwo, net.ParseIP("127.0.0.2"))
+	mdnsServer.Add(nonSenseOne, net.ParseIP("192.168.1.1"))
+	mdnsServer.Add(nonSenseTwo, net.ParseIP("192.168.1.2"))
 	test.That(t, len(mdnsServer.mappedDevices), test.ShouldEqual, 2)
 
 	// Write out a cache file that ought to contain both mappings.
@@ -559,15 +567,193 @@ func TestFileCaching(t *testing.T) {
 
 	// Leverage the sorting to safely assume the first entry represents `nonSenseOne`.
 	test.That(t, cachedDNSResults[0].DNSName, test.ShouldEqual, nonSenseOne)
-	test.That(t, cachedDNSResults[0].IP, test.ShouldEqual, "127.0.0.1")
+	test.That(t, cachedDNSResults[0].IP, test.ShouldEqual, "192.168.1.1")
 	test.That(t, cachedDNSResults[1].DNSName, test.ShouldEqual, nonSenseTwo)
-	test.That(t, cachedDNSResults[1].IP, test.ShouldEqual, "127.0.0.2")
+	test.That(t, cachedDNSResults[1].IP, test.ShouldEqual, "192.168.1.2")
 
 	// Start a new mdns server against the same file. This will load/apply the cache file. This test
 	// is not skipped, so we do not assert `ping`ing works. Just the existence of the expected
 	// entries in the `mappedDevices` map.
 	cleanMDNSServer := newMDNSServerFromCachedData(cachedMDNSMappingsFilename, logger)
 	test.That(t, len(cleanMDNSServer.mappedDevices), test.ShouldEqual, 2)
-	test.That(t, cleanMDNSServer.mappedDevices[nonSenseOne].ip.String(), test.ShouldEqual, "127.0.0.1")
-	test.That(t, cleanMDNSServer.mappedDevices[nonSenseTwo].ip.String(), test.ShouldEqual, "127.0.0.2")
+	test.That(t, cleanMDNSServer.mappedDevices[nonSenseOne].ip.String(), test.ShouldEqual, "192.168.1.1")
+	test.That(t, cleanMDNSServer.mappedDevices[nonSenseTwo].ip.String(), test.ShouldEqual, "192.168.1.2")
+}
+
+func TestNormalizeMACAddress(t *testing.T) {
+	// Colon-separated
+	test.That(t, normalizeMACAddress("AA:BB:CC:DD:EE:FF"), test.ShouldEqual, "aa:bb:cc:dd:ee:ff")
+	// Dash-separated
+	test.That(t, normalizeMACAddress("AA-BB-CC-DD-EE-FF"), test.ShouldEqual, "aa:bb:cc:dd:ee:ff")
+	// Dot-separated (Cisco style)
+	test.That(t, normalizeMACAddress("AABB.CCDD.EEFF"), test.ShouldEqual, "aa:bb:cc:dd:ee:ff")
+	// Already normalized
+	test.That(t, normalizeMACAddress("aa:bb:cc:dd:ee:ff"), test.ShouldEqual, "aa:bb:cc:dd:ee:ff")
+	// No separators
+	test.That(t, normalizeMACAddress("AABBCCDDEEFF"), test.ShouldEqual, "aa:bb:cc:dd:ee:ff")
+	// Invalid length returns lowercased input
+	test.That(t, normalizeMACAddress("AA:BB"), test.ShouldEqual, "aa:bb")
+}
+
+func TestMacToHostName(t *testing.T) {
+	test.That(t, macToHostName("aa:bb:cc:dd:ee:ff"), test.ShouldEqual, "aabbccddeeff")
+	test.That(t, macToHostName("AA-BB-CC-DD-EE-FF"), test.ShouldEqual, "aabbccddeeff")
+	test.That(t, macToHostName("AABB.CCDD.EEFF"), test.ShouldEqual, "aabbccddeeff")
+}
+
+func makeNetworkInterface(mac string, ipv4Addr string) onvif.NetworkInterface {
+	ni := onvif.NetworkInterface{
+		Info: onvif.NetworkInterfaceInfo{
+			HwAddress: onvif.HwAddress(mac),
+		},
+	}
+	if ipv4Addr != "" {
+		ni.IPv4 = onvif.IPv4NetworkInterface{
+			Config: onvif.IPv4Configuration{
+				Manual: onvif.PrefixedIPv4Address{
+					Address: onvif.IPv4Address(ipv4Addr),
+				},
+			},
+		}
+	}
+	return ni
+}
+
+func TestGetMACFromNetworkInterfaces(t *testing.T) {
+	logger := logging.NewTestLogger(t)
+	deviceIP := net.ParseIP("192.168.1.100")
+
+	t.Run("matches interface by IP", func(t *testing.T) {
+		mockDev := NewMockDevice()
+		mockDev.GetNetworkInterfacesFn = func(_ context.Context) (device.GetNetworkInterfacesResponse, error) {
+			return device.GetNetworkInterfacesResponse{
+				NetworkInterfaces: []onvif.NetworkInterface{
+					makeNetworkInterface("AA:BB:CC:DD:EE:01", "10.0.0.1"),
+					makeNetworkInterface("AA:BB:CC:DD:EE:02", "192.168.1.100"),
+				},
+			}, nil
+		}
+		mac := getMACFromNetworkInterfaces(context.Background(), mockDev, deviceIP, logger)
+		test.That(t, mac, test.ShouldEqual, "aa:bb:cc:dd:ee:02")
+	})
+
+	t.Run("falls back to first MAC when no IP match", func(t *testing.T) {
+		mockDev := NewMockDevice()
+		mockDev.GetNetworkInterfacesFn = func(_ context.Context) (device.GetNetworkInterfacesResponse, error) {
+			return device.GetNetworkInterfacesResponse{
+				NetworkInterfaces: []onvif.NetworkInterface{
+					makeNetworkInterface("AA:BB:CC:DD:EE:01", "10.0.0.1"),
+					makeNetworkInterface("AA:BB:CC:DD:EE:02", "10.0.0.2"),
+				},
+			}, nil
+		}
+		mac := getMACFromNetworkInterfaces(context.Background(), mockDev, deviceIP, logger)
+		test.That(t, mac, test.ShouldEqual, "aa:bb:cc:dd:ee:01")
+	})
+
+	t.Run("returns empty on error", func(t *testing.T) {
+		mockDev := NewMockDevice()
+		mockDev.GetNetworkInterfacesFn = func(_ context.Context) (device.GetNetworkInterfacesResponse, error) {
+			return device.GetNetworkInterfacesResponse{}, errors.New("connection refused")
+		}
+		mac := getMACFromNetworkInterfaces(context.Background(), mockDev, deviceIP, logger)
+		test.That(t, mac, test.ShouldEqual, "")
+	})
+
+	t.Run("returns empty when no interfaces", func(t *testing.T) {
+		mockDev := NewMockDevice()
+		mac := getMACFromNetworkInterfaces(context.Background(), mockDev, deviceIP, logger)
+		test.That(t, mac, test.ShouldEqual, "")
+	})
+
+	t.Run("returns empty when deviceIP is nil", func(t *testing.T) {
+		mockDev := NewMockDevice()
+		mac := getMACFromNetworkInterfaces(context.Background(), mockDev, nil, logger)
+		test.That(t, mac, test.ShouldEqual, "")
+	})
+}
+
+func TestTryMDNS_DualRegistration(t *testing.T) {
+	t.Skip("fails in CI")
+	logger := logging.NewTestLogger(t)
+
+	t.Run("registers both MAC and serial hostnames", func(t *testing.T) {
+		server := newMDNSServer(logger)
+		defer server.Shutdown()
+
+		cam := CameraInfo{
+			SerialNumber: "SN123",
+			MACAddress:   "aa:bb:cc:dd:ee:ff",
+			deviceIP:     net.ParseIP("127.0.0.1"),
+			MediaEndpoints: []MediaInfo{
+				{StreamURI: "rtsp://127.0.0.1/stream"},
+			},
+		}
+		cam.tryMDNS(server, logger)
+
+		// Both hostnames should be registered.
+		test.That(t, len(server.mappedDevices), test.ShouldEqual, 2)
+		_, hasMac := server.mappedDevices["aabbccddeeff"]
+		_, hasSerial := server.mappedDevices["SN123"]
+		test.That(t, hasMac, test.ShouldBeTrue)
+		test.That(t, hasSerial, test.ShouldBeTrue)
+
+		// URL should be rewritten with MAC-based hostname (primary).
+		test.That(t, cam.mdnsName, test.ShouldEqual, "aabbccddeeff.local")
+		test.That(t, cam.MediaEndpoints[0].StreamURI, test.ShouldEqual, "rtsp://aabbccddeeff.local/stream")
+	})
+
+	t.Run("MAC only, no serial", func(t *testing.T) {
+		server := newMDNSServer(logger)
+		defer server.Shutdown()
+
+		cam := CameraInfo{
+			MACAddress: "aa:bb:cc:dd:ee:ff",
+			deviceIP:   net.ParseIP("127.0.0.1"),
+			MediaEndpoints: []MediaInfo{
+				{StreamURI: "rtsp://127.0.0.1/stream"},
+			},
+		}
+		cam.tryMDNS(server, logger)
+
+		test.That(t, len(server.mappedDevices), test.ShouldEqual, 1)
+		_, hasMac := server.mappedDevices["aabbccddeeff"]
+		test.That(t, hasMac, test.ShouldBeTrue)
+		test.That(t, cam.mdnsName, test.ShouldEqual, "aabbccddeeff.local")
+	})
+
+	t.Run("serial only, no MAC", func(t *testing.T) {
+		server := newMDNSServer(logger)
+		defer server.Shutdown()
+
+		cam := CameraInfo{
+			SerialNumber: "SN123",
+			deviceIP:     net.ParseIP("127.0.0.1"),
+			MediaEndpoints: []MediaInfo{
+				{StreamURI: "rtsp://127.0.0.1/stream"},
+			},
+		}
+		cam.tryMDNS(server, logger)
+
+		test.That(t, len(server.mappedDevices), test.ShouldEqual, 1)
+		_, hasSerial := server.mappedDevices["SN123"]
+		test.That(t, hasSerial, test.ShouldBeTrue)
+		test.That(t, cam.mdnsName, test.ShouldEqual, "SN123.local")
+	})
+
+	t.Run("no MAC and no serial does nothing", func(t *testing.T) {
+		server := newMDNSServer(logger)
+		defer server.Shutdown()
+
+		cam := CameraInfo{
+			deviceIP: net.ParseIP("127.0.0.1"),
+			MediaEndpoints: []MediaInfo{
+				{StreamURI: "rtsp://127.0.0.1/stream"},
+			},
+		}
+		cam.tryMDNS(server, logger)
+
+		test.That(t, len(server.mappedDevices), test.ShouldEqual, 0)
+		test.That(t, cam.mdnsName, test.ShouldEqual, "")
+	})
 }

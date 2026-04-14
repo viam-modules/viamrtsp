@@ -19,7 +19,7 @@ jobs:
             os: linux
             arch: amd64
             docker_image: ghcr.io/viamrobotics/antique2:amd64-cache
-          - runner: buildjet-8vcpu-ubuntu-2204-arm
+          - runner: github-linux-arm64-8core
             os: linux
             arch: arm64
             docker_image: ghcr.io/viamrobotics/antique2:arm64-cache
@@ -62,7 +62,7 @@ jobs:
             os: linux
             arch: amd64
             mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_linux_amd64.tar.gz
-          - runner: buildjet-8vcpu-ubuntu-2204-arm
+          - runner: github-linux-arm64-8core
             os: linux
             arch: arm64
             mediamtx_url: https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_linux_arm64v8.tar.gz

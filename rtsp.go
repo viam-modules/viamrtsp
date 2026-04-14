@@ -595,7 +595,8 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 	}
 
 	params := [][]byte{f.SPS, f.PPS}
-	onPacketRTP := func(pkt *rtp.Packet) {
+
+	onPacketRTP := wrapWithMarkerFromTimestamp(func(pkt *rtp.Packet) {
 		pts, ok := rc.client.PacketPTS2(media, pkt)
 		if !ok {
 			rc.logger.Debug("no pts found for packet")
@@ -613,7 +614,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		}
 		storeImage(au)
 		rc.videoRequest.write(videostore.CodecTypeH264, params, au, pts)
-	}
+	})
 
 	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
 	if err != nil {
@@ -710,16 +711,13 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 	}
 
 	params := [][]byte{f.VPS, f.SPS, f.PPS}
-	onPacketRTP := func(pkt *rtp.Packet) {
-		// we need to do this before calling Decode as apparently rtpDec.Decode mutates
-		// the packet such that one can't get the pts out after Decode is called
+
+	onPacketRTP := wrapWithMarkerFromTimestamp(func(pkt *rtp.Packet) {
 		pts, ok := rc.client.PacketPTS2(media, pkt)
 		if !ok {
 			rc.logger.Debug("no pts found for packet")
 			return
 		}
-
-		// Extract access units from RTP packets
 		au, err := rtpDec.Decode(pkt)
 		if err != nil {
 			if !errors.Is(err, rtph265.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph265.ErrMorePacketsNeeded) {
@@ -729,7 +727,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 		}
 		storeImage(au)
 		rc.videoRequest.write(videostore.CodecTypeH265, params, au, pts)
-	}
+	})
 
 	_, err = rc.client.Setup(session.BaseURL, media, 0, 0)
 	if err != nil {
@@ -1510,4 +1508,21 @@ func (rc *rtspCamera) NextPointCloud(_ context.Context, _ map[string]interface{}
 
 func (rc *rtspCamera) DoCommand(_ context.Context, _ map[string]interface{}) (map[string]interface{}, error) {
 	return nil, errors.New("not implemented")
+}
+
+// wrapWithMarkerFromTimestamp wraps an RTP packet handler to force the marker bit
+// when the RTP timestamp changes. Some cameras (e.g. GStreamer-based) never set
+// the marker bit, causing gortsplib to buffer NALUs indefinitely. Timestamp
+// changes indicate a new access unit, so we mark the previous packet as complete.
+func wrapWithMarkerFromTimestamp(handler func(pkt *rtp.Packet)) func(pkt *rtp.Packet) {
+	var pendingPkt *rtp.Packet
+	return func(pkt *rtp.Packet) {
+		if pendingPkt != nil {
+			if pkt.Timestamp != pendingPkt.Timestamp {
+				pendingPkt.Marker = true
+			}
+			handler(pendingPkt)
+		}
+		pendingPkt = pkt
+	}
 }

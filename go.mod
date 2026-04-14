@@ -17,7 +17,7 @@ require (
 	github.com/rhysd/actionlint v1.7.8
 	github.com/stretchr/testify v1.11.1
 	github.com/viam-modules/video-store v0.0.9-rc2
-	github.com/viamrobotics/zeroconf v1.0.13
+	github.com/viamrobotics/zeroconf v1.0.14
 	go.uber.org/zap v1.27.0
 	go.viam.com/rdk v0.111.0
 	go.viam.com/test v1.2.4
