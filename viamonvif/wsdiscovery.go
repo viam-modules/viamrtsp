@@ -13,16 +13,13 @@ import (
 	"go.viam.com/rdk/logging"
 )
 
-// rfc2544BenchmarkNet is 198.18.0.0/15, reserved by RFC 2544 for benchmark
-// testing. It is not globally routable, and some vendors (notably Raymarine
-// marine networks) use it as the LAN range for their devices, so we treat it
-// as local for ONVIF discovery purposes.
+// rfc2544BenchmarkNet is 198.18.0.0/15, reserved for benchmark testing and
+// not globally routable. Some vendors (notably Raymarine) repurpose it as a
+// LAN range, so we treat it as local for discovery.
 var rfc2544BenchmarkNet = &net.IPNet{IP: net.IPv4(198, 18, 0, 0), Mask: net.CIDRMask(15, 32)}
 
-// isLocalIP checks if the given IP address is a local/private network address.
-// This includes RFC 1918 private ranges (10.x, 172.16-31.x, 192.168.x, fc00::/7),
-// loopback (127.x, ::1), and the RFC 2544 benchmark range (198.18.0.0/15) which
-// is non-globally-routable and used as a LAN range by some vendors.
+// isLocalIP reports whether ip is reachable on a local network — RFC 1918
+// private, loopback, or the RFC 2544 benchmark range.
 func isLocalIP(ip net.IP) bool {
 	return ip.IsPrivate() || ip.IsLoopback() || rfc2544BenchmarkNet.Contains(ip)
 }
