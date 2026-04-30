@@ -16,6 +16,8 @@ import (
 // rfc2544BenchmarkNet is 198.18.0.0/15, reserved for benchmark testing and
 // not globally routable. Some vendors (notably Raymarine) repurpose it as a
 // LAN range, so we treat it as local for discovery.
+//
+//nolint:mnd // literal RFC 2544 reservation
 var rfc2544BenchmarkNet = &net.IPNet{IP: net.IPv4(198, 18, 0, 0), Mask: net.CIDRMask(15, 32)}
 
 // isLocalIP reports whether ip is reachable on a local network — RFC 1918
