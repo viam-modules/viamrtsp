@@ -168,16 +168,18 @@ func (s *onvifPtzClient) EndPosition(ctx context.Context, extra map[string]inter
 //
 // The gaze axis is +X at zero position. Inverting the forward kinematics:
 //
-//	direction = [cos(pan)·cos(tilt), sin(pan)·cos(tilt), -sin(tilt)]
+//	direction = [cos(pan)·cos(tilt), sin(pan)·cos(tilt), sin(tilt)]
 //
 // gives:
 //
 //	pan  = atan2(Y, X)           — angle in XY plane from +X
-//	tilt = atan2(-Z, √(X²+Y²))  — negative because +Z is up, tilting up is negative tilt
+//	tilt = atan2(-Z, √(X²+Y²))  — negative because ONVIF positive tilt = tilt down for this camera
 func (s *onvifPtzClient) MoveToPosition(ctx context.Context, pose spatialmath.Pose, extra map[string]interface{}) error {
 	pt := pose.Point()
 	pan := math.Atan2(pt.Y, pt.X)
 	tilt := math.Atan2(-pt.Z, math.Sqrt(pt.X*pt.X+pt.Y*pt.Y))
+	s.logger.Debugf("MoveToPosition IK: target=(%.1f, %.1f, %.1f) → pan=%.1f° tilt=%.1f°",
+		pt.X, pt.Y, pt.Z, pan*180/math.Pi, tilt*180/math.Pi)
 	return s.MoveToJointPositions(ctx, []referenceframe.Input{pan, tilt}, extra)
 }
 

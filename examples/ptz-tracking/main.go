@@ -1,14 +1,18 @@
 // Package main is a test script that continuously points a PTZ camera at the
-// end effector of a UR5 arm using the Viam frame system.
+// end effector of a robot arm using the Viam frame system.
 //
 // Setup:
-//   - arm-1: fake UR5e arm, parented to world
+//   - universal-arm: UR7e arm, parented to world
 //   - ptz arm: onvif-ptz arm, parented to world at a fixed offset
 //   - motion-1: motion service (rdk:builtin:builtin)
 //
-// The motion service GetPose call does the full frame chain in one shot:
-// arm-1 EE → world → PTZ local frame. The result is passed directly to
-// PTZ.MoveToPosition which runs analytical IK (atan2).
+// The script uses motionSvc.GetPose with ptzName+"_origin" as the destination
+// frame to get the arm EE directly in the PTZ's mount frame. The frame system
+// handles all the math from the Viam config — no hardcoded constants needed.
+//
+// The "_origin" frame is the PTZ's static base/mount frame. Using it (rather
+// than ptzName directly) avoids a feedback loop: ptzName would require querying
+// the PTZ end-effector via FK → ONVIF GetStatus on every iteration.
 //
 // Usage:
 //
@@ -22,27 +26,19 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/joho/godotenv"
 	"go.viam.com/rdk/components/arm"
 	"go.viam.com/rdk/logging"
-	"go.viam.com/rdk/referenceframe"
 	"go.viam.com/rdk/robot/client"
 	"go.viam.com/rdk/services/motion"
 	"go.viam.com/utils/rpc"
 )
 
 const (
-	armName       = "arm-1"
+	armName       = "universal-arm"
 	ptzName       = "ptz-client-LOREXSystems-LNZ43P4A-ND012501000714-url2"
 	motionSvcName = "motion-1"
-	pollInterval  = 200 * time.Millisecond
-
-	// PTZ world position from frame config (mm). Must match the frame block in Viam config.
-	ptzWorldX = 100.0
-	ptzWorldY = 100.0
-	ptzWorldZ = 0.0
 )
 
 func main() {
@@ -82,7 +78,6 @@ func main() {
 		logger.Fatalf("PTZ arm not found: %v — available: %v", err, machine.ResourceNames())
 	}
 
-	// motionSvc, err := motion.FromRobot(machine, motionSvcName)
 	motionSvc, err := motion.FromProvider(machine, motionSvcName)
 	if err != nil {
 		logger.Fatalf("Motion service not found: %v", err)
@@ -90,48 +85,31 @@ func main() {
 
 	logger.Infof("Starting tracking loop: pointing %s at end effector of %s", ptzName, armName)
 
-	ticker := time.NewTicker(pollInterval)
-	defer ticker.Stop()
-
-	var lastPan, lastTilt float64
-	const deadbandRad = 0.02 // ~1 degree
-
 	for {
-		select {
-		case <-ctx.Done():
+		if ctx.Err() != nil {
 			logger.Info("Shutting down")
 			return
-		case <-ticker.C:
-			// Get arm EE in world frame — does not query the PTZ, avoids feedback loop.
-			eeInWorld, err := motionSvc.GetPose(ctx, armName, "world", nil, nil)
-			if err != nil {
-				logger.Warnf("GetPose failed: %v", err)
-				continue
-			}
-			pt := eeInWorld.Pose().Point()
+		}
 
-			// Vector from PTZ to arm EE in world frame.
-			// PTZ orientation is th=0 so world frame == PTZ local frame (no rotation needed).
-			x := pt.X - ptzWorldX
-			y := pt.Y - ptzWorldY
-			z := pt.Z - ptzWorldZ
-			logger.Infof("EE relative to PTZ (mm): (%.1f, %.1f, %.1f)", x, y, z)
+		// Get arm EE expressed in the PTZ's mount frame.
+		// ptzName+"_origin" is the PTZ's static base frame — using it avoids
+		// querying PTZ joint positions (ONVIF GetStatus) on every iteration.
+		// The frame system reads translation+orientation from the Viam config.
+		target, err := motionSvc.GetPose(ctx, armName, ptzName+"_origin", nil, nil)
+		if err != nil {
+			logger.Warnf("GetPose failed: %v", err)
+			continue
+		}
 
-			// Analytical IK matching MoveToPosition in arm.go
-			pan := math.Atan2(y, x)
-			tilt := math.Atan2(-z, math.Sqrt(x*x+y*y))
-			logger.Infof("target pan=%.2f° tilt=%.2f°", pan*180/math.Pi, tilt*180/math.Pi)
+		pt := target.Pose().Point()
+		panDeg := math.Atan2(pt.Y, pt.X) * 180 / math.Pi
+		tiltDeg := math.Atan2(-pt.Z, math.Sqrt(pt.X*pt.X+pt.Y*pt.Y)) * 180 / math.Pi
+		logger.Infof("EE in PTZ local (mm): x=%.1f y=%.1f z=%.1f → pan=%.1f° tilt=%.1f°", pt.X, pt.Y, pt.Z, panDeg, tiltDeg)
 
-			if math.Abs(pan-lastPan) < deadbandRad && math.Abs(tilt-lastTilt) < deadbandRad {
-				logger.Infof("within deadband, skipping")
-				continue
-			}
-			lastPan, lastTilt = pan, tilt
-
-			// MoveToJointPositions bypasses motion planning — sends ONVIF AbsoluteMove directly.
-			if err := ptzArm.MoveToJointPositions(ctx, []referenceframe.Input{pan, tilt}, nil); err != nil {
-				logger.Warnf("MoveToJointPositions failed: %v", err)
-			}
+		// MoveToPosition runs analytical IK (atan2) and sends one ONVIF AbsoluteMove.
+		// Blocks until camera finishes moving — naturally rate-limits the loop.
+		if err := ptzArm.MoveToPosition(ctx, target.Pose(), nil); err != nil {
+			logger.Warnf("MoveToPosition failed: %v", err)
 		}
 	}
 }
