@@ -44,6 +44,7 @@ func init() {
 	resource.RegisterService(video.API, ServiceModel, resource.Registration[resource.Resource, *Config]{
 		Constructor: New,
 	})
+	vsutils.SetFFmpegLogCallback()
 }
 
 type service struct {
