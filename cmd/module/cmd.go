@@ -4,13 +4,13 @@ package main
 import (
 	"context"
 
-	vsutils "github.com/viam-modules/video-store/videostore/utils"
 	"github.com/viam-modules/viamrtsp"
 	"github.com/viam-modules/viamrtsp/ptzclient"
 	"github.com/viam-modules/viamrtsp/unifi"
 	"github.com/viam-modules/viamrtsp/upnpdiscovery"
 	"github.com/viam-modules/viamrtsp/viamonvif"
 	"github.com/viam-modules/viamrtsp/videostore"
+	vsutils "github.com/viam-modules/video-store/videostore/utils"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/components/generic"
 	"go.viam.com/rdk/logging"
