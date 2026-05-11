@@ -10,21 +10,28 @@ import (
 	"github.com/viam-modules/viamrtsp/upnpdiscovery"
 	"github.com/viam-modules/viamrtsp/viamonvif"
 	"github.com/viam-modules/viamrtsp/videostore"
+	vsutils "github.com/viam-modules/video-store/videostore/utils"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/components/generic"
+	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/module"
 	"go.viam.com/rdk/services/discovery"
 	"go.viam.com/rdk/services/video"
+	"go.viam.com/utils"
 )
 
 func main() {
-	err := realMain(context.Background())
-	if err != nil {
-		panic(err)
-	}
+	utils.ContextualMain(mainWithArgs, module.NewLoggerFromArgs("viamrtsp"))
 }
 
-func realMain(ctx context.Context) error {
+func mainWithArgs(ctx context.Context, _ []string, logger logging.Logger) error {
+	if logger.GetLevel() == logging.DEBUG {
+		vsutils.SetLibAVLogLevel("debug")
+	} else {
+		vsutils.SetLibAVLogLevel("fatal")
+	}
+	vsutils.SetFFmpegLogCallback()
+
 	myMod, err := module.NewModuleFromArgs(ctx)
 	if err != nil {
 		return err
