@@ -18,10 +18,11 @@ type Video struct {
 
 // Config is the config for videostore.
 type Config struct {
-	Camera    *string `json:"camera,omitempty"`
-	Storage   Storage `json:"storage"`
-	Video     Video   `json:"video,omitempty"`
-	Framerate int     `json:"framerate,omitempty"`
+	Camera     *string `json:"camera,omitempty"`
+	SourceName string  `json:"source_name,omitempty"`
+	Storage    Storage `json:"storage"`
+	Video      Video   `json:"video,omitempty"`
+	Framerate  int     `json:"framerate,omitempty"`
 }
 
 // Storage is the storage subconfig for videostore.
@@ -48,7 +49,8 @@ func applyDefaults(cfg *Config, name string) (videostore.Config, error) {
 		Storage: sc,
 		Encoder: ec,
 		FramePoller: videostore.FramePollerConfig{
-			Framerate: fps,
+			Framerate:  fps,
+			SourceName: cfg.SourceName,
 		},
 	}, nil
 }
