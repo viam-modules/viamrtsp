@@ -411,6 +411,7 @@ This model implements the `"rdk:service:video"` API for streaming stored video f
 | Name                | Type    | Inclusion    | Description |
 | ------------------- | ------- | ------------ | ----------- |
 | `camera`            | string  | Optional     | Name of the camera component to use as the video source. If omitted, operates in read-only mode for existing stored video. |
+| `source_name`       | string  | Optional     | Name of the upstream source to select when the camera exposes multiple (e.g. `color` or `depth` on a RealSense). When unset, the upstream must return exactly one source. |
 | `storage`           | object  | Required     | Storage configuration settings |
 | `storage.size_gb`   | integer | Required     | Maximum storage size in gigabytes |
 | `storage.upload_path` | string | Optional    | Path where uploaded video segments are saved |
@@ -502,6 +503,7 @@ This model implements the [`"rdk:component:generic"` API](https://docs.viam.com/
 | Name                | Type    | Inclusion    | Description |
 | ------------------- | ------- | ------------ | ----------- |
 | `camera`            | string  | optional     | Name of the camera component to use as the video source |
+| `source_name`       | string  | optional     | Name of the upstream source to select when the camera exposes multiple (e.g. `color` or `depth` on a RealSense). When unset, the upstream must return exactly one source. |
 | `storage`           | object  | required     | Storage configuration settings |
 | `storage.size_gb`   | integer | required     | Maximum storage size in gigabytes |
 | `storage.upload_path` | string | optional    | Path where uploaded video segments are saved |
