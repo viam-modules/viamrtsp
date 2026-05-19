@@ -128,6 +128,10 @@ func (s *service) Name() resource.Name {
 	return s.name
 }
 
+func (s *service) Status(_ context.Context) (map[string]interface{}, error) {
+	return map[string]interface{}{}, nil
+}
+
 func (s *service) Close(_ context.Context) error {
 	if err := s.rsMux.close(); err != nil {
 		return err

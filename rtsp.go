@@ -196,7 +196,7 @@ type (
 type cache struct {
 	mimeType      string
 	bytes         []byte
-	imageMetadata camera.ImageMetadata
+	imageMetadata imageMetadata
 }
 
 // rtspCamera contains the rtsp client, and the reader function that fulfills the camera interface.
@@ -1388,7 +1388,7 @@ func isCompactableH264(nalu []byte) bool {
 }
 
 // Image returns the latest frame as JPEG bytes.
-func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
+func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]interface{}) ([]byte, imageMetadata, error) {
 	rc.closeMu.RLock()
 	defer rc.closeMu.RUnlock()
 	start := time.Now()
@@ -1397,36 +1397,36 @@ func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]int
 			videoCodec(rc.currentCodec.Load()), rc.lazyDecode, rc.iframeOnlyDecode, time.Since(start))
 	}()
 	if err := rc.cancelCtx.Err(); err != nil {
-		return nil, camera.ImageMetadata{}, err
+		return nil, imageMetadata{}, err
 	}
 	if msg := rc.streamErrMsg.Load(); msg != nil {
 		err := fmt.Errorf("camera is not streaming, last error: %s", *msg)
 		rc.logger.Error(err.Error())
-		return nil, camera.ImageMetadata{}, err
+		return nil, imageMetadata{}, err
 	}
 	if videoCodec(rc.currentCodec.Load()) == MJPEG {
 		mjpegBytes := rc.latestMJPEGBytes.Load()
 		if mjpegBytes == nil {
-			return nil, camera.ImageMetadata{}, errors.New("no frame yet")
+			return nil, imageMetadata{}, errors.New("no frame yet")
 		}
-		return *mjpegBytes, camera.ImageMetadata{
+		return *mjpegBytes, imageMetadata{
 			MimeType: rutils.MimeTypeJPEG,
 		}, nil
 	}
 	return rc.getAndConvertFrame(mimeType)
 }
 
-func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, camera.ImageMetadata, error) {
+func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, imageMetadata, error) {
 	rc.consumeLazyAU()
 	rc.latestFrameMu.Lock()
 	defer rc.latestFrameMu.Unlock()
 	if rc.latestFrame == nil {
-		return nil, camera.ImageMetadata{}, errors.New("no frame yet")
+		return nil, imageMetadata{}, errors.New("no frame yet")
 	}
 	currentFrame := rc.latestFrame
 	currentFrame.incrementRefs()
 	var bytes []byte
-	var metadata camera.ImageMetadata
+	var metadata imageMetadata
 	var err error
 	if rc.latestFrameCache.bytes != nil && rc.latestFrameCache.mimeType == mimeType {
 		if refCount := currentFrame.decrementRefs(); refCount == 0 {
@@ -1450,7 +1450,7 @@ func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, camera.ImageM
 		rc.avFramePool.put(currentFrame)
 	}
 	if err != nil {
-		return nil, camera.ImageMetadata{}, err
+		return nil, imageMetadata{}, err
 	}
 	rc.latestFrameCache = cache{
 		mimeType:      mimeType,
@@ -1469,6 +1469,10 @@ func (rc *rtspCamera) Properties(_ context.Context) (camera.Properties, error) {
 
 func (rc *rtspCamera) Name() resource.Name {
 	return rc.name
+}
+
+func (rc *rtspCamera) Status(_ context.Context) (map[string]interface{}, error) {
+	return map[string]interface{}{}, nil
 }
 
 // Images returns the latest frame as a named image as jpeg bytes.

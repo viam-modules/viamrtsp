@@ -175,6 +175,10 @@ func (s *onvifPtzClient) Name() resource.Name {
 	return s.name
 }
 
+func (s *onvifPtzClient) Status(_ context.Context) (map[string]interface{}, error) {
+	return map[string]interface{}{}, nil
+}
+
 // callPTZMethod calls an ONVIF PTZ method and unmarshals the response into result.
 // If result is nil, unmarshaling is skipped and raw bytes are returned.
 func (s *onvifPtzClient) callPTZMethod(req interface{}, result interface{}) ([]byte, error) {
