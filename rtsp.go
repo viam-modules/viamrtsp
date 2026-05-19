@@ -265,9 +265,7 @@ func (rc *rtspCamera) Close(_ context.Context) error {
 	}
 	rc.cancelFunc()
 	rc.unsubscribeAll()
-	// Wait for the reconnect worker to exit before taking closeMu — the worker
-	// acquires closeMu inside reconnectClient, so holding it across Wait() would
-	// deadlock with an in-flight reconnect attempt.
+	// Wait for the reconnect worker to exit before taking closeMu
 	rc.activeBackgroundWorkers.Wait()
 	rc.closeMu.Lock()
 	defer rc.closeMu.Unlock()
