@@ -264,9 +264,13 @@ func (rc *rtspCamera) Close(_ context.Context) error {
 		rc.logger.Errorf("error removing camera from global registry: %s", err.Error())
 	}
 	rc.cancelFunc()
-	rc.closeMu.Lock()
 	rc.unsubscribeAll()
+	// Wait for the reconnect worker to exit before taking closeMu — the worker
+	// acquires closeMu inside reconnectClient, so holding it across Wait() would
+	// deadlock with an in-flight reconnect attempt.
 	rc.activeBackgroundWorkers.Wait()
+	rc.closeMu.Lock()
+	defer rc.closeMu.Unlock()
 	rc.closeConnection()
 	rc.mimeHandler.close()
 	// Clean up latestFrame cache if it exists. This is necessary to ensure that the frame is properly
@@ -280,7 +284,6 @@ func (rc *rtspCamera) Close(_ context.Context) error {
 	}
 	rc.latestFrameMu.Unlock()
 	rc.avFramePool.close()
-	rc.closeMu.Unlock()
 	rc.videoRequest.clear()
 	return nil
 }
