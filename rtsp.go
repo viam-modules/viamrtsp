@@ -208,12 +208,10 @@ type rtspCamera struct {
 	lazyDecode       bool
 	iframeOnlyDecode bool
 
-	// closeMu guards client/h264Media/rawDecoder and lifecycle of mimeHandler/avFramePool.
-	// Writers Lock during teardown/reconnect, readers RLock for the duration of their work.
-	// Outermost lock: take before auMu/latestFrameMu/subsMu.
+	// closeMu guards gortsplib client, h264Media, rawDecoder and lifecycle of mimeHandler/avFramePool.
 	closeMu      sync.RWMutex
 	videoRequest *videoRequest
-	// auMu guards rc.au (lazy AU buffer).
+	// auMu guards the lazy AU buffer.
 	auMu       sync.Mutex
 	au         [][]byte
 	client     *gortsplib.Client
@@ -253,7 +251,7 @@ type rtspCamera struct {
 	rtpPassthroughCtx           context.Context
 	rtpPassthroughCancelCauseFn context.CancelCauseFunc
 
-	// subsMu guards bufAndCBByID (passthrough subscriber map).
+	// subsMu guards passthrough subscriber map.
 	subsMu       sync.RWMutex
 	bufAndCBByID map[rtppassthrough.SubscriptionID]bufAndCB
 
