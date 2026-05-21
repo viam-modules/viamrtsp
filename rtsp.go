@@ -267,8 +267,8 @@ func (rc *rtspCamera) Close(_ context.Context) error {
 	if err := registry.Global.Remove(rc.Name().String()); err != nil {
 		rc.logger.Errorf("error removing camera from global registry: %s", err.Error())
 	}
-	// Signal cancellation under closeMu so anyone waiting on RLock (e.g. SubscribeRTP)
-	// sees cancelCtx as cancelled the next time they enter the critical section.
+	// Lock around cancelFunc to serialize with RLock holders. Prevents SubscribeRTP
+	// from passing its ctx check and still adding an entry after unsubscribeAll sweeps.
 	rc.closeMu.Lock()
 	rc.cancelFunc()
 	rc.closeMu.Unlock()
