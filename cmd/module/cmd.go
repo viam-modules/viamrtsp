@@ -3,6 +3,8 @@ package main
 
 import (
 	"context"
+	"errors"
+	"os"
 
 	"github.com/viam-modules/viamrtsp"
 	"github.com/viam-modules/viamrtsp/ptzclient"
@@ -30,9 +32,13 @@ func mainWithArgs(ctx context.Context, _ []string, logger logging.Logger) error 
 	} else {
 		vsutils.SetLibAVLogLevel("fatal")
 	}
-	vsutils.SetFFmpegLogCallback()
+	vsutils.SetFFmpegLogCallback(logger)
 
-	myMod, err := module.NewModuleFromArgs(ctx)
+	// NewModule, not NewModuleFromArgs: latter spawns its own moduleLogger, stranding our ffmpeg sublogger on stdout fallback.
+	if len(os.Args) < 2 {
+		return errors.New("need socket path as command line argument")
+	}
+	myMod, err := module.NewModule(ctx, os.Args[1], logger)
 	if err != nil {
 		return err
 	}
