@@ -35,7 +35,7 @@ func mainWithArgs(ctx context.Context, _ []string, logger logging.Logger) error 
 	vsutils.SetFFmpegLogCallback(logger)
 
 	// NewModule, not NewModuleFromArgs: latter spawns its own moduleLogger, stranding our ffmpeg sublogger on stdout fallback.
-	if len(os.Args) < 2 {
+	if len(os.Args) < 2 { //nolint:mnd
 		return errors.New("need socket path as command line argument")
 	}
 	myMod, err := module.NewModule(ctx, os.Args[1], logger)
