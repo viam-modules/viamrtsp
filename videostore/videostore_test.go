@@ -64,7 +64,7 @@ func createTestService(t *testing.T, mockVS *mockVideoStore) *service {
 	logger := logging.NewTestLogger(t)
 
 	s := &service{
-		name:    resource.NewName(video.API, "test-video-service"),
+		Named:   resource.NewName(video.API, "test-video-service").AsNamed(),
 		logger:  logger,
 		vs:      mockVS,
 		rsMux:   nil,
@@ -406,7 +406,7 @@ func TestGetVideoWorkerShutdown(t *testing.T) {
 	workers := utils.NewBackgroundStoppableWorkers()
 
 	svc := &service{
-		name:    resource.NewName(video.API, "test-video-service"),
+		Named:   resource.NewName(video.API, "test-video-service").AsNamed(),
 		logger:  logger,
 		vs:      mockVS,
 		rsMux:   nil,
