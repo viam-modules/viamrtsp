@@ -201,6 +201,7 @@ type cache struct {
 
 // rtspCamera contains the rtsp client, and the reader function that fulfills the camera interface.
 type rtspCamera struct {
+	resource.Named
 	resource.AlwaysRebuild
 	model resource.Model
 	gostream.VideoReader
@@ -252,8 +253,6 @@ type rtspCamera struct {
 
 	subsMu       sync.RWMutex
 	bufAndCBByID map[rtppassthrough.SubscriptionID]bufAndCB
-
-	name resource.Name
 
 	preferredTransports []*gortsplib.Transport
 }
@@ -1164,7 +1163,7 @@ func NewRTSPCamera(ctx context.Context, deps resource.Dependencies, conf resourc
 		lazyDecode:                  newConf.LazyDecode,
 		iframeOnlyDecode:            newConf.IframeOnlyDecode,
 		u:                           u,
-		name:                        conf.ResourceName(),
+		Named:                       conf.ResourceName().AsNamed(),
 		preferredTransports:         preferredTransports,
 		rtpPassthrough:              rtpPassthrough,
 		videoRequest:                &videoRequest{logger: logger},
@@ -1463,14 +1462,6 @@ func (rc *rtspCamera) Properties(_ context.Context) (camera.Properties, error) {
 		SupportsPCD: false,
 		MimeTypes:   []string{rutils.MimeTypeJPEG},
 	}, nil
-}
-
-func (rc *rtspCamera) Name() resource.Name {
-	return rc.name
-}
-
-func (rc *rtspCamera) Status(_ context.Context) (map[string]interface{}, error) {
-	return map[string]interface{}{}, nil
 }
 
 // Images returns the latest frame as a named image as jpeg bytes.
