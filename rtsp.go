@@ -194,9 +194,9 @@ type (
 )
 
 type cache struct {
-	mimeType      string
-	bytes         []byte
-	imageMetadata imageMetadata
+	mimeType         string
+	bytes            []byte
+	responseMimeType string
 }
 
 // rtspCamera contains the rtsp client, and the reader function that fulfills the camera interface.
@@ -1388,7 +1388,7 @@ func isCompactableH264(nalu []byte) bool {
 }
 
 // Image returns the latest frame as JPEG bytes.
-func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]interface{}) ([]byte, imageMetadata, error) {
+func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]interface{}) ([]byte, string, error) {
 	rc.closeMu.RLock()
 	defer rc.closeMu.RUnlock()
 	start := time.Now()
@@ -1397,67 +1397,65 @@ func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]int
 			videoCodec(rc.currentCodec.Load()), rc.lazyDecode, rc.iframeOnlyDecode, time.Since(start))
 	}()
 	if err := rc.cancelCtx.Err(); err != nil {
-		return nil, imageMetadata{}, err
+		return nil, "", err
 	}
 	if msg := rc.streamErrMsg.Load(); msg != nil {
 		err := fmt.Errorf("camera is not streaming, last error: %s", *msg)
 		rc.logger.Error(err.Error())
-		return nil, imageMetadata{}, err
+		return nil, "", err
 	}
 	if videoCodec(rc.currentCodec.Load()) == MJPEG {
 		mjpegBytes := rc.latestMJPEGBytes.Load()
 		if mjpegBytes == nil {
-			return nil, imageMetadata{}, errors.New("no frame yet")
+			return nil, "", errors.New("no frame yet")
 		}
-		return *mjpegBytes, imageMetadata{
-			MimeType: rutils.MimeTypeJPEG,
-		}, nil
+		return *mjpegBytes, rutils.MimeTypeJPEG, nil
 	}
 	return rc.getAndConvertFrame(mimeType)
 }
 
-func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, imageMetadata, error) {
+func (rc *rtspCamera) getAndConvertFrame(mimeType string) ([]byte, string, error) {
 	rc.consumeLazyAU()
 	rc.latestFrameMu.Lock()
 	defer rc.latestFrameMu.Unlock()
 	if rc.latestFrame == nil {
-		return nil, imageMetadata{}, errors.New("no frame yet")
+		return nil, "", errors.New("no frame yet")
 	}
 	currentFrame := rc.latestFrame
 	currentFrame.incrementRefs()
 	var bytes []byte
-	var metadata imageMetadata
+	var responseMimeType string
 	var err error
 	if rc.latestFrameCache.bytes != nil && rc.latestFrameCache.mimeType == mimeType {
 		if refCount := currentFrame.decrementRefs(); refCount == 0 {
 			rc.avFramePool.put(currentFrame)
 		}
-		return rc.latestFrameCache.bytes, rc.latestFrameCache.imageMetadata, nil
+		return rc.latestFrameCache.bytes, rc.latestFrameCache.responseMimeType, nil
 	}
 
 	switch mimeType {
 	case rutils.MimeTypeJPEG, rutils.MimeTypeJPEG + "+" + rutils.MimeTypeSuffixLazy:
-		bytes, metadata, err = rc.mimeHandler.convertJPEG(currentFrame.frame)
+		bytes, responseMimeType, err = rc.mimeHandler.convertJPEG(currentFrame.frame)
 	case mimeTypeYUYV, mimeTypeYUYV + "+" + rutils.MimeTypeSuffixLazy:
-		bytes, metadata, err = rc.mimeHandler.convertYUYV(currentFrame.frame)
+		bytes, responseMimeType, err = rc.mimeHandler.convertYUYV(currentFrame.frame)
 	case rutils.MimeTypeRawRGBA, rutils.MimeTypeRawRGBA + "+" + rutils.MimeTypeSuffixLazy:
-		bytes, metadata, err = rc.mimeHandler.convertRGBA(currentFrame.frame)
+		bytes, responseMimeType, err = rc.mimeHandler.convertRGBA(currentFrame.frame)
 	default:
 		rc.logger.Debugf("unsupported mime type: %s, defaulting to JPEG", mimeType)
-		bytes, metadata, err = rc.mimeHandler.convertJPEG(currentFrame.frame)
+		bytes, responseMimeType, err = rc.mimeHandler.convertJPEG(currentFrame.frame)
 	}
 	if refCount := currentFrame.decrementRefs(); refCount == 0 {
 		rc.avFramePool.put(currentFrame)
 	}
 	if err != nil {
-		return nil, imageMetadata{}, err
+		return nil, "", err
 	}
 	rc.latestFrameCache = cache{
-		mimeType:      mimeType,
-		bytes:         bytes,
-		imageMetadata: metadata,
+		mimeType:         mimeType,
+		bytes:            bytes,
+		responseMimeType: responseMimeType,
 	}
-	return bytes, metadata, err
+	return bytes, responseMimeType, err
 }
 
 func (rc *rtspCamera) Properties(_ context.Context) (camera.Properties, error) {
@@ -1481,12 +1479,12 @@ func (rc *rtspCamera) Images(
 	_ []string,
 	_ map[string]interface{},
 ) ([]camera.NamedImage, resource.ResponseMetadata, error) {
-	imgBytes, metadata, err := rc.Image(ctx, rutils.MimeTypeJPEG, nil)
+	imgBytes, mimeType, err := rc.Image(ctx, rutils.MimeTypeJPEG, nil)
 	if err != nil {
 		return nil, resource.ResponseMetadata{}, err
 	}
 
-	namedImage, err := camera.NamedImageFromBytes(imgBytes, "", metadata.MimeType, data.Annotations{})
+	namedImage, err := camera.NamedImageFromBytes(imgBytes, "", mimeType, data.Annotations{})
 	if err != nil {
 		return nil, resource.ResponseMetadata{}, err
 	}
