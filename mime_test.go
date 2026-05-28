@@ -18,11 +18,11 @@ func TestJPEGConvert(t *testing.T) {
 		fillDummyYUV420PData(frame)
 		logger := logging.NewDebugLogger("mime_test")
 		mh := newMimeHandler(logger)
-		bytes, metadata, err := mh.convertJPEG(frame)
+		bytes, mimeType, err := mh.convertJPEG(frame)
 		test.That(t, err, test.ShouldBeNil)
 		test.That(t, bytes, test.ShouldNotBeNil)
 		test.That(t, len(bytes), test.ShouldBeGreaterThan, 0)
-		test.That(t, metadata, test.ShouldNotBeEmpty)
+		test.That(t, mimeType, test.ShouldNotBeEmpty)
 	})
 
 	t.Run("valid YUVJ420P frame succeeds", func(t *testing.T) {
@@ -33,11 +33,11 @@ func TestJPEGConvert(t *testing.T) {
 		fillDummyYUV420PData(frame)
 		logger := logging.NewDebugLogger("mime_test")
 		mh := newMimeHandler(logger)
-		bytes, metadata, err := mh.convertJPEG(frame)
+		bytes, mimeType, err := mh.convertJPEG(frame)
 		test.That(t, err, test.ShouldBeNil)
 		test.That(t, bytes, test.ShouldNotBeNil)
 		test.That(t, len(bytes), test.ShouldBeGreaterThan, 0)
-		test.That(t, metadata, test.ShouldNotBeEmpty)
+		test.That(t, mimeType, test.ShouldNotBeEmpty)
 	})
 
 	t.Run("invalid frame fails", func(t *testing.T) {
@@ -46,11 +46,11 @@ func TestJPEGConvert(t *testing.T) {
 		defer freeFrame(frame)
 		logger := logging.NewDebugLogger("mime_test")
 		mh := newMimeHandler(logger)
-		bytes, metadata, err := mh.convertJPEG(frame)
+		bytes, mimeType, err := mh.convertJPEG(frame)
 		test.That(t, err, test.ShouldNotBeNil)
 		test.That(t, err.Error(), test.ShouldContainSubstring, "failed to open MJPEG encoder")
 		test.That(t, bytes, test.ShouldBeNil)
-		test.That(t, metadata.MimeType, test.ShouldBeEmpty)
+		test.That(t, mimeType, test.ShouldBeEmpty)
 	})
 }
 
@@ -63,11 +63,11 @@ func TestYUYVConvert(t *testing.T) {
 		fillDummyYUV420PData(frame)
 		logger := logging.NewDebugLogger("mime_test")
 		mh := newMimeHandler(logger)
-		bytes, metadata, err := mh.convertYUYV(frame)
+		bytes, mimeType, err := mh.convertYUYV(frame)
 		test.That(t, err, test.ShouldBeNil)
 		test.That(t, bytes, test.ShouldNotBeNil)
 		test.That(t, len(bytes), test.ShouldBeGreaterThan, 0)
-		test.That(t, metadata, test.ShouldNotBeEmpty)
+		test.That(t, mimeType, test.ShouldNotBeEmpty)
 	})
 
 	t.Run("valid YUVJ420P frame succeeds", func(t *testing.T) {
@@ -78,11 +78,11 @@ func TestYUYVConvert(t *testing.T) {
 		fillDummyYUV420PData(frame)
 		logger := logging.NewDebugLogger("mime_test")
 		mh := newMimeHandler(logger)
-		bytes, metadata, err := mh.convertYUYV(frame)
+		bytes, mimeType, err := mh.convertYUYV(frame)
 		test.That(t, err, test.ShouldBeNil)
 		test.That(t, bytes, test.ShouldNotBeNil)
 		test.That(t, len(bytes), test.ShouldBeGreaterThan, 0)
-		test.That(t, metadata, test.ShouldNotBeEmpty)
+		test.That(t, mimeType, test.ShouldNotBeEmpty)
 	})
 
 	t.Run("invalid frame fails", func(t *testing.T) {
@@ -91,11 +91,11 @@ func TestYUYVConvert(t *testing.T) {
 		defer freeFrame(frame)
 		logger := logging.NewDebugLogger("mime_test")
 		mh := newMimeHandler(logger)
-		bytes, metadata, err := mh.convertYUYV(frame)
+		bytes, mimeType, err := mh.convertYUYV(frame)
 		test.That(t, err, test.ShouldNotBeNil)
 		test.That(t, err.Error(), test.ShouldContainSubstring, "failed to allocate buffer")
 		test.That(t, bytes, test.ShouldBeNil)
-		test.That(t, metadata.MimeType, test.ShouldBeEmpty)
+		test.That(t, mimeType, test.ShouldBeEmpty)
 	})
 
 	//nolint:dupl
@@ -125,11 +125,11 @@ func TestRGBAConvert(t *testing.T) {
 		fillDummyYUV420PData(frame)
 		logger := logging.NewDebugLogger("mime_test")
 		mh := newMimeHandler(logger)
-		bytes, metadata, err := mh.convertRGBA(frame)
+		bytes, mimeType, err := mh.convertRGBA(frame)
 		test.That(t, err, test.ShouldBeNil)
 		test.That(t, bytes, test.ShouldNotBeNil)
 		test.That(t, len(bytes), test.ShouldEqual, width*height*rgbaBytesPerPixel+12) // header size
-		test.That(t, metadata.MimeType, test.ShouldEqual, rutils.MimeTypeRawRGBA)
+		test.That(t, mimeType, test.ShouldEqual, rutils.MimeTypeRawRGBA)
 
 		// Verify the header
 		header := bytes[:12]
@@ -145,11 +145,11 @@ func TestRGBAConvert(t *testing.T) {
 		defer freeFrame(frame)
 		logger := logging.NewDebugLogger("mime_test")
 		mh := newMimeHandler(logger)
-		bytes, metadata, err := mh.convertRGBA(frame)
+		bytes, mimeType, err := mh.convertRGBA(frame)
 		test.That(t, err, test.ShouldNotBeNil)
 		test.That(t, err.Error(), test.ShouldContainSubstring, "failed to allocate buffer")
 		test.That(t, bytes, test.ShouldBeNil)
-		test.That(t, metadata.MimeType, test.ShouldBeEmpty)
+		test.That(t, mimeType, test.ShouldBeEmpty)
 	})
 
 	//nolint:dupl
