@@ -209,15 +209,24 @@ type rtspCamera struct {
 	iframeOnlyDecode bool
 
 	// closeMu guards gortsplib client, h264Media, rawDecoder and lifecycle of mimeHandler/avFramePool.
-	closeMu      sync.RWMutex
-	videoRequest *videoRequest
-	// auMu guards the lazy AU buffer.
-	auMu       sync.Mutex
-	au         [][]byte
-	client     *gortsplib.Client
-	rawDecoder *decoder
+	closeMu     sync.RWMutex
+	client      *gortsplib.Client
 	// h264Media is the RTSP media track for H264.
-	h264Media *description.Media
+	h264Media   *description.Media
+	rawDecoder  *decoder
+	mimeHandler *mimeHandler
+	// We use a pool data structure to amortize the malloc cost of AVFrames and reduce pressure on memory
+	// management. We create one pool for the entire lifetime of the RTSP camera. Additionally, frames
+	// from the pool may be for a resolution that does not match the current image. The user of the pool
+	// is responsible for the underlying frame contents and further initializing it and/or throwing it away.
+	avFramePool *framePool
+
+	videoRequest *videoRequest
+
+	// auMu guards the lazy AU buffer.
+	auMu sync.Mutex
+	au   [][]byte
+
 	// firSeqNum holds the last FIR sequence number (0–255), wraps per RFC 5104.
 	firSeqNum atomic.Uint32
 
@@ -228,16 +237,10 @@ type rtspCamera struct {
 
 	// latestFrameMu guards latestFrame ref counting and latestFrameCache.
 	latestFrameMu    sync.Mutex
-	latestMJPEGBytes atomic.Pointer[[]byte]
 	latestFrame      *avFrameWrapper
 	latestFrameCache cache
-	// We use a pool data structure to amortize the malloc cost of AVFrames and reduce pressure on memory
-	// management. We create one pool for the entire lifetime of the RTSP camera. Additionally, frames
-	// from the pool may be for a resolution that does not match the current image. The user of the pool
-	// is responsible for the underlying frame contents and further initializing it and/or throwing it away.
-	avFramePool *framePool
 
-	mimeHandler *mimeHandler
+	latestMJPEGBytes atomic.Pointer[[]byte]
 
 	logger logging.Logger
 
