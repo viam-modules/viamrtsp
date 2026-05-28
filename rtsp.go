@@ -209,8 +209,8 @@ type rtspCamera struct {
 	iframeOnlyDecode bool
 
 	// closeMu guards gortsplib client, h264Media, rawDecoder and lifecycle of mimeHandler/avFramePool.
-	closeMu     sync.RWMutex
-	client      *gortsplib.Client
+	closeMu sync.RWMutex
+	client  *gortsplib.Client
 	// h264Media is the RTSP media track for H264.
 	h264Media   *description.Media
 	rawDecoder  *decoder
