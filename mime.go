@@ -21,7 +21,6 @@ import (
 	"sync"
 	"unsafe"
 
-	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
 	rutils "go.viam.com/rdk/utils"
 )
@@ -54,22 +53,22 @@ func newMimeHandler(logger logging.Logger) *mimeHandler {
 	}
 }
 
-func (mh *mimeHandler) convertJPEG(frame *C.AVFrame) ([]byte, camera.ImageMetadata, error) {
+func (mh *mimeHandler) convertJPEG(frame *C.AVFrame) ([]byte, string, error) {
 	if frame == nil {
-		return nil, camera.ImageMetadata{}, errors.New("frame input is nil, cannot convert to JPEG")
+		return nil, "", errors.New("frame input is nil, cannot convert to JPEG")
 	}
 	if mh.jpegEnc == nil || frame.width != mh.jpegEnc.width || frame.height != mh.jpegEnc.height {
 		if err := mh.initJPEGEncoder(frame); err != nil {
-			return nil, camera.ImageMetadata{}, err
+			return nil, "", err
 		}
 	}
 	if mh.jpegEnc == nil {
-		return nil, camera.ImageMetadata{}, errors.New("failed to create encoder or destination frame")
+		return nil, "", errors.New("failed to create encoder or destination frame")
 	}
 	// Allocate a fresh packet to prevent issues with concurrent jpeg encoding
 	pkt := C.av_packet_alloc()
 	if pkt == nil {
-		return nil, camera.ImageMetadata{}, errors.New("failed to allocate packet")
+		return nil, "", errors.New("failed to allocate packet")
 	}
 	defer C.av_packet_free(&pkt)
 	frame.pts = C.int64_t(mh.currentPTS)
@@ -77,18 +76,16 @@ func (mh *mimeHandler) convertJPEG(frame *C.AVFrame) ([]byte, camera.ImageMetada
 	mh.currentPTS++
 	res := C.avcodec_send_frame(mh.jpegEnc, frame)
 	if res < 0 {
-		return nil, camera.ImageMetadata{}, newAvError(res, "failed to send frame to MJPEG encoder")
+		return nil, "", newAvError(res, "failed to send frame to MJPEG encoder")
 	}
 	res = C.avcodec_receive_packet(mh.jpegEnc, pkt)
 	if res < 0 {
-		return nil, camera.ImageMetadata{}, newAvError(res, "failed to receive packet from MJPEG encoder")
+		return nil, "", newAvError(res, "failed to receive packet from MJPEG encoder")
 	}
 	// There is no need to create a frame for the packet, as the packet already contains the data
 	dataGo := C.GoBytes(unsafe.Pointer(pkt.data), pkt.size)
 
-	return dataGo, camera.ImageMetadata{
-		MimeType: rutils.MimeTypeJPEG,
-	}, nil
+	return dataGo, rutils.MimeTypeJPEG, nil
 }
 
 func (mh *mimeHandler) initJPEGEncoder(frame *C.AVFrame) error {
@@ -130,7 +127,7 @@ func (mh *mimeHandler) initJPEGEncoder(frame *C.AVFrame) error {
 	return nil
 }
 
-func (mh *mimeHandler) convertYUYV(frame *C.AVFrame) ([]byte, camera.ImageMetadata, error) {
+func (mh *mimeHandler) convertYUYV(frame *C.AVFrame) ([]byte, string, error) {
 	return mh.convertPixelFormat(
 		frame,
 		yuyvMagicString,
@@ -142,7 +139,7 @@ func (mh *mimeHandler) convertYUYV(frame *C.AVFrame) ([]byte, camera.ImageMetada
 	)
 }
 
-func (mh *mimeHandler) convertRGBA(frame *C.AVFrame) ([]byte, camera.ImageMetadata, error) {
+func (mh *mimeHandler) convertRGBA(frame *C.AVFrame) ([]byte, string, error) {
 	return mh.convertPixelFormat(
 		frame,
 		rgbaMagicString,
@@ -163,9 +160,9 @@ func (mh *mimeHandler) convertPixelFormat(
 	initContext func(*C.AVFrame) error,
 	bytesPerPixel int,
 	mimeType string,
-) ([]byte, camera.ImageMetadata, error) {
+) ([]byte, string, error) {
 	if frame == nil {
-		return nil, camera.ImageMetadata{}, fmt.Errorf("frame input is nil, cannot convert to %s", format)
+		return nil, "", fmt.Errorf("frame input is nil, cannot convert to %s", format)
 	}
 	// sws_scale is not thread-safe, so we need to lock here to prevent concurrent access.
 	mh.mu.Lock()
@@ -173,15 +170,15 @@ func (mh *mimeHandler) convertPixelFormat(
 
 	if *swsCtx == nil || frame.width != (*dstFrame).width || frame.height != (*dstFrame).height {
 		if err := initContext(frame); err != nil {
-			return nil, camera.ImageMetadata{}, err
+			return nil, "", err
 		}
 	}
 
 	if *swsCtx == nil {
-		return nil, camera.ImageMetadata{}, fmt.Errorf("failed to create %s converter", format)
+		return nil, "", fmt.Errorf("failed to create %s converter", format)
 	}
 	if *dstFrame == nil {
-		return nil, camera.ImageMetadata{}, fmt.Errorf("failed to create %s destination frame", format)
+		return nil, "", fmt.Errorf("failed to create %s destination frame", format)
 	}
 
 	res := C.sws_scale(
@@ -194,7 +191,7 @@ func (mh *mimeHandler) convertPixelFormat(
 		(*C.int)(unsafe.Pointer(&(*dstFrame).linesize[0])),
 	)
 	if res < 0 {
-		return nil, camera.ImageMetadata{}, newAvError(res, "failed to convert frame to "+format)
+		return nil, "", newAvError(res, "failed to convert frame to "+format)
 	}
 
 	dataSize := int((*dstFrame).width) * int((*dstFrame).height) * bytesPerPixel
@@ -203,9 +200,7 @@ func (mh *mimeHandler) convertPixelFormat(
 	copy(data[0:], header)
 	C.memcpy(unsafe.Pointer(&data[len(header)]), unsafe.Pointer((*dstFrame).data[0]), C.size_t(dataSize))
 
-	return data, camera.ImageMetadata{
-		MimeType: mimeType,
-	}, nil
+	return data, mimeType, nil
 }
 
 func (mh *mimeHandler) initYUYVContext(frame *C.AVFrame) error {

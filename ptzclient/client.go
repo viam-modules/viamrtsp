@@ -84,9 +84,9 @@ func (cfg *Config) Validate(path string) ([]string, []string, error) {
 }
 
 type onvifPtzClient struct {
+	resource.Named
 	resource.AlwaysRebuild
 
-	name   resource.Name
 	logger logging.Logger
 	cfg    *Config
 	dev    *device.Device
@@ -157,7 +157,7 @@ func NewClient(
 	logger.Info("successfully connected to ONVIF device.")
 
 	s := &onvifPtzClient{
-		name:       name,
+		Named:      name.AsNamed(),
 		logger:     logger,
 		cfg:        conf,
 		dev:        dev,
@@ -169,10 +169,6 @@ func NewClient(
 	}
 
 	return s, nil
-}
-
-func (s *onvifPtzClient) Name() resource.Name {
-	return s.name
 }
 
 // callPTZMethod calls an ONVIF PTZ method and unmarshals the response into result.

@@ -47,8 +47,8 @@ func init() {
 }
 
 type service struct {
+	resource.Named
 	resource.AlwaysRebuild
-	name    resource.Name
 	logger  logging.Logger
 	vs      videostore.VideoStore
 	rsMux   *rawSegmenterMux
@@ -115,17 +115,13 @@ func New(ctx context.Context, deps resource.Dependencies, conf resource.Config, 
 	}
 
 	s := &service{
-		name:    conf.ResourceName(),
+		Named:   conf.ResourceName().AsNamed(),
 		logger:  logger,
 		vs:      vs,
 		rsMux:   mux,
 		workers: utils.NewBackgroundStoppableWorkers(),
 	}
 	return s, nil
-}
-
-func (s *service) Name() resource.Name {
-	return s.name
 }
 
 func (s *service) Close(_ context.Context) error {
