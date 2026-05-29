@@ -268,8 +268,7 @@ func (rc *rtspCamera) Close(_ context.Context) error {
 	if err := registry.Global.Remove(rc.Name().String()); err != nil {
 		rc.logger.Errorf("error removing camera from global registry: %s", err.Error())
 	}
-	// Lock around cancelFunc to serialize with RLock holders. Prevents SubscribeRTP
-	// from passing its ctx check and still adding an entry after unsubscribeAll sweeps.
+	// Cancel under Lock so SubscribeRTP can't orphan an entry after unsubscribeAll sweeps.
 	rc.closeMu.Lock()
 	rc.cancelFunc()
 	rc.closeMu.Unlock()
@@ -277,6 +276,7 @@ func (rc *rtspCamera) Close(_ context.Context) error {
 	rc.unsubscribeAll()
 	rc.activeBackgroundWorkers.Wait()
 
+	// Wait for in-flight Image/SubscribeRTP RLock holders, then teardown under exclusive access.
 	rc.closeMu.Lock()
 	defer rc.closeMu.Unlock()
 	rc.closeConnection()
