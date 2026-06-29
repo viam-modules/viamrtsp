@@ -24,14 +24,14 @@ const (
 // Camera is a single Garmin camera discovered over mDNS.
 type Camera struct {
 	// Instance is the mDNS instance name, e.g. "garmin-cv28-copepod-3530195020".
-	Instance string
+	Instance string `json:"instance"`
 	// Host is the advertised hostname without the trailing dot, e.g.
 	// "garmin-cv28-copepod-3530195020.local". May be empty if not advertised.
-	Host string
+	Host string `json:"host"`
 	// IPs are the resolved IPv4 addresses for the host.
-	IPs []net.IP
+	IPs []net.IP `json:"ips"`
 	// Text holds the raw TXT records, retained for future enrichment.
-	Text []string
+	Text []string `json:"text"`
 }
 
 // addressHost returns the host to use when building an RTSP URL. We prefer the
@@ -45,6 +45,13 @@ func (c Camera) addressHost() string {
 		return c.IPs[0].String()
 	}
 	return ""
+}
+
+// DiscoverCameras browses the local network over mDNS and returns the
+// deduplicated set of Garmin cameras found. Exported for use by the standalone
+// cmd/garmin debug binary.
+func DiscoverCameras(ctx context.Context, logger logging.Logger) ([]Camera, error) {
+	return browseGarmin(ctx, logger)
 }
 
 // browseGarmin browses the local network over mDNS for Garmin cameras for the

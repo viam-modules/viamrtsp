@@ -36,6 +36,7 @@ ifeq ($(TARGET_OS),windows)
 endif
 BIN_VIAMRTSP := $(BIN_OUTPUT_PATH)/viamrtsp$(BIN_SUFFIX)
 BIN_DISCOVERY := $(BIN_OUTPUT_PATH)/discovery$(BIN_SUFFIX)
+BIN_GARMIN := $(BIN_OUTPUT_PATH)/garmin$(BIN_SUFFIX)
 TOOL_BIN = bin/gotools/$(shell uname -s)-$(shell uname -m)
 
 FFMPEG_TAG ?= n6.1
@@ -142,7 +143,7 @@ endif
 endif
 endif
 
-.PHONY: build-ffmpeg tool-install gofmt lint lint-ci test profile-cpu profile-memory update-rdk module clean clean-all install-deps viam-server
+.PHONY: build-ffmpeg tool-install gofmt lint lint-ci test profile-cpu profile-memory update-rdk module garmin clean clean-all install-deps viam-server
 
 all: $(BIN_VIAMRTSP) $(BIN_DISCOVERY)
 
@@ -186,6 +187,15 @@ $(BIN_DISCOVERY): build-ffmpeg *.go cmd/discovery/*.go
 	CGO_CFLAGS="$(CGO_CFLAGS)" \
 	GOOS=$(TARGET_OS) \
 	GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) -ldflags="-checklinkname=0" -o $(BIN_DISCOVERY) cmd/discovery/cmd.go
+
+$(BIN_GARMIN): build-ffmpeg *.go garmin/*.go cmd/garmin/*.go
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" \
+	CGO_CFLAGS="$(CGO_CFLAGS)" \
+	GOOS=$(TARGET_OS) \
+	GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) -ldflags="-checklinkname=0" -o $(BIN_GARMIN) cmd/garmin/cmd.go
+
+# Convenience phony target to build just the Garmin discovery debug binary.
+garmin: $(BIN_GARMIN)
 
 tool-install:
 	GOBIN=`pwd`/$(TOOL_BIN) go install \
@@ -318,7 +328,7 @@ module: $(BIN_VIAMRTSP)
 	rm bin/viamrtsp$(BIN_SUFFIX)
 
 clean:
-	rm -rf $(BIN_VIAMRTSP) $(BIN_DISCOVERY) module.tar.gz
+	rm -rf $(BIN_VIAMRTSP) $(BIN_DISCOVERY) $(BIN_GARMIN) module.tar.gz
 
 clean-all:
 	rm -rf FFmpeg
