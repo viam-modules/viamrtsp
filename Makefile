@@ -143,7 +143,7 @@ endif
 endif
 endif
 
-.PHONY: build-ffmpeg tool-install gofmt lint lint-ci test profile-cpu profile-memory update-rdk module garmin clean clean-all install-deps viam-server
+.PHONY: build-ffmpeg tool-install gofmt lint lint-ci test profile-cpu profile-memory update-rdk module clean clean-all install-deps viam-server
 
 all: $(BIN_VIAMRTSP) $(BIN_DISCOVERY)
 
@@ -193,9 +193,6 @@ $(BIN_GARMIN): build-ffmpeg *.go garmin/*.go cmd/garmin/*.go
 	CGO_CFLAGS="$(CGO_CFLAGS)" \
 	GOOS=$(TARGET_OS) \
 	GOARCH=$(TARGET_ARCH) go build $(GO_TAGS) -ldflags="-checklinkname=0" -o $(BIN_GARMIN) cmd/garmin/cmd.go
-
-# Convenience phony target to build just the Garmin discovery debug binary.
-garmin: $(BIN_GARMIN)
 
 tool-install:
 	GOBIN=`pwd`/$(TOOL_BIN) go install \
