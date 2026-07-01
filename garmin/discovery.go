@@ -30,8 +30,6 @@ type Camera struct {
 	Host string `json:"host"`
 	// IPs are the resolved IPv4 addresses for the host.
 	IPs []net.IP `json:"ips"`
-	// Text holds the raw TXT records, retained for future enrichment.
-	Text []string `json:"text"`
 }
 
 // addressHost returns the host to use when building an RTSP URL. We prefer the
@@ -45,13 +43,6 @@ func (c Camera) addressHost() string {
 		return c.IPs[0].String()
 	}
 	return ""
-}
-
-// DiscoverCameras browses the local network over mDNS and returns the
-// deduplicated set of Garmin cameras found. Exported for use by the standalone
-// cmd/garmin debug binary.
-func DiscoverCameras(ctx context.Context, logger logging.Logger) ([]Camera, error) {
-	return browseGarmin(ctx, logger)
 }
 
 // browseGarmin browses the local network over mDNS for Garmin cameras for the
@@ -81,6 +72,7 @@ func browseGarmin(ctx context.Context, logger logging.Logger) ([]Camera, error) 
 		case <-browseCtx.Done():
 			cams := make([]Camera, 0, len(found))
 			for _, c := range found {
+				logger.Debugf("discovered garmin camera: instance=%s host=%s ips=%v", c.Instance, c.Host, c.IPs)
 				cams = append(cams, c)
 			}
 			logger.Debugf("garmin mDNS browse found %d camera(s)", len(cams))
@@ -104,6 +96,5 @@ func serviceEntryToCamera(entry *zeroconf.ServiceEntry) Camera {
 		Instance: entry.Instance,
 		Host:     strings.TrimSuffix(entry.HostName, "."),
 		IPs:      entry.AddrIPv4,
-		Text:     entry.Text,
 	}
 }

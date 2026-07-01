@@ -109,12 +109,19 @@ func newDiscovery(_ context.Context, _ resource.Dependencies,
 // DiscoverResources browses for Garmin cameras over mDNS and returns a camera
 // config for each discovered camera (one per configured stream path).
 func (dis *garminDiscovery) DiscoverResources(ctx context.Context, _ map[string]any) ([]resource.Config, error) {
-	cameras, err := browseGarmin(ctx, dis.logger)
+	return DiscoverConfigs(ctx, dis.cfg, dis.logger)
+}
+
+// DiscoverConfigs browses for Garmin cameras and returns the camera resource
+// configs the discovery service would emit for them. Exported for use by the
+// standalone cmd/garmin debug binary.
+func DiscoverConfigs(ctx context.Context, cfg *Config, logger logging.Logger) ([]resource.Config, error) {
+	cameras, err := browseGarmin(ctx, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to browse for garmin cameras: %w", err)
 	}
 
-	return camerasToConfigs(cameras, dis.cfg, dis.logger)
+	return camerasToConfigs(cameras, cfg, logger)
 }
 
 // camerasToConfigs turns discovered cameras into camera resource configs. Pure

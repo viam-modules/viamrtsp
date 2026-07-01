@@ -1,6 +1,7 @@
 package garmin
 
 import (
+	"encoding/json"
 	"net"
 	"testing"
 
@@ -132,6 +133,29 @@ func TestCamerasToConfigs(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 		test.That(t, configs, test.ShouldBeEmpty)
 	})
+}
+
+func TestCameraConfigMarshalsToMachineConfig(t *testing.T) {
+	// The debug binary dumps these configs as JSON; lock the shape a user sees.
+	logger := logging.NewTestLogger(t)
+	configs, err := camerasToConfigs(
+		[]Camera{{Instance: "garmin-cv28-copepod-3530195020", Host: "garmin-cv28-copepod-3530195020.local"}},
+		&Config{}, logger,
+	)
+	test.That(t, err, test.ShouldBeNil)
+
+	jsonBytes, err := json.Marshal(configs[0])
+	test.That(t, err, test.ShouldBeNil)
+
+	var got map[string]any
+	test.That(t, json.Unmarshal(jsonBytes, &got), test.ShouldBeNil)
+	test.That(t, got["name"], test.ShouldEqual, "garmin-cv28-copepod-3530195020")
+	test.That(t, got["api"], test.ShouldEqual, "rdk:component:camera")
+	test.That(t, got["model"], test.ShouldEqual, "viam:viamrtsp:rtsp")
+	attrs, ok := got["attributes"].(map[string]any)
+	test.That(t, ok, test.ShouldBeTrue)
+	test.That(t, attrs["rtsp_address"], test.ShouldEqual, "rtsp://garmin-cv28-copepod-3530195020.local:8554/Independent/1080p")
+	test.That(t, attrs["rtp_passthrough"], test.ShouldBeTrue)
 }
 
 func TestCreateCameraConfig(t *testing.T) {

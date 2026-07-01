@@ -21,7 +21,7 @@ func main() {
 }
 
 func realMain() error {
-	debug := flag.Bool("debug", false, "enable debug logging")
+	debug := flag.Bool("debug", false, "enable debug logging (logs each discovered camera's host/ips)")
 	output := flag.String("output", "", "if set, also write the JSON to this file")
 	flag.Parse()
 
@@ -32,17 +32,20 @@ func realMain() error {
 		logger = logging.NewLogger("garmin-discovery")
 	}
 
-	cameras, err := garmin.DiscoverCameras(context.Background(), logger)
+	// Dump the camera resource configs the discovery service would emit
+	// (paste-able into a machine's components). Run with -debug to also see each
+	// discovered camera's host/ips logged, e.g. for direct ffmpeg testing.
+	configs, err := garmin.DiscoverConfigs(context.Background(), &garmin.Config{}, logger)
 	if err != nil {
 		return err
 	}
 
-	jsonBytes, err := json.MarshalIndent(cameras, "", "  ")
+	jsonBytes, err := json.MarshalIndent(configs, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	fmt.Println(string(jsonBytes))
+	fmt.Fprintln(os.Stdout, string(jsonBytes))
 
 	if *output != "" {
 		//nolint:mnd
