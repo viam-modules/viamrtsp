@@ -26,13 +26,17 @@ import (
 // Model is the model for a Garmin discovery service for rtsp cameras.
 var Model = viamrtsp.Family.WithModel("garmin")
 
-const (
-	// defaultRTSPPort is the port Garmin's GStreamer RTSP server listens on.
-	defaultRTSPPort = 8554
-	// defaultStreamPath is the RTSP path Garmin cameras serve. Fixed across the
-	// models seen in the field; overridable via config if that changes.
-	defaultStreamPath = "/Independent/1080p"
-)
+// defaultRTSPPort is the port Garmin's GStreamer RTSP server listens on.
+const defaultRTSPPort = 8554
+
+// defaultStreamPaths are the RTSP routes Garmin cameras serve, confirmed by
+// probing live GC-series cameras in the field. One camera config is emitted per
+// route. Overridable via config if a model exposes a different set.
+var defaultStreamPaths = []string{
+	"/Independent/480p",
+	"/Independent/540p",
+	"/Independent/720p",
+}
 
 func init() {
 	resource.RegisterService(
@@ -78,7 +82,7 @@ func (cfg *Config) paths() []string {
 	if len(cfg.StreamPaths) > 0 {
 		return cfg.StreamPaths
 	}
-	return []string{defaultStreamPath}
+	return defaultStreamPaths
 }
 
 type garminDiscovery struct {

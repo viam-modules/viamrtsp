@@ -27,7 +27,7 @@ func TestConfigDefaults(t *testing.T) {
 	t.Run("empty config uses garmin defaults", func(t *testing.T) {
 		cfg := &Config{}
 		test.That(t, cfg.port(), test.ShouldEqual, defaultRTSPPort)
-		test.That(t, cfg.paths(), test.ShouldResemble, []string{defaultStreamPath})
+		test.That(t, cfg.paths(), test.ShouldResemble, defaultStreamPaths)
 	})
 
 	t.Run("overrides are respected", func(t *testing.T) {
@@ -92,21 +92,27 @@ func TestCameraName(t *testing.T) {
 func TestCamerasToConfigs(t *testing.T) {
 	logger := logging.NewTestLogger(t)
 
-	t.Run("default path emits one camera config per camera", func(t *testing.T) {
+	t.Run("default config emits one camera config per route", func(t *testing.T) {
 		cams := []Camera{{Instance: "garmin-cv28-x", Host: "garmin-cv28-x.local"}}
 		configs, err := camerasToConfigs(cams, &Config{}, logger)
 		test.That(t, err, test.ShouldBeNil)
-		test.That(t, len(configs), test.ShouldEqual, 1)
+		test.That(t, len(configs), test.ShouldEqual, len(defaultStreamPaths))
 
-		cfg := configs[0]
-		test.That(t, cfg.Name, test.ShouldEqual, "garmin-cv28-x")
-		test.That(t, cfg.API, test.ShouldResemble, camera.API)
-		test.That(t, cfg.Model, test.ShouldResemble, viamrtsp.ModelAgnostic)
-
-		rtsp, ok := cfg.ConvertedAttributes.(*viamrtsp.Config)
-		test.That(t, ok, test.ShouldBeTrue)
-		test.That(t, rtsp.Address, test.ShouldEqual, "rtsp://garmin-cv28-x.local:8554/Independent/1080p")
-		test.That(t, *rtsp.RTPPassthrough, test.ShouldBeTrue)
+		// Each config points at a distinct route and has a unique name.
+		gotAddrs := map[string]bool{}
+		gotNames := map[string]bool{}
+		for _, cfg := range configs {
+			test.That(t, cfg.API, test.ShouldResemble, camera.API)
+			test.That(t, cfg.Model, test.ShouldResemble, viamrtsp.ModelAgnostic)
+			rtsp, ok := cfg.ConvertedAttributes.(*viamrtsp.Config)
+			test.That(t, ok, test.ShouldBeTrue)
+			test.That(t, *rtsp.RTPPassthrough, test.ShouldBeTrue)
+			gotAddrs[rtsp.Address] = true
+			gotNames[cfg.Name] = true
+		}
+		test.That(t, len(gotAddrs), test.ShouldEqual, len(defaultStreamPaths))
+		test.That(t, len(gotNames), test.ShouldEqual, len(defaultStreamPaths))
+		test.That(t, gotAddrs["rtsp://garmin-cv28-x.local:8554/Independent/540p"], test.ShouldBeTrue)
 	})
 
 	t.Run("multiple paths emit a config per path with unique names", func(t *testing.T) {
@@ -120,11 +126,11 @@ func TestCamerasToConfigs(t *testing.T) {
 
 	t.Run("falls back to IP when no hostname advertised", func(t *testing.T) {
 		cams := []Camera{{Instance: "garmin-cv28-x", IPs: []net.IP{net.ParseIP("172.16.0.5")}}}
-		configs, err := camerasToConfigs(cams, &Config{}, logger)
+		configs, err := camerasToConfigs(cams, &Config{StreamPaths: []string{"/Independent/720p"}}, logger)
 		test.That(t, err, test.ShouldBeNil)
 		test.That(t, len(configs), test.ShouldEqual, 1)
 		rtsp := configs[0].ConvertedAttributes.(*viamrtsp.Config)
-		test.That(t, rtsp.Address, test.ShouldEqual, "rtsp://172.16.0.5:8554/Independent/1080p")
+		test.That(t, rtsp.Address, test.ShouldEqual, "rtsp://172.16.0.5:8554/Independent/720p")
 	})
 
 	t.Run("skips cameras with neither hostname nor IP", func(t *testing.T) {
@@ -140,7 +146,7 @@ func TestCameraConfigMarshalsToMachineConfig(t *testing.T) {
 	logger := logging.NewTestLogger(t)
 	configs, err := camerasToConfigs(
 		[]Camera{{Instance: "garmin-cv28-copepod-3530195020", Host: "garmin-cv28-copepod-3530195020.local"}},
-		&Config{}, logger,
+		&Config{StreamPaths: []string{"/Independent/720p"}}, logger,
 	)
 	test.That(t, err, test.ShouldBeNil)
 
@@ -154,7 +160,7 @@ func TestCameraConfigMarshalsToMachineConfig(t *testing.T) {
 	test.That(t, got["model"], test.ShouldEqual, "viam:viamrtsp:rtsp")
 	attrs, ok := got["attributes"].(map[string]any)
 	test.That(t, ok, test.ShouldBeTrue)
-	test.That(t, attrs["rtsp_address"], test.ShouldEqual, "rtsp://garmin-cv28-copepod-3530195020.local:8554/Independent/1080p")
+	test.That(t, attrs["rtsp_address"], test.ShouldEqual, "rtsp://garmin-cv28-copepod-3530195020.local:8554/Independent/720p")
 	test.That(t, attrs["rtp_passthrough"], test.ShouldBeTrue)
 }
 
