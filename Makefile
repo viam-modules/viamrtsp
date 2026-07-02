@@ -169,6 +169,7 @@ endif
 	sudo ./viam-server --aix-install
 endif
 ifeq ($(SOURCE_OS),darwin)
+	brew trust viamrobotics/brews
 	brew tap viamrobotics/brews
 	brew install viam-server
 endif
