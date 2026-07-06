@@ -112,7 +112,7 @@ func TestCollectCamerasDrainsBufferedEntriesAtTimeout(t *testing.T) {
 	// must collect every buffered camera.
 	const n = 16
 	entries := make(chan *zeroconf.ServiceEntry, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		instance := fmt.Sprintf("garmin-%d", i)
 		entries <- newServiceEntry(instance, instance+".local.", "172.16.0.1")
 	}
