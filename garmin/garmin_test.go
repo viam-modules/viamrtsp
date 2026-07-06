@@ -162,7 +162,7 @@ func TestCamerasToConfigs(t *testing.T) {
 		}
 		test.That(t, len(gotAddrs), test.ShouldEqual, len(defaultStreamPaths))
 		test.That(t, len(gotNames), test.ShouldEqual, len(defaultStreamPaths))
-		test.That(t, gotAddrs["rtsp://garmin-cv28-x.local:8554/Independent/540p"], test.ShouldBeTrue)
+		test.That(t, gotAddrs["rtsp://garmin-cv28-x.local:8554/Independent/1080p"], test.ShouldBeTrue)
 	})
 
 	t.Run("multiple paths emit a config per path with unique names", func(t *testing.T) {

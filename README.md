@@ -403,14 +403,14 @@ The machine running this service must be on the same network as the cameras so i
 | Name    | Type   | Inclusion    | Description |
 | ------- | ------ | ------------ | ----------- |
 | `rtsp_port` | int | Optional | The port the Garmin RTSP server listens on. Defaults to `8554`. |
-| `stream_paths` | []string | Optional | The RTSP routes to emit a camera config for, one config per route. Defaults to `["/Independent/480p", "/Independent/540p", "/Independent/720p"]`. |
+| `stream_paths` | []string | Optional | The RTSP routes to emit a camera config for, one config per route. Defaults to `["/Independent/480p", "/Independent/720p", "/Independent/1080p"]`. |
 
 ### Example Configuration
 
 ```json
 {
   "rtsp_port": 8554,
-  "stream_paths": ["/Independent/480p", "/Independent/540p", "/Independent/720p"]
+  "stream_paths": ["/Independent/480p", "/Independent/720p", "/Independent/1080p"]
 }
 ```
 

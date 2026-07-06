@@ -34,8 +34,8 @@ const defaultRTSPPort = 8554
 // route. Overridable via config if a model exposes a different set.
 var defaultStreamPaths = []string{
 	"/Independent/480p",
-	"/Independent/540p",
 	"/Independent/720p",
+	"/Independent/1080p",
 }
 
 func init() {
