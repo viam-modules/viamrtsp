@@ -11,6 +11,7 @@ Five camera models are provided:
 This module also implements the `"rdk:service:discovery"` API to surface RTSP cameras based on their communication protocol:
 * `viam:viamrtsp:onvif` - discovers cameras using the [onvif interface](https://www.onvif.org/).
 * `viam:viamrtsp:unifi` - discovers cameras connected to a [UniFi Protect](https://ui.com/camera-security) NVR.
+* `viam:viamrtsp:garmin` - discovers [Garmin](https://www.garmin.com/en-US/c/marine/boat-cameras/) marine cameras that advertise over mDNS.
 
 This module also implements the `"rdk:service:video"` API for streaming stored video:
 * `viam:viamrtsp:video-service` - streams stored video from RTSP cameras using the `GetVideo` API.
@@ -386,6 +387,50 @@ The `DiscoverResources` API returns a list of cameras discovered from the NVR wi
 ### RTSP URL Conversion
 
 The UniFi Protect API returns RTSPS (secure) URLs on port 7441. This discovery service automatically converts them to plain RTSP on port 7447, which is more widely compatible with video clients.
+
+## Configure the `viamrtsp:garmin` discovery service
+
+This model discovers [Garmin](https://www.garmin.com/en-US/c/marine/boat-cameras/) marine cameras (such as the GC 100 / GC 200) on the local network. Garmin cameras are not ONVIF-discoverable; instead they advertise themselves over mDNS under the `_garmin-mrn-svcm._tcp` service type with a stable `*.local` hostname. This service browses for those advertisements and surfaces a camera configuration for each Garmin RTSP route.
+
+The machine running this service must be on the same network as the cameras so it can receive their mDNS broadcasts (Garmin networks are typically a `172.16.0.0/12` subnet). No attributes are required — the service discovers cameras automatically:
+
+```json
+{}
+```
+
+### Attributes
+
+| Name    | Type   | Inclusion    | Description |
+| ------- | ------ | ------------ | ----------- |
+| `rtsp_port` | int | Optional | The port the Garmin RTSP server listens on. Defaults to `8554`. |
+| `stream_paths` | []string | Optional | The RTSP routes to emit a camera config for, one config per route. Defaults to `["/Independent/480p", "/Independent/720p", "/Independent/1080p"]`. |
+
+### Example Configuration
+
+```json
+{
+  "rtsp_port": 8554,
+  "stream_paths": ["/Independent/480p", "/Independent/720p", "/Independent/1080p"]
+}
+```
+
+### Camera Configs
+
+The `DiscoverResources` API returns a list of cameras discovered over mDNS, with one component configuration per configured route. The `rtsp_address` uses the camera's self-advertised mDNS hostname:
+
+```json
+{
+  "api": "rdk:component:camera",
+  "attributes": {
+    "rtsp_address": "rtsp://garmin-cv28-copepod-3530195020.local:8554/Independent/720p",
+    "rtp_passthrough": true
+  },
+  "model": "viam:viamrtsp:rtsp",
+  "name": "garmin-cv28-copepod-3530195020-Independent-720p"
+}
+```
+
+**Note:** Camera names are derived from the mDNS instance name with the route appended for disambiguation. If the advertised hostname is unavailable, the discovered IP address is used in the `rtsp_address` instead.
 
 ## Configure the `viamrtsp:video-service` video service
 

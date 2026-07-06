@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/viam-modules/viamrtsp"
+	"github.com/viam-modules/viamrtsp/garmin"
 	"github.com/viam-modules/viamrtsp/ptzclient"
 	"github.com/viam-modules/viamrtsp/unifi"
 	"github.com/viam-modules/viamrtsp/upnpdiscovery"
@@ -65,6 +66,10 @@ func mainWithArgs(ctx context.Context, _ []string, logger logging.Logger) error 
 		return err
 	}
 	err = myMod.AddModelFromRegistry(ctx, discovery.API, upnpdiscovery.Model)
+	if err != nil {
+		return err
+	}
+	err = myMod.AddModelFromRegistry(ctx, discovery.API, garmin.Model)
 	if err != nil {
 		return err
 	}
