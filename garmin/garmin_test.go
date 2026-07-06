@@ -1,9 +1,11 @@
 package garmin
 
 import (
+	"context"
 	"encoding/json"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/viam-modules/viamrtsp"
 	"github.com/viamrobotics/zeroconf"
@@ -72,6 +74,31 @@ func TestServiceEntryToCamera(t *testing.T) {
 	test.That(t, cam.Instance, test.ShouldEqual, "garmin-cv28-copepod-3530195020")
 	test.That(t, cam.Host, test.ShouldEqual, "garmin-cv28-copepod-3530195020.local")
 	test.That(t, cam.IPs[0].String(), test.ShouldEqual, "172.16.0.5")
+}
+
+func TestCollectCamerasReturnsOnClosedChannel(t *testing.T) {
+	logger := logging.NewTestLogger(t)
+
+	entries := make(chan *zeroconf.ServiceEntry, 4)
+	entries <- newServiceEntry("garmin-a", "garmin-a.local.", "172.16.0.1")
+	entries <- newServiceEntry("garmin-b", "garmin-b.local.", "172.16.0.2")
+	close(entries)
+
+	// ctx never expires: before the J1 fix, a single-value receive on the closed
+	// channel yields nil forever and spins the loop at 100% CPU. The comma-ok
+	// receive must instead finalize and return. Guard with a timeout so a
+	// regression fails fast rather than hanging the whole suite.
+	done := make(chan []Camera, 1)
+	go func() {
+		done <- collectCameras(context.Background(), entries, logger)
+	}()
+
+	select {
+	case cams := <-done:
+		test.That(t, len(cams), test.ShouldEqual, 2)
+	case <-time.After(2 * time.Second):
+		t.Fatal("collectCameras did not return on closed channel (busy-loop regression)")
+	}
 }
 
 func TestCameraName(t *testing.T) {

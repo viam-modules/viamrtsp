@@ -63,29 +63,46 @@ func browseGarmin(ctx context.Context, logger logging.Logger) ([]Camera, error) 
 		return nil, err
 	}
 
-	// Collect until the browse window closes. zeroconf may emit the same instance
-	// multiple times; dedupe by instance name, preferring entries that carry a
-	// resolved hostname/IP.
+	return collectCameras(browseCtx, entries, logger), nil
+}
+
+// collectCameras drains ServiceEntries until the browse window closes or the
+// entries channel is closed, deduping by instance name and preferring entries
+// that carry a resolved hostname/IP.
+func collectCameras(ctx context.Context, entries <-chan *zeroconf.ServiceEntry, logger logging.Logger) []Camera {
 	found := make(map[string]Camera)
+	add := func(entry *zeroconf.ServiceEntry) {
+		if entry == nil {
+			return
+		}
+		cam := serviceEntryToCamera(entry)
+		if existing, seen := found[cam.Instance]; !seen || (existing.addressHost() == "" && cam.addressHost() != "") {
+			found[cam.Instance] = cam
+		}
+	}
+	finalize := func() []Camera {
+		cams := make([]Camera, 0, len(found))
+		for _, c := range found {
+			logger.Debugf("discovered garmin camera: instance=%s host=%s ips=%v", c.Instance, c.Host, c.IPs)
+			cams = append(cams, c)
+		}
+		logger.Debugf("garmin mDNS browse found %d camera(s)", len(cams))
+		return cams
+	}
+
 	for {
 		select {
-		case <-browseCtx.Done():
-			cams := make([]Camera, 0, len(found))
-			for _, c := range found {
-				logger.Debugf("discovered garmin camera: instance=%s host=%s ips=%v", c.Instance, c.Host, c.IPs)
-				cams = append(cams, c)
+		case <-ctx.Done():
+			return finalize()
+		case entry, ok := <-entries:
+			// zeroconf closes the channel when the browse ends or on a transient
+			// error (via params.done()). A single-value receive can't tell a
+			// closed channel from a nil entry, so check ok explicitly: otherwise
+			// a close while ctx is still live spins the loop at 100% CPU.
+			if !ok {
+				return finalize()
 			}
-			logger.Debugf("garmin mDNS browse found %d camera(s)", len(cams))
-			return cams, nil
-		case entry := <-entries:
-			if entry == nil {
-				continue
-			}
-			cam := serviceEntryToCamera(entry)
-			existing, ok := found[cam.Instance]
-			if !ok || (existing.addressHost() == "" && cam.addressHost() != "") {
-				found[cam.Instance] = cam
-			}
+			add(entry)
 		}
 	}
 }
