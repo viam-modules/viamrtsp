@@ -145,11 +145,11 @@ func camerasToConfigs(cameras []Camera, cfg *Config, logger logging.Logger) ([]r
 		for _, path := range paths {
 			address := fmt.Sprintf("rtsp://%s:%d%s", host, port, path)
 			name := cameraName(cam.Instance, path, len(paths) > 1)
-			cfg, err := createCameraConfig(name, address)
+			camCfg, err := createCameraConfig(name, address)
 			if err != nil {
 				return nil, err
 			}
-			configs = append(configs, cfg)
+			configs = append(configs, camCfg)
 		}
 	}
 
