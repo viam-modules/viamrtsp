@@ -3,6 +3,7 @@ package garmin
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -99,6 +100,28 @@ func TestCollectCamerasReturnsOnClosedChannel(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("collectCameras did not return on closed channel (busy-loop regression)")
 	}
+}
+
+func TestCollectCamerasDrainsBufferedEntriesAtTimeout(t *testing.T) {
+	logger := logging.NewTestLogger(t)
+
+	// Pre-buffer several distinct entries, then use an already-expired ctx so the
+	// Done case is always ready. Without the drain, the outer select would pick
+	// Done over a ready receive and drop buffered cameras (with n=16, the odds of
+	// draining all before the coin-flip lands on Done are ~1/2^16). The drain
+	// must collect every buffered camera.
+	const n = 16
+	entries := make(chan *zeroconf.ServiceEntry, n)
+	for i := 0; i < n; i++ {
+		instance := fmt.Sprintf("garmin-%d", i)
+		entries <- newServiceEntry(instance, instance+".local.", "172.16.0.1")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	cams := collectCameras(ctx, entries, logger)
+	test.That(t, len(cams), test.ShouldEqual, n)
 }
 
 func TestCameraName(t *testing.T) {

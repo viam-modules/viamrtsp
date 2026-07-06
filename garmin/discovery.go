@@ -93,7 +93,21 @@ func collectCameras(ctx context.Context, entries <-chan *zeroconf.ServiceEntry, 
 	for {
 		select {
 		case <-ctx.Done():
-			return finalize()
+			// The browse window closed. Drain whatever is still buffered before
+			// finalizing: select picks uniformly at random among ready cases, so
+			// otherwise a camera that responded right at the deadline could be
+			// dropped whenever this Done case wins over a ready receive.
+			for {
+				select {
+				case entry, ok := <-entries:
+					if !ok {
+						return finalize()
+					}
+					add(entry)
+				default:
+					return finalize()
+				}
+			}
 		case entry, ok := <-entries:
 			// zeroconf closes the channel when the browse ends or on a transient
 			// error (via params.done()). A single-value receive can't tell a
