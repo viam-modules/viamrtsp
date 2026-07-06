@@ -51,8 +51,8 @@ func init() {
 type Config struct {
 	// RTSPPort overrides the RTSP port. Defaults to 8554 if unset.
 	RTSPPort int `json:"rtsp_port,omitempty"`
-	// StreamPaths overrides the RTSP path(s) to emit per camera. Defaults to
-	// ["/Independent/1080p"] if unset. One camera config is emitted per path.
+	// StreamPaths overrides the RTSP path(s) to emit a camera config for, one
+	// config per path. Defaults to defaultStreamPaths if unset.
 	StreamPaths []string `json:"stream_paths,omitempty"`
 }
 
