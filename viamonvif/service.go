@@ -4,7 +4,6 @@ package viamonvif
 import (
 	"context"
 	"crypto/tls"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,13 +21,13 @@ import (
 	"github.com/icholy/digest"
 	"github.com/viam-modules/viamrtsp"
 	"github.com/viam-modules/viamrtsp/ptzclient"
+	"github.com/viam-modules/viamrtsp/rtsppreview"
 	"github.com/viam-modules/viamrtsp/viamonvif/device"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/components/generic"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/services/discovery"
-	rutils "go.viam.com/rdk/utils"
 	"go.viam.com/utils"
 )
 
@@ -41,8 +40,6 @@ var (
 
 const (
 	snapshotClientTimeout = 5 * time.Second
-	rtspPollTimeout       = 5 * time.Second
-	rtspImageInterval     = 100 * time.Millisecond
 	discoveryInterval     = time.Minute
 	ptzClientNamePrefix   = "ptz-client-"
 )
@@ -70,10 +67,6 @@ func (cfg *Config) Validate(_ string) ([]string, []string, error) {
 		}
 	}
 	return []string{}, nil, nil
-}
-
-type previewRequest struct {
-	rtspURL string
 }
 
 type rtspDiscovery struct {
@@ -237,12 +230,12 @@ func (dis *rtspDiscovery) DoCommand(ctx context.Context, command map[string]inte
 	switch cmd {
 	case "preview":
 		dis.logger.Debugf("snapshot command received")
-		previewReq, err := toPreviewCommand(command)
+		rtspURL, err := rtsppreview.ParsePreviewCommand(command)
 		if err != nil {
 			return nil, err
 		}
 
-		dataURL, err := dis.preview(ctx, previewReq.rtspURL)
+		dataURL, err := dis.preview(ctx, rtspURL)
 		if err != nil {
 			return nil, err
 		}
@@ -280,7 +273,7 @@ func (dis *rtspDiscovery) preview(ctx context.Context, rtspURL string) (string, 
 
 	// Fallback to fetching the image via RTSP
 	dis.logger.Debugf("attempting to fetch image via RTSP URL: %s", rtspURL)
-	dataURL, err := fetchImageFromRTSPURL(ctx, dis.logger, rtspURL)
+	dataURL, err := rtsppreview.FetchImageFromRTSPURL(ctx, dis.logger, rtspURL)
 	if err == nil {
 		dis.logger.Debugf("successfully fetched image via RTSP for URL: %s", rtspURL)
 		return dataURL, nil
@@ -320,24 +313,6 @@ func (dis *rtspDiscovery) Close(_ context.Context) error {
 	dis.logger.Debug("discovery service closed")
 
 	return nil
-}
-
-func toPreviewCommand(command map[string]interface{}) (*previewRequest, error) {
-	attributes, ok := command["attributes"].(map[string]interface{})
-	if !ok {
-		return nil, errors.New("attributes is missing or not a map")
-	}
-	rtspURL, ok := attributes["rtsp_address"].(string)
-	if !ok {
-		return nil, errors.New("rtsp_address cannot be empty")
-	}
-	return &previewRequest{rtspURL: rtspURL}, nil
-}
-
-// formatDataURL formats the image data and content type into a data URL.
-func formatDataURL(contentType string, imageBytes []byte) string {
-	base64Image := base64.StdEncoding.EncodeToString(imageBytes)
-	return fmt.Sprintf("data:%s;base64,%s", contentType, base64Image)
 }
 
 // downloadPreviewImage downloads the preview image from the snapshot uri and returns it as a data URL.
@@ -411,81 +386,9 @@ func downloadPreviewImage(ctx context.Context, logger logging.Logger, snapshotUR
 	}
 	logger.Debugf("retrieved image data: %d bytes and content type: %s", len(imageBytes), contentType)
 
-	dataURL := formatDataURL(contentType, imageBytes)
+	dataURL := rtsppreview.FormatDataURL(contentType, imageBytes)
 
 	return dataURL, nil
-}
-
-// fetchImageFromRTSPURL fetches the image from the rtsp URL and returns it as a data URL.
-func fetchImageFromRTSPURL(ctx context.Context, logger logging.Logger, rtspURL string) (string, error) {
-	// Wrap viamrtsp.Config in a resource.Config
-	rtspConfig := viamrtsp.Config{
-		Address: rtspURL,
-	}
-	uniqueName := generateUniqueName("tmp-camera")
-	resourceConfig := resource.Config{
-		Name:                uniqueName,
-		API:                 camera.API,
-		Model:               viamrtsp.ModelAgnostic,
-		ConvertedAttributes: &rtspConfig,
-	}
-
-	camera, err := viamrtsp.NewRTSPCamera(ctx, nil, resourceConfig, logger)
-	if err != nil {
-		return "", fmt.Errorf("failed to create RTSP camera: %w", err)
-	}
-	defer func() {
-		if closeErr := camera.Close(ctx); closeErr != nil {
-			logger.Warnf("failed to close camera: %v", closeErr)
-		}
-	}()
-
-	retryInterval := rtspImageInterval
-	timeout := rtspPollTimeout
-	ticker := time.NewTicker(retryInterval)
-	defer ticker.Stop()
-	timeoutChan := time.After(timeout)
-	var imageErr error
-	for {
-		select {
-		case <-ticker.C:
-			// Attempt to get an image from the RTSP camera
-			namedImages, _, err := camera.Images(ctx, nil, nil)
-			if err == nil {
-				if len(namedImages) != 1 {
-					imageErr = fmt.Errorf("expected exactly 1 image, got %d", len(namedImages))
-					continue
-				}
-				namedImage := namedImages[0]
-				imgBytes, err := namedImage.Bytes(ctx)
-				if err != nil {
-					imageErr = fmt.Errorf("failed to get image bytes: %w", err)
-					continue
-				}
-				if namedImage.MimeType() != rutils.MimeTypeJPEG {
-					imageErr = fmt.Errorf("expected %s, got %s", rutils.MimeTypeJPEG, namedImage.MimeType())
-					continue
-				}
-
-				logger.Debugf("Received image with metadata: %v, size: %d bytes", namedImage.SourceName, len(imgBytes))
-				dataURL := formatDataURL(rutils.MimeTypeJPEG, imgBytes)
-				return dataURL, nil
-			}
-			imageErr = err
-			logger.Debugf("Failed to get image from RTSP camera: %v", imageErr)
-		case <-timeoutChan:
-			return "", fmt.Errorf("timeout while trying to get image from RTSP camera: %w", imageErr)
-		case <-ctx.Done():
-			return "", fmt.Errorf("context canceled while fetching image from RTSP camera: %w", ctx.Err())
-		}
-	}
-}
-
-// generateUniqueName creates a unique name by adding timestamp and random bytes.
-func generateUniqueName(prefix string) string {
-	timestamp := time.Now().UnixNano()
-	uniqueName := fmt.Sprintf("%s-%d", prefix, timestamp)
-	return uniqueName
 }
 
 func createCamerasFromURLs(l CameraInfo, discoveryDependencyName string, logger logging.Logger) ([]resource.Config, error) {

@@ -17,6 +17,7 @@ import (
 	"strings"
 
 	"github.com/viam-modules/viamrtsp"
+	"github.com/viam-modules/viamrtsp/rtsppreview"
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
@@ -114,6 +115,31 @@ func newDiscovery(_ context.Context, _ resource.Dependencies,
 // config for each discovered camera (one per configured stream path).
 func (dis *garminDiscovery) DiscoverResources(ctx context.Context, _ map[string]any) ([]resource.Config, error) {
 	return DiscoverConfigs(ctx, dis.cfg, dis.logger)
+}
+
+// DoCommand handles the "preview" command, returning a JPEG data URL for the
+// given rtsp_address grabbed over RTSP. Garmin cameras expose no HTTP snapshot
+// endpoint, so preview always goes through RTSP.
+func (dis *garminDiscovery) DoCommand(ctx context.Context, command map[string]interface{}) (map[string]interface{}, error) {
+	cmd, ok := command["command"].(string)
+	if !ok {
+		return nil, errors.New("invalid command type")
+	}
+
+	switch cmd {
+	case "preview":
+		rtspURL, err := rtsppreview.ParsePreviewCommand(command)
+		if err != nil {
+			return nil, err
+		}
+		dataURL, err := rtsppreview.FetchImageFromRTSPURL(ctx, dis.logger, rtspURL)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{"preview": dataURL}, nil
+	default:
+		return nil, fmt.Errorf("unknown command: %s", cmd)
+	}
 }
 
 // DiscoverConfigs browses for Garmin cameras and returns the camera resource
