@@ -432,6 +432,27 @@ The `DiscoverResources` API returns a list of cameras discovered over mDNS, with
 
 **Note:** Camera names are derived from the mDNS instance name with the route appended for disambiguation. If the advertised hostname is unavailable, the discovered IP address is used in the `rtsp_address` instead.
 
+### Preview DoCommand
+
+The `preview` DoCommand returns a preview image of a discovered camera's stream. Copy the `attributes` section from a `DiscoverResources` result into the command; `rtsp_address` is the only required field. Unlike ONVIF, Garmin cameras have no HTTP snapshot endpoint, so the image is grabbed directly over RTSP.
+
+```json
+{
+  "command": "preview",
+  "attributes": {
+    "rtsp_address": "rtsp://garmin-cv28-copepod-3530195020.local:8554/Independent/720p"
+  }
+}
+```
+
+The response is a preview image in the [DataURL](https://developer.mozilla.org/en-US/docs/Web/URI/Reference/Schemes/data) format.
+
+```json
+{
+  "preview": "data:image/jpeg;base64,<base64_encoded_image>"
+}
+```
+
 ## Configure the `viamrtsp:video-service` video service
 
 This model implements the `"rdk:service:video"` API for streaming stored video from RTSP cameras. It provides the `GetVideo` method for streaming video chunks between specified timestamps.

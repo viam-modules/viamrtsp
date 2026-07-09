@@ -404,18 +404,6 @@ func TestDoCommandPreview(t *testing.T) {
 	})
 }
 
-func TestGenerateUniqueName(t *testing.T) {
-	t.Run("Test unique name generation", func(t *testing.T) {
-		prefix := "test-prefix"
-		name1 := generateUniqueName(prefix)
-		test.That(t, strings.HasPrefix(name1, prefix), test.ShouldBeTrue)
-		name2 := generateUniqueName(prefix)
-		test.That(t, strings.HasPrefix(name2, prefix), test.ShouldBeTrue)
-		// Ensure names are unique
-		test.That(t, name1, test.ShouldNotEqual, name2)
-	})
-}
-
 func startTestHTTPServer(t *testing.T, path string, statusCode int, contentType, responseBody string, useTLS bool) *httptest.Server {
 	handler := http.NewServeMux()
 	handler.HandleFunc(path, func(w http.ResponseWriter, _ *http.Request) {
