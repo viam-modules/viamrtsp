@@ -31,7 +31,7 @@ func ParsePreviewCommand(command map[string]interface{}) (string, error) {
 		return "", errors.New("attributes is missing or not a map")
 	}
 	rtspURL, ok := attributes["rtsp_address"].(string)
-	if !ok {
+	if !ok || rtspURL == "" {
 		return "", errors.New("rtsp_address cannot be empty")
 	}
 	return rtspURL, nil

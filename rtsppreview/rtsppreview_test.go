@@ -30,6 +30,13 @@ func TestParsePreviewCommand(t *testing.T) {
 		})
 		test.That(t, err, test.ShouldNotBeNil)
 	})
+
+	t.Run("empty rtsp_address", func(t *testing.T) {
+		_, err := ParsePreviewCommand(map[string]interface{}{
+			"attributes": map[string]interface{}{"rtsp_address": ""},
+		})
+		test.That(t, err, test.ShouldNotBeNil)
+	})
 }
 
 func TestFormatDataURL(t *testing.T) {
