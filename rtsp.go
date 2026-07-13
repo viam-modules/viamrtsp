@@ -250,11 +250,11 @@ type rtspCamera struct {
 
 	logger logging.Logger
 
-	// lastFrameReceived is the UnixNano timestamp of the most recently received frame. It is the
-	// single source of truth for stream liveness: the reconnect worker reconnects only once frames
-	// stop arriving, and Image() uses it to avoid returning stale frames. A stream that is actively
-	// delivering frames is healthy and is never reconnected, regardless of the OPTIONS probe.
-	lastFrameReceived atomic.Int64
+	// lastFrameTime is the UnixNano timestamp of the most recently received frame. It is
+	// the single source of truth for stream liveness: the reconnect worker reconnects only once
+	// frames stop arriving, and Image() uses it to avoid returning stale frames. A stream that is
+	// actively delivering frames is healthy and is never reconnected, regardless of the OPTIONS probe.
+	lastFrameTime atomic.Int64
 
 	rtpPassthrough              bool
 	currentCodec                atomic.Int64
@@ -273,9 +273,12 @@ func (rc *rtspCamera) Close(_ context.Context) error {
 		rc.logger.Errorf("error removing camera from global registry: %s", err.Error())
 	}
 	rc.cancelFunc()
+	// Wait for the reconnect worker to exit BEFORE taking closeMu. The worker acquires closeMu
+	// while reconnecting (see reconnectClient), so holding it here would deadlock: Close would wait
+	// for a worker that is itself blocked waiting for closeMu.
+	rc.activeBackgroundWorkers.Wait()
 	rc.closeMu.Lock()
 	rc.unsubscribeAll()
-	rc.activeBackgroundWorkers.Wait()
 	rc.closeConnection()
 	rc.mimeHandler.close()
 	// Clean up latestFrame cache if it exists. This is necessary to ensure that the frame is properly
@@ -1408,12 +1411,12 @@ func (rc *rtspCamera) handleLatestFrame(newFrame *avFrameWrapper) {
 
 // markFrameReceived stamps the liveness timestamp used by the reconnect worker and Image().
 func (rc *rtspCamera) markFrameReceived() {
-	rc.lastFrameReceived.Store(time.Now().UnixNano())
+	rc.lastFrameTime.Store(time.Now().UnixNano())
 }
 
 // timeSinceLastFrame reports how long it has been since the last frame was received.
 func (rc *rtspCamera) timeSinceLastFrame() time.Duration {
-	return time.Since(time.Unix(0, rc.lastFrameReceived.Load()))
+	return time.Since(time.Unix(0, rc.lastFrameTime.Load()))
 }
 
 func naluType(nalu []byte) h264.NALUType {
