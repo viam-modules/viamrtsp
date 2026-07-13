@@ -44,6 +44,12 @@ import (
 const (
 	// reconnectIntervalSeconds is the interval in secs to wait before reconnecting the background worker.
 	reconnectIntervalSeconds = 5
+	// noFrameTimeoutSeconds is how long the stream may go without receiving a frame before the
+	// reconnect worker considers it unhealthy and reconnects. A stream that is actively delivering
+	// frames is treated as healthy and is never reconnected, even if the OPTIONS liveness probe
+	// fails. Some cameras (e.g. FLIR) never answer out-of-band OPTIONS requests while streaming
+	// fine, so a failed probe on its own must not tear down a working connection.
+	noFrameTimeoutSeconds = 10
 	// webRTCPayloadMaxSize is the maximum size of a WebRTC RTP payload, calculated as 1200 - 12 (RTP header).
 	webRTCPayloadMaxSize = 1188
 	// defaultPayloadType is the default payload type for RTP packets.
@@ -61,7 +67,10 @@ const (
 	transportUDPMulticast = "udp-multicast"
 )
 
-var reconnectIntervalDuration = reconnectIntervalSeconds * time.Second
+var (
+	reconnectIntervalDuration = reconnectIntervalSeconds * time.Second
+	noFrameTimeout            = noFrameTimeoutSeconds * time.Second
+)
 
 var (
 	// Family is the namespace family for the viamrtsp module.
@@ -241,10 +250,11 @@ type rtspCamera struct {
 
 	logger logging.Logger
 
-	// streamErrMsg is set by the reconnect worker when the camera is detected as disconnected.
-	// It is cleared when new frames arrive or reconnection succeeds.
-	// Image() checks this field to avoid returning stale frames.
-	streamErrMsg atomic.Pointer[string]
+	// lastFrameReceived is the UnixNano timestamp of the most recently received frame. It is the
+	// single source of truth for stream liveness: the reconnect worker reconnects only once frames
+	// stop arriving, and Image() uses it to avoid returning stale frames. A stream that is actively
+	// delivering frames is healthy and is never reconnected, regardless of the OPTIONS probe.
+	lastFrameReceived atomic.Int64
 
 	rtpPassthrough              bool
 	currentCodec                atomic.Int64
@@ -284,17 +294,28 @@ func (rc *rtspCamera) Close(_ context.Context) error {
 	return nil
 }
 
-// clientReconnectBackgroundWorker checks every reconnectIntervalSeconds to see if the client is connected to the server,
-// and reconnects if not.
+// clientReconnectBackgroundWorker checks every reconnectIntervalSeconds whether the stream is
+// still healthy, and reconnects if not. A stream is considered healthy as long as it is delivering
+// frames: if a frame has arrived within noFrameTimeout, the connection is left alone regardless of
+// what the OPTIONS liveness probe reports. Only once frames stop flowing do we probe with OPTIONS
+// (for a useful diagnostic) and reconnect.
 func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 	rc.activeBackgroundWorkers.Add(1)
 	utils.ManagedGo(func() {
 		for utils.SelectContextOrWait(rc.cancelCtx, reconnectIntervalDuration) {
-			// use an OPTIONS request to see if the server is still responding to requests
-			now := time.Now().UTC().Format(time.RFC3339)
+			// A stream that is actively delivering frames is healthy. Do not reconnect it, even
+			// if the OPTIONS probe below would fail: some cameras (e.g. FLIR) never answer
+			// out-of-band OPTIONS requests while streaming fine, and tearing down a working
+			// connection just churns the stream.
+			if since := rc.timeSinceLastFrame(); since < noFrameTimeout {
+				continue
+			}
+
+			// No frames for noFrameTimeout: treat the stream as down. Probe with OPTIONS to get a
+			// useful diagnostic for the log, then reconnect regardless of the result.
+			reason := fmt.Sprintf("no frames received in %s", noFrameTimeout)
 			if rc.client == nil {
-				errMsg := "RTSP client is not connected; at timestamp: " + now
-				rc.streamErrMsg.Store(&errMsg)
+				reason = "RTSP client is not connected"
 			} else {
 				res, err := rc.client.Options(rc.u)
 				// Nick S:
@@ -302,23 +323,20 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 				// the performance of camera streaming. As a result, we ignore this error specifically
 				var errClientInvalidState liberrors.ErrClientInvalidState
 				if err != nil && !errors.As(err, &errClientInvalidState) {
-					rc.logger.Warnf("The rtsp client encountered an error, trying to reconnect to %s, err: %s", rc.u, err)
-					errMsg := fmt.Sprintf("%s; at timestamp: %s", err.Error(), now)
-					rc.streamErrMsg.Store(&errMsg)
+					reason = fmt.Sprintf("%s: %s", reason, err.Error())
 				} else if res != nil && res.StatusCode != base.StatusOK {
-					rc.logger.Warnf("The rtsp server responded with non-OK status url: %s, status_code: %d", rc.u, res.StatusCode)
-					errMsg := fmt.Sprintf("RTSP server responded with status code: %d; at timestamp: %s", res.StatusCode, now)
-					rc.streamErrMsg.Store(&errMsg)
+					reason = fmt.Sprintf("%s: RTSP server responded with status code: %d", reason, res.StatusCode)
 				}
 			}
 
-			if rc.streamErrMsg.Load() != nil {
-				if err := rc.reconnectClientWithFallbackTransports(codecInfo); err != nil {
-					rc.logger.Warnf("cannot reconnect to rtsp server err: %s", err.Error())
-				} else {
-					rc.logger.Infof("reconnected to rtsp server url: %s", rc.u)
-					rc.streamErrMsg.Store(nil)
-				}
+			rc.logger.Warnf("stream unhealthy, trying to reconnect to %s, reason: %s", rc.u, reason)
+			if err := rc.reconnectClientWithFallbackTransports(codecInfo); err != nil {
+				rc.logger.Warnf("cannot reconnect to rtsp server err: %s", err.Error())
+			} else {
+				rc.logger.Infof("reconnected to rtsp server url: %s", rc.u)
+				// Reset the watchdog so the freshly reconnected stream gets a full grace period
+				// to start delivering frames before we consider reconnecting again.
+				rc.markFrameReceived()
 			}
 		}
 	}, rc.activeBackgroundWorkers.Done)
@@ -536,6 +554,11 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 
 	var receivedFirstIDR bool
 	storeImage := func(au [][]byte) {
+		// A complete access unit arrived from the camera: the stream is alive. Stamp the liveness
+		// clock here, on the receive path, before any iframe-only/lazy gating below. Doing it here
+		// (rather than at decode-to-image time) keeps liveness independent of decode mode and of how
+		// often Image() is polled, which matters for lazyDecode and iframeOnlyDecode streams.
+		rc.markFrameReceived()
 		// NOTE(Nick S): This is duplicating work that the videoStoreMuxer is doing
 		// we could probably save a few iterations through au by
 		// consolidating that logic
@@ -693,6 +716,9 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 	}
 
 	storeImage := func(au [][]byte) {
+		// Stamp the liveness clock on the receive path, before any gating (see the H264 storeImage
+		// for why this must be independent of decode mode and Image() polling).
+		rc.markFrameReceived()
 		if rc.iframeOnlyDecode && !h265.IsRandomAccess(au) {
 			return
 		}
@@ -822,7 +848,7 @@ func (rc *rtspCamera) initMJPEG(session *description.Session) error {
 		}
 
 		rc.latestMJPEGBytes.Store(&frame)
-		rc.streamErrMsg.Store(nil)
+		rc.markFrameReceived()
 	})
 
 	return nil
@@ -947,6 +973,9 @@ func (rc *rtspCamera) initMPEG4(session *description.Session) error {
 		}
 
 		if frame != nil {
+			// A complete frame arrived from the camera: the stream is alive. Stamp the liveness
+			// clock on the receive path, before decode-to-image (see the H264 storeImage comment).
+			rc.markFrameReceived()
 			if decodedFrame, err := rc.rawDecoder.decode(frame); err == nil && decodedFrame != nil {
 				rc.handleLatestFrame(decodedFrame)
 			}
@@ -1197,6 +1226,9 @@ func NewRTSPCamera(ctx context.Context, deps resource.Dependencies, conf resourc
 		logger.Error(err.Error())
 		return nil, err
 	}
+	// Start the liveness clock so the initial connection gets a full grace period to deliver its
+	// first frame before the reconnect worker or Image() consider the stream stale.
+	rc.markFrameReceived()
 
 	rc.clientReconnectBackgroundWorker(codecInfo)
 	guard.Success()
@@ -1360,9 +1392,6 @@ func (rc *rtspCamera) decodeAndStore(nalu []byte) error {
 // the previous frame by trying to put it back in the pool. It might not make
 // it back into the pool immediately or at all depending on its state.
 func (rc *rtspCamera) handleLatestFrame(newFrame *avFrameWrapper) {
-	// A new frame arriving means the stream is healthy. Clear any error set by the
-	// reconnect worker to stop returning stale frame errors.
-	rc.streamErrMsg.Store(nil)
 	rc.latestFrameMu.Lock()
 	defer rc.latestFrameMu.Unlock()
 
@@ -1375,6 +1404,16 @@ func (rc *rtspCamera) handleLatestFrame(newFrame *avFrameWrapper) {
 	newFrame.incrementRefs()
 	rc.latestFrame = newFrame
 	rc.latestFrameCache = cache{}
+}
+
+// markFrameReceived stamps the liveness timestamp used by the reconnect worker and Image().
+func (rc *rtspCamera) markFrameReceived() {
+	rc.lastFrameReceived.Store(time.Now().UnixNano())
+}
+
+// timeSinceLastFrame reports how long it has been since the last frame was received.
+func (rc *rtspCamera) timeSinceLastFrame() time.Duration {
+	return time.Since(time.Unix(0, rc.lastFrameReceived.Load()))
 }
 
 func naluType(nalu []byte) h264.NALUType {
@@ -1398,8 +1437,8 @@ func (rc *rtspCamera) Image(_ context.Context, mimeType string, _ map[string]int
 	if err := rc.cancelCtx.Err(); err != nil {
 		return nil, "", err
 	}
-	if msg := rc.streamErrMsg.Load(); msg != nil {
-		err := fmt.Errorf("camera is not streaming, last error: %s", *msg)
+	if since := rc.timeSinceLastFrame(); since > noFrameTimeout {
+		err := fmt.Errorf("camera is not streaming, no frame received in %s", since.Round(time.Millisecond))
 		rc.logger.Error(err.Error())
 		return nil, "", err
 	}
