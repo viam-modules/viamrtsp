@@ -209,14 +209,25 @@ type rtspCamera struct {
 	lazyDecode       bool
 	iframeOnlyDecode bool
 
-	closeMu      sync.RWMutex
-	videoRequest *videoRequest
-	auMu         sync.Mutex
-	au           [][]byte
-	client       *gortsplib.Client
-	rawDecoder   *decoder
+	// closeMu guards gortsplib client, h264Media, rawDecoder and lifecycle of mimeHandler/avFramePool.
+	closeMu sync.RWMutex
+	client  *gortsplib.Client
 	// h264Media is the RTSP media track for H264.
-	h264Media *description.Media
+	h264Media   *description.Media
+	rawDecoder  *decoder
+	mimeHandler *mimeHandler
+	// We use a pool data structure to amortize the malloc cost of AVFrames and reduce pressure on memory
+	// management. We create one pool for the entire lifetime of the RTSP camera. Additionally, frames
+	// from the pool may be for a resolution that does not match the current image. The user of the pool
+	// is responsible for the underlying frame contents and further initializing it and/or throwing it away.
+	avFramePool *framePool
+
+	videoRequest *videoRequest
+
+	// auMu guards the lazy AU buffer.
+	auMu sync.Mutex
+	au   [][]byte
+
 	// firSeqNum holds the last FIR sequence number (0–255), wraps per RFC 5104.
 	firSeqNum atomic.Uint32
 
@@ -225,19 +236,12 @@ type rtspCamera struct {
 
 	activeBackgroundWorkers sync.WaitGroup
 
-	// latestFrameMu protects critical sections where frame state changes (e.g. ref counting) need to be atomic
-	// with swapping out the latest frame.
+	// latestFrameMu guards latestFrame ref counting and latestFrameCache.
 	latestFrameMu    sync.Mutex
-	latestMJPEGBytes atomic.Pointer[[]byte]
 	latestFrame      *avFrameWrapper
 	latestFrameCache cache
-	// We use a pool data structure to amortize the malloc cost of AVFrames and reduce pressure on memory
-	// management. We create one pool for the entire lifetime of the RTSP camera. Additionally, frames
-	// from the pool may be for a resolution that does not match the current image. The user of the pool
-	// is responsible for the underlying frame contents and further initializing it and/or throwing it away.
-	avFramePool *framePool
 
-	mimeHandler *mimeHandler
+	latestMJPEGBytes atomic.Pointer[[]byte]
 
 	logger logging.Logger
 
@@ -251,6 +255,7 @@ type rtspCamera struct {
 	rtpPassthroughCtx           context.Context
 	rtpPassthroughCancelCauseFn context.CancelCauseFunc
 
+	// subsMu guards passthrough subscriber map.
 	subsMu       sync.RWMutex
 	bufAndCBByID map[rtppassthrough.SubscriptionID]bufAndCB
 
@@ -262,10 +267,17 @@ func (rc *rtspCamera) Close(_ context.Context) error {
 	if err := registry.Global.Remove(rc.Name().String()); err != nil {
 		rc.logger.Errorf("error removing camera from global registry: %s", err.Error())
 	}
-	rc.cancelFunc()
+	// Cancel under Lock so SubscribeRTP can't orphan an entry after unsubscribeAll sweeps.
 	rc.closeMu.Lock()
+	rc.cancelFunc()
+	rc.closeMu.Unlock()
+
 	rc.unsubscribeAll()
 	rc.activeBackgroundWorkers.Wait()
+
+	// Wait for in-flight Image/SubscribeRTP RLock holders, then teardown under exclusive access.
+	rc.closeMu.Lock()
+	defer rc.closeMu.Unlock()
 	rc.closeConnection()
 	rc.mimeHandler.close()
 	// Clean up latestFrame cache if it exists. This is necessary to ensure that the frame is properly
@@ -279,7 +291,6 @@ func (rc *rtspCamera) Close(_ context.Context) error {
 	}
 	rc.latestFrameMu.Unlock()
 	rc.avFramePool.close()
-	rc.closeMu.Unlock()
 	rc.videoRequest.clear()
 	return nil
 }
@@ -364,6 +375,12 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib
 
 	rc.closeMu.Lock()
 	defer rc.closeMu.Unlock()
+
+	// Bail if Close has fired between the worker's outer ctx check and us acquiring the lock
+	// otherwise we'd do a full reconnect (TCP connect + DESCRIBE + SETUP) only for Close to tear it down.
+	if err := rc.cancelCtx.Err(); err != nil {
+		return err
+	}
 
 	rc.closeConnection()
 
@@ -964,6 +981,13 @@ func (rc *rtspCamera) SubscribeRTP(
 	bufferSize int,
 	packetsCB rtppassthrough.PacketCallback,
 ) (rtppassthrough.Subscription, error) {
+	// Hold closeMu.RLock for the full body so Close cannot run cancelFunc
+	// (and the subsequent unsubscribeAll) until we either complete or bail.
+	rc.closeMu.RLock()
+	defer rc.closeMu.RUnlock()
+	if err := rc.cancelCtx.Err(); err != nil {
+		return rtppassthrough.NilSubscription, err
+	}
 	if err := rc.validateSupportsPassthrough(); err != nil {
 		rc.logger.Debug(err.Error())
 		return rtppassthrough.NilSubscription, ErrH264PassthroughNotEnabled
@@ -1073,13 +1097,8 @@ func (rc *rtspCamera) SubscribeRTP(
 	// Send an RTCP FIR to request an IDR keyframe from the camera so the new subscriber
 	// receives a decodable frame immediately. This is best-effort: if the camera ignores FIR
 	// or the client is mid-reconnect, the subscriber will receive an IDR naturally.
-	rc.closeMu.RLock()
-	client := rc.client
-	media := rc.h264Media
-	rc.closeMu.RUnlock()
-
-	if client != nil && media != nil {
-		if err := client.WritePacketRTCP(media, &rtcp.FullIntraRequest{
+	if rc.client != nil && rc.h264Media != nil {
+		if err := rc.client.WritePacketRTCP(rc.h264Media, &rtcp.FullIntraRequest{
 			//nolint:gosec // FIR seq is uint8 per RFC 5104; wrapping at 256 is intentional.
 			FIR: []rtcp.FIREntry{{SequenceNumber: uint8(rc.firSeqNum.Add(1))}},
 		}); err != nil {
