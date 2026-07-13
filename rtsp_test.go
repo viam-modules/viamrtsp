@@ -3,9 +3,11 @@ package viamrtsp
 import (
 	"context"
 	"image"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/bluenviron/gortsplib/v4"
 	"github.com/bluenviron/gortsplib/v4/pkg/base"
 	"github.com/bluenviron/gortsplib/v4/pkg/format"
 	"github.com/erh/viamupnp"
@@ -114,11 +116,19 @@ func TestRTSPCamera(t *testing.T) {
 		})
 
 		t.Run("GetImages returns error when camera disconnects", func(t *testing.T) {
-			// Speeds up the reconnect worker for this test to avoid long sleeps.
+			// Speeds up the reconnect worker and shortens the no-frame timeout for this test to
+			// avoid long sleeps. noFrameTimeout must be overridden too: Image() now reports the
+			// stream as down based on how long it has been since the last frame arrived.
 			originalReconnectDuration := reconnectIntervalDuration
+			originalNoFrameTimeout := noFrameTimeout
+			// noFrameTimeout must stay above the mock's 200ms frame interval so a healthy stream
+			// is not considered stale between frames, but short enough to fire quickly on
+			// disconnect.
 			reconnectIntervalDuration = 10 * time.Millisecond
+			noFrameTimeout = 400 * time.Millisecond
 			defer func() {
 				reconnectIntervalDuration = originalReconnectDuration
+				noFrameTimeout = originalNoFrameTimeout
 			}()
 
 			h, closeFunc := NewMockH264ServerHandler(t, forma, bURL, logger)
@@ -149,7 +159,7 @@ func TestRTSPCamera(t *testing.T) {
 			closeFunc()
 
 			// Wait, with a timeout, for the reconnect worker to detect the bad state.
-			waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second)
+			waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second*2)
 			defer waitCancel()
 			for waitCtx.Err() == nil {
 				_, _, err = rtspCam.Images(context.Background(), nil, nil)
@@ -163,6 +173,89 @@ func TestRTSPCamera(t *testing.T) {
 			// Verify GetImages returned an error instead of a stale frame
 			test.That(t, err, test.ShouldNotBeNil)
 			test.That(t, err.Error(), test.ShouldContainSubstring, "not streaming")
+		})
+
+		// A stream that keeps delivering frames is healthy and must never be reconnected, even
+		// though the OPTIONS liveness probe may fail. We assert this by counting connections to the
+		// mock server (each reconnect opens a new one) and requiring the count to stay flat while
+		// frames flow. The lazyDecode-without-polling case is the important one: it proves the
+		// liveness clock is stamped on the receive path, not at decode/Image() time.
+		t.Run("healthy stream is not reconnected", func(t *testing.T) {
+			testCases := []struct {
+				name       string
+				lazyDecode bool
+				pollImages bool
+			}{
+				{name: "eager decode with polling", lazyDecode: false, pollImages: true},
+				{name: "lazy decode without polling", lazyDecode: true, pollImages: false},
+			}
+			for _, tc := range testCases {
+				t.Run(tc.name, func(t *testing.T) {
+					// Speed up the worker and shorten the timeout, but keep noFrameTimeout well
+					// above the mock's 200ms frame interval so a healthy stream never trips it.
+					originalReconnectDuration := reconnectIntervalDuration
+					originalNoFrameTimeout := noFrameTimeout
+					reconnectIntervalDuration = 50 * time.Millisecond
+					noFrameTimeout = 1 * time.Second
+					defer func() {
+						reconnectIntervalDuration = originalReconnectDuration
+						noFrameTimeout = originalNoFrameTimeout
+					}()
+
+					h, closeFunc := NewMockH264ServerHandler(t, forma, bURL, logger)
+					defer closeFunc()
+					var connCount atomic.Int64
+					h.OnConnOpenFunc = func(_ *gortsplib.ServerHandlerOnConnOpenCtx, _ *ServerHandler) {
+						connCount.Add(1)
+					}
+					test.That(t, h.S.Start(), test.ShouldBeNil)
+
+					timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), time.Second*15)
+					defer timeoutCancel()
+					config := resource.NewEmptyConfig(camera.Named("foo"), ModelAgnostic)
+					config.ConvertedAttributes = &Config{
+						Address:    "rtsp://" + h.S.RTSPAddress + "/stream1",
+						LazyDecode: tc.lazyDecode,
+					}
+					rtspCam, err := NewRTSPCamera(timeoutCtx, nil, config, logger)
+					test.That(t, err, test.ShouldBeNil)
+					defer func() { test.That(t, rtspCam.Close(context.Background()), test.ShouldBeNil) }()
+
+					// Wait for the stream to actually be delivering frames before measuring. For the
+					// polling variant, confirm by a successful image (tolerating early "no frame
+					// yet" while the decoder warms up on the first IDR). For the non-polling variant,
+					// just give it time: frames are consumed on the receive path regardless of
+					// whether anything calls Images().
+					warmupCtx, warmupCancel := context.WithTimeout(context.Background(), time.Second*5)
+					defer warmupCancel()
+					if tc.pollImages {
+						for warmupCtx.Err() == nil {
+							if _, _, imgErr := rtspCam.Images(context.Background(), nil, nil); imgErr == nil {
+								break
+							}
+							time.Sleep(50 * time.Millisecond)
+						}
+						test.That(t, warmupCtx.Err(), test.ShouldBeNil)
+					} else {
+						time.Sleep(time.Second)
+					}
+
+					// Observe for longer than noFrameTimeout: the worker gets many chances to
+					// (wrongly) reconnect. A healthy stream must open exactly one connection total
+					// (the initial connect over TCP) and never reconnect.
+					observeCtx, observeCancel := context.WithTimeout(context.Background(), time.Second*2)
+					defer observeCancel()
+					for observeCtx.Err() == nil {
+						if tc.pollImages {
+							_, _, imgErr := rtspCam.Images(context.Background(), nil, nil)
+							test.That(t, imgErr, test.ShouldBeNil)
+						}
+						time.Sleep(50 * time.Millisecond)
+					}
+
+					test.That(t, connCount.Load(), test.ShouldEqual, int64(1))
+				})
+			}
 		})
 
 		t.Run("SubscribeRTP", func(t *testing.T) {
