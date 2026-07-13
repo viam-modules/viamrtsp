@@ -44,11 +44,9 @@ import (
 const (
 	// reconnectIntervalSeconds is the interval in secs to wait before reconnecting the background worker.
 	reconnectIntervalSeconds = 5
-	// noFrameTimeoutSeconds is how long the stream may go without receiving a frame before the
-	// reconnect worker considers it unhealthy and reconnects. A stream that is actively delivering
-	// frames is treated as healthy and is never reconnected, even if the OPTIONS liveness probe
-	// fails. Some cameras (e.g. FLIR) never answer out-of-band OPTIONS requests while streaming
-	// fine, so a failed probe on its own must not tear down a working connection.
+	// noFrameTimeoutSeconds is how long we let a stream go without a frame before reconnecting.
+	// While frames keep arriving we leave the connection alone, even if OPTIONS fails: some cameras
+	// (e.g. FLIR) never answer OPTIONS while streaming fine.
 	noFrameTimeoutSeconds = 10
 	// webRTCPayloadMaxSize is the maximum size of a WebRTC RTP payload, calculated as 1200 - 12 (RTP header).
 	webRTCPayloadMaxSize = 1188
@@ -250,10 +248,9 @@ type rtspCamera struct {
 
 	logger logging.Logger
 
-	// lastFrameTime is the UnixNano timestamp of the most recently received frame. It is
-	// the single source of truth for stream liveness: the reconnect worker reconnects only once
-	// frames stop arriving, and Image() uses it to avoid returning stale frames. A stream that is
-	// actively delivering frames is healthy and is never reconnected, regardless of the OPTIONS probe.
+	// lastFrameTime is the UnixNano time of the last received frame, and the single source of truth
+	// for liveness. The reconnect worker only reconnects once frames stop; Image() uses it to avoid
+	// returning stale frames. A stream that keeps delivering frames is never reconnected.
 	lastFrameTime atomic.Int64
 
 	rtpPassthrough              bool
@@ -273,9 +270,8 @@ func (rc *rtspCamera) Close(_ context.Context) error {
 		rc.logger.Errorf("error removing camera from global registry: %s", err.Error())
 	}
 	rc.cancelFunc()
-	// Wait for the reconnect worker to exit BEFORE taking closeMu. The worker acquires closeMu
-	// while reconnecting (see reconnectClient), so holding it here would deadlock: Close would wait
-	// for a worker that is itself blocked waiting for closeMu.
+	// Wait for the reconnect worker to exit before taking closeMu. The worker grabs closeMu while
+	// reconnecting, so holding it here would deadlock.
 	rc.activeBackgroundWorkers.Wait()
 	rc.closeMu.Lock()
 	rc.unsubscribeAll()
@@ -297,25 +293,20 @@ func (rc *rtspCamera) Close(_ context.Context) error {
 	return nil
 }
 
-// clientReconnectBackgroundWorker checks every reconnectIntervalSeconds whether the stream is
-// still healthy, and reconnects if not. A stream is considered healthy as long as it is delivering
-// frames: if a frame has arrived within noFrameTimeout, the connection is left alone regardless of
-// what the OPTIONS liveness probe reports. Only once frames stop flowing do we probe with OPTIONS
-// (for a useful diagnostic) and reconnect.
+// clientReconnectBackgroundWorker reconnects the client when the stream stops delivering frames.
+// A stream that produced a frame within noFrameTimeout is healthy and left alone, regardless of the
+// OPTIONS probe. Only once frames stop do we probe OPTIONS (for the log) and reconnect.
 func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 	rc.activeBackgroundWorkers.Add(1)
 	utils.ManagedGo(func() {
 		for utils.SelectContextOrWait(rc.cancelCtx, reconnectIntervalDuration) {
-			// A stream that is actively delivering frames is healthy. Do not reconnect it, even
-			// if the OPTIONS probe below would fail: some cameras (e.g. FLIR) never answer
-			// out-of-band OPTIONS requests while streaming fine, and tearing down a working
-			// connection just churns the stream.
+			// Frames still arriving means the stream is healthy, so leave it alone even if OPTIONS
+			// would fail. Reconnecting a working stream just churns it.
 			if since := rc.timeSinceLastFrame(); since < noFrameTimeout {
 				continue
 			}
 
-			// No frames for noFrameTimeout: treat the stream as down. Probe with OPTIONS to get a
-			// useful diagnostic for the log, then reconnect regardless of the result.
+			// Frames stopped. Probe OPTIONS for a better log message, then reconnect either way.
 			reason := fmt.Sprintf("no frames received in %s", noFrameTimeout)
 			if rc.client == nil {
 				reason = "RTSP client is not connected"
@@ -337,8 +328,7 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 				rc.logger.Warnf("cannot reconnect to rtsp server err: %s", err.Error())
 			} else {
 				rc.logger.Infof("reconnected to rtsp server url: %s", rc.u)
-				// Reset the watchdog so the freshly reconnected stream gets a full grace period
-				// to start delivering frames before we consider reconnecting again.
+				// Give the new connection a full grace period to start delivering frames.
 				rc.markFrameReceived()
 			}
 		}
@@ -557,10 +547,9 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 
 	var receivedFirstIDR bool
 	storeImage := func(au [][]byte) {
-		// A complete access unit arrived from the camera: the stream is alive. Stamp the liveness
-		// clock here, on the receive path, before any iframe-only/lazy gating below. Doing it here
-		// (rather than at decode-to-image time) keeps liveness independent of decode mode and of how
-		// often Image() is polled, which matters for lazyDecode and iframeOnlyDecode streams.
+		// A full access unit arrived, so the stream is alive. Stamp liveness here on the receive
+		// path, before the iframe-only/lazy gates below, so it doesn't depend on decode mode or how
+		// often Image() is polled.
 		rc.markFrameReceived()
 		// NOTE(Nick S): This is duplicating work that the videoStoreMuxer is doing
 		// we could probably save a few iterations through au by
@@ -719,8 +708,7 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 	}
 
 	storeImage := func(au [][]byte) {
-		// Stamp the liveness clock on the receive path, before any gating (see the H264 storeImage
-		// for why this must be independent of decode mode and Image() polling).
+		// Stamp liveness on the receive path, before any gating (see H264 storeImage).
 		rc.markFrameReceived()
 		if rc.iframeOnlyDecode && !h265.IsRandomAccess(au) {
 			return
@@ -976,8 +964,8 @@ func (rc *rtspCamera) initMPEG4(session *description.Session) error {
 		}
 
 		if frame != nil {
-			// A complete frame arrived from the camera: the stream is alive. Stamp the liveness
-			// clock on the receive path, before decode-to-image (see the H264 storeImage comment).
+			// A frame arrived, so the stream is alive. Stamp liveness on the receive path (see
+			// H264 storeImage).
 			rc.markFrameReceived()
 			if decodedFrame, err := rc.rawDecoder.decode(frame); err == nil && decodedFrame != nil {
 				rc.handleLatestFrame(decodedFrame)
@@ -1229,8 +1217,8 @@ func NewRTSPCamera(ctx context.Context, deps resource.Dependencies, conf resourc
 		logger.Error(err.Error())
 		return nil, err
 	}
-	// Start the liveness clock so the initial connection gets a full grace period to deliver its
-	// first frame before the reconnect worker or Image() consider the stream stale.
+	// Start the liveness clock so the first connection gets a full grace period before the worker
+	// or Image() call it stale.
 	rc.markFrameReceived()
 
 	rc.clientReconnectBackgroundWorker(codecInfo)
