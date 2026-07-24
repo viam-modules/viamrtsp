@@ -6,11 +6,17 @@ on:
       - main
     paths:
       - '**/**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'Makefile'
+      - '.github/workflows/quality-test.yml'
   pull_request:
     paths:
       - '**/**.go'
+      - 'go.mod'
+      - 'go.sum'
       - 'Makefile'
-      - '.github/workflows/quality-checks.yml'
+      - '.github/workflows/quality-test.yml'
 
 jobs:
   quality-checks:
