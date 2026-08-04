@@ -17,6 +17,7 @@ import (
 	"net/netip"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/beevik/etree"
 	"github.com/viam-modules/viamrtsp/viamonvif/gosoap"
@@ -57,6 +58,10 @@ type Device struct {
 	logger    logging.Logger
 	params    Params
 	endpoints map[string]string
+	// clockOffset is the device's clock minus the local clock. WS-Security Created
+	// timestamps are generated in the device's time frame so that devices with wrong
+	// system dates (e.g. a default of 2000-01-01) do not reject them as stale.
+	clockOffset time.Duration
 }
 
 // Params configures the device connection.
@@ -104,6 +109,12 @@ type GetCapabilities struct {
 	Category onvif.CapabilityCategory `xml:"tds:Category"`
 }
 
+// GetSystemDateAndTime is a request to the GetSystemDateAndTime onvif endpoint.
+// Per the ONVIF Core Spec this endpoint must be available without authentication.
+type GetSystemDateAndTime struct {
+	XMLName string `xml:"tds:GetSystemDateAndTime"`
+}
+
 // NewDevice construct an ONVIF Device entity.
 func NewDevice(ctx context.Context, params Params, logger logging.Logger) (*Device, error) {
 	dev := &Device{
@@ -136,6 +147,15 @@ func NewDevice(ctx context.Context, params Params, logger logging.Logger) (*Devi
 			logger.Debugf("TLS certificate verification disabled for local IP address: %s.",
 				params.Xaddr.Hostname())
 		}
+	}
+
+	// Sync with the device's clock before making any authenticated calls. The
+	// WS-Security password digest embeds a Created timestamp that devices validate
+	// against their own clock, so a device with a wrong system date (e.g. a default
+	// of 2000-01-01) rejects tokens generated from the local clock. Only needed
+	// when credentials will be sent.
+	if params.Username != "" || params.Password != "" {
+		dev.syncClock(ctx)
 	}
 
 	data, err := dev.callDevice(ctx, GetCapabilities{Category: "All"})
@@ -201,6 +221,101 @@ func (dev *Device) GetDeviceInformation(ctx context.Context) (GetDeviceInformati
 	}
 	dev.logger.Debugf("GetDeviceInformation decoded: %#v", resp.Body.GetDeviceInformationResponse)
 	return resp.Body.GetDeviceInformationResponse, nil
+}
+
+// onvifDate is a calendar date in a GetSystemDateAndTime response.
+type onvifDate struct {
+	Year  int `xml:"Year"`
+	Month int `xml:"Month"`
+	Day   int `xml:"Day"`
+}
+
+// onvifTime is a wall-clock time in a GetSystemDateAndTime response.
+type onvifTime struct {
+	Hour   int `xml:"Hour"`
+	Minute int `xml:"Minute"`
+	Second int `xml:"Second"`
+}
+
+// onvifDateTime is a date and time in a GetSystemDateAndTime response.
+type onvifDateTime struct {
+	Time onvifTime `xml:"Time"`
+	Date onvifDate `xml:"Date"`
+}
+
+// toTime converts an onvifDateTime to a time.Time in UTC. The second return
+// value is false when the element was absent from the response (zero-valued).
+func (dt onvifDateTime) toTime() (time.Time, bool) {
+	if dt.Date.Year == 0 {
+		return time.Time{}, false
+	}
+	return time.Date(dt.Date.Year, time.Month(dt.Date.Month), dt.Date.Day,
+		dt.Time.Hour, dt.Time.Minute, dt.Time.Second, 0, time.UTC), true
+}
+
+// getSystemDateAndTimeResponseEnvelope is the envelope of the response to the
+// GetSystemDateAndTime endpoint.
+type getSystemDateAndTimeResponseEnvelope struct {
+	XMLName xml.Name `xml:"Envelope"`
+	Body    struct {
+		GetSystemDateAndTimeResponse struct {
+			SystemDateAndTime struct {
+				UTCDateTime   onvifDateTime `xml:"UTCDateTime"`
+				LocalDateTime onvifDateTime `xml:"LocalDateTime"`
+			} `xml:"SystemDateAndTime"`
+		} `xml:"GetSystemDateAndTimeResponse"`
+	} `xml:"Body"`
+}
+
+// parseSystemDateAndTimeResponse extracts the device's clock reading from a
+// GetSystemDateAndTime response body. UTCDateTime is preferred; some devices
+// omit it, in which case LocalDateTime is treated as UTC — an approximate
+// offset still beats none for clock-skew compensation.
+func parseSystemDateAndTimeResponse(b []byte) (time.Time, error) {
+	var zero time.Time
+	var resp getSystemDateAndTimeResponseEnvelope
+	if err := xml.NewDecoder(bytes.NewReader(b)).Decode(&resp); err != nil {
+		return zero, fmt.Errorf("failed to decode system date and time response: %w", err)
+	}
+	sdt := resp.Body.GetSystemDateAndTimeResponse.SystemDateAndTime
+	if t, ok := sdt.UTCDateTime.toTime(); ok {
+		return t, nil
+	}
+	if t, ok := sdt.LocalDateTime.toTime(); ok {
+		return t, nil
+	}
+	return zero, errors.New("no date and time found in GetSystemDateAndTime response")
+}
+
+// getSystemDateAndTime returns the device's current clock reading. It is sent
+// without a WS-Security header: the ONVIF Core Spec requires this endpoint to
+// work unauthenticated, and on a clock-skewed device an authenticated request
+// would be rejected for exactly the skew this call exists to measure.
+func (dev *Device) getSystemDateAndTime(ctx context.Context) (time.Time, error) {
+	var zero time.Time
+	b, err := dev.callOnvifServiceMethodNoAuth(ctx, dev.endpoints["device"], GetSystemDateAndTime{})
+	if err != nil {
+		return zero, fmt.Errorf("failed to get system date and time: %w", err)
+	}
+	dev.logger.Debugf("GetSystemDateAndTime response body: %s", string(b))
+	return parseSystemDateAndTimeResponse(b)
+}
+
+// syncClock measures the offset between the device's clock and the local clock
+// so authenticated requests can be timestamped in the device's time frame. Any
+// failure leaves the offset at zero, i.e. assumes synchronized clocks.
+func (dev *Device) syncClock(ctx context.Context) {
+	deviceTime, err := dev.getSystemDateAndTime(ctx)
+	if err != nil {
+		dev.logger.Debugf("GetSystemDateAndTime failed, assuming device clock is synchronized with local clock: %v", err)
+		return
+	}
+	offset := deviceTime.Sub(time.Now().UTC())
+	if offset.Abs() > time.Minute {
+		dev.logger.Infof("device %s clock differs from local clock by %v; using device time for authentication",
+			dev.xaddr.Host, offset)
+	}
+	dev.clockOffset = offset
 }
 
 // GetNetworkInterfacesResponse is the body of the response to the GetNetworkInterfaces endpoint.
@@ -393,6 +508,16 @@ func (dev *Device) callDevice(ctx context.Context, method interface{}) ([]byte, 
 }
 
 func (dev *Device) callOnvifServiceMethod(ctx context.Context, endpoint string, method interface{}) ([]byte, error) {
+	return dev.call(ctx, endpoint, method, true)
+}
+
+// callOnvifServiceMethodNoAuth calls an ONVIF service method without a WS-Security
+// header, for endpoints the spec defines as pre-auth (e.g. GetSystemDateAndTime).
+func (dev *Device) callOnvifServiceMethodNoAuth(ctx context.Context, endpoint string, method interface{}) ([]byte, error) {
+	return dev.call(ctx, endpoint, method, false)
+}
+
+func (dev *Device) call(ctx context.Context, endpoint string, method interface{}, authenticate bool) ([]byte, error) {
 	output, err := xml.MarshalIndent(method, "  ", "    ")
 	if err != nil {
 		return nil, err
@@ -420,8 +545,8 @@ func (dev *Device) callOnvifServiceMethod(ctx context.Context, endpoint string, 
 		return nil, err
 	}
 
-	if dev.params.Username != "" || dev.params.Password != "" {
-		if err := soap.AddWSSecurity(dev.params.Username, dev.params.Password); err != nil {
+	if authenticate && (dev.params.Username != "" || dev.params.Password != "") {
+		if err := soap.AddWSSecurity(dev.params.Username, dev.params.Password, dev.clockOffset); err != nil {
 			return nil, err
 		}
 	}
@@ -446,6 +571,13 @@ func (dev *Device) sendSoap(ctx context.Context, endpoint, message string) ([]by
 
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
+		// Include the (truncated) response body: devices report SOAP faults such as
+		// ter:NotAuthorized there, which is often the only clue to auth failures.
+		const maxErrBodyLen = 4096
+		errBody, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrBodyLen))
+		if len(errBody) > 0 {
+			return nil, fmt.Errorf("SOAP request to %s failed with status code: %d, body: %s", endpoint, resp.StatusCode, errBody)
+		}
 		return nil, fmt.Errorf("SOAP request to %s failed with status code: %d", endpoint, resp.StatusCode)
 	}
 
