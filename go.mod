@@ -18,6 +18,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/viam-modules/video-store v0.0.12
 	github.com/viamrobotics/zeroconf v1.0.14
+	go.uber.org/zap v1.27.0
 	go.viam.com/rdk v1.0.0
 	go.viam.com/test v1.2.4
 	go.viam.com/utils v0.6.6
@@ -241,7 +242,6 @@ require (
 	go.opentelemetry.io/proto/otlp v1.9.0 // indirect
 	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.27.0 // indirect
 	go.viam.com/api v0.1.566 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.2 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20230525183740-e7c30c78aeb2 // indirect
