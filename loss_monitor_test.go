@@ -46,17 +46,17 @@ func TestLossMonitorBaselineAndCleanWindows(t *testing.T) {
 	test.That(t, logsAtLevel(logs, zapcore.DebugLevel), test.ShouldHaveLength, 2)
 }
 
-func TestLossMonitorTransientLossLogsInfo(t *testing.T) {
+func TestLossMonitorLightLossStaysAtDebug(t *testing.T) {
 	lm, logs := newTestLossMonitor(t, "TCP")
 
 	lm.observe(rtpStatsSnapshot{packetsReceived: 10000})
-	// 10 lost out of 10010 is 0.1%, under both warn thresholds.
+	// 10 lost out of 10010 is 0.1%, under both warn thresholds: nothing above debug.
 	lm.observe(rtpStatsSnapshot{packetsReceived: 20000, packetsLost: 10})
+	lm.observe(rtpStatsSnapshot{packetsReceived: 30000, packetsLost: 20})
 
 	test.That(t, logsAtLevel(logs, zapcore.WarnLevel), test.ShouldHaveLength, 0)
-	infos := logsAtLevel(logs, zapcore.InfoLevel)
-	test.That(t, infos, test.ShouldHaveLength, 1)
-	test.That(t, infos[0].Message, test.ShouldContainSubstring, "lost 10 RTP packets")
+	test.That(t, logsAtLevel(logs, zapcore.InfoLevel), test.ShouldHaveLength, 0)
+	test.That(t, logsAtLevel(logs, zapcore.DebugLevel), test.ShouldHaveLength, 2)
 }
 
 func TestLossMonitorTCPWarn(t *testing.T) {
@@ -117,13 +117,37 @@ func TestLossMonitorEscalationLogsImmediately(t *testing.T) {
 	lm, logs := newTestLossMonitor(t, "TCP")
 
 	lm.observe(rtpStatsSnapshot{packetsReceived: 10000})
-	// Window 1: transient loss, logs info.
+	// Window 1: light loss, debug only.
 	lm.observe(rtpStatsSnapshot{packetsReceived: 20000, packetsLost: 10})
 	// Window 2: escalates past the warn threshold; must not be suppressed by rate limiting.
 	lm.observe(rtpStatsSnapshot{packetsReceived: 30000, packetsLost: 510})
 
-	test.That(t, logsAtLevel(logs, zapcore.InfoLevel), test.ShouldHaveLength, 1)
+	test.That(t, logsAtLevel(logs, zapcore.InfoLevel), test.ShouldHaveLength, 0)
 	test.That(t, logsAtLevel(logs, zapcore.WarnLevel), test.ShouldHaveLength, 1)
+}
+
+func TestLossMonitorRewarnsAfterLightLossGap(t *testing.T) {
+	lm, logs := newTestLossMonitor(t, "TCP")
+
+	received := uint64(10000)
+	lost := uint64(0)
+	observe := func(lostDelta uint64) {
+		received += 10000
+		lost += lostDelta
+		lm.observe(rtpStatsSnapshot{packetsReceived: received, packetsLost: lost})
+	}
+
+	lm.observe(rtpStatsSnapshot{packetsReceived: received}) // baseline
+	observe(500)                                            // warns
+	// A long stretch of light (sub-threshold) loss: no logging, but the suppression window
+	// keeps advancing because the stream never went fully clean.
+	for range lossRewarnWindows {
+		observe(10)
+	}
+	observe(500) // warn-level again after ~5 minutes: must warn, not be suppressed
+
+	test.That(t, logsAtLevel(logs, zapcore.WarnLevel), test.ShouldHaveLength, 2)
+	test.That(t, logsAtLevel(logs, zapcore.InfoLevel), test.ShouldHaveLength, 0)
 }
 
 func TestLossMonitorRecoveryLogsOnceAfterWarn(t *testing.T) {
@@ -144,16 +168,15 @@ func TestLossMonitorRecoveryLogsOnceAfterWarn(t *testing.T) {
 	test.That(t, recoveries, test.ShouldHaveLength, 1)
 }
 
-func TestLossMonitorNoRecoveryLogAfterTransientLoss(t *testing.T) {
+func TestLossMonitorNoRecoveryLogAfterLightLoss(t *testing.T) {
 	lm, logs := newTestLossMonitor(t, "TCP")
 
 	lm.observe(rtpStatsSnapshot{packetsReceived: 10000})
 	lm.observe(rtpStatsSnapshot{packetsReceived: 20000, packetsLost: 10})
+	// A clean window after light loss: no warning was issued, so nothing to recover from.
 	lm.observe(rtpStatsSnapshot{packetsReceived: 30000, packetsLost: 10})
 
-	for _, entry := range logsAtLevel(logs, zapcore.InfoLevel) {
-		test.That(t, entry.Message, test.ShouldNotContainSubstring, "recovered")
-	}
+	test.That(t, logsAtLevel(logs, zapcore.InfoLevel), test.ShouldHaveLength, 0)
 }
 
 func TestLossMonitorCounterResetOnReconnect(t *testing.T) {

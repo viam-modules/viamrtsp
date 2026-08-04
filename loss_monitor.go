@@ -53,11 +53,9 @@ type lossMonitor struct {
 	fps       float64
 
 	prev *rtpStatsSnapshot
-	// lossWindows counts consecutive windows with nonzero loss; 0 means healthy.
-	lossWindows int
-	// warned is whether the current loss run has logged at warning severity.
-	warned          bool
-	windowsSinceLog int
+	// warned is whether the current loss run has logged a warning.
+	warned           bool
+	windowsSinceWarn int
 }
 
 // setConnection records the transport of a newly established connection and resets all window
@@ -67,9 +65,8 @@ func (lm *lossMonitor) setConnection(transport string) {
 	defer lm.mu.Unlock()
 	lm.transport = transport
 	lm.prev = nil
-	lm.lossWindows = 0
 	lm.warned = false
-	lm.windowsSinceLog = 0
+	lm.windowsSinceWarn = 0
 }
 
 // setVideoInfo records stream resolution and frame rate for log context. Zero values are ignored
@@ -136,33 +133,25 @@ func (lm *lossMonitor) observe(curr rtpStatsSnapshot) {
 			lm.logger.Infof("RTSP stream %q (%s): packet loss recovered, no packets lost in the last %ds",
 				lm.name, lm.describeStreamLocked(), lossReportIntervalSeconds)
 		}
-		lm.lossWindows = 0
 		lm.warned = false
-		lm.windowsSinceLog = 0
+		lm.windowsSinceWarn = 0
 		return
 	}
 
-	lm.lossWindows++
+	// Loss under the warn thresholds stays at the debug summary above; users only hear about
+	// loss once it is heavy enough to plausibly corrupt video. After warning, stay quiet for
+	// lossRewarnWindows windows so a persistently lossy stream doesn't flood the logs. The
+	// counter keeps ticking through light-loss windows so warn-level loss recurring after a
+	// stretch of light loss re-warns instead of being suppressed.
 	warnLevel := lossPct >= lossWarnPercent || lost >= lossWarnMinPackets
-
-	// Log the first lossy window of a run and any escalation to warning severity immediately;
-	// after that, repeat only every lossRewarnWindows windows so a persistently lossy stream
-	// doesn't flood the logs.
-	logNow := lm.lossWindows == 1 ||
-		(warnLevel && !lm.warned) ||
-		lm.windowsSinceLog >= lossRewarnWindows-1
-	if !logNow {
-		lm.windowsSinceLog++
-		return
+	if lm.warned {
+		lm.windowsSinceWarn++
 	}
-	lm.windowsSinceLog = 0
-
-	if !warnLevel {
-		lm.logger.Infof("RTSP stream %q (%s) lost %d RTP packets in the last %ds (%.2f%% of packets)",
-			lm.name, lm.describeStreamLocked(), lost, lossReportIntervalSeconds, lossPct)
+	if !warnLevel || (lm.warned && lm.windowsSinceWarn < lossRewarnWindows) {
 		return
 	}
 	lm.warned = true
+	lm.windowsSinceWarn = 0
 
 	var corruption string
 	if decodeErrors > 0 {
