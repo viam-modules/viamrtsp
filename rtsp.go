@@ -262,6 +262,9 @@ type rtspCamera struct {
 	bufAndCBByID map[rtppassthrough.SubscriptionID]bufAndCB
 
 	preferredTransports []*gortsplib.Transport
+
+	// lossMonitor aggregates RTP packet-loss stats into periodic, actionable log messages.
+	lossMonitor *lossMonitor
 }
 
 // Close closes the camera. It always returns nil, but because of Close() interface, it needs to return an error.
@@ -335,6 +338,34 @@ func (rc *rtspCamera) clientReconnectBackgroundWorker(codecInfo videoCodec) {
 	}, rc.activeBackgroundWorkers.Done)
 }
 
+// lossMonitorBackgroundWorker periodically samples the RTSP client's cumulative RTP stats and
+// feeds them to the loss monitor, which logs windowed packet-loss summaries and warnings.
+func (rc *rtspCamera) lossMonitorBackgroundWorker() {
+	rc.activeBackgroundWorkers.Add(1)
+	utils.ManagedGo(func() {
+		for utils.SelectContextOrWait(rc.cancelCtx, lossReportIntervalDuration) {
+			// closeMu excludes reconnectClient, which replaces the client and mutates its
+			// media/format maps while holding the write lock; Stats() itself only reads atomics.
+			rc.closeMu.RLock()
+			var stats *gortsplib.ClientStats
+			if rc.client != nil {
+				stats = rc.client.Stats()
+			}
+			rc.closeMu.RUnlock()
+			if stats == nil {
+				continue
+			}
+			rc.lossMonitor.observe(rtpStatsSnapshot{
+				packetsReceived: stats.Session.RTPPacketsReceived,
+				packetsLost:     stats.Session.RTPPacketsLost,
+				packetsInError:  stats.Session.RTPPacketsInError,
+				bytesReceived:   stats.Session.BytesReceived,
+				jitter:          stats.Session.RTPPacketsJitter,
+			})
+		}
+	}, rc.activeBackgroundWorkers.Done)
+}
+
 func (rc *rtspCamera) closeConnection() {
 	if rc.client != nil {
 		rc.client.Close()
@@ -382,11 +413,14 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib
 	rc.client = &gortsplib.Client{
 		Transport: transport,
 	}
+	// Per-event logs stay at debug; the loss monitor aggregates the same counters (via
+	// client.Stats()) into windowed, actionable messages at higher levels.
 	rc.client.OnPacketLost = func(err error) {
 		rc.logger.Debugf("OnPacketLost: err: %s", err)
 	}
 	rc.client.OnTransportSwitch = func(err error) {
-		rc.logger.Debugf("OnTransportSwitch: err: %s", err)
+		// A transport switch changes the meaning of subsequent loss logs, so it is worth an info.
+		rc.logger.Infof("OnTransportSwitch: err: %s", err)
 	}
 	rc.client.OnDecodeError = func(err error) {
 		rc.logger.Debugf("OnDecodeError: err: %s", err)
@@ -454,6 +488,8 @@ func (rc *rtspCamera) reconnectClient(codecInfo videoCodec, transport *gortsplib
 	}
 	clientSuccessful = true
 	rc.currentCodec.Store(int64(codecInfo))
+	// The new client's stats counters start at zero, so reset the loss monitor's baseline.
+	rc.lossMonitor.setConnection(transport.String())
 	// if after reconnecting we no longer support rtp_passthrough
 	// terminate all subscription
 	// otherwise, let any remaining subscriptions continue
@@ -536,6 +572,10 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 	initialSPSAndPPS := [][]byte{}
 	if f.SPS != nil {
 		initialSPSAndPPS = append(initialSPSAndPPS, f.SPS)
+		var sps h264.SPS
+		if err := sps.Unmarshal(f.SPS); err == nil {
+			rc.lossMonitor.setVideoInfo(sps.Width(), sps.Height(), sps.FPS())
+		}
 	} else {
 		rc.logger.Warn("no initial SPS found in H264 format")
 	}
@@ -694,6 +734,10 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 	if f.SPS != nil {
 		if _, err := rc.rawDecoder.decode(f.SPS); err != nil {
 			rc.logger.Debugf("failed to decode sps from SDP: %#v", f.SPS)
+		}
+		var sps h265.SPS
+		if err := sps.Unmarshal(f.SPS); err == nil {
+			rc.lossMonitor.setVideoInfo(sps.Width(), sps.Height(), sps.FPS())
 		}
 	} else {
 		rc.logger.Warn("no SPS found in H265 format")
@@ -1178,6 +1222,20 @@ func NewRTSPCamera(ctx context.Context, deps resource.Dependencies, conf resourc
 
 	rtpPassthroughCtx, rtpPassthroughCancelCauseFn := context.WithCancelCause(context.Background())
 	cancelCtx, cancel := context.WithCancel(context.Background())
+	lm := &lossMonitor{
+		logger: logger,
+		name:   conf.ResourceName().ShortName(),
+		url:    u.CloneWithoutCredentials().String(),
+	}
+	// Config-provided resolution and frame rate are fallbacks; SPS values from the SDP
+	// overwrite them once a codec is set up.
+	if newConf.Resolution != nil {
+		lm.width = newConf.Resolution.Width
+		lm.height = newConf.Resolution.Height
+	}
+	if newConf.FrameRate > 0 {
+		lm.fps = float64(newConf.FrameRate)
+	}
 	rc := &rtspCamera{
 		model:                       conf.Model,
 		lazyDecode:                  newConf.LazyDecode,
@@ -1195,6 +1253,7 @@ func NewRTSPCamera(ctx context.Context, deps resource.Dependencies, conf resourc
 		cancelCtx:                   cancelCtx,
 		cancelFunc:                  cancel,
 		logger:                      logger,
+		lossMonitor:                 lm,
 	}
 	codecInfo, err := modelToCodec(conf.Model)
 	if err != nil {
@@ -1222,6 +1281,7 @@ func NewRTSPCamera(ctx context.Context, deps resource.Dependencies, conf resourc
 	rc.markFrameReceived()
 
 	rc.clientReconnectBackgroundWorker(codecInfo)
+	rc.lossMonitorBackgroundWorker()
 	guard.Success()
 	return rc, nil
 }
