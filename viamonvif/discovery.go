@@ -260,6 +260,7 @@ func DiscoverCameraInfo(
 ) (CameraInfo, error) {
 	logger.Debugf("Connecting to ONVIF device with URL: %s", xaddr)
 	var zero CameraInfo
+	var lastErr error
 	for _, cred := range creds {
 		if ctx.Err() != nil {
 			return zero, fmt.Errorf("context canceled while connecting to ONVIF device: %s", xaddr)
@@ -273,16 +274,25 @@ func DiscoverCameraInfo(
 		}, logger)
 		if err != nil {
 			logger.Debugf("Failed to get camera capabilities from %s: %v", xaddr, err)
+			lastErr = err
 			continue
 		}
 
 		cameraInfo, err := GetCameraInfo(ctx, dev, xaddr, cred, logger)
 		if err != nil {
 			logger.Debugf("Failed to get camera info from %s: %v", xaddr, err)
+			lastErr = err
 			continue
 		}
 		// once we have added a camera info break
 		return cameraInfo, nil
+	}
+	if lastErr != nil {
+		// Surface this above debug level: the device answered WS-Discovery but every
+		// credential failed, which otherwise looks like the camera was never found.
+		logger.Warnf("ONVIF device %s was discovered but could not be queried with any of the provided credentials; last error: %v",
+			xaddr, lastErr)
+		return zero, fmt.Errorf("no credentials matched IP %s: %w", xaddr, lastErr)
 	}
 	return zero, fmt.Errorf("no credentials matched IP %s", xaddr)
 }

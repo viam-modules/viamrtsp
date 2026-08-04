@@ -100,11 +100,16 @@ func (msg *SoapMessage) AddRootNamespace(key, value string) error {
 }
 
 // AddWSSecurity Header for soapMessage.
-func (msg *SoapMessage) AddWSSecurity(username, password string) error {
+// clockOffset is the difference between the device's clock and the local clock
+// (device time minus local time). The WS-Security Created timestamp is generated
+// in the device's time frame so that devices with skewed clocks (e.g. a default
+// date of 2000-01-01) do not reject the token as stale. Pass 0 when the clocks
+// are synchronized or the offset is unknown.
+func (msg *SoapMessage) AddWSSecurity(username, password string, clockOffset time.Duration) error {
 	/*
 		Getting an WS-Security struct representation
 	*/
-	auth := newSecurity(username, password)
+	auth := newSecurity(username, password, clockOffset)
 
 	/*
 		Adding WS-Security namespaces to root element of SOAP message
@@ -188,13 +193,13 @@ type wsAuth struct {
 */
 
 // newSecurity get a new security.
-func newSecurity(username, passwd string) Security {
+func newSecurity(username, passwd string, clockOffset time.Duration) Security {
 	/** Generating Nonce sequence **/
 	charsToGenerate := 32
 	charSet := gostrgen.Lower | gostrgen.Digit
 
 	nonceSeq, _ := gostrgen.RandGen(charsToGenerate, charSet, "", "")
-	created := time.Now().UTC().Format(time.RFC3339Nano)
+	created := time.Now().UTC().Add(clockOffset).Format(time.RFC3339Nano)
 	auth := Security{
 		Auth: wsAuth{
 			Username: username,
