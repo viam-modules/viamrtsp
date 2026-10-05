@@ -665,6 +665,11 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 			}
 			return
 		}
+		au = dropEmptyNALUs(au)
+		if len(au) == 0 {
+			rc.logger.Debug("h264 access unit contained only empty NALUs, skipping")
+			return
+		}
 		storeImage(au)
 		rc.videoRequest.write(videostore.CodecTypeH264, params, au, pts)
 	})
@@ -784,6 +789,11 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 			}
 			return
 		}
+		au = dropEmptyNALUs(au)
+		if len(au) == 0 {
+			rc.logger.Debug("h265 access unit contained only empty NALUs, skipping")
+			return
+		}
 		storeImage(au)
 		rc.videoRequest.write(videostore.CodecTypeH265, params, au, pts)
 	})
@@ -797,6 +807,29 @@ func (rc *rtspCamera) initH265(session *description.Session) (err error) {
 	rc.client.OnPacketRTP(media, f, onPacketRTP)
 
 	return nil
+}
+
+// dropEmptyNALUs removes zero-length NALUs from a depacketized access unit. They occur on real
+// streams, and downstream code (h265.IsRandomAccess in mediacommon, the video-store mux) indexes
+// nalu[0] directly. The input is returned untouched when there is nothing to drop.
+func dropEmptyNALUs(au [][]byte) [][]byte {
+	hasEmpty := false
+	for _, nalu := range au {
+		if len(nalu) == 0 {
+			hasEmpty = true
+			break
+		}
+	}
+	if !hasEmpty {
+		return au
+	}
+	filtered := make([][]byte, 0, len(au))
+	for _, nalu := range au {
+		if len(nalu) != 0 {
+			filtered = append(filtered, nalu)
+		}
+	}
+	return filtered
 }
 
 func packH265AUIntoNALU(au [][]byte, logger logging.Logger) []byte {

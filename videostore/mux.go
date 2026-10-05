@@ -34,6 +34,9 @@ type metadata struct {
 	firstDTS           int64
 	lastDTS            int64
 	lastDTSSet         bool
+	// unknownNALUTypes records unrecognized NALU types already reported at warn level, so each
+	// type is only warned about once per mux lifetime (reset in Stop with the rest of metadata).
+	unknownNALUTypes map[uint8]struct{}
 }
 type rawSegmenterMux struct {
 	// are valid for the lifetime of the rawSegmenterMux
@@ -153,6 +156,9 @@ func (m *rawSegmenterMux) Start(codec videostore.CodecType, au [][]byte) error {
 	if vsCodec := videostore.CodecType(m.codec.Load()); vsCodec != videostore.CodecTypeUnknown {
 		return fmt.Errorf("init called when codec already set to %s", vsCodec)
 	}
+	// Start only receives the parameter sets advertised in the SDP, so anything that is not a
+	// parameter set means the SDP itself is malformed. Unlike writeH264/writeH265, this stays a
+	// hard error on purpose: dropping it would leave the segmenter with no SPS and nothing recorded.
 	switch codec {
 	case videostore.CodecTypeH264:
 		for _, nalu := range au {
@@ -195,7 +201,7 @@ func (m *rawSegmenterMux) Start(codec videostore.CodecType, au [][]byte) error {
 				h264.NALUTypeFUB:
 				fallthrough
 			default:
-				return errors.New("invalid nalu")
+				return fmt.Errorf("unexpected NALU type %d in SDP parameter sets", typ)
 			}
 		}
 	case videostore.CodecTypeH265:
@@ -249,7 +255,7 @@ func (m *rawSegmenterMux) Start(codec videostore.CodecType, au [][]byte) error {
 				h265.NALUType_PACI:
 				fallthrough
 			default:
-				return errors.New("invalid nalu")
+				return fmt.Errorf("unexpected NALU type %d in SDP parameter sets", typ)
 			}
 		}
 	case videostore.CodecTypeUnknown:
@@ -319,33 +325,59 @@ func (m *rawSegmenterMux) enforceMonotonicTimestamps(pts, dts int64) (int64, int
 	return normPTS, normDTS
 }
 
-func (m *rawSegmenterMux) writeH265(au [][]byte, pts int64) error {
-	var filteredAU [][]byte
+// droppedNALU records a NALU removed from an access unit because its type is not one mediacommon
+// defines (reserved or vendor-private ranges), so the caller can log what the camera is emitting.
+type droppedNALU struct {
+	typ  uint8
+	size int
+}
 
-	isRandomAccess := false
+// h265AUInfo is the result of filterH265AU.
+type h265AUInfo struct {
+	// filtered is the access unit with parameter sets, access unit delimiters, empty NALUs and
+	// unrecognized NALUs removed. It is nil when nothing remains.
+	filtered [][]byte
+	// vps, sps and pps are set only when the corresponding parameter set was present in the AU.
+	vps []byte
+	sps []byte
+	pps []byte
+	// isRandomAccess is true when the AU contains an IDR or CRA slice.
+	isRandomAccess bool
+	// dropped lists the unrecognized NALUs that were removed, in order.
+	dropped []droppedNALU
+}
 
+// filterH265AU classifies every NALU in an H265 access unit. Parameter sets are pulled out so the
+// caller can cache them, access unit delimiters are stripped, and NALUs whose type mediacommon does
+// not define (reserved VCL 24-31, reserved non-VCL 41-47, unspecified 51-63) are dropped instead of
+// failing the whole AU. NVRs commonly carry vendor metadata in the unspecified range, and the slices
+// next to it are still perfectly good video (RSDK-14390).
+func filterH265AU(au [][]byte) h265AUInfo {
+	var info h265AUInfo
 	for _, nalu := range au {
+		if len(nalu) == 0 {
+			continue
+		}
 		//nolint:mnd
 		typ := h265.NALUType((nalu[0] >> 1) & 0b111111)
 		switch typ {
 		case h265.NALUType_VPS_NUT:
-			m.metadata.vps = nalu
+			info.vps = nalu
 			continue
 
 		case h265.NALUType_SPS_NUT:
-			m.metadata.sps = nalu
-			m.metadata.spsUnChanged = false
+			info.sps = nalu
 			continue
 
 		case h265.NALUType_PPS_NUT:
-			m.metadata.pps = nalu
+			info.pps = nalu
 			continue
 
 		case h265.NALUType_AUD_NUT:
 			continue
 
 		case h265.NALUType_IDR_W_RADL, h265.NALUType_IDR_N_LP, h265.NALUType_CRA_NUT:
-			isRandomAccess = true
+			info.isRandomAccess = true
 		case h265.NALUType_TRAIL_N,
 			h265.NALUType_TRAIL_R,
 			h265.NALUType_TSA_N,
@@ -376,13 +408,129 @@ func (m *rawSegmenterMux) writeH265(au [][]byte, pts int64) error {
 			h265.NALUType_FragmentationUnit,
 			h265.NALUType_PACI:
 		default:
-			return errors.New("invalid nalu")
+			info.dropped = append(info.dropped, droppedNALU{typ: uint8(typ), size: len(nalu)})
+			continue
 		}
 
-		filteredAU = append(filteredAU, nalu)
+		info.filtered = append(info.filtered, nalu)
 	}
+	return info
+}
 
-	au = filteredAU
+// h264AUInfo is the result of filterH264AU.
+type h264AUInfo struct {
+	// filtered is the access unit with parameter sets, access unit delimiters, empty NALUs and
+	// unrecognized NALUs removed. It is nil when nothing remains.
+	filtered [][]byte
+	// sps and pps are set only when the corresponding parameter set was present in the AU.
+	sps []byte
+	pps []byte
+	// idrPresent / nonIDRPresent report which slice types the AU carries.
+	idrPresent    bool
+	nonIDRPresent bool
+	// dropped lists the unrecognized NALUs that were removed, in order.
+	dropped []droppedNALU
+}
+
+// filterH264AU is the H264 counterpart of filterH265AU. The types mediacommon does not define are
+// 0 and 30-31 (unspecified).
+func filterH264AU(au [][]byte) h264AUInfo {
+	var info h264AUInfo
+	for _, nalu := range au {
+		if len(nalu) == 0 {
+			continue
+		}
+		//nolint:mnd
+		typ := h264.NALUType(nalu[0] & 0x1F)
+		switch typ {
+		case h264.NALUTypeSPS:
+			info.sps = nalu
+			continue
+
+		case h264.NALUTypePPS:
+			info.pps = nalu
+			continue
+
+		case h264.NALUTypeAccessUnitDelimiter:
+			continue
+
+		case h264.NALUTypeIDR:
+			info.idrPresent = true
+
+		case h264.NALUTypeNonIDR:
+			info.nonIDRPresent = true
+		case h264.NALUTypeDataPartitionA,
+			h264.NALUTypeDataPartitionB,
+			h264.NALUTypeDataPartitionC,
+			h264.NALUTypeSEI,
+			h264.NALUTypeEndOfSequence,
+			h264.NALUTypeEndOfStream,
+			h264.NALUTypeFillerData,
+			h264.NALUTypeSPSExtension,
+			h264.NALUTypePrefix,
+			h264.NALUTypeSubsetSPS,
+			h264.NALUTypeReserved16,
+			h264.NALUTypeReserved17,
+			h264.NALUTypeReserved18,
+			h264.NALUTypeSliceLayerWithoutPartitioning,
+			h264.NALUTypeSliceExtension,
+			h264.NALUTypeSliceExtensionDepth,
+			h264.NALUTypeReserved22,
+			h264.NALUTypeReserved23,
+			h264.NALUTypeSTAPA,
+			h264.NALUTypeSTAPB,
+			h264.NALUTypeMTAP16,
+			h264.NALUTypeMTAP24,
+			h264.NALUTypeFUA,
+			h264.NALUTypeFUB:
+		default:
+			info.dropped = append(info.dropped, droppedNALU{typ: uint8(typ), size: len(nalu)})
+			continue
+		}
+
+		info.filtered = append(info.filtered, nalu)
+	}
+	return info
+}
+
+// logDropped reports NALUs removed by the AU filters. The first time a given type is seen on this
+// mux it is logged at warn so support can tell what a camera is emitting; after that it goes to
+// debug, replacing the once-per-keyframe "invalid nalu" error this used to be. Assumes mu is held.
+func (m *rawSegmenterMux) logDropped(codec videostore.CodecType, dropped []droppedNALU) {
+	if len(dropped) == 0 {
+		return
+	}
+	if m.metadata.unknownNALUTypes == nil {
+		m.metadata.unknownNALUTypes = map[uint8]struct{}{}
+	}
+	for _, d := range dropped {
+		if _, seen := m.metadata.unknownNALUTypes[d.typ]; !seen {
+			m.metadata.unknownNALUTypes[d.typ] = struct{}{}
+			m.logger.Warnf("dropping unrecognized %s NALU type %d (%d bytes) from access unit for camera %s; "+
+				"this is usually vendor metadata and the rest of the frame is kept",
+				codec, d.typ, d.size, m.camName.ShortName())
+			continue
+		}
+		m.logger.Debugf("dropping unrecognized %s NALU type %d (%d bytes) from access unit", codec, d.typ, d.size)
+	}
+}
+
+func (m *rawSegmenterMux) writeH265(au [][]byte, pts int64) error {
+	info := filterH265AU(au)
+	if info.vps != nil {
+		m.metadata.vps = info.vps
+	}
+	if info.sps != nil {
+		m.metadata.sps = info.sps
+		m.metadata.spsUnChanged = false
+	}
+	if info.pps != nil {
+		m.metadata.pps = info.pps
+	}
+	m.logDropped(videostore.CodecTypeH265, info.dropped)
+
+	au = info.filtered
+	isRandomAccess := info.isRandomAccess
 
 	if au == nil {
 		return nil
@@ -394,6 +542,13 @@ func (m *rawSegmenterMux) writeH265(au [][]byte, pts int64) error {
 
 	// add VPS, SPS and PPS before random access au
 	if isRandomAccess {
+		// The DTS extractor indexes nalu[0] on every entry without a length check, so a parameter
+		// set that has not arrived yet (absent from the SDP and not yet sent in-band) must not be
+		// prepended as nil. Nothing can be recorded until the camera sends them anyway.
+		if m.metadata.vps == nil || m.metadata.sps == nil || m.metadata.pps == nil {
+			m.logger.Debug("random access AU before all H265 parameter sets were seen, skipping")
+			return nil
+		}
 		au = append([][]byte{m.metadata.vps, m.metadata.sps, m.metadata.pps}, au...)
 	}
 
@@ -432,63 +587,18 @@ func (m *rawSegmenterMux) writeH265(au [][]byte, pts int64) error {
 }
 
 func (m *rawSegmenterMux) writeH264(au [][]byte, pts int64) error {
-	var filteredAU [][]byte
-	nonIDRPresent := false
-	idrPresent := false
-
-	for _, nalu := range au {
-		//nolint:mnd
-		typ := h264.NALUType(nalu[0] & 0x1F)
-		switch typ {
-		case h264.NALUTypeSPS:
-			m.metadata.sps = nalu
-			m.metadata.spsUnChanged = false
-			continue
-
-		case h264.NALUTypePPS:
-			m.metadata.pps = nalu
-			continue
-
-		case h264.NALUTypeAccessUnitDelimiter:
-			continue
-
-		case h264.NALUTypeIDR:
-			idrPresent = true
-
-		case h264.NALUTypeNonIDR:
-			nonIDRPresent = true
-		case h264.NALUTypeDataPartitionA,
-			h264.NALUTypeDataPartitionB,
-			h264.NALUTypeDataPartitionC,
-			h264.NALUTypeSEI,
-			h264.NALUTypeEndOfSequence,
-			h264.NALUTypeEndOfStream,
-			h264.NALUTypeFillerData,
-			h264.NALUTypeSPSExtension,
-			h264.NALUTypePrefix,
-			h264.NALUTypeSubsetSPS,
-			h264.NALUTypeReserved16,
-			h264.NALUTypeReserved17,
-			h264.NALUTypeReserved18,
-			h264.NALUTypeSliceLayerWithoutPartitioning,
-			h264.NALUTypeSliceExtension,
-			h264.NALUTypeSliceExtensionDepth,
-			h264.NALUTypeReserved22,
-			h264.NALUTypeReserved23,
-			h264.NALUTypeSTAPA,
-			h264.NALUTypeSTAPB,
-			h264.NALUTypeMTAP16,
-			h264.NALUTypeMTAP24,
-			h264.NALUTypeFUA,
-			h264.NALUTypeFUB:
-		default:
-			return errors.New("invalid nalu")
-		}
-
-		filteredAU = append(filteredAU, nalu)
+	info := filterH264AU(au)
+	if info.sps != nil {
+		m.metadata.sps = info.sps
+		m.metadata.spsUnChanged = false
 	}
+	if info.pps != nil {
+		m.metadata.pps = info.pps
+	}
+	m.logDropped(videostore.CodecTypeH264, info.dropped)
 
-	au = filteredAU
+	au = info.filtered
+	idrPresent, nonIDRPresent := info.idrPresent, info.nonIDRPresent
 
 	if au == nil || (!nonIDRPresent && !idrPresent) {
 		return nil
@@ -501,6 +611,11 @@ func (m *rawSegmenterMux) writeH264(au [][]byte, pts int64) error {
 
 	// add SPS and PPS before access unit that contains an IDR
 	if idrPresent {
+		// See writeH265: a nil parameter set here would panic in the DTS extractor.
+		if m.metadata.sps == nil || m.metadata.pps == nil {
+			m.logger.Debug("IDR AU before SPS and PPS parameter sets were seen, skipping")
+			return nil
+		}
 		au = append([][]byte{m.metadata.sps, m.metadata.pps}, au...)
 	}
 
