@@ -581,7 +581,7 @@ func (m *rawSegmenterMux) writeH265(au [][]byte, pts int64) error {
 	normPTS, normDTS := m.enforceMonotonicTimestamps(pts, dts)
 	err = m.rawSeg.WritePacket(nalu, normPTS, normDTS, isRandomAccess)
 	if err != nil {
-		m.logger.Errorf("error writing packet to segmenter: %s", err)
+		m.logger.Debugf("error writing packet to segmenter: %s", err)
 	}
 	return nil
 }
@@ -648,7 +648,7 @@ func (m *rawSegmenterMux) writeH264(au [][]byte, pts int64) error {
 	normPTS, normDTS := m.enforceMonotonicTimestamps(pts, dts)
 	err = m.rawSeg.WritePacket(packed, normPTS, normDTS, idrPresent)
 	if err != nil {
-		m.logger.Errorf("error writing packet to segmenter: %s", err)
+		m.logger.Debugf("error writing packet to segmenter: %s", err)
 	}
 	return nil
 }
