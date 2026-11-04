@@ -641,7 +641,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 			// Publish the newly received packet Unit to all subscribers
 			for _, bufAndCB := range rc.bufAndCBByID {
 				if err := bufAndCB.buf.Publish(func() { bufAndCB.cb(u) }); err != nil {
-					rc.logger.Debug("RTP packet dropped due to %s", err.Error())
+					rc.logger.Debugf("RTP packet dropped due to %s", err.Error())
 				}
 			}
 		}
@@ -661,7 +661,7 @@ func (rc *rtspCamera) initH264(session *description.Session) (err error) {
 		au, err := rtpDec.Decode(pkt)
 		if err != nil {
 			if !errors.Is(err, rtph264.ErrNonStartingPacketAndNoPrevious) && !errors.Is(err, rtph264.ErrMorePacketsNeeded) {
-				rc.logger.Debugf("error decoding(1) h264 rtsp stream %w", err)
+				rc.logger.Debugf("error decoding(1) h264 rtsp stream %v", err)
 			}
 			return
 		}
