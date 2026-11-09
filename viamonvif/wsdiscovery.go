@@ -44,7 +44,7 @@ func WSDiscovery(ctx context.Context, logger logging.Logger, iface net.Interface
 
 		resp, err := SendProbe(iface.Name, logger)
 		if err != nil {
-			logger.Debugf("breaking at attempt %d: failed to send WS-Discovery probe on interface %s: %w\n", i+1, iface.Name, err)
+			logger.Debugf("breaking at attempt %d: failed to send WS-Discovery probe on interface %s: %v\n", i+1, iface.Name, err)
 			break
 		}
 		logger.Debugf("attempt %d succeeded: WS-Discovery probe on interface %s", i+1, iface.Name)
@@ -90,7 +90,7 @@ func extractXAddrsFromProbeMatch(response string, logger logging.Logger) []*url.
 	var probeMatch ProbeMatch
 	err := xml.NewDecoder(strings.NewReader(response)).Decode(&probeMatch)
 	if err != nil {
-		logger.Warnf("error unmarshalling ONVIF discovery xml response: %w\nFull xml resp: %s", err, response)
+		logger.Warnf("error unmarshalling ONVIF discovery xml response: %v\nFull xml resp: %s", err, response)
 	}
 
 	xaddrs := []*url.URL{}
@@ -98,7 +98,7 @@ func extractXAddrsFromProbeMatch(response string, logger logging.Logger) []*url.
 		for _, xaddr := range strings.Split(match.XAddrs, " ") {
 			parsedURL, err := url.Parse(xaddr)
 			if err != nil {
-				logger.Warnf("failed to parse XAddr %s: %w", xaddr, err)
+				logger.Warnf("failed to parse XAddr %s: %v", xaddr, err)
 				continue
 			}
 

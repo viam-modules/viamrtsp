@@ -71,7 +71,7 @@ func NewMockH264ServerHandler(
 					Medias:  []*description.Media{sh.media},
 				}
 				sh.stream = gortsplib.NewServerStream(sh.S, d)
-				logger.Debug("sh.stream.Description().Medias[0].Formats[0]: %#v ", sh.stream.Description().Medias[0].Formats[0])
+				logger.Debugf("sh.stream.Description().Medias[0].Formats[0]: %#v ", sh.stream.Description().Medias[0].Formats[0])
 			}
 			return &base.Response{StatusCode: base.StatusOK}, sh.stream, nil
 		},

@@ -82,7 +82,7 @@ func discoverOnAllInterfaces(ctx context.Context, manualXAddrs []*url.URL, logge
 		utils.ManagedGo(func() {
 			xaddrs, err := WSDiscovery(ctx, logger, iface)
 			if err != nil {
-				logger.Debugf("WS-Discovery skipping interface %s: due to error from SendProbe: %w", iface.Name, err)
+				logger.Debugf("WS-Discovery skipping interface %s: due to error from SendProbe: %v", iface.Name, err)
 				return
 			}
 			ch <- xaddrs

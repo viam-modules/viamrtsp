@@ -205,7 +205,7 @@ func (dis *rtspDiscovery) runDiscoveryLookup(ctx context.Context, extra map[stri
 
 		ptzConfigs, err := createPTZClientFromInfo(camInfo, dis.Name().ShortName(), dis.logger)
 		if err != nil {
-			dis.logger.Debugf("Failed to create PTZ client configs for camera %s: %v", camInfo.Name, err)
+			dis.logger.Debugf("Failed to create PTZ client configs for camera %s: %v", camInfo.Host, err)
 			continue
 		}
 		cams = append(cams, ptzConfigs...)
@@ -394,7 +394,7 @@ func downloadPreviewImage(ctx context.Context, logger logging.Logger, snapshotUR
 func createCamerasFromURLs(l CameraInfo, discoveryDependencyName string, logger logging.Logger) ([]resource.Config, error) {
 	cams := []resource.Config{}
 	for index, u := range l.MediaEndpoints {
-		logger.Debugf("camera URL:\t%s", u)
+		logger.Debugf("camera URL:\t%+v", u)
 
 		// Some URLs may contain a hostname that is served by the DiscoveryService's mDNS
 		// server. For those that are, we create a config where the dependency is explicitly written
@@ -452,7 +452,7 @@ func createCameraConfig(name string, attributes viamrtsp.Config) (resource.Confi
 func createPTZClientFromInfo(l CameraInfo, discoveryDependencyName string, logger logging.Logger) ([]resource.Config, error) {
 	ptzConfigs := []resource.Config{}
 	for index, u := range l.PTZEndpoints {
-		logger.Debugf("PTZ URL:\t%s", u)
+		logger.Debugf("PTZ URL:\t%+v", u)
 
 		discDep := ""
 		if l.urlDependsOnMDNS(index) {
