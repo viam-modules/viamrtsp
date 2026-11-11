@@ -3,6 +3,8 @@ package upnpdiscovery
 
 import (
 	"context"
+	"errors"
+	"syscall"
 	"testing"
 
 	"github.com/erh/viamupnp"
@@ -27,6 +29,11 @@ func TestDiscoveryService(t *testing.T) {
 		test.That(t, dis.Name().ShortName(), test.ShouldResemble, testName)
 		cfgs, err := dis.DiscoverResources(ctx, nil)
 		test.That(t, cfgs, test.ShouldBeEmpty)
+		if errors.Is(err, syscall.EHOSTUNREACH) {
+			// The SSDP search sends a multicast probe. Hosts that can't send multicast, such as
+			// GitHub's macos-15 runners, fail here before any query can be matched.
+			t.Skipf("host can't send multicast: %v", err)
+		}
 		test.That(t, err.Error(), test.ShouldContainSubstring, "no match found for queries:")
 	})
 }
