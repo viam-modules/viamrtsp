@@ -3,6 +3,7 @@ package upnpdiscovery
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/erh/viamupnp"
@@ -27,6 +28,11 @@ func TestDiscoveryService(t *testing.T) {
 		test.That(t, dis.Name().ShortName(), test.ShouldResemble, testName)
 		cfgs, err := dis.DiscoverResources(ctx, nil)
 		test.That(t, cfgs, test.ShouldBeEmpty)
+		test.That(t, err, test.ShouldNotBeNil)
+		// Some CI runners (e.g. GitHub's macOS 26 image) have no route for SSDP multicast.
+		if strings.Contains(err.Error(), "no route to host") {
+			t.Skipf("host cannot send SSDP multicast: %v", err)
+		}
 		test.That(t, err.Error(), test.ShouldContainSubstring, "no match found for queries:")
 	})
 }
