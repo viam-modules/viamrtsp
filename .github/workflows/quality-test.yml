@@ -22,7 +22,7 @@ jobs:
   quality-checks:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-26]
+        os: [ubuntu-24.04, macos-26]
     runs-on: ${{ matrix.os }}
     steps:
     - name: Checkout code
