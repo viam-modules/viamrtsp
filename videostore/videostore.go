@@ -261,6 +261,14 @@ func (s *service) DoCommand(ctx context.Context, command map[string]interface{})
 }
 
 func toSaveCommand(command map[string]interface{}) (*videostore.SaveRequest, error) {
+	if last, ok := command["seconds"].(float64); ok {
+		now := time.Now()
+		distance := time.Duration(last * float64(time.Second) * -1)
+		then := now.Add(distance)
+		command["from"] = then.String()
+		command["to"] = now.String()
+	}
+
 	fromStr, ok := command["from"].(string)
 	if !ok {
 		return nil, errors.New("from timestamp not found")
