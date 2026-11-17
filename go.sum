@@ -891,8 +891,8 @@ github.com/urfave/cli v1.20.0/go.mod h1:70zkFmudgCuE/ngEzBv17Jvp/497gISqfk5gWijb
 github.com/urfave/cli v1.22.1/go.mod h1:Gos4lmkARVdJ6EkW0WaNv/tZAAMe9V7XWyB60NtXRu0=
 github.com/viam-modules/trajex/go v0.101.0 h1:1jOG0qPC1LJ3fduyovPOusTQsvNos7Gn22u2ZGNsUHg=
 github.com/viam-modules/trajex/go v0.101.0/go.mod h1:e++tWpii+6KjSNMl6J4EPXoVuK9qoOxSFMVf/RfwlW4=
-github.com/viam-modules/video-store v0.0.13 h1:IFekWUZwXQAfYZDwQpBI002bb7xw1sQc5UyABicww3o=
-github.com/viam-modules/video-store v0.0.13/go.mod h1:lGnmJX4+j2m9uFdZqo65b3zYLwtpa+AlSh/kfkGNezI=
+github.com/viam-modules/video-store v0.0.14 h1:a2OZKMXfYAx9Gf1p7GXnlAZ4oOg+8t6ZDfvWjrzKbcA=
+github.com/viam-modules/video-store v0.0.14/go.mod h1:VwjnIHKCA8TjLyKCuktIVFlxRkD8YmgzJ1xjDgU8ZUE=
 github.com/viamrobotics/evdev v0.1.3 h1:mR4HFafvbc5Wx4Vp1AUJp6/aITfVx9AKyXWx+rWjpfc=
 github.com/viamrobotics/evdev v0.1.3/go.mod h1:N6nuZmPz7HEIpM7esNWwLxbYzqWqLSZkfI/1Sccckqk=
 github.com/viamrobotics/ice/v2 v2.3.40 h1:H9r4ztsKkxWSn42R4fLvYlaPtpBys1Yj7/MERBtZY0k=

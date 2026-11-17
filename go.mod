@@ -16,7 +16,7 @@ require (
 	github.com/pion/rtp v1.10.5
 	github.com/rhysd/actionlint v1.7.8
 	github.com/stretchr/testify v1.12.1
-	github.com/viam-modules/video-store v0.0.13
+	github.com/viam-modules/video-store v0.0.14
 	github.com/viamrobotics/zeroconf v1.1.0
 	go.uber.org/zap v1.28.0
 	go.viam.com/rdk v1.16.0
