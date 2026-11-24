@@ -86,6 +86,12 @@ endif
 ifeq ($(SOURCE_OS),darwin)
 	SUBST = $(shell brew --prefix x264)/lib/libx264.a
 endif
+# Without a deployment target, clang targets the build host's macOS, so a binary built on a
+# macos-26 runner won't launch on older macOS. Pin it so the minimum doesn't follow the runner.
+ifeq ($(TARGET_OS),darwin)
+MACOSX_DEPLOYMENT_TARGET ?= 14.0
+export MACOSX_DEPLOYMENT_TARGET
+endif
 CGO_LDFLAGS = $(subst -lx264, $(SUBST),$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(FFMPEG_LIBS))) 
 ifeq ($(TARGET_OS),windows)
 	CGO_LDFLAGS += -static -static-libgcc -static-libstdc++
